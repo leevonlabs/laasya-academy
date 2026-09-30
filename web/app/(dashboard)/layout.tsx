@@ -45,7 +45,7 @@ export default async function DashboardLayout({
     <div className="min-h-screen flex bg-[#FFF9FB]">
       
       {/* Sidebar Navigation */}
-      <aside className="w-72 bg-[#590231] text-white flex flex-col shrink-0 border-r border-[#8A064D]/40 shadow-2xl relative z-20">
+      <aside className="w-80 bg-[#590231] text-white flex flex-col shrink-0 border-r border-[#8A064D]/40 shadow-2xl relative z-20">
         
         {/* Brand Header */}
         <div className="p-4 border-b border-[#8A064D]/50 bg-[#3F0123]/70">
@@ -65,8 +65,8 @@ export default async function DashboardLayout({
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-          <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-[#F9E33A]/80">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          <div className="px-3 pb-2 text-xs font-bold uppercase tracking-wider text-[#F9E33A]">
             Academy Management
           </div>
 
@@ -76,29 +76,13 @@ export default async function DashboardLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-rose-100/90 hover:bg-[#8A064D] hover:text-white transition group border border-transparent hover:border-[#F9E33A]/30"
+                className="flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[14.5px] font-semibold text-rose-50 hover:bg-[#8A064D] hover:text-white transition group border border-transparent hover:border-[#F9E33A]/40 shadow-xs hover:shadow-md"
               >
-                <Icon className="w-4 h-4 text-[#F9E33A] group-hover:scale-110 transition-transform" />
+                <Icon className="w-5 h-5 text-[#F9E33A] group-hover:scale-110 transition-transform shrink-0" />
                 <span>{item.label}</span>
               </Link>
             );
           })}
-
-          <div className="pt-4 px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-[#F9E33A]/80">
-            Quick Links
-          </div>
-          <a
-            href="https://www.laasyaacademy.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-between px-3.5 py-2 rounded-xl text-xs text-rose-200/70 hover:bg-[#8A064D]/50 hover:text-white transition"
-          >
-            <span className="flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-[#F9E33A]" />
-              laasyaacademy.com
-            </span>
-            <ExternalLink className="w-3 h-3 text-rose-300" />
-          </a>
         </nav>
 
         {/* Director Profile & Logout Footer */}
