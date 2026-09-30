@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Student, Batch, Course, StudentEnrolledBatch } from '@/lib/academy';
 import { 
   GraduationCap, 
@@ -8,7 +8,6 @@ import {
   Plus, 
   Phone, 
   Mail, 
-  UserCheck, 
   X,
   Calendar,
   Layers,
@@ -16,16 +15,17 @@ import {
   List,
   Edit3,
   Eye,
+  Trash2,
   Clock,
   MapPin,
   CheckCircle2,
   Sparkles,
-  Printer,
-  ChevronRight,
   User,
   ShieldCheck,
   Check,
-  AlertCircle
+  AlertCircle,
+  IndianRupee,
+  AlertTriangle
 } from 'lucide-react';
 
 interface Props {
@@ -38,14 +38,17 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   const [students, setStudents] = useState<Student[]>(initialStudents);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // View mode: 'grid' as first preference!
+  // Status Filter: 'active' by default as required
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
+
+  // View mode: 'grid' as first preference
   const [viewMode, setViewMode] = useState<'grid' | 'row'>('grid');
 
   // Modals state
-  // 1. Full Details Popup Modal
+  // 1. Details Modal
   const [detailStudent, setDetailStudent] = useState<Student | null>(null);
 
-  // 2. Edit Details Modal
+  // 2. Edit Modal
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [editFullName, setEditFullName] = useState('');
   const [editEmail, setEditEmail] = useState('');
@@ -54,18 +57,14 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   const [editParentRelation, setEditParentRelation] = useState('Mother');
   const [editParentContact, setEditParentContact] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  const [editJoiningDate, setEditJoiningDate] = useState('');
+  const [editAdvancePaid, setEditAdvancePaid] = useState<number>(0);
   const [editStatus, setEditStatus] = useState<'active' | 'inactive' | 'suspended'>('active');
+  const [editSelectedCourseIds, setEditSelectedCourseIds] = useState<string[]>([]);
+  const [editSelectedBatchIds, setEditSelectedBatchIds] = useState<string[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // 3. View Timetable Modal
-  const [timetableStudent, setTimetableStudent] = useState<Student | null>(null);
-
-  // 4. Enroll in Batch Modal
-  const [enrollStudentModal, setEnrollStudentModal] = useState<Student | null>(null);
-  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
-  const [savingEnroll, setSavingEnroll] = useState(false);
-
-  // 5. Register New Student Modal
+  // 3. Register New Student Modal
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -74,9 +73,15 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   const [parentRelation, setParentRelation] = useState('Mother');
   const [parentContact, setParentContact] = useState('');
   const [address, setAddress] = useState('');
+  const [joiningDate, setJoiningDate] = useState('2026-09-30');
+  const [advancePaid, setAdvancePaid] = useState<number>(0);
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const [savingNew, setSavingNew] = useState(false);
+
+  // 4. Delete Confirmation Modal
+  const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -85,17 +90,56 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Filter students
-  const filteredStudents = students.filter(s =>
-    s.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.roll_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (s.parent_name && s.parent_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (s.address && s.address.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (s.enrolled_batches || []).some(b => b.course_title.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Helper to calculate next sequential Student ID
+  const getNextStudentId = (studentsList: Student[]) => {
+    let maxId = 0;
+    for (const s of studentsList) {
+      const m = (s.roll_number || '').match(/^LCA-(\d+)$/i);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (n > maxId) maxId = n;
+      }
+    }
+    return `LCA-${maxId + 1}`;
+  };
 
-  // Open Edit Modal
+  const nextAutoId = useMemo(() => getNextStudentId(students), [students]);
+
+  // Current month due date in MM/YY format (e.g. 09/26)
+  const currentMonthDueDate = useMemo(() => {
+    const now = new Date();
+    return `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`;
+  }, []);
+
+  // Filter students based on status and search query
+  const filteredStudents = useMemo(() => {
+    return students.filter(s => {
+      // 1. Status Filter
+      if (statusFilter === 'active' && s.status !== 'active') return false;
+      if (statusFilter === 'inactive' && s.status !== 'inactive' && s.status !== 'suspended') return false;
+
+      // 2. Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesName = s.full_name.toLowerCase().includes(q);
+        const matchesRoll = s.roll_number.toLowerCase().includes(q);
+        const matchesPhone = (s.phone || '').includes(q);
+        const matchesParent = (s.parent_name || '').toLowerCase().includes(q);
+        const matchesCourse = (s.enrolled_batches || []).some(b => b.course_title.toLowerCase().includes(q));
+        if (!matchesName && !matchesRoll && !matchesPhone && !matchesParent && !matchesCourse) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [students, statusFilter, searchQuery]);
+
+  // Counts for tabs
+  const activeCount = useMemo(() => students.filter(s => s.status === 'active').length, [students]);
+  const inactiveCount = useMemo(() => students.filter(s => s.status === 'inactive' || s.status === 'suspended').length, [students]);
+
+  // Open Edit Modal with pre-filled details
   const handleOpenEdit = (s: Student) => {
     setEditingStudent(s);
     setEditFullName(s.full_name);
@@ -105,154 +149,63 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     setEditParentRelation(s.parent_relation || 'Mother');
     setEditParentContact(s.parent_contact || s.phone);
     setEditAddress(s.address || '');
+    setEditJoiningDate(s.enrollment_date ? s.enrollment_date.substring(0, 10) : '2026-09-30');
+    setEditAdvancePaid(Number(s.advance_paid || 0));
     setEditStatus(s.status || 'active');
+
+    // Pre-fill courses and batches
+    const enrolledCourseIds = Array.from(new Set((s.enrolled_batches || []).map(b => b.course_id)));
+    const enrolledBatchIds = (s.enrolled_batches || []).map(b => b.batch_id);
+    setEditSelectedCourseIds(enrolledCourseIds);
+    setEditSelectedBatchIds(enrolledBatchIds);
   };
 
-  // Save Edit Details
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingStudent) return;
-    setSavingEdit(true);
-
-    try {
-      const res = await fetch('/api/students', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editingStudent.id,
-          full_name: editFullName,
-          email: editEmail,
-          phone: editPhone,
-          parent_name: editParentName,
-          parent_relation: editParentRelation,
-          parent_contact: editParentContact,
-          address: editAddress,
-          status: editStatus
-        })
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to update student');
-      }
-
-      const updated = await res.json();
-
-      setStudents(prev =>
-        prev.map(s => (s.id === editingStudent.id ? { ...s, ...updated } : s))
-      );
-
-      // If full detail modal is open for this student, update it
-      if (detailStudent && detailStudent.id === editingStudent.id) {
-        setDetailStudent({ ...detailStudent, ...updated });
-      }
-
-      showToast(`Student details for ${editFullName} updated successfully!`);
-      setEditingStudent(null);
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setSavingEdit(false);
-    }
+  // Open Register Modal
+  const handleOpenRegister = () => {
+    setFullName('');
+    setEmail('');
+    setPhone('');
+    setParentName('');
+    setParentRelation('Mother');
+    setParentContact('');
+    setAddress('');
+    setJoiningDate(new Date().toISOString().split('T')[0]);
+    setAdvancePaid(0);
+    setSelectedCourseIds(courses.slice(0, 1).map(c => c.id));
+    setSelectedBatchIds([]);
+    setIsAddOpen(true);
   };
 
-  // Enroll in Batch
-  const handleEnrollBatch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!enrollStudentModal || !selectedBatchId) return;
-    setSavingEnroll(true);
-
-    try {
-      const res = await fetch('/api/students/enroll', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: enrollStudentModal.id,
-          batchId: selectedBatchId
-        })
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to enroll student');
-      }
-
-      const batchObj = batches.find(b => b.id === selectedBatchId);
-      const newEnrolledBatch: StudentEnrolledBatch = {
-        batch_id: selectedBatchId,
-        batch_name: batchObj?.name || 'Class Batch',
-        course_id: batchObj?.course_id || '',
-        course_title: batchObj?.course_title || 'Course',
-        course_category: batchObj?.course_category || 'Academy Arts',
-        monthly_fee: 2000,
-        trainer_id: batchObj?.trainer_id || '',
-        trainer_name: batchObj?.trainer_name || 'Academy Guru',
-        days_of_week: batchObj?.days_of_week || [],
-        start_time: batchObj?.start_time || '09:00:00',
-        end_time: batchObj?.end_time || '10:30:00',
-        room_or_hall: batchObj?.room_or_hall || 'Hall',
-        enrollment_status: 'active'
-      };
-
-      setStudents(prev =>
-        prev.map(s => {
-          if (s.id === enrollStudentModal.id) {
-            const currentBatches = s.enrolled_batches || [];
-            // Prevent duplicate display
-            const exists = currentBatches.some(b => b.batch_id === selectedBatchId);
-            const updatedBatches = exists ? currentBatches : [...currentBatches, newEnrolledBatch];
-            return {
-              ...s,
-              enrolled_batches_count: updatedBatches.length,
-              enrolled_batches: updatedBatches
-            };
-          }
-          return s;
-        })
-      );
-
-      // If full detail modal is open for this student, update it
-      if (detailStudent && detailStudent.id === enrollStudentModal.id) {
-        setDetailStudent(prev => {
-          if (!prev) return null;
-          const currentBatches = prev.enrolled_batches || [];
-          const exists = currentBatches.some(b => b.batch_id === selectedBatchId);
-          const updatedBatches = exists ? currentBatches : [...currentBatches, newEnrolledBatch];
-          return {
-            ...prev,
-            enrolled_batches_count: updatedBatches.length,
-            enrolled_batches: updatedBatches
-          };
-        });
-      }
-
-      showToast(`Student ${enrollStudentModal.full_name} enrolled in ${batchObj?.name}!`);
-      setEnrollStudentModal(null);
-      setSelectedBatchId('');
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setSavingEnroll(false);
-    }
-  };
-
-  // Toggle course selection in Register Modal
+  // Course selection toggles in Register
   const handleToggleCourse = (courseId: string) => {
     setSelectedCourseIds(prev => {
       const exists = prev.includes(courseId);
       const updated = exists ? prev.filter(id => id !== courseId) : [...prev, courseId];
-      // Automatically keep batch selection in sync
-      const validBatchesForSelectedCourses = batches
-        .filter(b => updated.includes(b.course_id))
-        .map(b => b.id);
-      setSelectedBatchIds(bPrev => bPrev.filter(bId => validBatchesForSelectedCourses.includes(bId)));
+      const validBatches = batches.filter(b => updated.includes(b.course_id)).map(b => b.id);
+      setSelectedBatchIds(bPrev => bPrev.filter(bId => validBatches.includes(bId)));
       return updated;
     });
   };
 
-  // Toggle batch selection in Register Modal
   const handleToggleBatch = (batchId: string) => {
     setSelectedBatchIds(prev =>
+      prev.includes(batchId) ? prev.filter(id => id !== batchId) : [...prev, batchId]
+    );
+  };
+
+  // Course selection toggles in Edit
+  const handleEditToggleCourse = (courseId: string) => {
+    setEditSelectedCourseIds(prev => {
+      const exists = prev.includes(courseId);
+      const updated = exists ? prev.filter(id => id !== courseId) : [...prev, courseId];
+      const validBatches = batches.filter(b => updated.includes(b.course_id)).map(b => b.id);
+      setEditSelectedBatchIds(bPrev => bPrev.filter(bId => validBatches.includes(bId)));
+      return updated;
+    });
+  };
+
+  const handleEditToggleBatch = (batchId: string) => {
+    setEditSelectedBatchIds(prev =>
       prev.includes(batchId) ? prev.filter(id => id !== batchId) : [...prev, batchId]
     );
   };
@@ -267,13 +220,15 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          full_name: fullName,
-          email,
-          phone,
-          parent_name: parentName,
+          full_name: fullName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          parent_name: parentName.trim(),
           parent_relation: parentRelation,
-          parent_contact: parentContact || phone,
-          address: address,
+          parent_contact: parentContact || phone.trim(),
+          address: address.trim(),
+          joining_date: joiningDate,
+          advance_paid: Number(advancePaid || 0),
           batch_ids: selectedBatchIds
         })
       });
@@ -285,7 +240,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
       const created = await res.json();
 
-      // Build enrolled_batches objects for the newly registered student
+      // Build enrolled_batches objects
       const enrolledBatchObjects: StudentEnrolledBatch[] = selectedBatchIds.map(bId => {
         const b = batches.find(x => x.id === bId);
         return {
@@ -294,7 +249,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
           course_id: b?.course_id || '',
           course_title: b?.course_title || 'Course',
           course_category: b?.course_category || 'Academy Arts',
-          monthly_fee: 2000,
+          monthly_fee: Number(b?.course_title ? (courses.find(c => c.id === b.course_id)?.monthly_fee || 2000) : 2000),
           trainer_id: b?.trainer_id || '',
           trainer_name: b?.trainer_name || 'Academy Guru',
           days_of_week: b?.days_of_week || [],
@@ -305,35 +260,34 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         };
       });
 
+      const totalMonthly = enrolledBatchObjects.reduce((acc, b) => acc + (b.monthly_fee || 0), 0);
+      const adv = Number(advancePaid || 0);
+      const due = Math.max(0, totalMonthly - adv);
+
       const fullStudent: Student = {
         ...created,
-        full_name: fullName,
-        email,
-        phone,
-        parent_name: parentName,
+        full_name: fullName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        parent_name: parentName.trim(),
         parent_relation: parentRelation,
-        parent_contact: parentContact || phone,
-        address,
+        parent_contact: parentContact || phone.trim(),
+        address: address.trim(),
         status: 'active',
+        enrollment_date: joiningDate,
+        advance_paid: adv,
+        total_monthly_fee: totalMonthly,
+        due_amount: due,
+        due_date: currentMonthDueDate,
+        due_status: due <= 0 ? 'green' : 'yellow',
         enrolled_batches_count: selectedBatchIds.length,
         attendance_rate: 100,
         enrolled_batches: enrolledBatchObjects
       };
 
       setStudents(prev => [fullStudent, ...prev]);
-      showToast(`Student ${fullName} registered successfully with ${selectedBatchIds.length} batch(es)!`);
-      
-      // Reset form
+      showToast(`Student ${fullName} (${fullStudent.roll_number}) registered successfully!`);
       setIsAddOpen(false);
-      setFullName('');
-      setEmail('');
-      setPhone('');
-      setParentName('');
-      setParentRelation('Mother');
-      setParentContact('');
-      setAddress('');
-      setSelectedCourseIds([]);
-      setSelectedBatchIds([]);
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -341,10 +295,175 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     }
   };
 
-  // Batches available for the selected courses in the register modal
-  const availableBatchesForSelectedCourses = batches.filter(b =>
-    selectedCourseIds.includes(b.course_id)
-  );
+  // Save Edit Details
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    setSavingEdit(true);
+
+    try {
+      const res = await fetch('/api/students', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingStudent.id,
+          full_name: editFullName.trim(),
+          email: editEmail.trim(),
+          phone: editPhone.trim(),
+          parent_name: editParentName.trim(),
+          parent_relation: editParentRelation,
+          parent_contact: editParentContact.trim() || editPhone.trim(),
+          address: editAddress.trim(),
+          joining_date: editJoiningDate,
+          advance_paid: Number(editAdvancePaid || 0),
+          status: editStatus,
+          batch_ids: editSelectedBatchIds
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update student');
+      }
+
+      // Reconstruct updated enrolled batches
+      const updatedBatchObjects: StudentEnrolledBatch[] = editSelectedBatchIds.map(bId => {
+        const b = batches.find(x => x.id === bId);
+        return {
+          batch_id: bId,
+          batch_name: b?.name || 'Class Batch',
+          course_id: b?.course_id || '',
+          course_title: b?.course_title || 'Course',
+          course_category: b?.course_category || 'Academy Arts',
+          monthly_fee: Number(courses.find(c => c.id === b?.course_id)?.monthly_fee || 2000),
+          trainer_id: b?.trainer_id || '',
+          trainer_name: b?.trainer_name || 'Academy Guru',
+          days_of_week: b?.days_of_week || [],
+          start_time: b?.start_time || '09:00:00',
+          end_time: b?.end_time || '10:30:00',
+          room_or_hall: b?.room_or_hall || 'Hall',
+          enrollment_status: 'active'
+        };
+      });
+
+      const totalMonthly = updatedBatchObjects.reduce((acc, b) => acc + (b.monthly_fee || 0), 0);
+      const adv = Number(editAdvancePaid || 0);
+      const due = Math.max(0, totalMonthly - adv);
+
+      setStudents(prev =>
+        prev.map(s =>
+          s.id === editingStudent.id
+            ? {
+                ...s,
+                full_name: editFullName.trim(),
+                email: editEmail.trim(),
+                phone: editPhone.trim(),
+                parent_name: editParentName.trim(),
+                parent_relation: editParentRelation,
+                parent_contact: editParentContact.trim() || editPhone.trim(),
+                address: editAddress.trim(),
+                enrollment_date: editJoiningDate,
+                advance_paid: adv,
+                status: editStatus,
+                total_monthly_fee: totalMonthly,
+                due_amount: due,
+                due_status: due <= 0 ? 'green' : due > totalMonthly ? 'red' : 'yellow',
+                enrolled_batches_count: editSelectedBatchIds.length,
+                enrolled_batches: updatedBatchObjects
+              }
+            : s
+        )
+      );
+
+      // If details modal was open, sync it
+      if (detailStudent && detailStudent.id === editingStudent.id) {
+        setDetailStudent({
+          ...detailStudent,
+          full_name: editFullName.trim(),
+          email: editEmail.trim(),
+          phone: editPhone.trim(),
+          parent_name: editParentName.trim(),
+          parent_relation: editParentRelation,
+          parent_contact: editParentContact.trim() || editPhone.trim(),
+          address: editAddress.trim(),
+          enrollment_date: editJoiningDate,
+          advance_paid: adv,
+          status: editStatus,
+          total_monthly_fee: totalMonthly,
+          due_amount: due,
+          due_status: due <= 0 ? 'green' : due > totalMonthly ? 'red' : 'yellow',
+          enrolled_batches_count: editSelectedBatchIds.length,
+          enrolled_batches: updatedBatchObjects
+        });
+      }
+
+      showToast(`Student ${editFullName} updated successfully!`);
+      setEditingStudent(null);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // Delete Student
+  const handleDeleteStudent = async () => {
+    if (!deletingStudent) return;
+    setDeleting(true);
+
+    try {
+      const res = await fetch(`/api/students?id=${deletingStudent.id}`, {
+        method: 'DELETE'
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to delete student');
+      }
+
+      // If status was marked inactive to preserve history, or deleted
+      setStudents(prev => prev.filter(s => s.id !== deletingStudent.id));
+      if (detailStudent && detailStudent.id === deletingStudent.id) {
+        setDetailStudent(null);
+      }
+      showToast(`Student ${deletingStudent.full_name} (${deletingStudent.roll_number}) deleted.`);
+      setDeletingStudent(null);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Helper for due amount color styling
+  const getDueAmountDisplay = (s: Student) => {
+    const due = s.due_amount !== undefined ? s.due_amount : (s.total_monthly_fee || 0);
+    const status = s.due_status || (due <= 0 ? 'green' : 'yellow');
+
+    if (status === 'green') {
+      return {
+        text: `₹${due.toLocaleString('en-IN')}`,
+        badgeClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+        dotClass: 'bg-emerald-500'
+      };
+    } else if (status === 'red') {
+      return {
+        text: `₹${due.toLocaleString('en-IN')}`,
+        badgeClass: 'bg-rose-50 text-rose-700 border border-rose-200',
+        dotClass: 'bg-rose-500'
+      };
+    } else {
+      return {
+        text: `₹${due.toLocaleString('en-IN')}`,
+        badgeClass: 'bg-amber-50 text-amber-700 border border-amber-200',
+        dotClass: 'bg-amber-500'
+      };
+    }
+  };
+
+  // Batches available for register modal courses
+  const registerAvailableBatches = batches.filter(b => selectedCourseIds.includes(b.course_id));
+  const editAvailableBatches = batches.filter(b => editSelectedCourseIds.includes(b.course_id));
 
   return (
     <div className="space-y-6">
@@ -357,7 +476,9 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         </div>
       )}
 
-      {/* HEADER WITH VIEW SWITCHER AND ACTION BUTTONS */}
+      {/* ===================================================================== */}
+      {/* 1. HEADER & TOP CONTROLS */}
+      {/* ===================================================================== */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -365,15 +486,15 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               Student Directory
             </span>
             <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-full font-bold">
-              {students.length} Learners Enrolled
+              {students.length} Total Learners
             </span>
           </div>
           <h1 className="text-2xl font-black text-[#2D041A] tracking-tight flex items-center gap-2">
             <GraduationCap className="w-7 h-7 text-[#8A064D]" />
-            Student Roster & Enrollments
+            Student Management
           </h1>
           <p className="text-xs text-gray-500 mt-1 max-w-2xl">
-            Manage student registrations, parent & guardian profiles, weekly timetables, and batch assignments across all cultural arts disciplines.
+            Track student admissions, status, course fees, due amounts, and parent details.
           </p>
         </div>
 
@@ -384,14 +505,14 @@ export default function StudentsListClient({ initialStudents, batches, courses }
             <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search student, roll no, parent..."
+              placeholder="Search student, ID, phone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3.5 py-2 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#8A064D]"
+              className="w-full pl-9 pr-3.5 py-2 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
             />
           </div>
 
-          {/* VIEW SWITCHER: GRID WISE (1ST PREFERENCE) VS ROW WISE */}
+          {/* View Mode Toggle: Grid vs Row */}
           <div className="flex items-center bg-gray-100 p-1 rounded-2xl border border-gray-200">
             <button
               onClick={() => setViewMode('grid')}
@@ -421,11 +542,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
           {/* Register New Student Button */}
           <button
-            onClick={() => {
-              setIsAddOpen(true);
-              setSelectedCourseIds(courses.slice(0, 1).map(c => c.id));
-              setSelectedBatchIds([]);
-            }}
+            onClick={handleOpenRegister}
             className="bg-[#8A064D] hover:bg-[#70043E] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-[#F9E33A]" />
@@ -436,162 +553,160 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       </div>
 
       {/* ===================================================================== */}
-      {/* 1. GRID-WISE VIEW (FIRST PREFERENCE) */}
+      {/* 2. ACTIVE / INACTIVE FILTERS (Active by default) */}
+      {/* ===================================================================== */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setStatusFilter('active')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            statusFilter === 'active'
+              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/40'
+              : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span>Active Students</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+            statusFilter === 'active' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {activeCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setStatusFilter('inactive')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            statusFilter === 'inactive'
+              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/40'
+              : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-gray-400" />
+          <span>Inactive Students</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+            statusFilter === 'inactive' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {inactiveCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setStatusFilter('all')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            statusFilter === 'all'
+              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/40'
+              : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
+          }`}
+        >
+          <span>All Students</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+            statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {students.length}
+          </span>
+        </button>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* 3. MAIN STUDENTS GRID (DISPLAY ONLY REQUIRED FIELDS) */}
       {/* ===================================================================== */}
       {viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredStudents.length === 0 ? (
             <div className="col-span-full py-16 text-center text-gray-400 bg-white rounded-3xl border border-[#F0D5E4]">
-              No students found matching your search.
+              <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+              <p className="font-bold text-gray-600">No {statusFilter !== 'all' ? statusFilter : ''} students found.</p>
+              <p className="text-xs text-gray-400 mt-1">Try switching filters or clearing your search.</p>
             </div>
           ) : (
             filteredStudents.map((s) => {
-              const initials = s.full_name
-                .split(' ')
-                .map(n => n[0])
-                .slice(0, 2)
-                .join('')
-                .toUpperCase();
-
-              const enrolledCount = s.enrolled_batches?.length || s.enrolled_batches_count || 0;
+              const dueInfo = getDueAmountDisplay(s);
+              const monthlyFee = s.total_monthly_fee || 0;
 
               return (
                 <div
                   key={s.id}
-                  className="bg-white rounded-3xl border border-[#F0D5E4] p-5 shadow-xs hover:shadow-md transition group flex flex-col justify-between relative overflow-hidden"
+                  className="bg-white rounded-3xl border border-[#F0D5E4] p-5 shadow-xs hover:shadow-md hover:border-[#8A064D]/50 transition flex flex-col justify-between group"
                 >
-                  {/* Top Bar with Roll No and Status */}
                   <div>
+                    {/* Top Bar: Status Badge & Student ID */}
                     <div className="flex items-center justify-between mb-3.5">
-                      <span className="font-mono text-xs font-extrabold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-xl">
+                      <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-xl">
                         {s.roll_number}
                       </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        s.status === 'active'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-gray-100 text-gray-600 border border-gray-200'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${s.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                         <span className="capitalize">{s.status || 'Active'}</span>
                       </span>
                     </div>
 
-                    {/* Student Avatar & Basic Info - CLICKABLE FOR FULL DETAILS */}
-                    <div 
-                      onClick={() => setDetailStudent(s)}
-                      className="cursor-pointer group-hover:opacity-95 transition"
-                    >
-                      <div className="flex items-center gap-3.5 mb-3">
-                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#430928] text-white flex items-center justify-center font-black text-sm shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-                          {initials}
-                        </div>
-                        <div className="overflow-hidden">
-                          <h3 className="font-bold text-base text-[#2D041A] truncate group-hover:text-[#8A064D] transition">
-                            {s.full_name}
-                          </h3>
-                          <div className="text-[11px] text-gray-500 flex items-center gap-1 truncate">
-                            <Mail className="w-3 h-3 text-gray-400 shrink-0" />
-                            <span className="truncate">{s.email}</span>
-                          </div>
-                        </div>
+                    {/* Student Name as Primary Heading */}
+                    <h3 className="font-bold text-base text-[#2D041A] tracking-tight group-hover:text-[#8A064D] transition">
+                      {s.full_name}
+                    </h3>
+
+                    {/* Contact Number below Name (Email removed from main grid!) */}
+                    <div className="text-xs text-gray-500 flex items-center gap-1.5 mt-1">
+                      <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="font-medium text-gray-700">{s.phone}</span>
+                    </div>
+
+                    {/* Fee Details Box: Total Monthly Fee, Due Amount with Color, Due Date */}
+                    <div className="mt-4 p-3.5 bg-gray-50/80 rounded-2xl border border-gray-100 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 font-medium">Total Monthly Fee:</span>
+                        <span className="font-bold text-[#2D041A]">
+                          ₹{monthlyFee.toLocaleString('en-IN')}
+                        </span>
                       </div>
 
-                      {/* Parent / Guardian Info */}
-                      <div className="bg-[#FFF9FB] p-3 rounded-2xl border border-[#F0D5E4] space-y-1.5 mb-3.5 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-gray-400 font-bold uppercase">Parent / Guardian:</span>
-                          <span className="px-1.5 py-0.2 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold">
-                            {s.parent_relation || 'Parent'}
-                          </span>
-                        </div>
-                        <div className="font-semibold text-gray-900 text-xs">
-                          {s.parent_name || 'Guardian Not Listed'}
-                        </div>
-                        <div className="flex items-center gap-1 text-[11px] text-gray-600">
-                          <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
-                          <span>{s.parent_contact || s.phone}</span>
-                        </div>
-                        {s.address && (
-                          <div className="flex items-start gap-1 text-[10px] text-gray-500 pt-1 border-t border-rose-100 truncate">
-                            <MapPin className="w-3 h-3 text-[#8A064D] shrink-0 mt-0.5" />
-                            <span className="truncate">{s.address}</span>
-                          </div>
-                        )}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 font-medium">Due Amount:</span>
+                        <span className={`font-bold px-2 py-0.5 rounded-lg text-xs flex items-center gap-1.5 ${dueInfo.badgeClass}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${dueInfo.dotClass}`} />
+                          <span>{dueInfo.text}</span>
+                        </span>
                       </div>
 
-                      {/* Enrolled Classes Pills */}
-                      <div className="space-y-1.5 mb-4">
-                        <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold">
-                          <span>Enrolled Batches</span>
-                          <span className="text-[#8A064D] font-bold">{enrolledCount} Classes</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(s.enrolled_batches && s.enrolled_batches.length > 0) ? (
-                            s.enrolled_batches.slice(0, 2).map((eb, idx) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 bg-gray-100 rounded-lg text-[10px] font-semibold text-gray-700 truncate max-w-[200px]"
-                              >
-                                {eb.course_title} ({eb.trainer_name.replace('Guru: ', '')})
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-[11px] text-gray-400 italic">No batches assigned yet</span>
-                          )}
-                          {enrolledCount > 2 && (
-                            <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded-lg text-[10px] font-bold">
-                              +{enrolledCount - 2} more
-                            </span>
-                          )}
-                        </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 font-medium">Due Date:</span>
+                        <span className="font-mono font-bold text-gray-700">
+                          {s.due_date || currentMonthDueDate}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* BOTTOM ACTION BUTTONS (Edit, View Timetable, Enroll in Batch) */}
-                  <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-1.5">
-                    
-                    {/* View Details / Open popup */}
+                  {/* Action Buttons Below: Details, Edit, Delete */}
+                  <div className="mt-5 pt-3.5 border-t border-gray-100 flex items-center justify-between gap-2">
                     <button
                       onClick={() => setDetailStudent(s)}
-                      className="px-2.5 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
-                      title="View Full Profile Details"
+                      className="flex-1 py-2 px-3 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Eye className="w-3 h-3 text-gray-500" />
+                      <Eye className="w-3.5 h-3.5 text-gray-500" />
                       <span>Details</span>
                     </button>
 
-                    <div className="flex items-center gap-1.5">
-                      {/* Option 1: Edit Details */}
-                      <button
-                        onClick={() => handleOpenEdit(s)}
-                        className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                        title="Edit Student Details"
-                      >
-                        <Edit3 className="w-3 h-3 text-blue-600" />
-                        <span>Edit</span>
-                      </button>
+                    <button
+                      onClick={() => handleOpenEdit(s)}
+                      className="flex-1 py-2 px-3 rounded-xl border border-gray-200 bg-white hover:bg-[#FFF9FB] text-gray-800 hover:text-[#8A064D] hover:border-[#8A064D] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Edit</span>
+                    </button>
 
-                      {/* Option 2: View Timetable */}
-                      <button
-                        onClick={() => setTimetableStudent(s)}
-                        className="px-2.5 py-1.5 rounded-xl bg-[#FFF9FB] hover:bg-[#FCE7F3] text-[#8A064D] border border-[#F0D5E4] text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                        title="View Class Timetable"
-                      >
-                        <Calendar className="w-3 h-3 text-[#8A064D]" />
-                        <span>Timetable</span>
-                      </button>
-
-                      {/* Option 3: Enroll in Batch */}
-                      <button
-                        onClick={() => {
-                          setEnrollStudentModal(s);
-                          setSelectedBatchId(batches[0]?.id || '');
-                        }}
-                        className="px-2.5 py-1.5 rounded-xl bg-[#8A064D] hover:bg-[#70043E] text-white text-[11px] font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
-                        title="Enroll in New Batch"
-                      >
-                        <Plus className="w-3 h-3 text-[#F9E33A]" />
-                        <span>Enroll</span>
-                      </button>
-                    </div>
-
+                    <button
+                      onClick={() => setDeletingStudent(s)}
+                      className="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                      title="Delete Student"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
                   </div>
                 </div>
               );
@@ -601,7 +716,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       )}
 
       {/* ===================================================================== */}
-      {/* 2. ROW-WISE (TABLE) VIEW */}
+      {/* 4. ROW-WISE (TABLE) VIEW */}
       {/* ===================================================================== */}
       {viewMode === 'row' && (
         <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
@@ -609,146 +724,97 @@ export default function StudentsListClient({ initialStudents, batches, courses }
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-[#FFF9FB] border-b border-[#F0D5E4] text-[#2D041A] font-bold">
-                  <th className="py-3.5 px-4">Roll Number</th>
-                  <th className="py-3.5 px-4">Student Details</th>
-                  <th className="py-3.5 px-4">Parent / Guardian</th>
-                  <th className="py-3.5 px-3">Address</th>
-                  <th className="py-3.5 px-3 text-center">Enrolled Batches</th>
-                  <th className="py-3.5 px-3 text-center">Attendance %</th>
+                  <th className="py-3.5 px-4">Student ID & Status</th>
+                  <th className="py-3.5 px-4">Student Name & Contact</th>
+                  <th className="py-3.5 px-4 text-right">Total Monthly Fee</th>
+                  <th className="py-3.5 px-4 text-center">Due Amount</th>
+                  <th className="py-3.5 px-4 text-center">Due Date</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-gray-400">
-                      No students found matching your search.
+                    <td colSpan={6} className="py-12 text-center text-gray-400">
+                      No students found matching your criteria.
                     </td>
                   </tr>
                 ) : (
-                  filteredStudents.map((s) => (
-                    <tr 
-                      key={s.id} 
-                      className="hover:bg-[#FFFDFC] transition group cursor-pointer"
-                    >
-                      {/* Roll Number */}
-                      <td 
-                        onClick={() => setDetailStudent(s)}
-                        className="py-3.5 px-4 font-mono font-bold text-[#8A064D]"
-                      >
-                        <span className="bg-[#FFF2F8] border border-rose-100 px-2 py-0.5 rounded-lg">
-                          {s.roll_number}
-                        </span>
-                      </td>
+                  filteredStudents.map((s) => {
+                    const dueInfo = getDueAmountDisplay(s);
+                    const monthlyFee = s.total_monthly_fee || 0;
 
-                      {/* Student Details */}
-                      <td 
-                        onClick={() => setDetailStudent(s)}
-                        className="py-3.5 px-4"
-                      >
-                        <div className="font-bold text-gray-900 group-hover:text-[#8A064D] transition">
-                          {s.full_name}
-                        </div>
-                        <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
-                          <Mail className="w-3 h-3 text-gray-400" />
-                          <span>{s.email}</span>
-                        </div>
-                      </td>
+                    return (
+                      <tr key={s.id} className="hover:bg-[#FFFDFC] transition">
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2 py-0.5 rounded-lg">
+                              {s.roll_number}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              s.status === 'active' 
+                                ? 'bg-emerald-50 text-emerald-700' 
+                                : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${s.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                              <span className="capitalize">{s.status || 'Active'}</span>
+                            </span>
+                          </div>
+                        </td>
 
-                      {/* Parent / Guardian */}
-                      <td 
-                        onClick={() => setDetailStudent(s)}
-                        className="py-3.5 px-4"
-                      >
-                        <div className="font-semibold text-gray-800 flex items-center gap-1.5">
-                          <span>{s.parent_name || '—'}</span>
-                          <span className="px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 text-[10px] font-bold">
-                            {s.parent_relation || 'Parent'}
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-gray-900 text-xs">{s.full_name}</div>
+                          <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
+                            <Phone className="w-3 h-3 text-emerald-600" />
+                            <span>{s.phone}</span>
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-right font-bold text-gray-900">
+                          ₹{monthlyFee.toLocaleString('en-IN')}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-center">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold text-xs ${dueInfo.badgeClass}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${dueInfo.dotClass}`} />
+                            <span>{dueInfo.text}</span>
                           </span>
-                        </div>
-                        <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
-                          <Phone className="w-3 h-3 text-emerald-600" />
-                          <span>{s.parent_contact || s.phone}</span>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Address */}
-                      <td 
-                        onClick={() => setDetailStudent(s)}
-                        className="py-3.5 px-3 max-w-xs truncate text-gray-500 text-[11px]"
-                      >
-                        {s.address || 'Kannamangala, Bangalore'}
-                      </td>
+                        <td className="py-3.5 px-4 text-center font-mono font-bold text-gray-700">
+                          {s.due_date || currentMonthDueDate}
+                        </td>
 
-                      {/* Enrolled Batches */}
-                      <td 
-                        onClick={() => setDetailStudent(s)}
-                        className="py-3.5 px-3 text-center"
-                      >
-                        <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2.5 py-0.5 rounded-full font-bold text-[11px]">
-                          <Layers className="w-3 h-3" />
-                          <span>{s.enrolled_batches?.length || s.enrolled_batches_count || 0} Batches</span>
-                        </span>
-                      </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => setDetailStudent(s)}
+                              className="px-2.5 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Details</span>
+                            </button>
 
-                      {/* Attendance % */}
-                      <td 
-                        onClick={() => setDetailStudent(s)}
-                        className="py-3.5 px-3 text-center"
-                      >
-                        <span className={`font-bold ${
-                          (s.attendance_rate || 0) >= 80 ? 'text-emerald-600' :
-                          (s.attendance_rate || 0) >= 60 ? 'text-amber-600' : 'text-rose-600'
-                        }`}>
-                          {s.attendance_rate || 100}%
-                        </span>
-                      </td>
+                            <button
+                              onClick={() => handleOpenEdit(s)}
+                              className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-[#FFF9FB] text-gray-800 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Edit</span>
+                            </button>
 
-                      {/* Action Options */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* Option 1: Edit Details */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEdit(s);
-                            }}
-                            className="p-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition shadow-2xs"
-                            title="Edit Details"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-
-                          {/* Option 2: View Timetable */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setTimetableStudent(s);
-                            }}
-                            className="p-1.5 rounded-xl bg-[#FFF9FB] hover:bg-[#FCE7F3] text-[#8A064D] border border-[#F0D5E4] transition shadow-2xs"
-                            title="View Timetable"
-                          >
-                            <Calendar className="w-3.5 h-3.5" />
-                          </button>
-
-                          {/* Option 3: Enroll in Batch */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEnrollStudentModal(s);
-                              setSelectedBatchId(batches[0]?.id || '');
-                            }}
-                            className="px-2.5 py-1.5 rounded-xl bg-[#8A064D] hover:bg-[#70043E] text-white font-bold text-[11px] transition flex items-center gap-1 shadow-xs"
-                            title="Enroll in Batch"
-                          >
-                            <Plus className="w-3 h-3 text-[#F9E33A]" />
-                            <span>Enroll</span>
-                          </button>
-                        </div>
-                      </td>
-
-                    </tr>
-                  ))
+                            <button
+                              onClick={() => setDeletingStudent(s)}
+                              className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 transition cursor-pointer"
+                              title="Delete Student"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -757,30 +823,31 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       )}
 
       {/* ===================================================================== */}
-      {/* POPUP 1: SELECTED STUDENT FULL DETAILS MODAL */}
+      {/* 5. DETAILS MODAL (ALL STUDENT DETAILS IN ONE PLACE) */}
       {/* ===================================================================== */}
       {detailStudent && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 my-6">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-[#F0D5E4] max-h-[90vh] overflow-y-auto">
             
-            {/* Top Bar */}
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-6">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-5">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#430928] text-white flex items-center justify-center font-black text-base shadow-md">
-                  {detailStudent.full_name.slice(0, 2).toUpperCase()}
-                </div>
+                <span className="font-mono text-sm font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-3 py-1 rounded-xl">
+                  {detailStudent.roll_number}
+                </span>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-black text-[#2D041A]">{detailStudent.full_name}</h2>
-                    <span className="font-mono text-xs font-bold text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-lg border border-rose-100">
-                      {detailStudent.roll_number}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    Enrolled on {detailStudent.enrollment_date || '2026-01-15'} • Status: <strong className="text-emerald-600 capitalize">{detailStudent.status || 'Active'}</strong>
-                  </p>
+                  <h3 className="font-black text-lg text-[#2D041A] leading-tight">
+                    {detailStudent.full_name}
+                  </h3>
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${
+                    detailStudent.status === 'active' ? 'text-emerald-700' : 'text-gray-500'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${detailStudent.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                    <span className="capitalize">{detailStudent.status || 'Active'}</span>
+                  </span>
                 </div>
               </div>
+
               <button
                 onClick={() => setDetailStudent(null)}
                 className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
@@ -789,824 +856,707 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               </button>
             </div>
 
-            {/* Quick Stat Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-              <div className="bg-[#FFF9FB] p-3 rounded-2xl border border-[#F0D5E4] text-center">
-                <span className="text-[10px] font-bold text-gray-400 uppercase block">Enrolled Batches</span>
-                <span className="text-lg font-black text-[#8A064D]">
-                  {detailStudent.enrolled_batches?.length || detailStudent.enrolled_batches_count || 0}
-                </span>
-              </div>
-              <div className="bg-emerald-50/60 p-3 rounded-2xl border border-emerald-100 text-center">
-                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Attendance Rate</span>
-                <span className="text-lg font-black text-emerald-700">
-                  {detailStudent.attendance_rate || 100}%
-                </span>
-              </div>
-              <div className="bg-purple-50/60 p-3 rounded-2xl border border-purple-100 text-center">
-                <span className="text-[10px] font-bold text-purple-700 uppercase block">Weekly Classes</span>
-                <span className="text-lg font-black text-purple-700">
-                  {(detailStudent.enrolled_batches || []).reduce((acc, b) => acc + (b.days_of_week?.length || 2), 0)} Sessions
-                </span>
-              </div>
-              <div className="bg-amber-50/60 p-3 rounded-2xl border border-amber-100 text-center">
-                <span className="text-[10px] font-bold text-amber-700 uppercase block">Fee Status</span>
-                <span className="text-xs font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full inline-block mt-1">
-                  Active
-                </span>
-              </div>
-            </div>
+            <div className="space-y-4">
+              
+              {/* Section 1: Financial & Fee Summary */}
+              <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-rose-100">
+                <h4 className="text-xs font-bold text-[#8A064D] uppercase tracking-wider mb-2.5">
+                  Fee & Due Overview
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="bg-white p-3 rounded-xl border border-rose-100">
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Total Monthly Fee</span>
+                    <span className="text-base font-bold text-gray-900 mt-0.5 block">
+                      ₹{(detailStudent.total_monthly_fee || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
 
-            {/* Personal & Parent / Guardian Dossier */}
-            <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-200 mb-6 space-y-3 text-xs">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-[#8A064D]" />
-                Personal & Guardian Profile
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                <div>
-                  <span className="text-[10px] text-gray-400 font-semibold block uppercase">Student / Parent Email</span>
-                  <span className="font-semibold text-gray-900">{detailStudent.email}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-gray-400 font-semibold block uppercase">Student Contact Phone</span>
-                  <span className="font-semibold text-gray-900">{detailStudent.phone}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-gray-400 font-semibold block uppercase">Parent / Guardian Name & Relation</span>
-                  <span className="font-bold text-gray-900">
-                    {detailStudent.parent_name || 'Not Listed'}{' '}
-                    <span className="text-[#8A064D] font-semibold">({detailStudent.parent_relation || 'Parent'})</span>
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-gray-400 font-semibold block uppercase">Guardian Emergency Contact</span>
-                  <span className="font-semibold text-gray-900">{detailStudent.parent_contact || detailStudent.phone}</span>
-                </div>
-                <div className="sm:col-span-2">
-                  <span className="text-[10px] text-gray-400 font-semibold block uppercase">Full Residential Address</span>
-                  <span className="font-medium text-gray-800">{detailStudent.address || 'Kannamangala, Doddabanahalli, Bangalore'}</span>
-                </div>
-              </div>
-            </div>
+                  <div className="bg-white p-3 rounded-xl border border-rose-100">
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Advance Paid</span>
+                    <span className="text-base font-bold text-emerald-700 mt-0.5 block">
+                      ₹{Number(detailStudent.advance_paid || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
 
-            {/* Enrolled Batches & Gurus Table */}
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-xs uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-[#8A064D]" />
-                  Enrolled Batches & Assigned Gurus
-                </h3>
-                <button
-                  onClick={() => {
-                    setEnrollStudentModal(detailStudent);
-                    setSelectedBatchId(batches[0]?.id || '');
-                  }}
-                  className="text-xs text-[#8A064D] hover:underline font-bold flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Enroll in Another Batch</span>
-                </button>
+                  <div className="bg-white p-3 rounded-xl border border-rose-100">
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Current Due</span>
+                    <span className="text-base font-bold text-[#8A064D] mt-0.5 block">
+                      ₹{(detailStudent.due_amount || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-rose-100">
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Due Date</span>
+                    <span className="text-base font-mono font-bold text-gray-800 mt-0.5 block">
+                      {detailStudent.due_date || currentMonthDueDate}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              {(detailStudent.enrolled_batches && detailStudent.enrolled_batches.length > 0) ? (
+              {/* Section 2: Contact & Personal Details */}
+              <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100">
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2.5">
+                  Student Contact & Registration Info
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Contact Phone:</span>
+                    <span className="font-semibold text-gray-900 flex items-center gap-1.5 mt-0.5">
+                      <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{detailStudent.phone}</span>
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Email Address:</span>
+                    <span className="font-semibold text-gray-900 flex items-center gap-1.5 mt-0.5">
+                      <Mail className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{detailStudent.email}</span>
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Joining Date:</span>
+                    <span className="font-semibold text-gray-900 flex items-center gap-1.5 mt-0.5">
+                      <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
+                      <span>{detailStudent.enrollment_date || '2026-09-28'}</span>
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Residential Address:</span>
+                    <span className="font-medium text-gray-700 flex items-start gap-1.5 mt-0.5">
+                      <MapPin className="w-3.5 h-3.5 text-[#8A064D] shrink-0 mt-0.5" />
+                      <span>{detailStudent.address || 'Kannamangala, Bangalore'}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Parent / Guardian Info */}
+              <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100">
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2.5">
+                  Parent / Guardian Details
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Guardian Name:</span>
+                    <span className="font-semibold text-gray-900 mt-0.5 block">{detailStudent.parent_name || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Relation:</span>
+                    <span className="font-semibold text-gray-900 mt-0.5 block">{detailStudent.parent_relation || 'Parent'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Guardian Contact:</span>
+                    <span className="font-semibold text-gray-900 mt-0.5 block">{detailStudent.parent_contact || detailStudent.phone}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 4: Enrolled Courses & Batches */}
+              <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100">
+                <div className="flex items-center justify-between mb-2.5">
+                  <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Enrolled Courses & Batches ({detailStudent.enrolled_batches?.length || 0})
+                  </h4>
+                </div>
+
                 <div className="space-y-2">
-                  {detailStudent.enrolled_batches.map((eb, idx) => (
-                    <div 
-                      key={idx}
-                      className="p-3.5 rounded-2xl bg-white border border-[#F0D5E4] flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-[#2D041A]">{eb.course_title}</span>
-                          <span className="px-2 py-0.5 rounded-md bg-[#FFF2F8] text-[#8A064D] text-[10px] font-bold">
-                            {eb.course_category}
-                          </span>
+                  {(detailStudent.enrolled_batches && detailStudent.enrolled_batches.length > 0) ? (
+                    detailStudent.enrolled_batches.map((eb, idx) => (
+                      <div key={idx} className="bg-white p-3 rounded-xl border border-gray-200 flex items-center justify-between text-xs">
+                        <div>
+                          <div className="font-bold text-gray-900">{eb.course_title}</div>
+                          <div className="text-[11px] text-gray-500 mt-0.5">
+                            Batch: <strong className="text-gray-800">{eb.batch_name}</strong> • Guru: {eb.trainer_name}
+                          </div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">
+                            Timings: {eb.start_time?.substring(0, 5)} - {eb.end_time?.substring(0, 5)} ({eb.days_of_week?.join(', ')})
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-600 font-medium mt-0.5">
-                          {eb.batch_name}
-                        </div>
-                        <div className="text-[11px] text-gray-500 mt-1 flex flex-wrap items-center gap-3">
-                          <span className="font-semibold text-gray-800">Guru: {eb.trainer_name}</span>
-                          <span>•</span>
-                          <span>{(eb.days_of_week || []).join(', ')}</span>
-                          <span>•</span>
-                          <span>{eb.start_time?.slice(0, 5)} - {eb.end_time?.slice(0, 5)}</span>
-                          <span>•</span>
-                          <span className="text-[#8A064D]">{eb.room_or_hall}</span>
+
+                        <div className="text-right">
+                          <span className="text-xs font-bold text-[#8A064D]">₹{eb.monthly_fee}</span>
+                          <span className="text-[10px] text-gray-400 block">/ month</span>
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-xs font-bold text-emerald-700">₹{eb.monthly_fee}/m</span>
-                      </div>
+                    ))
+                  ) : (
+                    <div className="text-xs text-gray-400 italic py-2">
+                      No active batch enrollments assigned.
                     </div>
-                  ))}
+                  )}
                 </div>
-              ) : (
-                <div className="p-6 text-center text-gray-400 bg-gray-50 rounded-2xl text-xs">
-                  No active batch enrollments. Click above to enroll in a batch.
-                </div>
-              )}
-            </div>
-
-            {/* Modal Bottom Actions */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-100">
-              <button
-                onClick={() => setDetailStudent(null)}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
-              >
-                Close
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    handleOpenEdit(detailStudent);
-                  }}
-                  className="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
-                >
-                  <Edit3 className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Edit Details</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setTimetableStudent(detailStudent);
-                  }}
-                  className="px-4 py-2 rounded-xl bg-[#8A064D] hover:bg-[#70043E] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md"
-                >
-                  <Calendar className="w-3.5 h-3.5 text-[#F9E33A]" />
-                  <span>View Timetable</span>
-                </button>
               </div>
-            </div>
 
+              {/* Modal Actions */}
+              <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = detailStudent;
+                    setDetailStudent(null);
+                    setDeletingStudent(s);
+                  }}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Student</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDetailStudent(null)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const s = detailStudent;
+                      setDetailStudent(null);
+                      handleOpenEdit(s);
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit Details</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
       )}
 
       {/* ===================================================================== */}
-      {/* MODAL 2: EDIT STUDENT DETAILS (OPTION 1) */}
+      {/* 6. EDIT STUDENT MODAL (PRE-FILLED REGISTRATION FORM) */}
       {/* ===================================================================== */}
       {editingStudent && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 my-6">
-            
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-[#F0D5E4] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
               <div>
-                <h3 className="font-bold text-base text-[#2D041A]">Edit Student Information</h3>
-                <p className="text-xs text-gray-500">Roll No: {editingStudent.roll_number}</p>
+                <span className="font-mono text-xs font-bold text-[#8A064D] bg-[#FFF2F8] px-2 py-0.5 rounded-lg border border-rose-100">
+                  {editingStudent.roll_number}
+                </span>
+                <h3 className="font-black text-lg text-[#2D041A] mt-1">Edit Student Details</h3>
+                <p className="text-xs text-gray-500">Update personal info, status, joining date, advance paid, and courses.</p>
               </div>
               <button
                 onClick={() => setEditingStudent(null)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSaveEdit} className="space-y-4">
               
-              {/* Full Name */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Student Full Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editFullName}
-                  onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-900 focus:ring-2 focus:ring-[#8A064D]"
-                />
-              </div>
-
-              {/* Email & Phone */}
+              {/* Row 1: Student ID (read-only) & Status (Active / Inactive toggle) */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Email Address</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Student ID <span className="text-[10px] text-gray-400 font-normal">(System Generated)</span>
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    disabled
+                    value={editingStudent.roll_number}
+                    className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Student Status <span className="text-[10px] text-[#8A064D] font-normal">(Active / Inactive)</span>
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-[#8A064D]"
+                  >
+                    <option value="active">Active (Currently Enrolled)</option>
+                    <option value="inactive">Inactive (Paused / Left)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 2: Full Name & Email */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Student Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editFullName}
+                    onChange={(e) => setEditFullName(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Student Email</label>
                   <input
                     type="email"
                     required
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-[#8A064D]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Student Contact Phone</label>
-                  <input
-                    type="text"
-                    required
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
               </div>
 
-              {/* Parent / Guardian Name & Relation */}
+              {/* Row 3: Phone & Joining Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Parent / Guardian Name <span className="text-rose-500">*</span>
-                  </label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Student Contact Number</label>
+                  <input
+                    type="tel"
+                    required
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Joining Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={editJoiningDate}
+                    onChange={(e) => setEditJoiningDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                </div>
+              </div>
+
+              {/* Row 4: Advance Paid */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Advance Paid (INR ₹)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editAdvancePaid}
+                  onChange={(e) => setEditAdvancePaid(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                />
+              </div>
+
+              {/* Row 5: Parent / Guardian Info */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Parent Name</label>
                   <input
                     type="text"
                     required
                     value={editParentName}
                     onChange={(e) => setEditParentName(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Relationship to Student</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Relation</label>
                   <select
                     value={editParentRelation}
                     onChange={(e) => setEditParentRelation(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                   >
                     <option value="Mother">Mother</option>
                     <option value="Father">Father</option>
                     <option value="Guardian">Guardian</option>
-                    <option value="Grandparent">Grandparent</option>
-                    <option value="Relative">Relative</option>
                     <option value="Other">Other</option>
                   </select>
                 </div>
-              </div>
-
-              {/* Parent Contact */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Parent / Guardian Contact</label>
-                <input
-                  type="text"
-                  value={editParentContact}
-                  onChange={(e) => setEditParentContact(e.target.value)}
-                  placeholder="+91 98450 12345"
-                  className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-[#8A064D]"
-                />
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Parent Contact</label>
+                  <input
+                    type="tel"
+                    required
+                    value={editParentContact}
+                    onChange={(e) => setEditParentContact(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                </div>
               </div>
 
               {/* Address */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Full Residential Address</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Full Address</label>
                 <textarea
                   rows={2}
                   value={editAddress}
                   onChange={(e) => setEditAddress(e.target.value)}
-                  placeholder="e.g. Flat 304, Prestige Willow, Kannamangala, Bangalore"
-                  className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-[#8A064D]"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                 />
               </div>
 
-              {/* Status */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Student Status</label>
-                <select
-                  value={editStatus}
-                  onChange={(e: any) => setEditStatus(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl font-medium"
-                >
-                  <option value="active">Active (Enrolled)</option>
-                  <option value="inactive">Inactive (Temporarily on leave)</option>
-                  <option value="suspended">Suspended</option>
-                </select>
+              {/* Courses & Batches Selection */}
+              <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-3">
+                <label className="block text-xs font-bold text-gray-800">
+                  Enrolled Courses (Select multiple to assign batches):
+                </label>
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                  {courses.map(crs => {
+                    const isSelected = editSelectedCourseIds.includes(crs.id);
+                    return (
+                      <button
+                        type="button"
+                        key={crs.id}
+                        onClick={() => handleEditToggleCourse(crs.id)}
+                        className={`px-3 py-1 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#8A064D] text-white shadow-2xs'
+                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        {crs.title}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {editAvailableBatches.length > 0 && (
+                  <div className="pt-2 border-t border-gray-200">
+                    <label className="block text-xs font-bold text-gray-800 mb-1.5">
+                      Select Available Batches:
+                    </label>
+                    <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                      {editAvailableBatches.map(b => {
+                        const isBatchSelected = editSelectedBatchIds.includes(b.id);
+                        return (
+                          <div
+                            key={b.id}
+                            onClick={() => handleEditToggleBatch(b.id)}
+                            className={`p-2 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition ${
+                              isBatchSelected
+                                ? 'bg-[#FFF2F8] border-[#8A064D] text-[#8A064D] font-bold'
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            <div>
+                              <span>{b.course_title} — {b.name}</span>
+                              <span className="text-[10px] text-gray-400 block font-normal">
+                                Guru: {b.trainer_name} ({b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)})
+                              </span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={isBatchSelected}
+                              readOnly
+                              className="accent-[#8A064D]"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Buttons */}
+              {/* Form Actions */}
               <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setEditingStudent(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingEdit}
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#F9E33A]" />
-                  <span>{savingEdit ? 'Saving...' : 'Save Changes'}</span>
+                  {savingEdit ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
-
             </form>
           </div>
         </div>
       )}
 
       {/* ===================================================================== */}
-      {/* MODAL 3: VIEW STUDENT TIMETABLE (OPTION 2) */}
-      {/* ===================================================================== */}
-      {timetableStudent && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 my-6">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-6 print:hidden">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-[#8A064D]" />
-                  <h3 className="font-black text-lg text-[#2D041A]">Weekly Class Timetable</h3>
-                </div>
-                <p className="text-xs text-gray-500">
-                  Student: <strong className="text-gray-900">{timetableStudent.full_name}</strong> ({timetableStudent.roll_number})
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="px-3.5 py-1.5 bg-[#8A064D] hover:bg-[#70043E] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
-                >
-                  <Printer className="w-3.5 h-3.5 text-[#F9E33A]" />
-                  <span>Print Timetable</span>
-                </button>
-                <button
-                  onClick={() => setTimetableStudent(null)}
-                  className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Printable Container */}
-            <div className="border border-[#F0D5E4] rounded-2xl p-5 bg-white space-y-4">
-              
-              {/* Academy Header for Print */}
-              <div className="text-center pb-3 border-b border-rose-100">
-                <h4 className="font-extrabold text-sm text-[#2D041A] uppercase tracking-wide">
-                  Laasya Cultural Academy
-                </h4>
-                <p className="text-[10px] text-[#8A064D] font-bold">
-                  ಲಾಸ್ಯ ಸಾಂಸ್ಕೃತಿಕ ಅಕಾಡೆಮಿ • Student Schedule & Class Timetable
-                </p>
-                <p className="text-[10px] text-gray-500">
-                  Kannamangala Campus, Bangalore • Helpdesk: +91 8151 998 899
-                </p>
-              </div>
-
-              {/* Student Name Banner */}
-              <div className="flex justify-between items-center text-xs bg-[#FFF9FB] p-3 rounded-xl border border-rose-100">
-                <div>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Learner</span>
-                  <span className="font-bold text-gray-900 text-sm">{timetableStudent.full_name}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Roll Number</span>
-                  <span className="font-mono font-bold text-[#8A064D]">{timetableStudent.roll_number}</span>
-                </div>
-              </div>
-
-              {/* Days breakdown: Monday to Sunday */}
-              <div className="space-y-2.5 pt-2">
-                {[
-                  'Monday',
-                  'Tuesday',
-                  'Wednesday',
-                  'Thursday',
-                  'Friday',
-                  'Saturday',
-                  'Sunday'
-                ].map((dayName) => {
-                  // Find all batches that have this day in their schedule
-                  const dayBatches = (timetableStudent.enrolled_batches || []).filter(b => {
-                    const days = (b.days_of_week || []).map(d => d.toLowerCase());
-                    return days.some(d => d.includes(dayName.toLowerCase().slice(0, 3)));
-                  });
-
-                  return (
-                    <div 
-                      key={dayName}
-                      className={`p-3 rounded-xl border transition ${
-                        dayBatches.length > 0 
-                          ? 'bg-white border-[#F0D5E4] shadow-2xs' 
-                          : 'bg-gray-50/50 border-gray-100 opacity-60'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-xs font-bold uppercase tracking-wider ${
-                          dayBatches.length > 0 ? 'text-[#8A064D]' : 'text-gray-400'
-                        }`}>
-                          {dayName}
-                        </span>
-                        {dayBatches.length > 0 ? (
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                            {dayBatches.length} Class Session(s)
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-gray-400 italic">No scheduled classes</span>
-                        )}
-                      </div>
-
-                      {dayBatches.length > 0 && (
-                        <div className="space-y-1.5 mt-2">
-                          {dayBatches.map((b, bIdx) => (
-                            <div 
-                              key={bIdx}
-                              className="bg-[#FFF9FB] p-2.5 rounded-lg border border-rose-100 flex items-center justify-between text-xs"
-                            >
-                              <div>
-                                <span className="font-bold text-gray-900">{b.course_title}</span>
-                                <span className="text-gray-500 block text-[11px]">{b.batch_name}</span>
-                                <span className="text-[10px] text-[#8A064D] font-semibold mt-0.5 block">
-                                  Guru: {b.trainer_name} • {b.room_or_hall}
-                                </span>
-                              </div>
-                              <div className="text-right">
-                                <span className="inline-flex items-center gap-1 font-mono font-bold text-gray-800 bg-white px-2 py-1 rounded border border-gray-200 text-[11px]">
-                                  <Clock className="w-3 h-3 text-[#8A064D]" />
-                                  {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-            </div>
-
-            {/* Close Button */}
-            <div className="flex justify-end pt-4 mt-2 print:hidden">
-              <button
-                onClick={() => setTimetableStudent(null)}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-[#8A064D] text-white hover:bg-[#70043E] transition cursor-pointer"
-              >
-                Close Timetable
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* ===================================================================== */}
-      {/* MODAL 4: ENROLL IN BATCH MODAL (OPTION 3) */}
-      {/* ===================================================================== */}
-      {enrollStudentModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
-            
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
-              <div>
-                <h3 className="font-bold text-base text-[#2D041A]">Enroll Student in Batch</h3>
-                <p className="text-xs text-gray-500">
-                  Student: <strong className="text-gray-900">{enrollStudentModal.full_name}</strong> ({enrollStudentModal.roll_number})
-                </p>
-              </div>
-              <button
-                onClick={() => setEnrollStudentModal(null)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleEnrollBatch} className="space-y-4">
-              
-              {/* Existing Enrollments Warning */}
-              {enrollStudentModal.enrolled_batches && enrollStudentModal.enrolled_batches.length > 0 && (
-                <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-100 text-xs">
-                  <span className="font-bold text-purple-900 block mb-1">Currently Enrolled In:</span>
-                  <ul className="list-disc pl-4 space-y-0.5 text-purple-800 text-[11px]">
-                    {enrollStudentModal.enrolled_batches.map((eb, idx) => (
-                      <li key={idx}>
-                        {eb.course_title} - {eb.batch_name} (Guru: {eb.trainer_name})
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Select Batch */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                  Select New Batch & Guru <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={selectedBatchId}
-                  onChange={(e) => setSelectedBatchId(e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-900 focus:ring-2 focus:ring-[#8A064D]"
-                >
-                  <option value="" disabled>-- Select Class Batch --</option>
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.course_title} - {b.name} | Guru: {b.trainer_name} ({b.days_of_week?.join(', ')} @ {b.start_time?.slice(0, 5)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Batch Highlight Card */}
-              {selectedBatchId && (() => {
-                const b = batches.find(x => x.id === selectedBatchId);
-                if (!b) return null;
-                return (
-                  <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-[#F0D5E4] text-xs space-y-1">
-                    <span className="font-bold text-[#8A064D] block">{b.course_title}</span>
-                    <span className="font-semibold text-gray-800 block">{b.name}</span>
-                    <div className="text-[11px] text-gray-600 flex items-center justify-between pt-1 border-t border-rose-100">
-                      <span><strong>Guru:</strong> {b.trainer_name}</span>
-                      <span><strong>Studio:</strong> {b.room_or_hall}</span>
-                    </div>
-                    <div className="text-[10px] text-gray-500">
-                      Schedule: {(b.days_of_week || []).join(', ')} ({b.start_time} - {b.end_time})
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setEnrollStudentModal(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingEnroll || !selectedBatchId}
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
-                >
-                  <Check className="w-3.5 h-3.5 text-[#F9E33A]" />
-                  <span>{savingEnroll ? 'Enrolling...' : 'Confirm Enrollment'}</span>
-                </button>
-              </div>
-
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ===================================================================== */}
-      {/* MODAL 5: REGISTER NEW STUDENT (WITH RELATION PROMPT & MULTI-COURSE/BATCH) */}
+      {/* 7. REGISTER NEW STUDENT MODAL */}
       {/* ===================================================================== */}
       {isAddOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 my-6">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-[#F0D5E4] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
               <div>
-                <h3 className="font-black text-lg text-[#2D041A]">Register New Academy Student</h3>
-                <p className="text-xs text-gray-500">
-                  Student roll number will be generated automatically. Select courses and available batches below.
-                </p>
+                <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                  New ID: {nextAutoId}
+                </span>
+                <h3 className="font-black text-lg text-[#2D041A] mt-1">Register New Student</h3>
+                <p className="text-xs text-gray-500">Student ID is generated in sequence automatically.</p>
               </div>
               <button
                 onClick={() => setIsAddOpen(false)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleRegisterStudent} className="space-y-4 text-xs">
+            <form onSubmit={handleRegisterStudent} className="space-y-4">
               
-              {/* 1. Student Full Name */}
+              {/* Row 1: Student ID (read-only, not manually editable) */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Student Full Name <span className="text-rose-500">*</span>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Student ID <span className="text-[10px] text-emerald-600 font-normal">(Auto-generated in sequence, not editable)</span>
                 </label>
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. Navya Ramesh"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-[#8A064D]"
+                  readOnly
+                  disabled
+                  value={nextAutoId}
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] cursor-not-allowed"
                 />
               </div>
 
-              {/* 2. Student / Parent Email & Contact */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Row 2: Full Name & Email */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Student / Parent Email <span className="text-rose-500">*</span>
-                  </label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Student Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Diya Sharma"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Student / Parent Email</label>
                   <input
                     type="email"
                     required
-                    placeholder="student.parent@example.com"
+                    placeholder="parent@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
+              </div>
+
+              {/* Row 3: Contact Number & Joining Date */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Contact Phone Number <span className="text-rose-500">*</span>
-                  </label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Contact Number</label>
                   <input
-                    type="text"
+                    type="tel"
                     required
-                    placeholder="+91 99000 12345"
+                    placeholder="+91 98450 12345"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
-              </div>
-
-              {/* 3. Parent / Guardian Name (with relation prompt after entering) */}
-              <div className="p-3.5 bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4] space-y-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Parent / Guardian Name <span className="text-rose-500">*</span>
-                  </label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Joining Date</label>
                   <input
-                    type="text"
+                    type="date"
                     required
-                    placeholder="e.g. Ramesh S."
-                    value={parentName}
-                    onChange={(e) => setParentName(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-white border border-rose-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-[#8A064D]"
+                    value={joiningDate}
+                    onChange={(e) => setJoiningDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
-
-                {/* AFTER ENTERING NAME: RELATION TO STUDENT PROMPT */}
-                {parentName.trim().length > 0 && (
-                  <div className="animate-in fade-in slide-in-from-top-1 duration-150 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <div>
-                      <label className="block text-xs font-bold text-[#8A064D] mb-1">
-                        Relation to Student <span className="text-rose-500">*</span>
-                      </label>
-                      <select
-                        value={parentRelation}
-                        onChange={(e) => setParentRelation(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-[#8A064D] rounded-xl text-xs font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
-                      >
-                        <option value="Mother">Mother</option>
-                        <option value="Father">Father</option>
-                        <option value="Guardian">Guardian</option>
-                        <option value="Grandmother">Grandmother</option>
-                        <option value="Grandfather">Grandfather</option>
-                        <option value="Relative">Relative</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">
-                        Parent / Guardian Contact <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="+91 99000 54321"
-                        value={parentContact}
-                        onChange={(e) => setParentContact(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#8A064D]"
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* 4. Full Address */}
+              {/* Row 4: Advance Paid */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Full Residential Address <span className="text-rose-500">*</span>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Advance Paid (INR ₹)
                 </label>
-                <textarea
-                  rows={2}
-                  required
-                  placeholder="e.g. Flat 204, Green Acres, Doddabanahalli, Kannamangala, Bangalore - 560067"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#8A064D]"
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="0"
+                  value={advancePaid}
+                  onChange={(e) => setAdvancePaid(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                 />
               </div>
 
-              {/* 5. Select Course(s) [Multi-select] */}
-              <div className="space-y-2 pt-1 border-t border-gray-100">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-[#2D041A]">
-                    Select Courses <span className="text-rose-500">*</span> (Select one or multiple)
-                  </label>
-                  <span className="text-[11px] text-gray-500">
-                    {selectedCourseIds.length} course(s) selected
-                  </span>
+              {/* Row 5: Parent / Guardian Info */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Parent / Guardian Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ramesh Sharma"
+                    value={parentName}
+                    onChange={(e) => setParentName(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  />
                 </div>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {courses.map((c) => {
-                    const isSelected = selectedCourseIds.includes(c.id);
-                    return (
-                      <div
-                        key={c.id}
-                        onClick={() => handleToggleCourse(c.id)}
-                        className={`p-2.5 rounded-xl border text-xs cursor-pointer transition flex items-center justify-between ${
-                          isSelected
-                            ? 'bg-[#8A064D] text-white border-[#8A064D] shadow-xs'
-                            : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        <div className="overflow-hidden">
-                          <span className="font-bold block truncate">{c.title}</span>
-                          <span className={`text-[10px] block truncate ${isSelected ? 'text-[#F9E33A]' : 'text-gray-500'}`}>
-                            {c.category}
-                          </span>
-                        </div>
-                        <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ml-1.5 ${
-                          isSelected ? 'bg-white border-white' : 'border-gray-300'
-                        }`}>
-                          {isSelected && <Check className="w-3 h-3 text-[#8A064D]" />}
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Relation</label>
+                  <select
+                    value={parentRelation}
+                    onChange={(e) => setParentRelation(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  >
+                    <option value="Mother">Mother</option>
+                    <option value="Father">Father</option>
+                    <option value="Guardian">Guardian</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Parent Contact</label>
+                  <input
+                    type="tel"
+                    placeholder="+91 98450 12345"
+                    value={parentContact}
+                    onChange={(e) => setParentContact(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  />
                 </div>
               </div>
 
-              {/* 6. Available Batches with Trainer / Guru Names (Appears when courses selected) */}
-              <div className="space-y-2 pt-2 border-t border-gray-100">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-[#2D041A]">
-                    Available Batches with Gurus
-                  </label>
-                  <span className="text-[11px] text-[#8A064D] font-bold">
-                    {selectedBatchIds.length} batch(es) selected
-                  </span>
+              {/* Address */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Full Residential Address</label>
+                <textarea
+                  rows={2}
+                  placeholder="Street, apartment, locality, Bangalore..."
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                />
+              </div>
+
+              {/* Select Courses & Batches */}
+              <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-3">
+                <label className="block text-xs font-bold text-gray-800">
+                  Select Course(s) (Select multiple to display available batches):
+                </label>
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                  {courses.map(crs => {
+                    const isSelected = selectedCourseIds.includes(crs.id);
+                    return (
+                      <button
+                        type="button"
+                        key={crs.id}
+                        onClick={() => handleToggleCourse(crs.id)}
+                        className={`px-3 py-1 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#8A064D] text-white shadow-2xs'
+                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        {crs.title}
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {availableBatchesForSelectedCourses.length === 0 ? (
-                  <div className="p-4 bg-gray-50 rounded-xl text-center text-gray-400 text-xs">
-                    Please select at least one course above to view available batch schedules and Gurus.
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {availableBatchesForSelectedCourses.map((b) => {
-                      const isBatchSelected = selectedBatchIds.includes(b.id);
-                      return (
-                        <div
-                          key={b.id}
-                          onClick={() => handleToggleBatch(b.id)}
-                          className={`p-3 rounded-xl border text-xs cursor-pointer transition flex items-center justify-between ${
-                            isBatchSelected
-                              ? 'bg-[#FFF9FB] border-[#8A064D] shadow-2xs'
-                              : 'bg-white border-gray-200 hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className="overflow-hidden">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-gray-900">{b.name}</span>
-                              <span className="px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 text-[9px] font-bold">
-                                {b.course_title}
+                {registerAvailableBatches.length > 0 && (
+                  <div className="pt-2 border-t border-gray-200">
+                    <label className="block text-xs font-bold text-gray-800 mb-1.5">
+                      Available Batches for Selected Courses:
+                    </label>
+                    <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                      {registerAvailableBatches.map(b => {
+                        const isBatchSelected = selectedBatchIds.includes(b.id);
+                        return (
+                          <div
+                            key={b.id}
+                            onClick={() => handleToggleBatch(b.id)}
+                            className={`p-2 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition ${
+                              isBatchSelected
+                                ? 'bg-[#FFF2F8] border-[#8A064D] text-[#8A064D] font-bold'
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            <div>
+                              <span>{b.course_title} — {b.name}</span>
+                              <span className="text-[10px] text-gray-400 block font-normal">
+                                Guru: {b.trainer_name} ({b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)})
                               </span>
                             </div>
-                            <div className="text-[11px] text-[#8A064D] font-bold mt-0.5">
-                              Guru: {b.trainer_name}
-                            </div>
-                            <div className="text-[10px] text-gray-500 mt-0.5">
-                              {(b.days_of_week || []).join(', ')} • {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)} ({b.room_or_hall})
-                            </div>
+                            <input
+                              type="checkbox"
+                              checked={isBatchSelected}
+                              readOnly
+                              className="accent-[#8A064D]"
+                            />
                           </div>
-
-                          <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 ml-3 ${
-                            isBatchSelected
-                              ? 'bg-[#8A064D] border-[#8A064D] text-white'
-                              : 'border-gray-300'
-                          }`}>
-                            {isBatchSelected && <Check className="w-3.5 h-3.5" />}
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-2.5 pt-4 border-t border-gray-100">
+              {/* Form Actions */}
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setIsAddOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={savingNew || selectedCourseIds.length === 0}
-                  className="px-6 py-2.5 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                  disabled={savingNew}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer"
                 >
-                  <CheckCircle2 className="w-4 h-4 text-[#F9E33A]" />
-                  <span>{savingNew ? 'Registering...' : 'Complete Registration'}</span>
+                  {savingNew ? 'Registering...' : 'Register Student'}
                 </button>
               </div>
-
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 8. DELETE CONFIRMATION MODAL */}
+      {/* ===================================================================== */}
+      {deletingStudent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-100">
+            <div className="flex items-center gap-3 text-rose-600 mb-3">
+              <div className="p-2.5 bg-rose-50 rounded-2xl">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <h3 className="font-black text-base text-[#2D041A]">Confirm Student Deletion</h3>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Are you sure you want to delete <strong className="text-gray-900">{deletingStudent.full_name}</strong> ({deletingStudent.roll_number})? 
+              This will remove active batch enrollments. Historical attendance and payment records will be preserved safely.
+            </p>
+
+            <div className="flex justify-end gap-2.5 mt-5">
+              <button
+                type="button"
+                onClick={() => setDeletingStudent(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDeleteStudent}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-md transition disabled:opacity-50 cursor-pointer"
+              >
+                {deleting ? 'Deleting...' : 'Yes, Delete Student'}
+              </button>
+            </div>
           </div>
         </div>
       )}

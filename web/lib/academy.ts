@@ -55,6 +55,11 @@ export interface Student {
   address?: string;
   status: 'active' | 'inactive' | 'suspended';
   enrollment_date: string;
+  advance_paid?: number;
+  total_monthly_fee?: number;
+  due_amount?: number;
+  due_date?: string;
+  due_status?: 'green' | 'yellow' | 'red';
   enrolled_batches_count?: number;
   attendance_rate?: number;
   enrolled_batches?: StudentEnrolledBatch[];
@@ -318,7 +323,9 @@ export async function getStudents(): Promise<Student[]> {
   const sql = `
     SELECT 
       s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone,
-      s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, s.enrollment_date::text as enrollment_date,
+      s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, 
+      TO_CHAR(s.enrollment_date, 'YYYY-MM-DD') as enrollment_date,
+      COALESCE(s.advance_paid, 0)::numeric as advance_paid,
       COUNT(DISTINCT be.batch_id)::int as enrolled_batches_count,
       ROUND(
         COALESCE(
@@ -331,8 +338,10 @@ export async function getStudents(): Promise<Student[]> {
     JOIN public.profiles p ON p.id = s.profile_id
     LEFT JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
     LEFT JOIN public.attendance a ON a.student_id = s.id
-    GROUP BY s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone, s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, s.enrollment_date
-    ORDER BY p.full_name;
+    GROUP BY s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone, s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, s.enrollment_date, s.advance_paid
+    ORDER BY 
+      CASE WHEN s.roll_number ~ '^LCA-[0-9]+$' THEN CAST(SUBSTRING(s.roll_number FROM 5) AS INT) ELSE 999999 END ASC,
+      p.full_name ASC;
   `;
   const students = await query<Student>(sql);
 
@@ -399,8 +408,70 @@ export async function getStudents(): Promise<Student[]> {
     });
   }
 
+  // Fetch fee invoices summary per student
+  const invoiceSummaries = await query<{
+    student_id: string;
+    invoice_balance: string;
+    has_overdue: number;
+    earliest_due_date: string;
+  }>(`
+    SELECT 
+      student_id, 
+      SUM(balance_amount)::text as invoice_balance,
+      MAX(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END)::int as has_overdue,
+      MIN(due_date)::text as earliest_due_date
+    FROM public.student_fee_invoices
+    WHERE status IN ('unpaid', 'partial', 'overdue')
+    GROUP BY student_id;
+  `);
+  const invoiceMap = new Map<string, { balance: number; hasOverdue: boolean; earliestDueDate: string }>();
+  for (const inv of invoiceSummaries) {
+    invoiceMap.set(inv.student_id, {
+      balance: parseFloat(inv.invoice_balance || '0'),
+      hasOverdue: inv.has_overdue === 1,
+      earliestDueDate: inv.earliest_due_date
+    });
+  }
+
+  // Calculate current month's due date in MM/YY format (e.g. 09/26)
+  const now = new Date();
+  const currentMonthDueDate = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`;
+
   for (const st of students) {
     st.enrolled_batches = enrollMap.get(st.id) || [];
+    
+    // Total Monthly Fee: sum of fees of all courses the student has joined
+    const totalMonthly = st.enrolled_batches.reduce((sum, b) => sum + (Number(b.monthly_fee) || 0), 0);
+    st.total_monthly_fee = totalMonthly;
+
+    const advPaid = Number(st.advance_paid || 0);
+    const invData = invoiceMap.get(st.id);
+
+    let rawDue = 0;
+    let isOverdue = false;
+
+    if (invData) {
+      rawDue = Math.max(0, invData.balance - advPaid);
+      isOverdue = invData.hasOverdue || (invData.balance > totalMonthly);
+    } else {
+      // If no invoices generated yet, current month's fee is pending
+      rawDue = Math.max(0, totalMonthly - advPaid);
+    }
+
+    st.due_amount = rawDue;
+    st.due_date = currentMonthDueDate;
+
+    // Color indicator logic:
+    // Green: Zero or negative due amount (fully paid or advance payment)
+    // Yellow: Current month's fee is pending and payable by month-end
+    // Red: Fee remains unpaid for more than one month
+    if (rawDue <= 0) {
+      st.due_status = 'green';
+    } else if (rawDue > totalMonthly || isOverdue) {
+      st.due_status = 'red';
+    } else {
+      st.due_status = 'yellow';
+    }
   }
 
   return JSON.parse(JSON.stringify(students));
@@ -415,13 +486,26 @@ export async function createStudent(data: {
   parent_contact?: string;
   address?: string;
   emergency_contact?: string;
+  joining_date?: string;
+  advance_paid?: number;
   batch_ids?: string[];
 }) {
-  const rollNumber = `LCA-${Math.floor(10000 + Math.random() * 90000)}`;
+  // Automatically generate unique student ID in sequence: LCA-1, LCA-2, LCA-3...
+  const rollRows = await query<{ roll_number: string }>(
+    `SELECT roll_number FROM public.students WHERE roll_number ~ '^LCA-[0-9]+$'`
+  );
+  let maxId = 0;
+  for (const r of rollRows) {
+    const m = r.roll_number.match(/^LCA-(\d+)$/);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > maxId) maxId = n;
+    }
+  }
+  const rollNumber = `LCA-${maxId + 1}`;
 
   const cleanEmail = data.email.toLowerCase().trim();
 
-  // If email already exists in auth.users, use unique alias for auth.users to ensure unique profile_id
   let authEmail = cleanEmail;
   const existingUser = await queryOne<{ id: string }>(
     `SELECT id FROM auth.users WHERE email = $1`,
@@ -451,12 +535,15 @@ export async function createStudent(data: {
     ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, phone = EXCLUDED.phone;
   `, [uid, data.full_name, cleanEmail, data.phone]);
 
+  const joiningDate = data.joining_date || new Date().toISOString().split('T')[0];
+  const advancePaid = Number(data.advance_paid || 0);
+
   const student = await queryOne<Student>(`
     INSERT INTO public.students (
       profile_id, roll_number, parent_name, parent_relation,
-      parent_contact, address, emergency_contact, status, enrollment_date
+      parent_contact, address, emergency_contact, status, enrollment_date, advance_paid
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', CURRENT_DATE)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9)
     ON CONFLICT (profile_id) DO UPDATE SET
       parent_name = EXCLUDED.parent_name,
       parent_relation = EXCLUDED.parent_relation,
@@ -464,7 +551,8 @@ export async function createStudent(data: {
       address = EXCLUDED.address,
       emergency_contact = EXCLUDED.emergency_contact,
       status = 'active',
-      enrollment_date = CURRENT_DATE
+      enrollment_date = EXCLUDED.enrollment_date,
+      advance_paid = EXCLUDED.advance_paid
     RETURNING *;
   `, [
     uid, 
@@ -473,7 +561,9 @@ export async function createStudent(data: {
     data.parent_relation || 'Parent',
     data.parent_contact || data.phone,
     data.address || 'Kannamangala, Bangalore',
-    data.emergency_contact || data.parent_contact || data.phone
+    data.emergency_contact || data.parent_contact || data.phone,
+    joiningDate,
+    advancePaid
   ]);
 
   if (student && data.batch_ids && data.batch_ids.length > 0) {
@@ -490,7 +580,8 @@ export async function createStudent(data: {
     ...student,
     full_name: data.full_name,
     email: data.email,
-    phone: data.phone
+    phone: data.phone,
+    advance_paid: advancePaid
   };
 }
 
@@ -502,7 +593,10 @@ export async function updateStudent(id: string, data: {
   parent_relation?: string;
   parent_contact?: string;
   address?: string;
+  joining_date?: string;
+  advance_paid?: number;
   status?: 'active' | 'inactive' | 'suspended';
+  batch_ids?: string[];
 }) {
   const current = await queryOne<{ profile_id: string }>(
     `SELECT profile_id FROM public.students WHERE id = $1`,
@@ -528,10 +622,27 @@ export async function updateStudent(id: string, data: {
         parent_contact = COALESCE($4, parent_contact),
         address = COALESCE($5, address),
         status = COALESCE($6, status),
+        enrollment_date = COALESCE($7::date, enrollment_date),
+        advance_paid = COALESCE($8, advance_paid),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
-  `, [id, data.parent_name, data.parent_relation, data.parent_contact, data.address, data.status]);
+  `, [
+    id, data.parent_name, data.parent_relation, data.parent_contact, 
+    data.address, data.status, data.joining_date, data.advance_paid
+  ]);
+
+  // Update batch enrollments if batch_ids provided
+  if (data.batch_ids) {
+    await query(`DELETE FROM public.batch_enrollments WHERE student_id = $1`, [id]);
+    for (const bId of data.batch_ids) {
+      await query(`
+        INSERT INTO public.batch_enrollments (batch_id, student_id, status)
+        VALUES ($1, $2, 'active')
+        ON CONFLICT (batch_id, student_id) DO UPDATE SET status = 'active';
+      `, [bId, id]);
+    }
+  }
 
   const prof = await queryOne<{ full_name: string; email: string; phone: string }>(
     `SELECT full_name, email, phone FROM public.profiles WHERE id = $1`,
@@ -544,6 +655,31 @@ export async function updateStudent(id: string, data: {
     email: prof?.email || data.email,
     phone: prof?.phone || data.phone
   };
+}
+
+export async function deleteStudent(id: string) {
+  // Check if student has historical payment or attendance records
+  const [att] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.attendance WHERE student_id = $1`, [id]);
+  const [inv] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.student_fee_invoices WHERE student_id = $1`, [id]);
+  const hasHistory = (parseInt(att?.count || '0', 10) > 0) || (parseInt(inv?.count || '0', 10) > 0);
+
+  // Remove active batch enrollments
+  await query(`DELETE FROM public.batch_enrollments WHERE student_id = $1`, [id]);
+
+  if (hasHistory) {
+    // Correctly preserve historical records: mark student as inactive
+    return queryOne<Student>(`
+      UPDATE public.students
+      SET status = 'inactive', updated_at = now()
+      WHERE id = $1
+      RETURNING *;
+    `, [id]);
+  } else {
+    // Safe to delete if no historical transactions
+    return queryOne<Student>(`
+      DELETE FROM public.students WHERE id = $1 RETURNING *;
+    `, [id]);
+  }
 }
 
 export async function enrollStudentInBatch(studentId: string, batchId: string) {
