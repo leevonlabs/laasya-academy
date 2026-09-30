@@ -14,7 +14,9 @@ import {
   Settings, 
   LogOut,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Receipt,
+  Banknote
 } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 
@@ -32,6 +34,8 @@ export default async function DashboardLayout({
 
   const navItems = [
     { label: 'Overview', href: '/overview', icon: LayoutDashboard },
+    { label: 'Student Fees', href: '/fees', icon: Receipt, badge: 'Finance' },
+    { label: 'Guru Salaries', href: '/salaries', icon: Banknote, badge: 'Payroll' },
     { label: 'Courses (18)', href: '/courses', icon: BookOpen },
     { label: 'Gurus (14)', href: '/trainers', icon: Users },
     { label: 'Students', href: '/students', icon: GraduationCap },
@@ -76,10 +80,17 @@ export default async function DashboardLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[14.5px] font-semibold text-rose-50 hover:bg-[#8A064D] hover:text-white transition group border border-transparent hover:border-[#F9E33A]/40 shadow-xs hover:shadow-md"
+                className="flex items-center justify-between px-4 py-3 rounded-2xl text-[14.5px] font-semibold text-rose-50 hover:bg-[#8A064D] hover:text-white transition group border border-transparent hover:border-[#F9E33A]/40 shadow-xs hover:shadow-md"
               >
-                <Icon className="w-5 h-5 text-[#F9E33A] group-hover:scale-110 transition-transform shrink-0" />
-                <span>{item.label}</span>
+                <div className="flex items-center gap-3.5">
+                  <Icon className="w-5 h-5 text-[#F9E33A] group-hover:scale-110 transition-transform shrink-0" />
+                  <span>{item.label}</span>
+                </div>
+                {item.badge && (
+                  <span className="text-[9.5px] uppercase font-extrabold tracking-wider px-2 py-0.5 rounded-full bg-[#F9E33A] text-[#2D041A]">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}

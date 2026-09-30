@@ -176,7 +176,7 @@ export async function getTrainers(): Promise<Trainer[]> {
   const sql = `
     SELECT 
       t.id, t.profile_id, p.full_name, p.email, p.phone,
-      t.specializations, t.display_title, t.bio, t.is_active, t.joined_date,
+      t.specializations, t.display_title, t.bio, t.is_active, t.joined_date::text as joined_date,
       COUNT(b.id)::int as batches_assigned
     FROM public.trainers t
     JOIN public.profiles p ON p.id = t.profile_id
@@ -274,7 +274,7 @@ export async function getStudents(): Promise<Student[]> {
   const sql = `
     SELECT 
       s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone,
-      s.parent_name, s.status, s.enrollment_date,
+      s.parent_name, s.status, s.enrollment_date::text as enrollment_date,
       COUNT(DISTINCT be.batch_id)::int as enrolled_batches_count,
       ROUND(
         COALESCE(

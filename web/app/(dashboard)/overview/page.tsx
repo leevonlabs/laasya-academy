@@ -6,6 +6,7 @@ import {
   getCourses, 
   getBatches 
 } from '@/lib/academy';
+import { getFinancialSummary } from '@/lib/finance';
 import { 
   BookOpen, 
   Users, 
@@ -17,13 +18,16 @@ import {
   Sparkles,
   MapPin,
   KeyRound,
-  PlayCircle
+  PlayCircle,
+  Receipt,
+  Banknote
 } from 'lucide-react';
 
 export const revalidate = 0; // Fresh dynamic data
 
 export default async function OverviewPage() {
   const metrics = await getDashboardMetrics();
+  const finance = await getFinancialSummary();
   const todaySessions = await getSessions();
   const allCourses = await getCourses();
   const allBatches = await getBatches();
@@ -154,6 +158,147 @@ export default async function OverviewPage() {
           <div className="flex items-baseline justify-between mt-1">
             <span className="text-2xl font-bold text-[#2D041A]">{metrics.presentTodayCount}</span>
             <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Checked in</span>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Financial Health & Cash Flow Overview (Owner Exclusive) */}
+      <div className="bg-white rounded-3xl p-7 border border-[#F0D5E4] shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#590231] text-[#F9E33A] flex items-center justify-center shadow-md shrink-0">
+              <Banknote className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-[#2D041A]">Academy Financial Health & Cash Flow</h2>
+                <span className="text-[10px] font-extrabold uppercase bg-[#F9E33A] text-[#2D041A] px-2 py-0.5 rounded-full">
+                  Owner Confidential
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Real-time tracking of student fee collections, overdue invoices, Guru salary disbursements, and operational cash flow.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <Link
+              href="/fees"
+              className="px-3.5 py-2 bg-[#FFF2F8] hover:bg-[#FFE3EF] text-[#8A064D] border border-[#F0D5E4] rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span>Student Fees</span>
+            </Link>
+            <Link
+              href="/salaries"
+              className="px-3.5 py-2 bg-[#8A064D] hover:bg-[#70043E] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+            >
+              <Banknote className="w-3.5 h-3.5 text-[#F9E33A]" />
+              <span>Guru Payroll</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* 4 Financial Highlight Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* Card 1: Fee Collections */}
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-emerald-100/30 border border-emerald-200">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase text-emerald-800">Fee Collections</span>
+              <span className="text-[10px] font-bold bg-emerald-200/60 text-emerald-900 px-2 py-0.5 rounded-full">
+                {finance.collectionRate}% Collected
+              </span>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-2xl font-black text-emerald-950">
+                ₹{finance.totalFeeCollected.toLocaleString('en-IN')}
+              </span>
+            </div>
+            <p className="text-[11px] text-emerald-700/90 mt-1 font-medium">
+              ₹{finance.totalFeeBilled.toLocaleString('en-IN')} total billed • {finance.totalStudentsBilled} students
+            </p>
+          </div>
+
+          {/* Card 2: Pending Fees */}
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50/80 to-rose-50/30 border border-amber-200">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase text-amber-900">Pending Fees</span>
+              <span className="text-[10px] font-bold bg-amber-200/70 text-amber-950 px-2 py-0.5 rounded-full">
+                {finance.overdueInvoicesCount} Overdue
+              </span>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-2xl font-black text-amber-950">
+                ₹{finance.totalFeePending.toLocaleString('en-IN')}
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-800/90 mt-1 font-medium">
+              {finance.partialInvoicesCount} partial accounts • WhatsApp reminders active
+            </p>
+          </div>
+
+          {/* Card 3: Salaries Paid */}
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-[#FFF2F8] to-rose-50/50 border border-[#F0D5E4]">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase text-[#8A064D]">Salaries Paid</span>
+              <span className="text-[10px] font-bold bg-rose-100 text-[#8A064D] px-2 py-0.5 rounded-full">
+                Disbursed
+              </span>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-2xl font-black text-[#2D041A]">
+                ₹{finance.totalSalariesPaid.toLocaleString('en-IN')}
+              </span>
+            </div>
+            <p className="text-[11px] text-gray-600 mt-1 font-medium">
+              Net payroll credited to revered Gurus
+            </p>
+          </div>
+
+          {/* Card 4: Pending Salaries */}
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50/80 to-blue-50/30 border border-indigo-200">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase text-indigo-900">Pending Salaries</span>
+              <span className="text-[10px] font-bold bg-indigo-200/70 text-indigo-950 px-2 py-0.5 rounded-full">
+                Awaiting Payout
+              </span>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-2xl font-black text-indigo-950">
+                ₹{finance.totalSalariesPending.toLocaleString('en-IN')}
+              </span>
+            </div>
+            <p className="text-[11px] text-indigo-800/90 mt-1 font-medium">
+              Active Advances: ₹{finance.totalAdvancesActive.toLocaleString('en-IN')}
+            </p>
+          </div>
+
+        </div>
+
+        {/* Operational Cash Flow Footer Strip */}
+        <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500 font-medium">Operating Cash Flow (Fees Collected - Salaries Paid):</span>
+            <span className={`font-bold px-2.5 py-0.5 rounded-full ${
+              finance.netOperatingCashFlow >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+            }`}>
+              {finance.netOperatingCashFlow >= 0 ? '+' : ''}₹{finance.netOperatingCashFlow.toLocaleString('en-IN')}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4 text-gray-500">
+            <Link href="/fees" className="font-semibold text-[#8A064D] hover:underline flex items-center gap-1">
+              <span>View Invoices & Receipts</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </Link>
+            <span className="text-gray-300">•</span>
+            <Link href="/salaries" className="font-semibold text-[#8A064D] hover:underline flex items-center gap-1">
+              <span>Manage Guru Payroll</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
 
