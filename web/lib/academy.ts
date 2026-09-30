@@ -19,6 +19,7 @@ export interface Trainer {
   email: string;
   phone: string;
   specializations: string[];
+  display_title?: string;
   bio: string;
   is_active: boolean;
   joined_date: string;
@@ -175,12 +176,12 @@ export async function getTrainers(): Promise<Trainer[]> {
   const sql = `
     SELECT 
       t.id, t.profile_id, p.full_name, p.email, p.phone,
-      t.specializations, t.bio, t.is_active, t.joined_date,
+      t.specializations, t.display_title, t.bio, t.is_active, t.joined_date,
       COUNT(b.id)::int as batches_assigned
     FROM public.trainers t
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batches b ON b.trainer_id = t.id
-    GROUP BY t.id, t.profile_id, p.full_name, p.email, p.phone
+    GROUP BY t.id, t.profile_id, p.full_name, p.email, p.phone, t.specializations, t.display_title, t.bio, t.is_active, t.joined_date
     ORDER BY p.full_name;
   `;
   return query<Trainer>(sql);
@@ -188,11 +189,18 @@ export async function getTrainers(): Promise<Trainer[]> {
 
 export async function createTrainer(data: {
   full_name: string;
-  email: string;
-  phone: string;
+  email?: string;
+  phone?: string;
   specializations: string[];
+  display_title?: string;
   bio: string;
 }) {
+  const cleanEmail = (data.email && data.email.trim())
+    ? data.email.toLowerCase().trim()
+    : `${data.full_name.toLowerCase().replace(/[^a-z0-9]/g, '') || 'guru'}@laasyaacademy.com`;
+  const cleanPhone = data.phone?.trim() || '+91 8151 998 899';
+  const displayTitle = data.display_title?.trim() || 'Revered Guru & Mentor';
+
   // Create in auth.users first
   const [authUser] = await query<{ id: string }>(`
     INSERT INTO auth.users (
@@ -200,11 +208,11 @@ export async function createTrainer(data: {
       raw_user_meta_data, created_at, updated_at
     ) VALUES (
       '00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated', 'authenticated',
-      $1, crypt('Trainer@123', gen_salt('bf')), now(),
+      $1, crypt('Guru@123', gen_salt('bf')), now(),
       jsonb_build_object('full_name', $2::text, 'role', 'trainer', 'phone', $3::text),
       now(), now()
     ) RETURNING id;
-  `, [data.email.toLowerCase().trim(), data.full_name, data.phone]);
+  `, [cleanEmail, data.full_name, cleanPhone]);
 
   const uid = authUser.id;
 
@@ -213,14 +221,50 @@ export async function createTrainer(data: {
     INSERT INTO public.profiles (id, full_name, email, phone, role)
     VALUES ($1, $2, $3, $4, 'trainer')
     ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, phone = EXCLUDED.phone;
-  `, [uid, data.full_name, data.email, data.phone]);
+  `, [uid, data.full_name, cleanEmail, cleanPhone]);
 
   // Insert trainer
   return queryOne<Trainer>(`
-    INSERT INTO public.trainers (profile_id, specializations, bio, is_active)
-    VALUES ($1, $2, $3, true)
+    INSERT INTO public.trainers (profile_id, specializations, display_title, bio, is_active)
+    VALUES ($1, $2, $3, $4, true)
     RETURNING *;
-  `, [uid, data.specializations, data.bio]);
+  `, [uid, data.specializations, displayTitle, data.bio]);
+}
+
+export async function updateTrainer(id: string, data: {
+  full_name?: string;
+  display_title?: string;
+  phone?: string;
+  specializations?: string[];
+  bio?: string;
+  is_active?: boolean;
+}) {
+  const trainer = await queryOne<{ profile_id: string }>(
+    'SELECT profile_id FROM public.trainers WHERE id = $1',
+    [id]
+  );
+  if (!trainer) throw new Error('Guru not found');
+
+  if (data.full_name || data.phone) {
+    await query(`
+      UPDATE public.profiles
+      SET full_name = COALESCE($2, full_name),
+          phone = COALESCE($3, phone),
+          updated_at = now()
+      WHERE id = $1
+    `, [trainer.profile_id, data.full_name, data.phone]);
+  }
+
+  return queryOne<Trainer>(`
+    UPDATE public.trainers
+    SET display_title = COALESCE($2, display_title),
+        specializations = COALESCE($3, specializations),
+        bio = COALESCE($4, bio),
+        is_active = COALESCE($5, is_active),
+        updated_at = now()
+    WHERE id = $1
+    RETURNING *;
+  `, [id, data.display_title, data.specializations, data.bio, data.is_active]);
 }
 
 // -------------------------------------------------------------
