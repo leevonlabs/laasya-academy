@@ -70,7 +70,7 @@ export default async function OverviewPage() {
               href="/trainers"
               className="bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2.5 rounded-xl text-xs border border-white/20 transition flex items-center gap-1.5"
             >
-              <span>+ Add Trainer</span>
+              <span>+ Add Guru</span>
             </Link>
             <Link
               href="/students"
@@ -102,10 +102,10 @@ export default async function OverviewPage() {
           <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center mb-3">
             <Users className="w-5 h-5" />
           </div>
-          <p className="text-xs font-medium text-gray-500">Active Gurus / Trainers</p>
+          <p className="text-xs font-medium text-gray-500">Faculty & Revered Gurus</p>
           <div className="flex items-baseline justify-between mt-1">
             <span className="text-2xl font-bold text-[#2D041A]">{metrics.totalTrainers}</span>
-            <span className="text-[10px] text-gray-400">Instructors</span>
+            <span className="text-[10px] text-gray-400">Masters</span>
           </div>
         </div>
 
@@ -204,7 +204,7 @@ export default async function OverviewPage() {
                       </div>
                       
                       <p className="text-xs text-gray-600 mt-0.5">
-                        Trainer: <span className="font-medium text-gray-800">{session.trainer_name}</span>
+                        Guru: <span className="font-medium text-gray-800">{session.trainer_name}</span>
                       </p>
 
                       <p className="text-xs text-gray-500 mt-0.5">

@@ -77,7 +77,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
           ...added,
           course_title: crs?.title || 'Course',
           course_category: crs?.category || 'Category',
-          trainer_name: trn?.full_name || 'Trainer',
+          trainer_name: trn?.full_name || 'Revered Guru',
           enrolled_count: 0
         }]);
         setIsAddOpen(false);
@@ -112,7 +112,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
             <input
               type="text"
-              placeholder="Search batches by name, course, trainer..."
+              placeholder="Search batches by name, course, guru..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-4 py-2 bg-white border border-[#F0D5E4] rounded-xl text-xs w-72 focus:outline-none focus:ring-2 focus:ring-[#8A064D]"
@@ -161,7 +161,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
                 <div className="mt-4 space-y-2 text-xs text-gray-600 bg-gray-50/70 p-3 rounded-2xl border border-gray-100">
                   <div className="flex items-center gap-2">
                     <Users className="w-3.5 h-3.5 text-[#8A064D]" />
-                    <span>Trainer: <strong className="text-gray-800">{b.trainer_name}</strong></span>
+                    <span>Guru: <strong className="text-gray-800">{b.trainer_name}</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="w-3.5 h-3.5 text-[#8A064D]" />
@@ -257,7 +257,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Assigned Instructor / Guru</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Assigned Guru / Faculty Master</label>
                   <select
                     value={trainerId}
                     onChange={(e) => setTrainerId(e.target.value)}

@@ -35,7 +35,7 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8FA),
       appBar: AppBar(
-        title: const Text('Faculty Notices & Updates'),
+        title: const Text('Guru Notices & Updates'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

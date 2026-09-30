@@ -34,24 +34,24 @@ interface Props {
 // Realistic Mock Database Seed for rich demonstration across all 18 courses
 // ---------------------------------------------------------------------------
 const MOCK_COURSES = [
-  { id: 'c-1', title: 'Bharathanatyam', category: 'Classical Dance', trainer: 'Guru Smt. Radhika Sharma', batch: 'Batch A (Evening)', enrolled: 42, sessions: 24, rate: 94 },
-  { id: 'c-2', title: 'Kuchupudi', category: 'Classical Dance', trainer: 'Guru Smt. Radhika Sharma', batch: 'Weekend Masterclass', enrolled: 28, sessions: 20, rate: 91 },
-  { id: 'c-3', title: 'Carnatic Music', category: 'Vocal & Music', trainer: 'Vidwan Sri K. Venkatesh', batch: 'Morning Ragas', enrolled: 35, sessions: 26, rate: 89 },
-  { id: 'c-4', title: 'Karatte', category: 'Martial Arts', trainer: 'Sensei Rajesh Varma', batch: 'Dojo Belt Batch', enrolled: 48, sessions: 30, rate: 95 },
-  { id: 'c-5', title: 'Violin', category: 'Musical Instruments', trainer: 'Vidwan Sri K. Venkatesh', batch: 'Strings Foundation', enrolled: 22, sessions: 18, rate: 88 },
-  { id: 'c-6', title: 'Keyboard', category: 'Musical Instruments', trainer: 'Master Anthony David', batch: 'Western Notation', enrolled: 38, sessions: 22, rate: 92 },
-  { id: 'c-7', title: 'Guitar', category: 'Musical Instruments', trainer: 'Master Anthony David', batch: 'Acoustic Fingerstyle', enrolled: 30, sessions: 20, rate: 90 },
-  { id: 'c-8', title: 'Yoga', category: 'Modern Dance & Fitness', trainer: 'Acharya Ramanathan', batch: 'Sunrise Asanas', enrolled: 40, sessions: 28, rate: 96 },
-  { id: 'c-9', title: 'Drawing', category: 'Fine Arts', trainer: 'Smt. Lakshmi Devi', batch: 'Pencil & Acrylics', enrolled: 32, sessions: 16, rate: 93 },
-  { id: 'c-10', title: 'Chess', category: 'Mind Sports', trainer: 'Coach Anand V.', batch: 'Grandmaster Tactics', enrolled: 25, sessions: 22, rate: 92 },
-  { id: 'c-11', title: 'Western Dance', category: 'Modern Dance & Fitness', trainer: 'Master Kevin', batch: 'Hip-Hop Juniors', enrolled: 36, sessions: 24, rate: 94 },
-  { id: 'c-12', title: 'Zumba', category: 'Modern Dance & Fitness', trainer: 'Master Kevin', batch: 'Cardio Rhythm', enrolled: 34, sessions: 20, rate: 91 },
-  { id: 'c-13', title: 'Mohiniyatam', category: 'Classical Dance', trainer: 'Guru Smt. Radhika Sharma', batch: 'Lasya Grace', enrolled: 18, sessions: 16, rate: 89 },
-  { id: 'c-14', title: 'Semi Classical', category: 'Classical Dance', trainer: 'Guru Smt. Radhika Sharma', batch: 'Fusion Choreography', enrolled: 26, sessions: 18, rate: 92 },
-  { id: 'c-15', title: 'Kalari', category: 'Martial Arts', trainer: 'Sensei Rajesh Varma', batch: 'Meipayattu Flow', enrolled: 20, sessions: 18, rate: 95 },
-  { id: 'c-16', title: 'Gymnastic', category: 'Modern Dance & Fitness', trainer: 'Master Kevin', batch: 'Acrobatics Floor', enrolled: 24, sessions: 20, rate: 90 },
-  { id: 'c-17', title: 'Art and Craft', category: 'Fine Arts', trainer: 'Smt. Lakshmi Devi', batch: 'Creative Clay & DIY', enrolled: 28, sessions: 16, rate: 94 },
-  { id: 'c-18', title: 'Ukulele', category: 'Musical Instruments', trainer: 'Master Anthony David', batch: 'Hawaiian Strumming', enrolled: 16, sessions: 14, rate: 87 }
+  { id: 'c-1', title: 'Bharathanatyam', category: 'Classical Dance', trainer: 'Smt. Anusha Sumesh (Founder & Guru)', batch: 'Batch A (Evening)', enrolled: 42, sessions: 24, rate: 94 },
+  { id: 'c-2', title: 'Kuchupudi', category: 'Classical Dance', trainer: 'Guru Pramod T. Peethambaran', batch: 'Weekend Masterclass', enrolled: 28, sessions: 20, rate: 91 },
+  { id: 'c-3', title: 'Carnatic Music', category: 'Vocal & Music', trainer: 'Shri H. Manikandan (Sangeetha Acharya)', batch: 'Morning Ragas', enrolled: 35, sessions: 26, rate: 89 },
+  { id: 'c-4', title: 'Karatte', category: 'Martial Arts', trainer: 'Sensei Vijay Kumar Olekar (2nd Dan)', batch: 'Dojo Belt Batch', enrolled: 48, sessions: 30, rate: 95 },
+  { id: 'c-5', title: 'Violin', category: 'Musical Instruments', trainer: 'Guru Amos P Ovung (Director)', batch: 'Strings Foundation', enrolled: 22, sessions: 18, rate: 88 },
+  { id: 'c-6', title: 'Keyboard', category: 'Musical Instruments', trainer: 'Guru Shahil Patro (Trinity/RSL)', batch: 'Western Notation', enrolled: 38, sessions: 22, rate: 92 },
+  { id: 'c-7', title: 'Guitar', category: 'Musical Instruments', trainer: 'Guru Amos P Ovung (Director)', batch: 'Acoustic Fingerstyle', enrolled: 30, sessions: 20, rate: 90 },
+  { id: 'c-8', title: 'Yoga', category: 'Modern Dance & Fitness', trainer: 'Acharya Sathish Kale (Yoga Acharya)', batch: 'Sunrise Asanas', enrolled: 40, sessions: 28, rate: 96 },
+  { id: 'c-9', title: 'Drawing', category: 'Fine Arts', trainer: 'Guru Dipayan Sarkar (MFA Santiniketan)', batch: 'Pencil & Acrylics', enrolled: 32, sessions: 16, rate: 93 },
+  { id: 'c-10', title: 'Chess', category: 'Mind Sports', trainer: 'Coach Sai Krishna (State Medalist)', batch: 'Grandmaster Tactics', enrolled: 25, sessions: 22, rate: 92 },
+  { id: 'c-11', title: 'Western Dance', category: 'Modern Dance & Fitness', trainer: 'Guru Karthik R (Dhee / DKD)', batch: 'Hip-Hop Juniors', enrolled: 36, sessions: 24, rate: 94 },
+  { id: 'c-12', title: 'Zumba', category: 'Modern Dance & Fitness', trainer: 'Guru Ranjith Kumar S J', batch: 'Cardio Rhythm', enrolled: 34, sessions: 20, rate: 91 },
+  { id: 'c-13', title: 'Mohiniyatam', category: 'Classical Dance', trainer: 'Guru Sruthy Ramesh', batch: 'Lasya Grace', enrolled: 18, sessions: 16, rate: 89 },
+  { id: 'c-14', title: 'Semi Classical', category: 'Classical Dance', trainer: 'Guru Nandhana (Nandana Krishna)', batch: 'Fusion Choreography', enrolled: 26, sessions: 18, rate: 92 },
+  { id: 'c-15', title: 'Kalari', category: 'Martial Arts', trainer: 'Guru Vrushabh Prakash Owhal', batch: 'Meipayattu Flow', enrolled: 20, sessions: 18, rate: 95 },
+  { id: 'c-16', title: 'Gymnastic', category: 'Modern Dance & Fitness', trainer: 'Guru Ranjith Kumar S J', batch: 'Acrobatics Floor', enrolled: 24, sessions: 20, rate: 90 },
+  { id: 'c-17', title: 'Art and Craft', category: 'Fine Arts', trainer: 'Guru Dipayan Sarkar (MFA Santiniketan)', batch: 'Creative Clay & DIY', enrolled: 28, sessions: 16, rate: 94 },
+  { id: 'c-18', title: 'Ukulele', category: 'Musical Instruments', trainer: 'Guru Shahil Patro', batch: 'Hawaiian Strumming', enrolled: 16, sessions: 14, rate: 87 }
 ];
 
 const SEED_STUDENTS = [
@@ -96,9 +96,9 @@ function generateRealisticAttendance(): AttendanceRecord[] {
         } else if (rand > 75) {
           status = 'late';
           checkInTime = `${d}T17:${(25 + (rand % 12)).toString().padStart(2, '0')}:00Z`;
-          method = 'Trainer Verified';
+          method = 'Guru Verified';
         } else if (rand % 3 === 0) {
-          method = 'Trainer Verified (Live Roster)';
+          method = 'Guru Verified (Live Roster)';
         }
 
         records.push({

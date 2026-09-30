@@ -283,7 +283,7 @@ class _StudentAttendanceTabState extends State<StudentAttendanceTab> {
                                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
                                   ),
                                   Text(
-                                    'Enter 6-digit PIN displayed on your Trainer\'s screen',
+                                    'Enter 6-digit PIN displayed on your Guru\'s screen',
                                     style: TextStyle(fontSize: 11, color: LaasyaColors.textMuted),
                                   ),
                                 ],

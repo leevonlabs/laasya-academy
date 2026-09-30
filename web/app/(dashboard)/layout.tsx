@@ -33,7 +33,7 @@ export default async function DashboardLayout({
   const navItems = [
     { label: 'Overview', href: '/overview', icon: LayoutDashboard },
     { label: 'Courses (18)', href: '/courses', icon: BookOpen },
-    { label: 'Trainers', href: '/trainers', icon: Users },
+    { label: 'Gurus (14)', href: '/trainers', icon: Users },
     { label: 'Students', href: '/students', icon: GraduationCap },
     { label: 'Batches', href: '/batches', icon: Calendar },
     { label: 'Today Schedule', href: '/schedule', icon: Clock },

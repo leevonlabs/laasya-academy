@@ -84,13 +84,13 @@ export default function TrainersListClient({ initialTrainers }: Props) {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#2D041A] flex items-center gap-2">
-            <span>Faculty & Instructors</span>
-            <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-full font-semibold">
+            <span>Faculty & Revered Gurus</span>
+            <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-full font-bold">
               {trainers.length} Gurus
             </span>
           </h1>
           <p className="text-xs text-gray-500 mt-1">
-            Manage classical dance gurus, vocal masters, music maestros, and martial arts trainers.
+            Manage classical dance gurus, vocal masters, musical instrument mentors, and martial arts acharyas.
           </p>
         </div>
 
@@ -111,7 +111,7 @@ export default function TrainersListClient({ initialTrainers }: Props) {
             className="bg-[#8A064D] hover:bg-[#70043E] text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-[#F9E33A]" />
-            <span>Add Instructor</span>
+            <span>Add New Guru</span>
           </button>
         </div>
       </div>
@@ -135,7 +135,7 @@ export default function TrainersListClient({ initialTrainers }: Props) {
                       {t.full_name}
                     </h3>
                     <span className="text-[11px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full inline-block mt-0.5">
-                      Active Instructor
+                      Active Guru / Mentor
                     </span>
                   </div>
                 </div>
@@ -199,8 +199,8 @@ export default function TrainersListClient({ initialTrainers }: Props) {
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
               <div>
-                <h3 className="font-bold text-base text-[#2D041A]">Add New Instructor</h3>
-                <p className="text-xs text-gray-500">Create instructor account and assign art disciplines.</p>
+                <h3 className="font-bold text-base text-[#2D041A]">Add New Guru / Faculty Master</h3>
+                <p className="text-xs text-gray-500">Create Guru profile and assign cultural disciplines.</p>
               </div>
               <button
                 onClick={() => setIsAddOpen(false)}
@@ -212,7 +212,7 @@ export default function TrainersListClient({ initialTrainers }: Props) {
 
             <form onSubmit={handleAddTrainer} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Guru / Trainer Full Name</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Guru Full Name & Title</label>
                 <input
                   type="text"
                   required

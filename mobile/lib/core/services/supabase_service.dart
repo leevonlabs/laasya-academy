@@ -94,43 +94,43 @@ class SupabaseService {
     }
 
     // -------------------------------------------------------------------------
-    // Faculty & Trainers
+    // Faculty & Revered Gurus
     // -------------------------------------------------------------------------
-    if (identifier.contains('venkatesh') || identifier.contains('22222')) {
+    if (identifier.contains('amos') || identifier.contains('director') || identifier.contains('8151998899')) {
       _cachedProfile = {
-        'id': 'tr-mock-2',
-        'full_name': 'Vidwan Sri K. Venkatesh',
-        'email': 'venkatesh.music@laasyaacademy.com',
-        'phone': '+91 98480 22222',
+        'id': 'guru-amos',
+        'full_name': 'Amos P Ovung',
+        'email': 'amos@laasyaacademy.com',
+        'phone': '+91 8151 998 899',
         'role': 'trainer',
-        'specialization': 'Carnatic Vocal & Veena',
-        'designation': 'Senior Faculty • Music',
-        'assigned_batches_count': 3,
-        'total_students_count': 28,
+        'specialization': 'Violin, Guitar, Keyboard & Western Music',
+        'designation': 'Director & Multi-Instrumentalist (Trinity / RSL Topper)',
+        'assigned_batches_count': 4,
+        'total_students_count': 52,
       };
       return _cachedProfile;
-    } else if (identifier.contains('rajesh') || identifier.contains('33333')) {
+    } else if (identifier.contains('manikandan') || identifier.contains('vocal')) {
       _cachedProfile = {
-        'id': 'tr-mock-3',
-        'full_name': 'Sensei Rajesh Varma',
-        'email': 'rajesh.martial@laasyaacademy.com',
-        'phone': '+91 98480 33333',
+        'id': 'guru-manikandan',
+        'full_name': 'Shri H. Manikandan',
+        'email': 'manikandan@laasyaacademy.com',
+        'phone': '+91 98765 00003',
         'role': 'trainer',
-        'specialization': 'Karate & Self Defense',
-        'designation': 'Chief Master • Martial Arts',
-        'assigned_batches_count': 2,
+        'specialization': 'Carnatic Vocal & Classical Music',
+        'designation': 'Title "Sangeetha Acharya" • 15+ Yrs Palakkad Disciple',
+        'assigned_batches_count': 3,
         'total_students_count': 35,
       };
       return _cachedProfile;
-    } else if (identifier.contains('trainer') || identifier.contains('radhika') || identifier.contains('11111')) {
+    } else if (identifier.contains('guru') || identifier.contains('anusha') || identifier.contains('trainer') || identifier.contains('11111') || identifier.contains('dance')) {
       _cachedProfile = {
-        'id': 'tr-mock-1',
-        'full_name': 'Guru Smt. Radhika Sharma',
-        'email': 'radhika.dance@laasyaacademy.com',
-        'phone': '+91 98480 11111',
+        'id': 'guru-anusha',
+        'full_name': 'Smt. Anusha Sumesh',
+        'email': 'anusha@laasyaacademy.com',
+        'phone': '+91 98765 00004',
         'role': 'trainer',
-        'specialization': 'Bharathanatyam Classical Dance',
-        'designation': 'Senior Guru & Choreographer',
+        'specialization': 'Bharatanatyam Classical Dance',
+        'designation': 'Founder & Bharatanatyam Master (Guruvayoor Arangetram)',
         'assigned_batches_count': 4,
         'total_students_count': 42,
       };
@@ -692,7 +692,7 @@ class SupabaseService {
     } else {
       return {
         'success': false,
-        'error': 'Invalid 6-digit Check-In PIN. Please check the code displayed by your Trainer.',
+        'error': 'Invalid 6-digit Check-In PIN. Please check the code displayed by your Guru.',
       };
     }
   }

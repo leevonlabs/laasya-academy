@@ -40,13 +40,13 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Edit Faculty Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text('Edit Guru Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Faculty Full Name'),
+              decoration: const InputDecoration(labelText: 'Guru Full Name'),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -74,7 +74,7 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
               nav.pop();
               _loadProfile();
               messenger.showSnackBar(
-                const SnackBar(content: Text('Faculty details updated successfully!')),
+                const SnackBar(content: Text('Guru details updated successfully!')),
               );
             },
             child: const Text('Save Changes'),
@@ -328,13 +328,13 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
             // 4. SECURITY & PASSWORDS
             // =================================================================
             _sectionCard(
-              title: 'Faculty Security',
+              title: 'Guru Security',
               children: [
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.lock_reset_rounded, color: LaasyaColors.primary),
                   title: const Text('Change Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Update your faculty portal login password', style: TextStyle(fontSize: 11)),
+                  subtitle: const Text('Update your Guru portal login password', style: TextStyle(fontSize: 11)),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                   onTap: _showChangePasswordDialog,
                 ),
@@ -354,7 +354,7 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 icon: const Icon(Icons.logout_rounded, size: 18),
-                label: const Text('Log Out of Trainer Account', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: const Text('Log Out of Guru Account', style: TextStyle(fontWeight: FontWeight.bold)),
                 onPressed: _handleLogout,
               ),
             ),

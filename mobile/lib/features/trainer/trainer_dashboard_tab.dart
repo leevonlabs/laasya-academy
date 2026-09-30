@@ -104,7 +104,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Faculty Portal',
+                          'Guru Portal',
                           style: TextStyle(color: Colors.white70, fontSize: 12),
                         ),
                         const SizedBox(height: 2),

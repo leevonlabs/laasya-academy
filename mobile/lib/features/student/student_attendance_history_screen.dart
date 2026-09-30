@@ -74,7 +74,7 @@ class _StudentAttendanceHistoryScreenState extends State<StudentAttendanceHistor
                       final batch = session?['batches'];
                       final course = batch?['courses'];
                       final status = (r['status'] as String? ?? 'absent').toLowerCase();
-                      final method = r['check_in_method'] == 'student_code' ? 'Self Check-in (PIN)' : 'Trainer Marked';
+                      final method = r['check_in_method'] == 'student_code' ? 'Self Check-in (PIN)' : 'Guru Marked';
 
                       return Card(
                         child: Padding(

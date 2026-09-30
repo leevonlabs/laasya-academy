@@ -135,7 +135,7 @@ export default function ScheduleListClient({ initialSessions }: Props) {
                   </div>
 
                   <p className="text-xs text-gray-600 mt-1">
-                    Guru / Trainer: <strong className="text-gray-800">{s.trainer_name}</strong>
+                    Guru: <strong className="text-gray-800">{s.trainer_name}</strong>
                   </p>
 
                   <p className="text-xs text-gray-500 mt-0.5">

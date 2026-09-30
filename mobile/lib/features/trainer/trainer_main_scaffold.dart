@@ -32,11 +32,11 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
     ];
 
     final titles = [
-      'Faculty Dashboard',
+      'Guru Dashboard',
       'My Classes & Schedule',
       'Student Management',
       'Attendance Management',
-      'Trainer Profile & Settings',
+      'Guru Profile & Settings',
     ];
 
     return Scaffold(
@@ -73,7 +73,7 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
-            tooltip: 'Faculty Notices',
+            tooltip: 'Guru Notices',
             onPressed: () {
               Navigator.push(
                 context,

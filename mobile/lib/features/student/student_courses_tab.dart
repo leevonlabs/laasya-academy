@@ -100,7 +100,7 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
               const Divider(),
               const SizedBox(height: 12),
 
-              _detailRow(Icons.person_rounded, 'Assigned Guru / Trainer', course['trainer_name']!),
+              _detailRow(Icons.person_rounded, 'Assigned Revered Guru', course['trainer_name']!),
               _detailRow(Icons.groups_rounded, 'Batch Name', course['batch_name']!),
               _detailRow(Icons.access_time_rounded, 'Timings & Days', course['timings']!),
               _detailRow(Icons.room_rounded, 'Hall / Location', course['room']!),
@@ -265,7 +265,7 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
                                       const Icon(Icons.person_rounded, size: 16, color: LaasyaColors.primary),
                                       const SizedBox(width: 8),
                                       Text(
-                                        'Trainer: ${course['trainer_name']}',
+                                        'Guru: ${course['trainer_name']}',
                                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
                                       ),
                                     ],

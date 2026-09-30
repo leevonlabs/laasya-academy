@@ -14,6 +14,27 @@ import {
   BookOpen
 } from 'lucide-react';
 
+const COURSE_GURUS_MAP: Record<string, string> = {
+  'Bharathanatyam': 'Smt. Anusha Sumesh (Founder & Guru)',
+  'Kuchupudi': 'Guru Pramod T. Peethambaran',
+  'Mohiniyatam': 'Guru Sruthy Ramesh',
+  'Semi Classical': 'Guru Nandhana (Nandana Krishna)',
+  'Western Dance': 'Guru Karthik R (Dhee / DKD)',
+  'Zumba': 'Guru Ranjith Kumar S J',
+  'Gymnastic': 'Guru Ranjith Kumar S J',
+  'Carnatic Music': 'Shri H. Manikandan (Sangeetha Acharya)',
+  'Violin': 'Guru Amos P Ovung (Director)',
+  'Keyboard': 'Guru Shahil Patro (Trinity / RSL)',
+  'Guitar': 'Guru Amos P Ovung (Director)',
+  'Ukulele': 'Guru Shahil Patro',
+  'Drawing': 'Guru Dipayan Sarkar (MFA Santiniketan)',
+  'Art and Craft': 'Guru Dipayan Sarkar',
+  'Kalari': 'Guru Vrushabh Prakash Owhal',
+  'Karatte': 'Sensei Vijay Kumar Olekar (2nd Dan)',
+  'Yoga': 'Acharya Sathish Kale (Yoga Acharya)',
+  'Chess': 'Coach Sai Krishna (State Medalist)',
+};
+
 interface Props {
   initialCourses: Course[];
 }
@@ -208,6 +229,14 @@ export default function CourseListClient({ initialCourses }: Props) {
               <h3 className="text-base font-bold text-[#2D041A] group-hover:text-[#8A064D] transition">
                 {c.title}
               </h3>
+
+              {/* Assigned Guru Badge */}
+              <div className="mt-2 py-1.5 px-2.5 rounded-xl bg-[#FFF9FB] border border-rose-100 flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase text-[#8A064D]">Assigned Guru</span>
+                <span className="text-xs font-bold text-gray-800 truncate">
+                  {COURSE_GURUS_MAP[c.title] || 'Senior Faculty Guru'}
+                </span>
+              </div>
 
               {/* Description */}
               <p className="text-xs text-gray-600 mt-2 line-clamp-3 leading-relaxed">

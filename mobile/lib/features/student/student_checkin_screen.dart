@@ -234,7 +234,7 @@ class _StudentCheckInScreenState extends State<StudentCheckInScreen> {
 
         // 6-Digit PIN Field
         const Text(
-          '6-Digit Trainer Check-In PIN',
+          '6-Digit Guru Check-In PIN',
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
         ),
         const SizedBox(height: 8),

@@ -34,8 +34,8 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
         _identifierController.text = '9845012345';
         _passwordController.text = 'student123';
       } else {
-        _identifierController.text = 'radhika.dance';
-        _passwordController.text = 'Trainer@123';
+        _identifierController.text = 'anusha@laasyaacademy.com';
+        _passwordController.text = 'Guru@123';
       }
     });
   }
@@ -47,8 +47,8 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
         _identifierController.text = '9845012345';
         _passwordController.text = 'student123';
       } else {
-        _identifierController.text = 'radhika.dance';
-        _passwordController.text = 'Trainer@123';
+        _identifierController.text = 'anusha@laasyaacademy.com';
+        _passwordController.text = 'Guru@123';
       }
     });
   }
@@ -112,7 +112,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
             const Icon(Icons.lock_reset_rounded, color: Color(0xFFEBB128)),
             const SizedBox(width: 10),
             Text(
-              _isStudent ? 'Student Password Reset' : 'Faculty Password Reset',
+              _isStudent ? 'Student Password Reset' : 'Guru Password Reset',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
             ),
           ],
@@ -124,7 +124,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
             Text(
               _isStudent
                   ? 'Student accounts are created and registered by the Academy Office.'
-                  : 'Trainer accounts are authorized and managed by the Academy Director.',
+                  : 'Guru accounts are authorized and managed by the Academy Director.',
               style: const TextStyle(fontSize: 13, color: Colors.white70, height: 1.4),
             ),
             const SizedBox(height: 12),
@@ -273,7 +273,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                             ),
                           ),
 
-                          // Tab 2: Trainer Login
+                          // Tab 2: Guru Login
                           Expanded(
                             child: GestureDetector(
                               onTap: () => _switchRole(false),
@@ -293,7 +293,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                                 ),
                                 child: Center(
                                   child: Text(
-                                    'Trainer Login',
+                                    'Guru Login',
                                     style: TextStyle(
                                       color: !_isStudent ? const Color(0xFF260117) : Colors.white,
                                       fontSize: 14,
@@ -341,7 +341,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        _isStudent ? 'Registered mobile number' : 'Registered faculty email / mobile',
+                        _isStudent ? 'Registered mobile number' : 'Registered Guru email / mobile',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -364,7 +364,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                         fillColor: const Color(0xFF220016),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
+                           borderRadius: BorderRadius.circular(14),
                           borderSide: const BorderSide(color: Color(0xFFEBB128), width: 1.8),
                         ),
                         enabledBorder: OutlineInputBorder(
@@ -384,7 +384,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                           ),
                         ),
                         prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 24),
-                        hintText: _isStudent ? 'e.g. 9845012345 or LCA-10021' : 'e.g. radhika.dance',
+                        hintText: _isStudent ? 'e.g. 9845012345 or LCA-10021' : 'e.g. anusha@laasyaacademy.com',
                         hintStyle: const TextStyle(color: Colors.white38, fontSize: 13.5),
                       ),
                     ),
@@ -479,7 +479,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                                 child: CircularProgressIndicator(color: Color(0xFF250216), strokeWidth: 2.2),
                               )
                             : Text(
-                                _isStudent ? 'Log in as student' : 'Log in as trainer',
+                                _isStudent ? 'Log in as student' : 'Log in as Guru',
                                 style: const TextStyle(
                                   fontSize: 15.5,
                                   fontWeight: FontWeight.w800,
@@ -528,7 +528,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                               TextSpan(
                                 text: _isStudent
                                     ? 'Demo: 9845012345 / student123 · '
-                                    : 'Demo: radhika.dance / Trainer@123 · ',
+                                    : 'Demo: anusha@laasyaacademy.com / Guru@123 · ',
                                 style: const TextStyle(
                                   color: Colors.white70,
                                   fontSize: 12,

@@ -11,42 +11,42 @@ class TrainerLoginScreen extends StatefulWidget {
 }
 
 class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
-  final _identifierController = TextEditingController(text: 'radhika.dance@laasyaacademy.com');
-  final _passwordController = TextEditingController(text: 'Trainer@123');
+  final _identifierController = TextEditingController(text: 'anusha@laasyaacademy.com');
+  final _passwordController = TextEditingController(text: 'Guru@123');
 
   bool _obscurePassword = true;
   bool _rememberMe = true;
   bool _isLoading = false;
   String? _errorMessage;
-  String _selectedId = 'tr-1';
+  String _selectedId = 'guru-anusha';
 
   final List<Map<String, String>> _demoTrainers = [
     {
-      'id': 'tr-1',
-      'name': 'Guru Smt. Radhika Sharma',
-      'role': 'Senior Guru • Bharathanatyam Classical Dance',
-      'email': 'radhika.dance@laasyaacademy.com',
-      'mobile': '9848011111',
-      'initials': 'RS',
-      'password': 'Trainer@123',
+      'id': 'guru-anusha',
+      'name': 'Guru Anusha',
+      'role': 'Master Instructor • Kuchipudi Classical Dance',
+      'email': 'anusha@laasyaacademy.com',
+      'mobile': '+91 8151 998 899',
+      'initials': 'GA',
+      'password': 'Guru@123',
     },
     {
-      'id': 'tr-2',
-      'name': 'Vidwan Sri K. Venkatesh',
-      'role': 'Faculty • Carnatic Vocal & Veena',
-      'email': 'venkatesh.music@laasyaacademy.com',
-      'mobile': '9848022222',
-      'initials': 'KV',
-      'password': 'Trainer@123',
+      'id': 'guru-amos',
+      'name': 'Guru Amos',
+      'role': 'Master Instructor • Western & Bollywood Dance',
+      'email': 'amos@laasyaacademy.com',
+      'mobile': '+91 8155 889 988',
+      'initials': 'AM',
+      'password': 'Guru@123',
     },
     {
-      'id': 'tr-3',
-      'name': 'Sensei Rajesh Varma',
-      'role': 'Chief Master • Karate & Self Defense',
-      'email': 'rajesh.martial@laasyaacademy.com',
-      'mobile': '9848033333',
-      'initials': 'RV',
-      'password': 'Trainer@123',
+      'id': 'guru-manikandan',
+      'name': 'Guru Manikandan',
+      'role': 'Revered Guru • Bharatanatyam Classical Dance',
+      'email': 'manikandan@laasyaacademy.com',
+      'mobile': '+91 98450 12345',
+      'initials': 'GM',
+      'password': 'Guru@123',
     },
   ];
 
@@ -154,7 +154,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Trainer Login',
+          'Guru Login',
           style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
@@ -190,7 +190,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'GURU & TRAINER FACULTY ACCESS',
+                      'REVERED GURU & FACULTY ACCESS',
                       style: TextStyle(
                         color: LaasyaColors.accentGold,
                         fontSize: 13,
@@ -200,7 +200,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                     ),
                     const SizedBox(height: 2),
                     const Text(
-                      'Laasya Cultural Academy Faculty Portal',
+                      'Laasya Cultural Academy Guru Portal',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
@@ -225,7 +225,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Sign in to Trainer Dashboard',
+                      'Sign in to Guru Dashboard',
                       style: TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.bold,
@@ -262,9 +262,9 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                         ),
                       ),
 
-                    // Faculty Email / Phone Field
+                    // Guru Email / Phone Field
                     const Text(
-                      'Faculty Email or Phone Number',
+                      'Guru Email or Phone Number',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
                     ),
                     const SizedBox(height: 6),
@@ -272,7 +272,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                       controller: _identifierController,
                       keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
-                        hintText: 'e.g. radhika.dance@laasyaacademy.com',
+                        hintText: 'e.g. anusha@laasyaacademy.com',
                         prefixIcon: Icon(Icons.badge_outlined, color: LaasyaColors.primary, size: 20),
                       ),
                     ),
@@ -304,7 +304,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       decoration: InputDecoration(
-                        hintText: 'Enter trainer password',
+                        hintText: 'Enter Guru password',
                         prefixIcon: const Icon(Icons.lock_outline_rounded, color: LaasyaColors.primary, size: 20),
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -355,7 +355,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                             : const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text('Trainer Sign In', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                  Text('Guru Sign In', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                                   SizedBox(width: 8),
                                   Icon(Icons.arrow_forward_rounded, size: 18, color: LaasyaColors.accentGold),
                                 ],
@@ -380,7 +380,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Select Faculty Account',
+                                'Select Guru Account',
                                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: LaasyaColors.primaryDark),
                               ),
                               Text(

@@ -246,9 +246,9 @@ export default function CourseAttendanceDetailClient({ course, initialRecords }:
               </h1>
 
               <p className="text-xs text-gray-500 mt-1 flex flex-wrap items-center gap-3">
-                <span className="flex items-center gap-1 font-semibold text-gray-700">
+                <span className="flex items-center gap-1 font-semibold text-gray-800">
                   <User className="w-3.5 h-3.5 text-[#8A064D]" />
-                  {course.trainer}
+                  <span>Guru: <strong>{course.trainer}</strong></span>
                 </span>
                 <span>•</span>
                 <span>Batch: <strong className="text-gray-700">{course.batch}</strong></span>

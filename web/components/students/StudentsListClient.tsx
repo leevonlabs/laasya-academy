@@ -369,7 +369,7 @@ export default function StudentsListClient({ initialStudents, batches }: Props) 
                 >
                   {batches.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.name} ({b.course_title}) - {b.trainer_name}
+                      {b.name} ({b.course_title}) - Guru: {b.trainer_name}
                     </option>
                   ))}
                 </select>
