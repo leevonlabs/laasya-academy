@@ -26,6 +26,22 @@ export interface Trainer {
   batches_assigned?: number;
 }
 
+export interface StudentEnrolledBatch {
+  batch_id: string;
+  batch_name: string;
+  course_id: string;
+  course_title: string;
+  course_category: string;
+  monthly_fee: number;
+  trainer_id: string;
+  trainer_name: string;
+  days_of_week: string[];
+  start_time: string;
+  end_time: string;
+  room_or_hall: string;
+  enrollment_status: string;
+}
+
 export interface Student {
   id: string;
   profile_id: string;
@@ -34,10 +50,14 @@ export interface Student {
   email: string;
   phone: string;
   parent_name: string;
+  parent_relation?: string;
+  parent_contact?: string;
+  address?: string;
   status: 'active' | 'inactive' | 'suspended';
   enrollment_date: string;
   enrolled_batches_count?: number;
   attendance_rate?: number;
+  enrolled_batches?: StudentEnrolledBatch[];
 }
 
 export interface Batch {
@@ -274,7 +294,7 @@ export async function getStudents(): Promise<Student[]> {
   const sql = `
     SELECT 
       s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone,
-      s.parent_name, s.status, s.enrollment_date::text as enrollment_date,
+      s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, s.enrollment_date::text as enrollment_date,
       COUNT(DISTINCT be.batch_id)::int as enrolled_batches_count,
       ROUND(
         COALESCE(
@@ -287,10 +307,79 @@ export async function getStudents(): Promise<Student[]> {
     JOIN public.profiles p ON p.id = s.profile_id
     LEFT JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
     LEFT JOIN public.attendance a ON a.student_id = s.id
-    GROUP BY s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone, s.parent_name, s.status, s.enrollment_date
+    GROUP BY s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone, s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, s.enrollment_date
     ORDER BY p.full_name;
   `;
-  return query<Student>(sql);
+  const students = await query<Student>(sql);
+
+  // Fetch all active batch enrollments with batch & course & trainer info
+  const enrollments = await query<{
+    student_id: string;
+    batch_id: string;
+    batch_name: string;
+    course_id: string;
+    course_title: string;
+    course_category: string;
+    monthly_fee: number;
+    trainer_id: string;
+    trainer_name: string;
+    days_of_week: string[];
+    start_time: string;
+    end_time: string;
+    room_or_hall: string;
+    enrollment_status: string;
+  }>(`
+    SELECT 
+      be.student_id,
+      b.id as batch_id,
+      b.name as batch_name,
+      c.id as course_id,
+      c.title as course_title,
+      c.category as course_category,
+      c.monthly_fee,
+      t.id as trainer_id,
+      tp.full_name as trainer_name,
+      b.days_of_week,
+      b.start_time,
+      b.end_time,
+      b.room_or_hall,
+      be.status as enrollment_status
+    FROM public.batch_enrollments be
+    JOIN public.batches b ON b.id = be.batch_id
+    JOIN public.courses c ON c.id = b.course_id
+    JOIN public.trainers t ON t.id = b.trainer_id
+    JOIN public.profiles tp ON tp.id = t.profile_id
+    WHERE be.status = 'active'
+    ORDER BY b.start_time;
+  `);
+
+  const enrollMap = new Map<string, StudentEnrolledBatch[]>();
+  for (const row of enrollments) {
+    if (!enrollMap.has(row.student_id)) {
+      enrollMap.set(row.student_id, []);
+    }
+    enrollMap.get(row.student_id)!.push({
+      batch_id: row.batch_id,
+      batch_name: row.batch_name,
+      course_id: row.course_id,
+      course_title: row.course_title,
+      course_category: row.course_category,
+      monthly_fee: Number(row.monthly_fee),
+      trainer_id: row.trainer_id,
+      trainer_name: row.trainer_name,
+      days_of_week: row.days_of_week || [],
+      start_time: row.start_time,
+      end_time: row.end_time,
+      room_or_hall: row.room_or_hall,
+      enrollment_status: row.enrollment_status
+    });
+  }
+
+  for (const st of students) {
+    st.enrolled_batches = enrollMap.get(st.id) || [];
+  }
+
+  return JSON.parse(JSON.stringify(students));
 }
 
 export async function createStudent(data: {
@@ -298,9 +387,25 @@ export async function createStudent(data: {
   email: string;
   phone: string;
   parent_name: string;
-  emergency_contact: string;
+  parent_relation?: string;
+  parent_contact?: string;
+  address?: string;
+  emergency_contact?: string;
+  batch_ids?: string[];
 }) {
   const rollNumber = `LCA-${Math.floor(10000 + Math.random() * 90000)}`;
+
+  const cleanEmail = data.email.toLowerCase().trim();
+
+  // If email already exists in auth.users, use unique alias for auth.users to ensure unique profile_id
+  let authEmail = cleanEmail;
+  const existingUser = await queryOne<{ id: string }>(
+    `SELECT id FROM auth.users WHERE email = $1`,
+    [cleanEmail]
+  );
+  if (existingUser) {
+    authEmail = `${cleanEmail.split('@')[0]}.${Date.now().toString().slice(-4)}@${cleanEmail.split('@')[1]}`;
+  }
 
   const [authUser] = await query<{ id: string }>(`
     INSERT INTO auth.users (
@@ -312,7 +417,7 @@ export async function createStudent(data: {
       jsonb_build_object('full_name', $2::text, 'role', 'student', 'phone', $3::text),
       now(), now()
     ) RETURNING id;
-  `, [data.email.toLowerCase().trim(), data.full_name, data.phone]);
+  `, [authEmail, data.full_name, data.phone]);
 
   const uid = authUser.id;
 
@@ -320,13 +425,101 @@ export async function createStudent(data: {
     INSERT INTO public.profiles (id, full_name, email, phone, role)
     VALUES ($1, $2, $3, $4, 'student')
     ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, phone = EXCLUDED.phone;
-  `, [uid, data.full_name, data.email, data.phone]);
+  `, [uid, data.full_name, cleanEmail, data.phone]);
 
-  return queryOne<Student>(`
-    INSERT INTO public.students (profile_id, roll_number, parent_name, emergency_contact, status)
-    VALUES ($1, $2, $3, $4, 'active')
+  const student = await queryOne<Student>(`
+    INSERT INTO public.students (
+      profile_id, roll_number, parent_name, parent_relation,
+      parent_contact, address, emergency_contact, status, enrollment_date
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', CURRENT_DATE)
+    ON CONFLICT (profile_id) DO UPDATE SET
+      parent_name = EXCLUDED.parent_name,
+      parent_relation = EXCLUDED.parent_relation,
+      parent_contact = EXCLUDED.parent_contact,
+      address = EXCLUDED.address,
+      emergency_contact = EXCLUDED.emergency_contact,
+      status = 'active',
+      enrollment_date = CURRENT_DATE
     RETURNING *;
-  `, [uid, rollNumber, data.parent_name, data.emergency_contact]);
+  `, [
+    uid, 
+    rollNumber, 
+    data.parent_name, 
+    data.parent_relation || 'Parent',
+    data.parent_contact || data.phone,
+    data.address || 'Kannamangala, Bangalore',
+    data.emergency_contact || data.parent_contact || data.phone
+  ]);
+
+  if (student && data.batch_ids && data.batch_ids.length > 0) {
+    for (const bId of data.batch_ids) {
+      await query(`
+        INSERT INTO public.batch_enrollments (batch_id, student_id, status)
+        VALUES ($1, $2, 'active')
+        ON CONFLICT (batch_id, student_id) DO UPDATE SET status = 'active';
+      `, [bId, student.id]);
+    }
+  }
+
+  return {
+    ...student,
+    full_name: data.full_name,
+    email: data.email,
+    phone: data.phone
+  };
+}
+
+export async function updateStudent(id: string, data: {
+  full_name?: string;
+  email?: string;
+  phone?: string;
+  parent_name?: string;
+  parent_relation?: string;
+  parent_contact?: string;
+  address?: string;
+  status?: 'active' | 'inactive' | 'suspended';
+}) {
+  const current = await queryOne<{ profile_id: string }>(
+    `SELECT profile_id FROM public.students WHERE id = $1`,
+    [id]
+  );
+  if (!current) throw new Error('Student not found');
+
+  if (data.full_name || data.email || data.phone) {
+    await query(`
+      UPDATE public.profiles
+      SET full_name = COALESCE($2, full_name),
+          email = COALESCE($3, email),
+          phone = COALESCE($4, phone),
+          updated_at = now()
+      WHERE id = $1;
+    `, [current.profile_id, data.full_name, data.email, data.phone]);
+  }
+
+  const updated = await queryOne<Student>(`
+    UPDATE public.students
+    SET parent_name = COALESCE($2, parent_name),
+        parent_relation = COALESCE($3, parent_relation),
+        parent_contact = COALESCE($4, parent_contact),
+        address = COALESCE($5, address),
+        status = COALESCE($6, status),
+        updated_at = now()
+    WHERE id = $1
+    RETURNING *;
+  `, [id, data.parent_name, data.parent_relation, data.parent_contact, data.address, data.status]);
+
+  const prof = await queryOne<{ full_name: string; email: string; phone: string }>(
+    `SELECT full_name, email, phone FROM public.profiles WHERE id = $1`,
+    [current.profile_id]
+  );
+
+  return {
+    ...updated,
+    full_name: prof?.full_name || data.full_name,
+    email: prof?.email || data.email,
+    phone: prof?.phone || data.phone
+  };
 }
 
 export async function enrollStudentInBatch(studentId: string, batchId: string) {
