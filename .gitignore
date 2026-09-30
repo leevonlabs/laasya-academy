@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+*.lock
+*.aot
+*.eaot
+
+# Android & Gradle
+.gradle/
+local.properties
+**/android/app/build/
+**/android/.gradle/
+**/build/
+*.apk
+*.aab
+
+# Environment & Temp
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+temp/
+*.log
+*.tmp
+*.exe
+*.zip
+
+# OS Files
+.DS_Store
+Thumbs.db

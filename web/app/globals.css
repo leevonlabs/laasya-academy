@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+:root {
+  --background: #FFF9FB;
+  --foreground: #220314;
+  --laasya-primary: #8A064D;
+  --laasya-primary-dark: #590231;
+  --laasya-gold: #F9E33A;
+  --laasya-gold-dark: #D4AF37;
+  --laasya-cream: #FFFDF7;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  min-height: 100vh;
+}
+
+/* Custom scrollbars with brand plum tint */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FDF2F7;
+}
+::-webkit-scrollbar-thumb {
+  background: #D9A0C3;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8A064D;
+}
