@@ -176,17 +176,41 @@ export async function createCourse(data: {
   `, [data.title, data.code, data.category, data.description, data.duration_months, data.monthly_fee]);
 }
 
-export async function updateCourse(id: string, data: Partial<Course>) {
+export async function updateCourse(id: string, data: {
+  title?: string;
+  code?: string;
+  category?: string;
+  monthly_fee?: number;
+  duration_months?: number;
+  description?: string;
+  is_active?: boolean;
+}) {
   return queryOne<Course>(`
     UPDATE public.courses
-    SET monthly_fee = COALESCE($2, monthly_fee),
-        description = COALESCE($3, description),
-        duration_months = COALESCE($4, duration_months),
-        is_active = COALESCE($5, is_active),
+    SET title = COALESCE($2, title),
+        code = COALESCE($3, code),
+        category = COALESCE($4, category),
+        monthly_fee = COALESCE($5, monthly_fee),
+        description = COALESCE($6, description),
+        duration_months = COALESCE($7, duration_months),
+        is_active = COALESCE($8, is_active),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
-  `, [id, data.monthly_fee, data.description, data.duration_months, data.is_active]);
+  `, [
+    id, data.title, data.code, data.category, data.monthly_fee,
+    data.description, data.duration_months, data.is_active
+  ]);
+}
+
+export async function deleteCourse(id: string) {
+  // Cascading cleanup of sessions and enrollments for any batches under this course
+  await query(`DELETE FROM public.batch_enrollments WHERE batch_id IN (SELECT id FROM public.batches WHERE course_id = $1)`, [id]);
+  await query(`DELETE FROM public.class_sessions WHERE batch_id IN (SELECT id FROM public.batches WHERE course_id = $1)`, [id]);
+  await query(`DELETE FROM public.batches WHERE course_id = $1`, [id]);
+  return queryOne<Course>(`
+    DELETE FROM public.courses WHERE id = $1 RETURNING *;
+  `, [id]);
 }
 
 // -------------------------------------------------------------
@@ -573,6 +597,45 @@ export async function createBatch(data: {
   ]);
 }
 
+export async function updateBatch(id: string, data: {
+  name?: string;
+  course_id?: string;
+  trainer_id?: string;
+  days_of_week?: string[];
+  start_time?: string;
+  end_time?: string;
+  room_or_hall?: string;
+  max_capacity?: number;
+  is_active?: boolean;
+}) {
+  return queryOne<Batch>(`
+    UPDATE public.batches
+    SET name = COALESCE($2, name),
+        course_id = COALESCE($3, course_id),
+        trainer_id = COALESCE($4, trainer_id),
+        days_of_week = COALESCE($5, days_of_week),
+        start_time = COALESCE($6, start_time),
+        end_time = COALESCE($7, end_time),
+        room_or_hall = COALESCE($8, room_or_hall),
+        max_capacity = COALESCE($9, max_capacity),
+        is_active = COALESCE($10, is_active),
+        updated_at = now()
+    WHERE id = $1
+    RETURNING *;
+  `, [
+    id, data.name, data.course_id, data.trainer_id, data.days_of_week,
+    data.start_time, data.end_time, data.room_or_hall, data.max_capacity, data.is_active
+  ]);
+}
+
+export async function deleteBatch(id: string) {
+  await query(`DELETE FROM public.batch_enrollments WHERE batch_id = $1`, [id]);
+  await query(`DELETE FROM public.class_sessions WHERE batch_id = $1`, [id]);
+  return queryOne<Batch>(`
+    DELETE FROM public.batches WHERE id = $1 RETURNING *;
+  `, [id]);
+}
+
 // -------------------------------------------------------------
 // SESSIONS & ATTENDANCE
 // -------------------------------------------------------------
@@ -636,4 +699,71 @@ export async function getAttendanceRecords(sessionId?: string, dateFilter?: stri
   }
   sql += ` ORDER BY s.session_date DESC, a.check_in_time DESC NULLS LAST;`;
   return query<AttendanceRecord>(sql, params);
+}
+
+export interface AttendanceAuditRecord {
+  id: string;
+  session_id: string;
+  session_date: string;
+  batch_id: string;
+  batch_name: string;
+  course_id: string;
+  course_title: string;
+  course_code: string;
+  course_category: string;
+  trainer_id: string;
+  trainer_name: string;
+  student_id: string;
+  student_name: string;
+  roll_number: string;
+  status: 'present' | 'absent' | 'late' | 'excused';
+  check_in_time?: string | null;
+  check_in_method?: string | null;
+  remarks?: string | null;
+}
+
+export async function getAttendanceAuditRecords(options?: {
+  courseId?: string;
+  startDate?: string;
+  endDate?: string;
+  dateFilter?: string;
+}): Promise<AttendanceAuditRecord[]> {
+  let sql = `
+    SELECT 
+      a.id, a.session_id, TO_CHAR(s.session_date, 'YYYY-MM-DD') as session_date,
+      b.id as batch_id, b.name as batch_name,
+      c.id as course_id, c.title as course_title, c.code as course_code, c.category as course_category,
+      t.id as trainer_id, tp.full_name as trainer_name,
+      st.id as student_id, p.full_name as student_name, st.roll_number,
+      a.status, a.check_in_time::text as check_in_time, a.check_in_method, a.remarks
+    FROM public.attendance a
+    JOIN public.class_sessions s ON s.id = a.session_id
+    JOIN public.batches b ON b.id = s.batch_id
+    JOIN public.courses c ON c.id = b.course_id
+    JOIN public.trainers t ON t.id = s.trainer_id
+    JOIN public.profiles tp ON tp.id = t.profile_id
+    JOIN public.students st ON st.id = a.student_id
+    JOIN public.profiles p ON p.id = st.profile_id
+    WHERE 1=1
+  `;
+  const params: any[] = [];
+  if (options?.courseId && options.courseId !== 'all') {
+    params.push(options.courseId);
+    sql += ` AND c.id = $${params.length}`;
+  }
+  if (options?.dateFilter) {
+    params.push(options.dateFilter);
+    sql += ` AND s.session_date = $${params.length}`;
+  }
+  if (options?.startDate) {
+    params.push(options.startDate);
+    sql += ` AND s.session_date >= $${params.length}`;
+  }
+  if (options?.endDate) {
+    params.push(options.endDate);
+    sql += ` AND s.session_date <= $${params.length}`;
+  }
+  sql += ` ORDER BY s.session_date DESC, c.title ASC, p.full_name ASC;`;
+  const rows = await query<AttendanceAuditRecord>(sql, params);
+  return JSON.parse(JSON.stringify(rows));
 }
