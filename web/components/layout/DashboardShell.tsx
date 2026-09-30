@@ -54,8 +54,8 @@ export default function DashboardShell({ user, children }: Props) {
 
   const navItems = [
     { label: 'Overview', href: '/overview', icon: LayoutDashboard },
-    { label: 'Student Fees', href: '/fees', icon: Receipt, badge: 'Finance' },
-    { label: 'Guru Salaries', href: '/salaries', icon: Banknote, badge: 'Payroll' },
+    { label: 'Student Fees', href: '/fees', icon: Receipt },
+    { label: 'Guru Salaries', href: '/salaries', icon: Banknote },
     { label: 'Courses (18)', href: '/courses', icon: BookOpen },
     { label: 'Gurus (14)', href: '/trainers', icon: Users },
     { label: 'Students', href: '/students', icon: GraduationCap },
@@ -108,22 +108,31 @@ export default function DashboardShell({ user, children }: Props) {
         </button>
         
         {/* Brand Header */}
-        <div className="p-4 border-b border-[#8A064D]/50 bg-[#3F0123]/70 shrink-0">
+        <div className="px-3 pt-2 pb-2 border-b border-[#8A064D]/50 bg-[#3F0123]/70 shrink-0">
           <div className="flex flex-col items-center text-center overflow-hidden">
             {!isCollapsed ? (
-              <>
-                <Image 
-                  src="/header_logo.png" 
-                  alt="Laasya Cultural Academy Logo" 
-                  width={210} 
-                  height={58} 
-                  className="object-contain drop-shadow-md transition-all duration-200"
-                  priority
-                />
-                <p className="text-[#F9E33A] text-[9.5px] font-bold tracking-widest uppercase mt-1.5 whitespace-nowrap">
-                  Unlock Your Talent
-                </p>
-              </>
+              <div className="flex flex-col items-center gap-0.5 w-full">
+                <div className="w-full relative flex items-center justify-center">
+                  <Image 
+                    src="/academy_illustration.png" 
+                    alt="Laasya Cultural Academy Arts" 
+                    width={240} 
+                    height={115} 
+                    className="w-full max-w-[240px] h-auto object-contain drop-shadow-md transition-all duration-200"
+                    priority
+                  />
+                </div>
+                <div className="w-full flex items-center justify-center px-1">
+                  <Image 
+                    src="/header_logo.png" 
+                    alt="Laasya Cultural Academy Logo" 
+                    width={235} 
+                    height={79} 
+                    className="w-full max-w-[235px] h-auto object-contain drop-shadow-md transition-all duration-200"
+                    priority
+                  />
+                </div>
+              </div>
             ) : (
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#8A064D] to-[#2D041A] border-2 border-[#F9E33A] flex items-center justify-center shadow-md">
                 <span className="font-serif font-black text-base text-[#F9E33A]">LC</span>
@@ -135,7 +144,7 @@ export default function DashboardShell({ user, children }: Props) {
         {/* Navigation Menu */}
         <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto overflow-x-hidden">
           {!isCollapsed && (
-            <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#F9E33A]">
+            <div className="px-3 pb-2 text-xs font-bold uppercase tracking-wider text-[#F9E33A]">
               Academy Management
             </div>
           )}
@@ -149,26 +158,18 @@ export default function DashboardShell({ user, children }: Props) {
                 href={item.href}
                 onClick={() => setIsMobileOpen(false)}
                 title={isCollapsed ? item.label : undefined}
-                className={`flex items-center ${isCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-3.5 py-2.5'} rounded-2xl text-[14px] font-semibold transition group border ${
+                className={`flex items-center ${isCollapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'} rounded-2xl text-[16px] font-bold transition group border ${
                   isActive
                     ? 'bg-[#8A064D] text-white border-[#F9E33A] shadow-md'
                     : 'text-rose-100/90 hover:bg-[#740340] hover:text-white border-transparent hover:border-[#F9E33A]/30'
                 }`}
               >
-                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} min-w-0`}>
-                  <Icon className={`w-5 h-5 text-[#F9E33A] shrink-0 ${isActive ? 'scale-110' : 'group-hover:scale-110'} transition-transform`} />
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3.5'} min-w-0`}>
+                  <Icon className={`w-5.5 h-5.5 text-[#F9E33A] shrink-0 ${isActive ? 'scale-110' : 'group-hover:scale-110'} transition-transform`} />
                   {!isCollapsed && (
-                    <span className="truncate">{item.label}</span>
+                    <span className="truncate tracking-wide">{item.label}</span>
                   )}
                 </div>
-                {!isCollapsed && item.badge && (
-                  <span className="text-[9px] uppercase font-extrabold tracking-wider px-2 py-0.5 rounded-full bg-[#F9E33A] text-[#2D041A] shrink-0">
-                    {item.badge}
-                  </span>
-                )}
-                {isCollapsed && item.badge && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#F9E33A] absolute top-2 right-2" />
-                )}
               </Link>
             );
           })}
@@ -234,11 +235,7 @@ export default function DashboardShell({ user, children }: Props) {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-[#FFF9FB] px-3 py-1.5 rounded-full border border-[#F0D5E4] text-xs font-semibold text-[#8A064D]">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="hidden sm:inline">Supabase Cloud Connected</span>
-              <span className="sm:hidden">Online</span>
-            </div>
+            {/* Header Right Actions */}
           </div>
         </header>
 

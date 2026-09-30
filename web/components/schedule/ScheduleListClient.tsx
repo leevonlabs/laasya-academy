@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ClassSession } from '@/lib/academy';
+import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
 import { 
   Clock, 
   KeyRound, 
@@ -19,14 +20,20 @@ interface Props {
 
 export default function ScheduleListClient({ initialSessions }: Props) {
   const [sessions, setSessions] = useState<ClassSession[]>(initialSessions);
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
 
-  const handleDateChange = async (newDate: string) => {
-    setSelectedDate(newDate);
+  const handleRangeApply = async (sDate: string, eDate: string) => {
+    setStartDate(sDate);
+    setEndDate(eDate);
     setLoading(true);
     try {
-      const res = await fetch(`/api/sessions?date=${newDate}`);
+      let url = `/api/sessions?startDate=${sDate}&endDate=${eDate}`;
+      if (sDate === eDate) {
+        url = `/api/sessions?date=${sDate}`;
+      }
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setSessions(data);
@@ -72,7 +79,7 @@ export default function ScheduleListClient({ initialSessions }: Props) {
   return (
     <div className="space-y-6">
       
-      {/* Header & Date Picker */}
+      {/* Header & Date Picker (Reference Image 2) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#2D041A] flex items-center gap-2">
@@ -84,15 +91,13 @@ export default function ScheduleListClient({ initialSessions }: Props) {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-white border border-[#F0D5E4] px-3.5 py-1.5 rounded-xl shadow-xs">
-            <CalendarIcon className="w-4 h-4 text-[#8A064D]" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="text-xs font-semibold text-gray-700 bg-transparent focus:outline-none"
-            />
-          </div>
+          <DateRangeQuickFilter
+            startDate={startDate}
+            endDate={endDate}
+            align="right"
+            onApply={({ startDate, endDate }) => handleRangeApply(startDate, endDate)}
+            placeholder="Select Date or Period"
+          />
         </div>
       </div>
 
@@ -105,7 +110,9 @@ export default function ScheduleListClient({ initialSessions }: Props) {
       ) : sessions.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center border border-[#F0D5E4] shadow-sm">
           <Clock className="w-12 h-12 text-rose-300 mx-auto mb-3" />
-          <h3 className="font-bold text-base text-[#2D041A]">No Sessions Scheduled For {selectedDate}</h3>
+          <h3 className="font-bold text-base text-[#2D041A]">
+            No Sessions Scheduled For {startDate === endDate ? startDate : `${startDate} to ${endDate}`}
+          </h3>
           <p className="text-xs text-gray-500 max-w-md mx-auto mt-1">
             Classes run according to their weekly batch days. You can create batches or select another date from the picker above.
           </p>
@@ -138,8 +145,11 @@ export default function ScheduleListClient({ initialSessions }: Props) {
                     Guru: <strong className="text-gray-800">{s.trainer_name}</strong>
                   </p>
 
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Scheduled Time: <strong className="text-gray-700">{s.start_time} - {s.end_time}</strong>
+                  <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#FFF2F8] text-[#8A064D] border border-rose-100">
+                      📅 {s.session_date}
+                    </span>
+                    <span>Scheduled Time: <strong className="text-gray-700">{s.start_time} - {s.end_time}</strong></span>
                   </p>
 
                   {s.session_topic_notes && (

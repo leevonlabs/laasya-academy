@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Student, Batch, Course, StudentEnrolledBatch } from '@/lib/academy';
+import PhotoUploadInput from '@/components/common/PhotoUploadInput';
 import { 
   GraduationCap, 
   Search, 
@@ -51,8 +52,11 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   // 2. Edit Modal
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [editFullName, setEditFullName] = useState('');
+  const [editAge, setEditAge] = useState<string>('');
+  const [editGender, setEditGender] = useState<'male' | 'female' | 'trans'>('female');
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editAvatarUrl, setEditAvatarUrl] = useState<string | null>(null);
   const [editParentName, setEditParentName] = useState('');
   const [editParentRelation, setEditParentRelation] = useState('Mother');
   const [editParentContact, setEditParentContact] = useState('');
@@ -67,8 +71,11 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   // 3. Register New Student Modal
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [age, setAge] = useState<string>('');
+  const [gender, setGender] = useState<'male' | 'female' | 'trans'>('female');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [parentName, setParentName] = useState('');
   const [parentRelation, setParentRelation] = useState('Mother');
   const [parentContact, setParentContact] = useState('');
@@ -179,8 +186,11 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   const handleOpenEdit = (s: Student) => {
     setEditingStudent(s);
     setEditFullName(s.full_name);
+    setEditAge(s.age ? String(s.age) : '');
+    setEditGender((s.gender as any) || 'female');
     setEditEmail(s.email);
     setEditPhone(s.phone);
+    setEditAvatarUrl(s.avatar_url || null);
     setEditParentName(s.parent_name || '');
     setEditParentRelation(s.parent_relation || 'Mother');
     setEditParentContact(s.parent_contact || s.phone);
@@ -199,8 +209,11 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   // Open Register Modal
   const handleOpenRegister = () => {
     setFullName('');
+    setAge('');
+    setGender('female');
     setEmail('');
     setPhone('');
+    setAvatarUrl(null);
     setParentName('');
     setParentRelation('Mother');
     setParentContact('');
@@ -257,8 +270,11 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: fullName.trim(),
+          age: age ? Number(age) : undefined,
+          gender: gender,
           email: email.trim(),
           phone: phone.trim(),
+          avatar_url: avatarUrl || undefined,
           parent_name: parentName.trim(),
           parent_relation: parentRelation,
           parent_contact: parentContact || phone.trim(),
@@ -304,8 +320,11 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       const fullStudent: Student = {
         ...created,
         full_name: fullName.trim(),
+        age: age ? Number(age) : undefined,
+        gender: gender as any,
         email: email.trim(),
         phone: phone.trim(),
+        avatar_url: avatarUrl || undefined,
         parent_name: parentName.trim(),
         parent_relation: parentRelation,
         parent_contact: parentContact || phone.trim(),
@@ -345,8 +364,11 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         body: JSON.stringify({
           id: editingStudent.id,
           full_name: editFullName.trim(),
+          age: editAge ? Number(editAge) : undefined,
+          gender: editGender,
           email: editEmail.trim(),
           phone: editPhone.trim(),
+          avatar_url: editAvatarUrl !== undefined ? editAvatarUrl : null,
           parent_name: editParentName.trim(),
           parent_relation: editParentRelation,
           parent_contact: editParentContact.trim() || editPhone.trim(),
@@ -394,8 +416,11 @@ export default function StudentsListClient({ initialStudents, batches, courses }
             ? {
                 ...s,
                 full_name: editFullName.trim(),
+                age: editAge ? Number(editAge) : undefined,
+                gender: editGender as any,
                 email: editEmail.trim(),
                 phone: editPhone.trim(),
+                avatar_url: editAvatarUrl || undefined,
                 parent_name: editParentName.trim(),
                 parent_relation: editParentRelation,
                 parent_contact: editParentContact.trim() || editPhone.trim(),
@@ -418,8 +443,11 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         setDetailStudent({
           ...detailStudent,
           full_name: editFullName.trim(),
+          age: editAge ? Number(editAge) : undefined,
+          gender: editGender as any,
           email: editEmail.trim(),
           phone: editPhone.trim(),
+          avatar_url: editAvatarUrl || undefined,
           parent_name: editParentName.trim(),
           parent_relation: editParentRelation,
           parent_contact: editParentContact.trim() || editPhone.trim(),
@@ -521,9 +549,20 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 bg-[#2D041A] text-white px-5 py-3 rounded-2xl shadow-xl border border-[#F9E33A] flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-200">
-          <Sparkles className="w-5 h-5 text-[#F9E33A]" />
-          <span className="text-xs font-semibold">{toastMessage}</span>
+        <div className="fixed top-6 right-6 z-70 bg-[#2D041A] text-white px-5 py-3.5 rounded-2xl shadow-2xl border-2 border-[#F9E33A] flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-200">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#8A064D] to-[#EBB128] flex items-center justify-center shrink-0 shadow-xs">
+            <CheckCircle2 className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <div className="text-[10px] font-black text-[#F9E33A] uppercase tracking-wider">Action Successful</div>
+            <div className="text-xs font-bold text-white mt-0.5">{toastMessage}</div>
+          </div>
+          <button 
+            onClick={() => setToastMessage(null)}
+            className="p-1 hover:bg-white/10 rounded-lg transition ml-3 cursor-pointer text-white/70 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -681,7 +720,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 >
                   <div>
                     {/* Top Bar: Status Badge & Student ID */}
-                    <div className="flex items-center justify-between mb-3.5">
+                    <div className="flex items-center justify-between mb-3">
                       <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-xl">
                         {s.roll_number}
                       </span>
@@ -695,15 +734,31 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                       </span>
                     </div>
 
-                    {/* Student Name as Primary Heading */}
-                    <h3 className="font-bold text-base text-[#2D041A] tracking-tight group-hover:text-[#8A064D] transition">
-                      {s.full_name}
-                    </h3>
+                    {/* Student Info with Profile Photo */}
+                    <div className="flex items-start gap-3 my-1">
+                      {s.avatar_url ? (
+                        <img
+                          src={s.avatar_url}
+                          alt={s.full_name}
+                          className="w-12 h-12 rounded-2xl object-cover border-2 border-[#F9E33A] shadow-xs shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-2xl bg-[#590231] text-[#F9E33A] font-black text-sm flex items-center justify-center shrink-0 border border-rose-200/50 shadow-2xs">
+                          {s.full_name.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        {/* Student Name as Primary Heading */}
+                        <h3 className="font-bold text-base text-[#2D041A] tracking-tight group-hover:text-[#8A064D] transition truncate">
+                          {s.full_name}
+                        </h3>
 
-                    {/* Contact Number below Name (Email removed from main grid!) */}
-                    <div className="text-xs text-gray-500 flex items-center gap-1.5 mt-1">
-                      <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="font-medium text-gray-700">{s.phone}</span>
+                        {/* Contact Number below Name */}
+                        <div className="text-xs text-gray-500 flex items-center gap-1.5 mt-1 truncate">
+                          <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="font-medium text-gray-700">{s.phone}</span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Fee Details Box: Total Monthly Fee, Due Amount with Color, Due Date */}
@@ -815,11 +870,26 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                           </div>
                         </td>
 
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-gray-900 text-xs">{s.full_name}</div>
-                          <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
-                            <Phone className="w-3 h-3 text-emerald-600" />
-                            <span>{s.phone}</span>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2.5">
+                            {s.avatar_url ? (
+                              <img
+                                src={s.avatar_url}
+                                alt={s.full_name}
+                                className="w-9 h-9 rounded-xl object-cover border border-[#F9E33A] shrink-0"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-xl bg-[#590231] text-[#F9E33A] font-black text-xs flex items-center justify-center shrink-0 border border-rose-200/50">
+                                {s.full_name.slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-bold text-gray-900 text-xs">{s.full_name}</div>
+                              <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                <Phone className="w-3 h-3 text-emerald-600" />
+                                <span>{s.phone}</span>
+                              </div>
+                            </div>
                           </div>
                         </td>
 
@@ -886,28 +956,41 @@ export default function StudentsListClient({ initialStudents, batches, courses }
             
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-5">
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-sm font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-3 py-1 rounded-xl">
-                  {detailStudent.roll_number}
-                </span>
+              <div className="flex items-center gap-3.5">
+                {detailStudent.avatar_url ? (
+                  <img
+                    src={detailStudent.avatar_url}
+                    alt={detailStudent.full_name}
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-[#F9E33A] shadow-xs shrink-0"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-[#590231] text-[#F9E33A] font-black text-base flex items-center justify-center border border-rose-200/50 shadow-xs shrink-0">
+                    {detailStudent.full_name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
                 <div>
-                  <h3 className="font-black text-lg text-[#2D041A] leading-tight">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-0.5 rounded-lg">
+                      {detailStudent.roll_number}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${
+                      detailStudent.status === 'active' ? 'text-emerald-700' : 'text-gray-500'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${detailStudent.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                      <span className="capitalize">{detailStudent.status || 'Active'}</span>
+                    </span>
+                  </div>
+                  <h3 className="font-black text-lg text-[#2D041A] leading-tight mt-1">
                     {detailStudent.full_name}
                   </h3>
-                  <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${
-                    detailStudent.status === 'active' ? 'text-emerald-700' : 'text-gray-500'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${detailStudent.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                    <span className="capitalize">{detailStudent.status || 'Active'}</span>
-                  </span>
                 </div>
               </div>
 
               <button
                 onClick={() => setDetailStudent(null)}
-                className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-[#8A064D] hover:text-[#590231] border border-rose-200 flex items-center justify-center transition shadow-2xs cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 stroke-[2.5]" />
               </button>
             </div>
 
@@ -915,26 +998,26 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               
               {/* Section 1: Financial & Fee Summary */}
               <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-rose-100">
-                <h4 className="text-xs font-bold text-[#8A064D] uppercase tracking-wider mb-2.5">
+                <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider mb-2.5">
                   Fee & Due Overview
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                   <div className="bg-white p-3 rounded-xl border border-rose-100">
-                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Total Monthly Fee</span>
-                    <span className="text-base font-bold text-gray-900 mt-0.5 block">
+                    <span className="text-[10px] text-gray-500 uppercase font-black block">Total Monthly Fee</span>
+                    <span className="text-base font-extrabold text-[#2D041A] mt-0.5 block">
                       ₹{(detailStudent.total_monthly_fee || 0).toLocaleString('en-IN')}
                     </span>
                   </div>
 
                   <div className="bg-white p-3 rounded-xl border border-rose-100">
-                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Advance Paid</span>
-                    <span className="text-base font-bold text-emerald-700 mt-0.5 block">
+                    <span className="text-[10px] text-gray-500 uppercase font-black block">Advance Paid</span>
+                    <span className="text-base font-extrabold text-emerald-700 mt-0.5 block">
                       ₹{Number(detailStudent.advance_paid || 0).toLocaleString('en-IN')}
                     </span>
                   </div>
 
                   <div className="bg-white p-3 rounded-xl border border-rose-100">
-                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Due Amount</span>
+                    <span className="text-[10px] text-gray-500 uppercase font-black block">Due Amount</span>
                     <span className={`text-base font-extrabold mt-0.5 block ${
                       (detailStudent.due_amount ?? 0) <= 0 
                         ? 'text-emerald-700' 
@@ -949,8 +1032,8 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   </div>
 
                   <div className="bg-white p-3 rounded-xl border border-rose-100">
-                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Due Date</span>
-                    <span className="text-base font-mono font-bold text-gray-800 mt-0.5 block">
+                    <span className="text-[10px] text-gray-500 uppercase font-black block">Due Date</span>
+                    <span className="text-base font-mono font-extrabold text-gray-800 mt-0.5 block">
                       {formatDueDateDisplay(detailStudent.due_date)}
                     </span>
                   </div>
@@ -959,37 +1042,51 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
               {/* Section 2: Contact & Personal Details */}
               <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100">
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2.5">
-                  Student Contact & Registration Info
+                <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider mb-2.5">
+                  Student Contact & Personal Info
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
                   <div>
-                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Contact Phone:</span>
-                    <span className="font-semibold text-gray-900 flex items-center gap-1.5 mt-0.5">
+                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Contact Phone</span>
+                    <span className="font-bold text-gray-900 flex items-center gap-1.5 mt-0.5">
                       <Phone className="w-3.5 h-3.5 text-emerald-600" />
                       <span>{detailStudent.phone}</span>
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Email Address:</span>
-                    <span className="font-semibold text-gray-900 flex items-center gap-1.5 mt-0.5">
-                      <Mail className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Email Address</span>
+                    <span className="font-bold text-gray-900 flex items-center gap-1.5 mt-0.5 truncate">
+                      <Mail className="w-3.5 h-3.5 text-[#8A064D]" />
                       <span>{detailStudent.email}</span>
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Joining Date:</span>
-                    <span className="font-semibold text-gray-900 flex items-center gap-1.5 mt-0.5">
+                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Age (Years)</span>
+                    <span className="font-bold text-gray-900 mt-0.5 block">
+                      {detailStudent.age ? `${detailStudent.age} Years` : '—'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Gender</span>
+                    <span className="font-bold text-gray-900 capitalize mt-0.5 block">
+                      {detailStudent.gender || '—'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Joining Date</span>
+                    <span className="font-bold text-gray-900 flex items-center gap-1.5 mt-0.5">
                       <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
                       <span>{formatDdMonthName(detailStudent.enrollment_date)}</span>
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Residential Address:</span>
-                    <span className="font-medium text-gray-700 flex items-start gap-1.5 mt-0.5">
+                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Residential Address</span>
+                    <span className="font-bold text-gray-800 flex items-start gap-1.5 mt-0.5">
                       <MapPin className="w-3.5 h-3.5 text-[#8A064D] shrink-0 mt-0.5" />
                       <span>{detailStudent.address || 'Kannamangala, Bangalore'}</span>
                     </span>
@@ -999,21 +1096,21 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
               {/* Section 3: Parent / Guardian Info */}
               <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100">
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2.5">
+                <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider mb-2.5">
                   Parent / Guardian Details
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <div>
-                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Guardian Name:</span>
-                    <span className="font-semibold text-gray-900 mt-0.5 block">{detailStudent.parent_name || '—'}</span>
+                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Guardian Name:</span>
+                    <span className="font-bold text-gray-900 mt-0.5 block">{detailStudent.parent_name || '—'}</span>
                   </div>
                   <div>
-                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Relation:</span>
-                    <span className="font-semibold text-gray-900 mt-0.5 block">{detailStudent.parent_relation || 'Parent'}</span>
+                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Relation:</span>
+                    <span className="font-bold text-gray-900 mt-0.5 block">{detailStudent.parent_relation || 'Parent'}</span>
                   </div>
                   <div>
-                    <span className="text-gray-400 block text-[10px] uppercase font-semibold">Guardian Contact:</span>
-                    <span className="font-semibold text-gray-900 mt-0.5 block">{detailStudent.parent_contact || detailStudent.phone}</span>
+                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Guardian Contact:</span>
+                    <span className="font-bold text-gray-900 mt-0.5 block">{detailStudent.parent_contact || detailStudent.phone}</span>
                   </div>
                 </div>
               </div>
@@ -1021,7 +1118,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               {/* Section 4: Enrolled Courses & Batches */}
               <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100">
                 <div className="flex items-center justify-between mb-2.5">
-                  <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider">
                     Enrolled Courses & Batches ({detailStudent.enrolled_batches?.length || 0})
                   </h4>
                 </div>
@@ -1113,37 +1210,46 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               </div>
               <button
                 onClick={() => setEditingStudent(null)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-[#8A064D] hover:text-[#590231] border border-rose-200 flex items-center justify-center transition shadow-2xs cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 stroke-[2.5]" />
               </button>
             </div>
 
             <form onSubmit={handleSaveEdit} className="space-y-4">
               
+              {/* Profile Photo Upload */}
+              <PhotoUploadInput
+                value={editAvatarUrl}
+                onChange={setEditAvatarUrl}
+                label="Student Profile Photo"
+                initials={editFullName ? editFullName.slice(0, 2).toUpperCase() : 'ST'}
+                maxSizeMB={1}
+              />
+
               {/* Row 1: Student ID (read-only) & Status (Active / Inactive toggle) */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Student ID <span className="text-[10px] text-gray-400 font-normal">(System Generated)</span>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Student ID <span className="text-[10px] text-gray-500 font-normal">(System Generated)</span>
                   </label>
                   <input
                     type="text"
                     readOnly
                     disabled
                     value={editingStudent.roll_number}
-                    className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] cursor-not-allowed"
+                    className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs font-mono font-black text-[#8A064D] cursor-not-allowed"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                     Student Status <span className="text-[10px] text-[#8A064D] font-normal">(Active / Inactive)</span>
                   </label>
                   <select
                     value={editStatus}
                     onChange={(e) => setEditStatus(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] cursor-pointer"
                   >
                     <option value="active">Active (Currently Enrolled)</option>
                     <option value="inactive">Inactive (Paused / Left)</option>
@@ -1151,57 +1257,89 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 </div>
               </div>
 
-              {/* Row 2: Full Name & Email */}
+              {/* Row 2: Age & Gender */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Student Full Name</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Age (Years)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    placeholder="e.g. 14"
+                    value={editAge}
+                    onChange={(e) => setEditAge(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Gender
+                  </label>
+                  <select
+                    value={editGender}
+                    onChange={(e) => setEditGender(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white cursor-pointer"
+                  >
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                    <option value="trans">Trans</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 3: Full Name & Email */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Student Full Name</label>
                   <input
                     type="text"
                     required
                     value={editFullName}
                     onChange={(e) => setEditFullName(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Student Email</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Student Email</label>
                   <input
                     type="email"
                     required
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
               </div>
 
-              {/* Row 3: Phone & Joining Date */}
+              {/* Row 4: Phone & Joining Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Student Contact Number</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Student Contact Number</label>
                   <input
                     type="tel"
                     required
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Joining Date</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Joining Date</label>
                   <input
                     type="date"
                     required
                     value={editJoiningDate}
                     onChange={(e) => setEditJoiningDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
               </div>
 
-              {/* Row 4: Advance Paid */}
+              {/* Row 5: Advance Paid */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                   Advance Paid (INR ₹)
                 </label>
                 <input
@@ -1209,28 +1347,28 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   min={0}
                   value={editAdvancePaid}
                   onChange={(e) => setEditAdvancePaid(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
               </div>
 
-              {/* Row 5: Parent / Guardian Info */}
+              {/* Row 6: Parent / Guardian Info */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Parent Name</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Parent Name</label>
                   <input
                     type="text"
                     required
                     value={editParentName}
                     onChange={(e) => setEditParentName(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Relation</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Relation</label>
                   <select
                     value={editParentRelation}
                     onChange={(e) => setEditParentRelation(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] cursor-pointer"
                   >
                     <option value="Mother">Mother</option>
                     <option value="Father">Father</option>
@@ -1239,31 +1377,31 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Parent Contact</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Parent Contact</label>
                   <input
                     type="tel"
                     required
                     value={editParentContact}
                     onChange={(e) => setEditParentContact(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
               </div>
 
               {/* Address */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Full Address</label>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Full Address</label>
                 <textarea
                   rows={2}
                   value={editAddress}
                   onChange={(e) => setEditAddress(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
               </div>
 
               {/* Courses & Batches Selection */}
               <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-3">
-                <label className="block text-xs font-bold text-gray-800">
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                   Enrolled Courses (Select multiple to assign batches):
                 </label>
                 <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
@@ -1274,7 +1412,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                         type="button"
                         key={crs.id}
                         onClick={() => handleEditToggleCourse(crs.id)}
-                        className={`px-3 py-1 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                        className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
                           isSelected
                             ? 'bg-[#8A064D] text-white shadow-2xs'
                             : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-100'
@@ -1288,7 +1426,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
                 {editAvailableBatches.length > 0 && (
                   <div className="pt-2 border-t border-gray-200">
-                    <label className="block text-xs font-bold text-gray-800 mb-1.5">
+                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                       Select Available Batches:
                     </label>
                     <div className="space-y-1.5 max-h-32 overflow-y-auto">
@@ -1301,7 +1439,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                             className={`p-2 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition ${
                               isBatchSelected
                                 ? 'bg-[#FFF2F8] border-[#8A064D] text-[#8A064D] font-bold'
-                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 font-semibold'
                             }`}
                           >
                             <div>
@@ -1362,82 +1500,123 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               </div>
               <button
                 onClick={() => setIsAddOpen(false)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-[#8A064D] hover:text-[#590231] border border-rose-200 flex items-center justify-center transition shadow-2xs cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 stroke-[2.5]" />
               </button>
             </div>
 
             <form onSubmit={handleRegisterStudent} className="space-y-4">
               
+              {/* Profile Photo Upload */}
+              <PhotoUploadInput
+                value={avatarUrl}
+                onChange={setAvatarUrl}
+                label="Student Profile Photo"
+                initials={fullName ? fullName.slice(0, 2).toUpperCase() : 'ST'}
+                maxSizeMB={1}
+              />
+
               {/* Row 1: Student ID (read-only, not manually editable) */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Student ID <span className="text-[10px] text-emerald-600 font-normal">(Auto-generated in sequence, not editable)</span>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Student ID <span className="text-[10px] text-emerald-600 font-bold">(Auto-generated in sequence, not editable)</span>
                 </label>
                 <input
                   type="text"
                   readOnly
                   disabled
                   value={nextAutoId}
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] cursor-not-allowed"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs font-mono font-black text-[#8A064D] cursor-not-allowed"
                 />
               </div>
 
-              {/* Row 2: Full Name & Email */}
+              {/* Row 2: Age & Gender */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Student Full Name</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Age (Years)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    placeholder="e.g. 14"
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Gender
+                  </label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white cursor-pointer"
+                  >
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                    <option value="trans">Trans</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 3: Full Name & Email */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Student Full Name</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Diya Sharma"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Student / Parent Email</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Student / Parent Email</label>
                   <input
                     type="email"
                     required
                     placeholder="parent@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
               </div>
 
-              {/* Row 3: Contact Number & Joining Date */}
+              {/* Row 4: Contact Number & Joining Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Contact Number</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Contact Number</label>
                   <input
                     type="tel"
                     required
                     placeholder="+91 98450 12345"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Joining Date</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Joining Date</label>
                   <input
                     type="date"
                     required
                     value={joiningDate}
                     onChange={(e) => setJoiningDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
               </div>
 
-              {/* Row 4: Advance Paid */}
+              {/* Row 5: Advance Paid */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                   Advance Paid (INR ₹)
                 </label>
                 <input
@@ -1446,29 +1625,29 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   placeholder="0"
                   value={advancePaid}
                   onChange={(e) => setAdvancePaid(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
               </div>
 
-              {/* Row 5: Parent / Guardian Info */}
+              {/* Row 6: Parent / Guardian Info */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Parent / Guardian Name</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Parent / Guardian Name</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Ramesh Sharma"
                     value={parentName}
                     onChange={(e) => setParentName(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Relation</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Relation</label>
                   <select
                     value={parentRelation}
                     onChange={(e) => setParentRelation(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] cursor-pointer"
                   >
                     <option value="Mother">Mother</option>
                     <option value="Father">Father</option>
@@ -1477,32 +1656,32 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Parent Contact</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Parent Contact</label>
                   <input
                     type="tel"
                     placeholder="+91 98450 12345"
                     value={parentContact}
                     onChange={(e) => setParentContact(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
               </div>
 
               {/* Address */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Full Residential Address</label>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Full Residential Address</label>
                 <textarea
                   rows={2}
                   placeholder="Street, apartment, locality, Bangalore..."
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
               </div>
 
               {/* Select Courses & Batches */}
               <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-3">
-                <label className="block text-xs font-bold text-gray-800">
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                   Select Course(s) (Select multiple to display available batches):
                 </label>
                 <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
@@ -1513,7 +1692,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                         type="button"
                         key={crs.id}
                         onClick={() => handleToggleCourse(crs.id)}
-                        className={`px-3 py-1 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                        className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
                           isSelected
                             ? 'bg-[#8A064D] text-white shadow-2xs'
                             : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-100'
@@ -1527,7 +1706,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
                 {registerAvailableBatches.length > 0 && (
                   <div className="pt-2 border-t border-gray-200">
-                    <label className="block text-xs font-bold text-gray-800 mb-1.5">
+                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                       Available Batches for Selected Courses:
                     </label>
                     <div className="space-y-1.5 max-h-32 overflow-y-auto">
@@ -1540,7 +1719,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                             className={`p-2 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition ${
                               isBatchSelected
                                 ? 'bg-[#FFF2F8] border-[#8A064D] text-[#8A064D] font-bold'
-                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 font-semibold'
                             }`}
                           >
                             <div>
@@ -1568,7 +1747,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 <button
                   type="button"
                   onClick={() => setIsAddOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>

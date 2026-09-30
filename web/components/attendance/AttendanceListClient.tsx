@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Course, Batch, AttendanceAuditRecord } from '@/lib/academy';
+import { Course, Batch, AttendanceAuditRecord, Student } from '@/lib/academy';
+import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
+import StudentSearchSelect, { StudentOption } from '@/components/common/StudentSearchSelect';
 import { 
   ClipboardCheck, 
   Search, 
@@ -30,6 +32,7 @@ interface Props {
   initialAuditRecords: AttendanceAuditRecord[];
   courses: Course[];
   batches: Batch[];
+  students?: Student[];
 }
 
 const COURSE_GURUS_MAP: Record<string, string> = {
@@ -53,7 +56,7 @@ const COURSE_GURUS_MAP: Record<string, string> = {
   'Chess': 'Coach Sai Krishna (State Medalist)',
 };
 
-export default function AttendanceListClient({ initialAuditRecords, courses, batches }: Props) {
+export default function AttendanceListClient({ initialAuditRecords, courses, batches, students = [] }: Props) {
   // -------------------------------------------------------------
   // TOP NAVIGATION TABS: Tab 1 = Course-Wise, Tab 2 = Complete
   // -------------------------------------------------------------
@@ -88,7 +91,30 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
   const [completeEndDate, setCompleteEndDate] = useState<string>(TODAY_STR);
   const [completeSearchQuery, setCompleteSearchQuery] = useState<string>('');
   const [completeStatusFilter, setCompleteStatusFilter] = useState<string>('All');
+  const [completeStudentId, setCompleteStudentId] = useState<string>('');
   const [completePreset, setCompletePreset] = useState<string>('Today');
+
+  // Searchable student options for Tab 2
+  const studentOptions: StudentOption[] = useMemo(() => {
+    if (students && students.length > 0) {
+      return students.map(s => ({
+        id: s.id,
+        full_name: s.full_name,
+        roll_number: s.roll_number
+      })).sort((a, b) => a.full_name.localeCompare(b.full_name));
+    }
+    const map = new Map<string, StudentOption>();
+    for (const r of allRecords) {
+      if (r.student_id && !map.has(r.student_id)) {
+        map.set(r.student_id, {
+          id: r.student_id,
+          full_name: r.student_name,
+          roll_number: r.roll_number
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }, [students, allRecords]);
 
   // Dynamic Categories for Course Grid
   const categories = useMemo(() => {
@@ -215,9 +241,14 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
   // -------------------------------------------------------------
   const filteredCompleteRecords = useMemo(() => {
     return allRecords.filter((r) => {
+      // Filter by Student
+      if (completeStudentId && r.student_id !== completeStudentId) return false;
+      // Filter by Date Range
       if (completeStartDate && r.session_date < completeStartDate) return false;
       if (completeEndDate && r.session_date > completeEndDate) return false;
+      // Filter by Attendance Status
       if (completeStatusFilter !== 'All' && r.status !== completeStatusFilter) return false;
+      // Free Text Search
       if (completeSearchQuery.trim()) {
         const q = completeSearchQuery.toLowerCase();
         const matchesName = r.student_name.toLowerCase().includes(q);
@@ -228,7 +259,7 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
       }
       return true;
     });
-  }, [allRecords, completeStartDate, completeEndDate, completeStatusFilter, completeSearchQuery]);
+  }, [allRecords, completeStudentId, completeStartDate, completeEndDate, completeStatusFilter, completeSearchQuery]);
 
   // Stats calculation
   const getStats = (records: AttendanceAuditRecord[]) => {
@@ -868,7 +899,7 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
           {/* Complete Attendance Controls */}
           <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
             
-            {/* Header info & Presets */}
+            {/* Header info & Date Range Filter */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
                 <h3 className="font-bold text-sm text-[#2D041A] flex items-center gap-1.5">
@@ -880,59 +911,43 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
                 </p>
               </div>
 
-              {/* Date Presets */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs font-semibold text-gray-500 mr-1">Presets:</span>
-                {['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'All Time'].map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => applyPreset(p, 'complete')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                      completePreset === p
-                        ? 'bg-[#8A064D] text-white shadow-2xs'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
+              {/* Date Range Quick Filter (Reference Image 2) */}
+              <div className="flex items-center gap-2">
+                <DateRangeQuickFilter
+                  startDate={completeStartDate}
+                  endDate={completeEndDate}
+                  align="right"
+                  onApply={({ startDate, endDate, presetLabel }) => {
+                    setCompleteStartDate(startDate);
+                    setCompleteEndDate(endDate);
+                    setCompletePreset(presetLabel || 'Custom');
+                  }}
+                  placeholder="Select Date Range"
+                />
               </div>
             </div>
 
-            {/* Filter Bar: From Date, To Date, Search, Status */}
-            <div className="pt-3 border-t border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-500 mb-1">From Date</label>
-                <input
-                  type="date"
-                  value={completeStartDate}
-                  onChange={(e) => {
-                    setCompleteStartDate(e.target.value);
-                    setCompletePreset('Custom');
-                  }}
-                  className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+            {/* Filter Bar: Student Search Dropdown, Status Filter, Search */}
+            <div className="pt-3 border-t border-gray-100 flex flex-col md:flex-row items-stretch md:items-end gap-3">
+              {/* Student Searchable Dropdown */}
+              <div className="min-w-[240px] flex-1">
+                <label className="block text-[11px] font-semibold text-gray-500 mb-1">Filter by Student</label>
+                <StudentSearchSelect
+                  students={studentOptions}
+                  value={completeStudentId}
+                  onChange={(studentId) => setCompleteStudentId(studentId)}
+                  placeholder="All Students (Filter by Student)"
+                  className="w-full"
                 />
               </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-500 mb-1">To Date</label>
-                <input
-                  type="date"
-                  value={completeEndDate}
-                  onChange={(e) => {
-                    setCompleteEndDate(e.target.value);
-                    setCompletePreset('Custom');
-                  }}
-                  className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
-                />
-              </div>
-
-              <div>
+              {/* Status Filter */}
+              <div className="min-w-[150px]">
                 <label className="block text-[11px] font-semibold text-gray-500 mb-1">Status Filter</label>
                 <select
                   value={completeStatusFilter}
                   onChange={(e) => setCompleteStatusFilter(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#8A064D]"
                 >
                   <option value="All">All Statuses</option>
                   <option value="present">Present Only</option>
@@ -941,19 +956,37 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
                 </select>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-500 mb-1">Search Student / Course</label>
+              {/* Search Course / Batch */}
+              <div className="min-w-[220px] flex-1">
+                <label className="block text-[11px] font-semibold text-gray-500 mb-1">Search Details</label>
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-3" />
                   <input
                     type="text"
-                    placeholder="Search by student, roll, course..."
+                    placeholder="Search by roll, course, batch..."
                     value={completeSearchQuery}
                     onChange={(e) => setCompleteSearchQuery(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full pl-8 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
               </div>
+
+              {/* Reset Button */}
+              {(completeStudentId || completeStatusFilter !== 'All' || completeSearchQuery) && (
+                <div className="pb-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCompleteStudentId('');
+                      setCompleteStatusFilter('All');
+                      setCompleteSearchQuery('');
+                    }}
+                    className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                </div>
+              )}
             </div>
 
           </div>

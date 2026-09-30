@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   StudentFeeInvoice, 
   FeePayment, 
@@ -29,8 +29,12 @@ import {
   CalendarRange, 
   Send,
   Layers,
-  Check
+  Check,
+  Download,
+  ChevronDown
 } from 'lucide-react';
+import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
+import { downloadStudentFeeInvoicePdf } from '@/lib/pdf';
 
 interface Props {
   initialInvoices: StudentFeeInvoice[];
@@ -39,6 +43,21 @@ interface Props {
   batches: Batch[];
   students: Student[];
 }
+
+const MONTHS = [
+  { short: 'Jan', full: 'January', num: 0 },
+  { short: 'Feb', full: 'February', num: 1 },
+  { short: 'Mar', full: 'March', num: 2 },
+  { short: 'Apr', full: 'April', num: 3 },
+  { short: 'May', full: 'May', num: 4 },
+  { short: 'Jun', full: 'June', num: 5 },
+  { short: 'Jul', full: 'July', num: 6 },
+  { short: 'Aug', full: 'August', num: 7 },
+  { short: 'Sep', full: 'September', num: 8 },
+  { short: 'Oct', full: 'October', num: 9 },
+  { short: 'Nov', full: 'November', num: 10 },
+  { short: 'Dec', full: 'December', num: 11 },
+];
 
 export default function StudentFeesClient({
   initialInvoices,
@@ -58,18 +77,39 @@ export default function StudentFeesClient({
   const [summary, setSummary] = useState<FinancialSummary>(initialSummary);
 
   // -------------------------------------------------------------
-  // 2. COLLECTIONS PAGE STATE & FILTERS
+  // 2. COLLECTIONS PAGE STATE & FILTERS (With Year & Month selector)
   // -------------------------------------------------------------
   const [collectionsSearch, setCollectionsSearch] = useState('');
   const [collectionsStatusFilter, setCollectionsStatusFilter] = useState<'all' | 'pending' | 'partial' | 'paid'>('all');
+  const [collectionsYear, setCollectionsYear] = useState<number>(2026);
+  const [collectionsMonth, setCollectionsMonth] = useState<number>(8); // 8 = September (0-indexed)
 
   // -------------------------------------------------------------
-  // 3. PAYMENTS PAGE STATE & FILTERS
+  // 3. PAYMENTS PAGE STATE & FILTERS (Searchable Student Dropdown, No Pending Due)
   // -------------------------------------------------------------
   const [paymentsSearch, setPaymentsSearch] = useState('');
-  const [paymentsStatusFilter, setPaymentsStatusFilter] = useState<'all' | 'pending' | 'partial' | 'paid'>('all');
+  const [paymentsStatusFilter, setPaymentsStatusFilter] = useState<'all' | 'partial' | 'paid'>('all');
+  const [paymentsStudentFilter, setPaymentsStudentFilter] = useState<string>('all');
+  const [isPaymentsStudentDropdownOpen, setIsPaymentsStudentDropdownOpen] = useState(false);
+  const [paymentsStudentSearch, setPaymentsStudentSearch] = useState('');
+  const paymentsStudentDropdownRef = useRef<HTMLDivElement>(null);
   const [paymentStartDate, setPaymentStartDate] = useState('');
   const [paymentEndDate, setPaymentEndDate] = useState('');
+
+  // Close payments student dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (paymentsStudentDropdownRef.current && !paymentsStudentDropdownRef.current.contains(event.target as Node)) {
+        setIsPaymentsStudentDropdownOpen(false);
+      }
+    }
+    if (isPaymentsStudentDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isPaymentsStudentDropdownOpen]);
 
   // -------------------------------------------------------------
   // 4. MODALS STATE
@@ -107,8 +147,34 @@ export default function StudentFeesClient({
   };
 
   // -------------------------------------------------------------
-  // DATE FORMATTER: "dd and month name" (e.g. "30 Sep" or "30 Sep 2026")
+  // DATE FORMATTER: Month End Date in DD/MM/YY format (e.g. 30/09/26, 31/03/26)
   // -------------------------------------------------------------
+  const formatMonthEndDdMmYy = (dateStrOrPeriod?: string | null) => {
+    let d = new Date();
+    if (dateStrOrPeriod) {
+      const parsed = new Date(dateStrOrPeriod);
+      if (!isNaN(parsed.getTime())) {
+        d = parsed;
+      } else {
+        const match = dateStrOrPeriod.match(/([a-zA-Z]+)\s+(\d{4})/);
+        if (match) {
+          const mNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+          const mIdx = mNames.findIndex(m => m.startsWith(match[1].toLowerCase()));
+          if (mIdx !== -1) {
+            d = new Date(parseInt(match[2], 10), mIdx, 1);
+          }
+        }
+      }
+    }
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const dd = String(lastDay).padStart(2, '0');
+    const mm = String(month + 1).padStart(2, '0');
+    const yy = String(year).slice(-2);
+    return `${dd}/${mm}/${yy}`;
+  };
+
   const formatDdMonthName = (dateStr?: string | null, includeYear = true) => {
     if (!dateStr) return '—';
     try {
@@ -122,11 +188,9 @@ export default function StudentFeesClient({
     }
   };
 
-  const currentMonthDueDate = useMemo(() => {
-    const now = new Date();
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return `${lastDay.getDate()} ${lastDay.toLocaleString('en-US', { month: 'short' })}`;
-  }, []);
+  const collectionsMonthDueDate = useMemo(() => {
+    return formatMonthEndDdMmYy(new Date(collectionsYear, collectionsMonth, 1).toISOString());
+  }, [collectionsYear, collectionsMonth]);
 
   // -------------------------------------------------------------
   // COLLECTIONS DATA TRANSFORMATION & COMPUTATION
@@ -148,35 +212,61 @@ export default function StudentFeesClient({
   }
 
   const collectionsData = useMemo<StudentCollectionRow[]>(() => {
+    const selectedMonthName = MONTHS[collectionsMonth].full;
+    const selectedMonthShort = MONTHS[collectionsMonth].short.toLowerCase();
+    const selectedYearStr = collectionsYear.toString();
+
     return students.map((s) => {
       const totalMonthly = Number(s.total_monthly_fee || 0);
-      const studentInvoices = invoices.filter((i) => i.student_id === s.id);
-      const invoicedPaid = studentInvoices.reduce((sum, inv) => sum + Number(inv.paid_amount || 0), 0);
-      const advancePaid = Number(s.advance_paid || 0);
-      
-      const totalPaid = invoicedPaid > 0 ? invoicedPaid + advancePaid : advancePaid;
-      
-      // Due formula: total monthly fee - advance paid (or invoice balance if overdue accumulated)
-      let due = s.due_amount !== undefined ? Number(s.due_amount) : (totalMonthly - advancePaid);
-      if (studentInvoices.length > 0) {
-        const invBalance = studentInvoices.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0);
-        if (invBalance > totalMonthly) {
-          due = invBalance - advancePaid;
+
+      // Invoices matching this student and selected month & year
+      const matchingInvoices = invoices.filter((inv) => {
+        if (inv.student_id !== s.id) return false;
+        
+        const period = (inv.fee_period || '').toLowerCase();
+        if (period.includes(selectedMonthName.toLowerCase()) || 
+           (period.includes(selectedMonthShort) && period.includes(selectedYearStr))) {
+          return true;
         }
+
+        const dStr = inv.due_date || inv.created_at;
+        if (dStr) {
+          const d = new Date(dStr);
+          if (!isNaN(d.getTime())) {
+            return d.getFullYear() === collectionsYear && d.getMonth() === collectionsMonth;
+          }
+        }
+        return false;
+      });
+
+      // Total paid in this selected month
+      let totalPaidInMonth = 0;
+      if (matchingInvoices.length > 0) {
+        totalPaidInMonth = matchingInvoices.reduce((sum, inv) => sum + Number(inv.paid_amount || 0), 0);
+      }
+
+      const advancePaid = Number(s.advance_paid || 0);
+
+      // Due calculation
+      let due = totalMonthly;
+      if (matchingInvoices.length > 0) {
+        due = matchingInvoices.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0);
+      } else if (advancePaid > 0) {
+        due = Math.max(0, totalMonthly - advancePaid);
       }
 
       let status: 'paid' | 'partial' | 'pending' = 'pending';
       let statusLabel = 'Pending Due';
 
-      if (due <= 0) {
+      if (due <= 0 && (totalPaidInMonth > 0 || advancePaid > 0)) {
         status = 'paid';
         statusLabel = due < 0 ? 'Advance Credit' : 'Paid & Settled';
-      } else if (totalPaid > 0 && due > 0) {
+      } else if (totalPaidInMonth > 0 && due > 0) {
         status = 'partial';
         statusLabel = 'Partial Payment';
       } else {
         status = 'pending';
-        statusLabel = due > totalMonthly ? 'Overdue' : 'Pending Due';
+        statusLabel = 'Pending Due';
       }
 
       return {
@@ -189,13 +279,13 @@ export default function StudentFeesClient({
         parentContact: s.parent_contact || s.phone,
         parentRelation: s.parent_relation || 'Parent',
         totalMonthlyFee: totalMonthly,
-        totalPaidAmount: totalPaid,
+        totalPaidAmount: totalPaidInMonth,
         balanceDue: due,
         status,
         statusLabel
       };
     });
-  }, [students, invoices]);
+  }, [students, invoices, collectionsYear, collectionsMonth]);
 
   // Filtered Collections
   const filteredCollections = useMemo(() => {
@@ -249,10 +339,20 @@ export default function StudentFeesClient({
 
   // -------------------------------------------------------------
   // PAYMENTS DATA FILTERING & COMPUTATION
+  // Payments = Money received from the student (can be multiple times in a month)
+  // Excludes students who didn't pay (amount_paid == 0)
   // -------------------------------------------------------------
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
-      // 1. Search Filter (by student name or invoice number)
+      // 1. Exclude 0 amount payments: payments are strictly money received from students!
+      if (Number(inv.paid_amount || 0) <= 0) return false;
+
+      // 2. Student Dropdown Filter
+      if (paymentsStudentFilter !== 'all' && inv.student_id !== paymentsStudentFilter) {
+        return false;
+      }
+
+      // 3. Search Filter (by student name or invoice number)
       if (paymentsSearch.trim()) {
         const q = paymentsSearch.toLowerCase();
         const matchesName = inv.student_name.toLowerCase().includes(q);
@@ -261,18 +361,17 @@ export default function StudentFeesClient({
         if (!matchesName && !matchesInv && !matchesRoll) return false;
       }
 
-      // 2. Status Filter
-      if (paymentsStatusFilter === 'pending') {
-        if (inv.status !== 'pending' && inv.status !== 'overdue') return false;
-      }
+      // 4. Status Filter: 'all' | 'partial' | 'paid' (Pending Due is removed)
       if (paymentsStatusFilter === 'partial') {
-        if (inv.status !== 'partial') return false;
+        const isPart = inv.status === 'partial' || Number(inv.balance_amount || 0) > 0;
+        if (!isPart) return false;
       }
       if (paymentsStatusFilter === 'paid') {
-        if (inv.status !== 'paid') return false;
+        const isPaid = inv.status === 'paid' || Number(inv.balance_amount || 0) <= 0;
+        if (!isPaid) return false;
       }
 
-      // 3. Date Range Filter
+      // 5. Date Range Filter
       if (paymentStartDate) {
         const invDate = inv.due_date || inv.created_at;
         if (invDate && invDate.substring(0, 10) < paymentStartDate) return false;
@@ -284,30 +383,36 @@ export default function StudentFeesClient({
 
       return true;
     });
-  }, [invoices, paymentsSearch, paymentsStatusFilter, paymentStartDate, paymentEndDate]);
+  }, [invoices, paymentsSearch, paymentsStatusFilter, paymentsStudentFilter, paymentStartDate, paymentEndDate]);
+
+  // Students list for payments searchable dropdown
+  const filteredStudentsForDropdown = useMemo(() => {
+    if (!paymentsStudentSearch.trim()) return students;
+    const q = paymentsStudentSearch.toLowerCase();
+    return students.filter(s => 
+      s.full_name.toLowerCase().includes(q) || 
+      s.roll_number.toLowerCase().includes(q)
+    );
+  }, [students, paymentsStudentSearch]);
 
   // Payments Summary Metrics
   const paymentsSummary = useMemo(() => {
-    const totalInvoices = filteredInvoices.length;
-    const totalBilled = filteredInvoices.reduce((sum, inv) => sum + (Number(inv.total_amount) - Number(inv.discount_amount || 0)), 0);
+    const validPayments = invoices.filter(inv => Number(inv.paid_amount || 0) > 0);
+    const totalPaymentsCount = filteredInvoices.length;
     const totalPaid = filteredInvoices.reduce((sum, inv) => sum + Number(inv.paid_amount || 0), 0);
     const totalDue = filteredInvoices.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0);
-    const pendingCount = filteredInvoices.filter((i) => i.status === 'pending' || i.status === 'overdue').length;
-    const partialCount = filteredInvoices.filter((i) => i.status === 'partial').length;
-    const paidCount = filteredInvoices.filter((i) => i.status === 'paid').length;
-    const settledRate = totalBilled > 0 ? Math.round((totalPaid / totalBilled) * 100) : 100;
+    const partialCount = filteredInvoices.filter((i) => i.status === 'partial' || Number(i.balance_amount || 0) > 0).length;
+    const paidCount = filteredInvoices.filter((i) => i.status === 'paid' || Number(i.balance_amount || 0) <= 0).length;
 
     return {
-      totalInvoices,
-      totalBilled,
+      totalPaymentsCount,
+      allPaymentsCount: validPayments.length,
       totalPaid,
       totalDue,
-      pendingCount,
       partialCount,
-      paidCount,
-      settledRate
+      paidCount
     };
-  }, [filteredInvoices]);
+  }, [filteredInvoices, invoices]);
 
   // -------------------------------------------------------------
   // ACTION HANDLERS
@@ -319,8 +424,8 @@ export default function StudentFeesClient({
     setCollectAmount(defAmount);
     setCollectMethod('upi');
     setCollectRef('');
-    setCollectFeePeriod('September 2026');
-    setCollectRemarks(`Tuition fee collection for ${row.studentName}`);
+    setCollectFeePeriod(`${MONTHS[collectionsMonth].full} ${collectionsYear}`);
+    setCollectRemarks(`Tuition fee collection for ${row.studentName} (${MONTHS[collectionsMonth].full} ${collectionsYear})`);
   };
 
   // Submit Collect Fee
@@ -469,11 +574,12 @@ _Unleash Your Talent_
 • Balance Due: *₹${Number(inv.balance_amount).toLocaleString('en-IN')}*
 • Status: *${inv.status === 'paid' ? '✅ PAID & SETTLED' : inv.status === 'partial' ? '⏳ PARTIALLY PAID' : '⚠️ PENDING DUE'}*
 
+📄 The official fee invoice PDF has been downloaded to your device for sharing.
 Namaste ${recipientName}, thank you for being a valued part of Laasya Cultural Academy!
-For queries, contact: +91 98450 12345`;
+For queries, contact: +91 8151 998 899`;
   };
 
-  const handleSendWhatsApp = (inv: StudentFeeInvoice, recipientType: 'parent' | 'student') => {
+  const handleSendWhatsApp = async (inv: StudentFeeInvoice, recipientType: 'parent' | 'student') => {
     let targetPhone = recipientType === 'parent' 
       ? (inv.phone || '') 
       : (inv.phone || '');
@@ -488,6 +594,9 @@ For queries, contact: +91 98450 12345`;
       alert('Contact phone number not available for this recipient.');
       return;
     }
+
+    // Trigger vector PDF download for the invoice
+    downloadStudentFeeInvoicePdf(inv);
 
     // Clean phone number (remove spaces, symbols)
     let cleanPhone = targetPhone.replace(/\D/g, '');
@@ -578,6 +687,68 @@ For queries, contact: +91 98450 12345`;
       {activeTab === 'collections' && (
         <div className="space-y-6">
 
+          {/* Month & Year Selection Filter for Collections Audit */}
+          <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center shrink-0">
+                <Calendar className="w-5 h-5 text-[#8A064D]" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Collection Period Audit</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black text-[#2D041A]">{MONTHS[collectionsMonth].full} {collectionsYear}</span>
+                  <span className="text-[10px] bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2 py-0.5 rounded-full font-bold">
+                    Due: {collectionsMonthDueDate}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Year Navigator */}
+              <div className="flex items-center bg-gray-50 border border-gray-200 rounded-2xl p-1">
+                <button
+                  type="button"
+                  onClick={() => setCollectionsYear(y => y - 1)}
+                  className="px-2 py-1 hover:bg-white text-gray-600 rounded-xl transition cursor-pointer font-black text-xs"
+                  title="Previous Year"
+                >
+                  «
+                </button>
+                <span className="px-3 text-xs font-black text-[#2D041A]">{collectionsYear}</span>
+                <button
+                  type="button"
+                  onClick={() => setCollectionsYear(y => y + 1)}
+                  className="px-2 py-1 hover:bg-white text-gray-600 rounded-xl transition cursor-pointer font-black text-xs"
+                  title="Next Year"
+                >
+                  »
+                </button>
+              </div>
+
+              {/* Month Pills */}
+              <div className="flex items-center gap-1 overflow-x-auto p-1 bg-gray-50 border border-gray-200 rounded-2xl scrollbar-none">
+                {MONTHS.map((m) => {
+                  const isSelected = collectionsMonth === m.num;
+                  return (
+                    <button
+                      key={m.short}
+                      type="button"
+                      onClick={() => setCollectionsMonth(m.num)}
+                      className={`px-2.5 py-1.2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#8A064D] text-white shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-white'
+                      }`}
+                    >
+                      {m.short}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
           {/* Collections Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
@@ -629,7 +800,7 @@ For queries, contact: +91 98450 12345`;
                 ₹{collectionsSummary.totalDue.toLocaleString('en-IN')}
               </div>
               <span className="text-[11px] text-rose-600 font-semibold mt-1 block">
-                Due by {currentMonthDueDate}
+                Due by {collectionsMonthDueDate}
               </span>
             </div>
 
@@ -832,62 +1003,62 @@ For queries, contact: +91 98450 12345`;
             
             <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs">
               <div className="flex items-center justify-between text-gray-500 mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider">Total Invoices</span>
+                <span className="text-xs font-bold uppercase tracking-wider">Total Payments Received</span>
                 <Receipt className="w-5 h-5 text-[#8A064D]" />
               </div>
               <div className="text-2xl font-black text-[#2D041A]">
-                {paymentsSummary.totalInvoices}
+                {paymentsSummary.totalPaymentsCount}
               </div>
               <span className="text-[11px] text-gray-500 font-medium mt-1 block">
-                {paymentsSummary.paidCount} Settled • {paymentsSummary.pendingCount} Pending
-              </span>
-            </div>
-
-            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs">
-              <div className="flex items-center justify-between text-gray-500 mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider">Total Invoiced Amount</span>
-                <IndianRupee className="w-5 h-5 text-blue-600" />
-              </div>
-              <div className="text-2xl font-black text-[#2D041A]">
-                ₹{paymentsSummary.totalBilled.toLocaleString('en-IN')}
-              </div>
-              <span className="text-[11px] text-gray-500 font-medium mt-1 block">
-                Gross billing across selected period
+                {paymentsSummary.paidCount} Full Settled • {paymentsSummary.partialCount} Partial
               </span>
             </div>
 
             <div className="bg-white p-5 rounded-3xl border border-emerald-100 shadow-xs bg-emerald-50/20">
               <div className="flex items-center justify-between text-emerald-700 mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider">Total Amount Paid</span>
+                <span className="text-xs font-bold uppercase tracking-wider">Total Amount Received</span>
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               </div>
               <div className="text-2xl font-black text-emerald-800">
                 ₹{paymentsSummary.totalPaid.toLocaleString('en-IN')}
               </div>
               <span className="text-[11px] text-emerald-700 font-semibold mt-1 block">
-                {paymentsSummary.settledRate}% settled across invoices
+                Total money collected from students
               </span>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl border border-rose-100 shadow-xs bg-rose-50/20">
-              <div className="flex items-center justify-between text-rose-700 mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider">Total Balance Due</span>
-                <AlertCircle className="w-5 h-5 text-rose-600" />
+            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs">
+              <div className="flex items-center justify-between text-gray-500 mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider">Paying Students</span>
+                <Users className="w-5 h-5 text-blue-600" />
               </div>
-              <div className="text-2xl font-black text-rose-700">
+              <div className="text-2xl font-black text-[#2D041A]">
+                {new Set(filteredInvoices.map(i => i.student_id)).size}
+              </div>
+              <span className="text-[11px] text-gray-500 font-medium mt-1 block">
+                Active student learners with paid fees
+              </span>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-amber-100 shadow-xs bg-amber-50/20">
+              <div className="flex items-center justify-between text-amber-700 mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider">Remaining Invoice Due</span>
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="text-2xl font-black text-amber-700">
                 ₹{paymentsSummary.totalDue.toLocaleString('en-IN')}
               </div>
-              <span className="text-[11px] text-rose-600 font-semibold mt-1 block">
-                Remaining outstanding receivables
+              <span className="text-[11px] text-amber-600 font-semibold mt-1 block">
+                Remaining balance on partial receipts
               </span>
             </div>
 
           </div>
 
-          {/* Payments Filters: Status Tabs, Date Range Filter & Search Bar */}
+          {/* Payments Filters: Status Tabs, Student Dropdown, Date Range Filter & Search Bar */}
           <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] space-y-3">
             
-            {/* Row 1: Filter Tabs */}
+            {/* Row 1: Filter Tabs (Pending Due REMOVED per user instruction) & Search */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -898,31 +1069,7 @@ For queries, contact: +91 98450 12345`;
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  All Invoices ({invoices.length})
-                </button>
-
-                <button
-                  onClick={() => setPaymentsStatusFilter('pending')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                    paymentsStatusFilter === 'pending'
-                      ? 'bg-[#8A064D] text-white shadow-xs'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-rose-500" />
-                  <span>Pending Due</span>
-                </button>
-
-                <button
-                  onClick={() => setPaymentsStatusFilter('partial')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                    paymentsStatusFilter === 'partial'
-                      ? 'bg-[#8A064D] text-white shadow-xs'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span>Partial Payments</span>
+                  All Payments ({filteredInvoices.length})
                 </button>
 
                 <button
@@ -935,6 +1082,20 @@ For queries, contact: +91 98450 12345`;
                 >
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   <span>Paid & Settled</span>
+                  <span className="text-[10px] opacity-80">({paymentsSummary.paidCount})</span>
+                </button>
+
+                <button
+                  onClick={() => setPaymentsStatusFilter('partial')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    paymentsStatusFilter === 'partial'
+                      ? 'bg-[#8A064D] text-white shadow-xs'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span>Partial Payments</span>
+                  <span className="text-[10px] opacity-80">({paymentsSummary.partialCount})</span>
                 </button>
               </div>
 
@@ -951,42 +1112,122 @@ For queries, contact: +91 98450 12345`;
               </div>
             </div>
 
-            {/* Row 2: Date Range Filter */}
-            <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center gap-3 text-xs">
-              <span className="font-bold text-gray-700 flex items-center gap-1.5">
-                <CalendarRange className="w-3.5 h-3.5 text-[#8A064D]" />
-                <span>Date Range:</span>
-              </span>
+            {/* Row 2: Student Searchable Dropdown & Date Range Filter (align left to prevent overlap) */}
+            <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-3">
+                
+                {/* Searchable Student Dropdown Filter */}
+                <div className="relative" ref={paymentsStudentDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsPaymentsStudentDropdownOpen(!isPaymentsStudentDropdownOpen)}
+                    className={`px-3.5 py-2 bg-white hover:bg-gray-50 border rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer ${
+                      paymentsStudentFilter !== 'all' ? 'border-[#8A064D] text-[#8A064D] bg-[#FFF2F8]' : 'border-[#F0D5E4] text-gray-800'
+                    }`}
+                  >
+                    <User className="w-4 h-4 text-[#8A064D]" />
+                    <span className="truncate max-w-[200px]">
+                      {paymentsStudentFilter === 'all'
+                        ? 'All Students'
+                        : students.find(s => s.id === paymentsStudentFilter)?.full_name || 'Selected Student'}
+                    </span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isPaymentsStudentDropdownOpen ? 'rotate-180 text-[#8A064D]' : ''}`} />
+                  </button>
 
-              <div className="flex items-center gap-2">
-                <label className="text-gray-500">From:</label>
-                <input
-                  type="date"
-                  value={paymentStartDate}
-                  onChange={(e) => setPaymentStartDate(e.target.value)}
-                  className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
-                />
+                  {isPaymentsStudentDropdownOpen && (
+                    <div className="absolute left-0 top-full mt-2 w-76 bg-white rounded-3xl shadow-2xl border border-[#F0D5E4] p-3 z-50 animate-in fade-in zoom-in-95 duration-100">
+                      <div className="relative mb-2">
+                        <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Search student name or ID..."
+                          value={paymentsStudentSearch}
+                          onChange={(e) => setPaymentsStudentSearch(e.target.value)}
+                          className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-1 focus:ring-[#8A064D] focus:bg-white"
+                        />
+                      </div>
+
+                      <div className="max-h-56 overflow-y-auto space-y-0.5 scrollbar-thin">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPaymentsStudentFilter('all');
+                            setIsPaymentsStudentDropdownOpen(false);
+                            setPaymentsStudentSearch('');
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition cursor-pointer ${
+                            paymentsStudentFilter === 'all'
+                              ? 'bg-[#FFF2F8] text-[#8A064D] font-bold'
+                              : 'text-gray-700 hover:bg-gray-50 font-medium'
+                          }`}
+                        >
+                          <span>All Students ({students.length})</span>
+                          {paymentsStudentFilter === 'all' && <Check className="w-3.5 h-3.5 text-[#8A064D]" />}
+                        </button>
+
+                        {filteredStudentsForDropdown.map((s) => {
+                          const isSelected = paymentsStudentFilter === s.id;
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => {
+                                setPaymentsStudentFilter(s.id);
+                                setIsPaymentsStudentDropdownOpen(false);
+                                setPaymentsStudentSearch('');
+                              }}
+                              className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[#FFF2F8] text-[#8A064D] font-bold'
+                                  : 'text-gray-700 hover:bg-gray-50 font-medium'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 truncate pr-2">
+                                <span className="font-mono text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded shrink-0">
+                                  {s.roll_number}
+                                </span>
+                                <span className="truncate">{s.full_name}</span>
+                              </div>
+                              {isSelected && <Check className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Date Range Quick Filter with align="left" to prevent table overlap */}
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-gray-700 flex items-center gap-1.5">
+                    <CalendarRange className="w-3.5 h-3.5 text-[#8A064D]" />
+                    <span>Payment Period:</span>
+                  </span>
+                  <DateRangeQuickFilter
+                    startDate={paymentStartDate}
+                    endDate={paymentEndDate}
+                    align="left"
+                    onApply={({ startDate, endDate }) => {
+                      setPaymentStartDate(startDate);
+                      setPaymentEndDate(endDate);
+                    }}
+                    placeholder="Select Date Range (All Payments)"
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <label className="text-gray-500">To:</label>
-                <input
-                  type="date"
-                  value={paymentEndDate}
-                  onChange={(e) => setPaymentEndDate(e.target.value)}
-                  className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
-                />
-              </div>
-
-              {(paymentStartDate || paymentEndDate) && (
+              {(paymentStartDate || paymentEndDate || paymentsStudentFilter !== 'all') && (
                 <button
+                  type="button"
                   onClick={() => {
                     setPaymentStartDate('');
                     setPaymentEndDate('');
+                    setPaymentsStudentFilter('all');
                   }}
                   className="text-xs font-bold text-rose-600 hover:underline px-2 py-1 cursor-pointer"
                 >
-                  Clear Dates
+                  Reset Filters
                 </button>
               )}
             </div>
@@ -1012,14 +1253,14 @@ For queries, contact: +91 98450 12345`;
                     <tr>
                       <td colSpan={6} className="py-12 text-center text-gray-400">
                         <Receipt className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                        <p className="font-bold text-gray-600">No invoices match your search or date criteria.</p>
-                        <p className="text-xs text-gray-400 mt-1">Try resetting the date range or status filters.</p>
+                        <p className="font-bold text-gray-600">No payments found matching your filter criteria.</p>
+                        <p className="text-xs text-gray-400 mt-1">Try resetting the student or date range filter.</p>
                       </td>
                     </tr>
                   ) : (
                     filteredInvoices.map((inv) => {
-                      const isPaid = inv.status === 'paid';
-                      const isPartial = inv.status === 'partial';
+                      const isPaid = inv.status === 'paid' || Number(inv.balance_amount) <= 0;
+                      const isPartial = !isPaid;
 
                       return (
                         <tr key={inv.id} className="hover:bg-[#FFFDFC] transition">
@@ -1039,11 +1280,11 @@ For queries, contact: +91 98450 12345`;
                             </div>
                           </td>
 
-                          {/* 2. Invoice Number */}
+                          {/* 2. Invoice Number & Due Date in DD/MM/YY format */}
                           <td className="py-3.5 px-4 font-mono font-bold text-[#8A064D]">
                             <div>{inv.invoice_number}</div>
-                            <span className="text-[10px] text-gray-500 font-sans font-normal block">
-                              Due: {formatDdMonthName(inv.due_date, false)}
+                            <span className="text-[10px] text-gray-500 font-sans font-medium block mt-0.5">
+                              Due: {formatMonthEndDdMmYy(inv.due_date || inv.fee_period || inv.created_at)}
                             </span>
                           </td>
 
@@ -1414,154 +1655,178 @@ For queries, contact: +91 98450 12345`;
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-[#F0D5E4] max-h-[92vh] overflow-y-auto print:p-0 print:border-none print:shadow-none">
             
-            {/* Header with Academy Brand */}
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#2D041A] border-2 border-[#F9E33A] flex items-center justify-center text-[#F9E33A] font-serif font-black text-lg shadow-sm">
-                  LC
-                </div>
-                <div>
-                  <h3 className="font-black text-base text-[#2D041A] uppercase tracking-wide">
-                    Laasya Cultural Academy
-                  </h3>
-                  <p className="text-[10px] text-gray-500 font-semibold tracking-widest uppercase">
-                    Official Student Fee Receipt
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setViewingInvoice(null)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition print:hidden"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Receipt Body */}
-            <div className="py-4 space-y-4 text-xs">
-              
-              {/* Receipt Metadata */}
-              <div className="grid grid-cols-2 gap-4 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100">
-                <div>
-                  <span className="text-[10px] text-gray-400 uppercase font-bold block">Invoice No</span>
-                  <span className="font-mono font-black text-[#8A064D] text-sm">{viewingInvoice.invoice_number}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-gray-400 uppercase font-bold block">Due Date</span>
-                  <span className="font-mono font-bold text-gray-800">{formatDdMonthName(viewingInvoice.due_date)}</span>
-                </div>
-              </div>
-
-              {/* Student & Guardian Info */}
-              <div className="grid grid-cols-2 gap-4 p-3 bg-[#FFF9FB] rounded-2xl border border-rose-100">
-                <div>
-                  <span className="text-[10px] text-[#8A064D] uppercase font-bold block">Student Details</span>
-                  <span className="font-bold text-gray-900 text-sm block mt-0.5">{viewingInvoice.student_name}</span>
-                  <span className="text-[11px] text-gray-600 font-mono font-bold">ID: {viewingInvoice.roll_number}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#8A064D] uppercase font-bold block">Guardian & Contact</span>
-                  <span className="font-semibold text-gray-800 block mt-0.5">{viewingInvoice.parent_name || 'Parent'}</span>
-                  <span className="text-[11px] text-gray-600">{viewingInvoice.phone}</span>
-                </div>
-              </div>
-
-              {/* Course & Fee Breakdown */}
-              <div className="border border-gray-200 rounded-2xl overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50 border-b border-gray-200 text-gray-700 font-bold">
-                    <tr>
-                      <th className="py-2.5 px-3">Description</th>
-                      <th className="py-2.5 px-3 text-center">Period</th>
-                      <th className="py-2.5 px-3 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 font-medium">
-                    <tr>
-                      <td className="py-3 px-3">
-                        <strong className="text-gray-900 block">{viewingInvoice.course_title}</strong>
-                        <span className="text-[10px] text-gray-500">Batch: {viewingInvoice.batch_name}</span>
-                      </td>
-                      <td className="py-3 px-3 text-center">{viewingInvoice.fee_period}</td>
-                      <td className="py-3 px-3 text-right font-bold text-gray-900">
-                        ₹{Number(viewingInvoice.total_amount).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                    {Number(viewingInvoice.discount_amount) > 0 && (
-                      <tr className="text-emerald-700 bg-emerald-50/40">
-                        <td className="py-2 px-3">Academy Discount / Concession</td>
-                        <td className="py-2 px-3 text-center">—</td>
-                        <td className="py-2 px-3 text-right font-bold">
-                          -₹{Number(viewingInvoice.discount_amount).toLocaleString('en-IN')}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                  <tfoot className="bg-gray-50 border-t border-gray-200 font-bold">
-                    <tr>
-                      <td colSpan={2} className="py-2 px-3 text-right">Paid Amount:</td>
-                      <td className="py-2 px-3 text-right text-emerald-700 font-black">
-                        ₹{Number(viewingInvoice.paid_amount).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                    <tr className="border-t border-gray-200 text-sm">
-                      <td colSpan={2} className="py-2.5 px-3 text-right text-[#8A064D] font-black">Balance Due:</td>
-                      <td className="py-2.5 px-3 text-right font-black text-rose-700">
-                        ₹{Number(viewingInvoice.balance_amount).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-
-              {/* Payment Timeline if recorded */}
-              {viewingInvoice.payments && viewingInvoice.payments.length > 0 && (
-                <div className="space-y-1.5 pt-1">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                    Installment Receipts ({viewingInvoice.payments.length})
-                  </span>
-                  <div className="space-y-1.5">
-                    {viewingInvoice.payments.map((p) => (
-                      <div key={p.id} className="p-2 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between text-[11px]">
-                        <div>
-                          <strong className="font-mono text-[#8A064D]">{p.receipt_number}</strong>
-                          <span className="text-gray-500 ml-2">({p.payment_method.toUpperCase()})</span>
-                          <span className="text-gray-400 block text-[10px]">{formatDdMonthName(p.payment_date)}</span>
-                        </div>
-                        <span className="font-black text-emerald-800">₹{Number(p.amount_paid).toLocaleString('en-IN')}</span>
-                      </div>
-                    ))}
+            {/* Printable Invoice Container */}
+            <div id="student-fee-invoice-content" className="bg-white p-2 rounded-2xl">
+              {/* Header with Academy Brand */}
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#2D041A] border-2 border-[#F9E33A] flex items-center justify-center text-[#F9E33A] font-serif font-black text-lg shadow-sm">
+                    LC
+                  </div>
+                  <div>
+                    <h3 className="font-black text-base text-[#2D041A] uppercase tracking-wide">
+                      Laasya Cultural Academy
+                    </h3>
+                    <p className="text-[10px] text-gray-500 font-semibold tracking-widest uppercase">
+                      Official Student Fee Receipt
+                    </p>
                   </div>
                 </div>
-              )}
 
+                <button
+                  type="button"
+                  onClick={() => setViewingInvoice(null)}
+                  className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition print:hidden cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Receipt Body */}
+              <div className="py-4 space-y-4 text-xs">
+                
+                {/* Receipt Metadata */}
+                <div className="grid grid-cols-2 gap-4 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100">
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase font-bold block">Invoice No</span>
+                    <span className="font-mono font-black text-[#8A064D] text-sm">{viewingInvoice.invoice_number}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-gray-400 uppercase font-bold block">Due Date</span>
+                    <span className="font-mono font-bold text-gray-800">{formatMonthEndDdMmYy(viewingInvoice.due_date || viewingInvoice.fee_period || viewingInvoice.created_at)}</span>
+                  </div>
+                </div>
+
+                {/* Student & Guardian Info */}
+                <div className="grid grid-cols-2 gap-4 p-3 bg-[#FFF9FB] rounded-2xl border border-rose-100">
+                  <div>
+                    <span className="text-[10px] text-[#8A064D] uppercase font-bold block">Student Details</span>
+                    <span className="font-bold text-gray-900 text-sm block mt-0.5">{viewingInvoice.student_name}</span>
+                    <span className="text-[11px] text-gray-600 font-mono font-bold">ID: {viewingInvoice.roll_number}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-[#8A064D] uppercase font-bold block">Guardian & Contact</span>
+                    <span className="font-semibold text-gray-800 block mt-0.5">{viewingInvoice.parent_name || 'Parent'}</span>
+                    <span className="text-[11px] text-gray-600">{viewingInvoice.phone}</span>
+                  </div>
+                </div>
+
+                {/* Course & Fee Breakdown */}
+                <div className="border border-gray-200 rounded-2xl overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 border-b border-gray-200 text-gray-700 font-bold">
+                      <tr>
+                        <th className="py-2.5 px-3">Description</th>
+                        <th className="py-2.5 px-3 text-center">Period</th>
+                        <th className="py-2.5 px-3 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 font-medium">
+                      <tr>
+                        <td className="py-3 px-3">
+                          <strong className="text-gray-900 block">{viewingInvoice.course_title}</strong>
+                          <span className="text-[10px] text-gray-500">Batch: {viewingInvoice.batch_name}</span>
+                        </td>
+                        <td className="py-3 px-3 text-center">{viewingInvoice.fee_period}</td>
+                        <td className="py-3 px-3 text-right font-bold text-gray-900">
+                          ₹{Number(viewingInvoice.total_amount).toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                      {Number(viewingInvoice.discount_amount) > 0 && (
+                        <tr className="text-emerald-700 bg-emerald-50/40">
+                          <td className="py-2 px-3">Academy Discount / Concession</td>
+                          <td className="py-2 px-3 text-center">—</td>
+                          <td className="py-2 px-3 text-right font-bold">
+                            -₹{Number(viewingInvoice.discount_amount).toLocaleString('en-IN')}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                    <tfoot className="bg-gray-50 border-t border-gray-200 font-bold">
+                      <tr>
+                        <td colSpan={2} className="py-2 px-3 text-right">Paid Amount:</td>
+                        <td className="py-2 px-3 text-right text-emerald-700 font-black">
+                          ₹{Number(viewingInvoice.paid_amount).toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                      <tr className="border-t border-gray-200 text-sm">
+                        <td colSpan={2} className="py-2.5 px-3 text-right text-[#8A064D] font-black">Balance Due:</td>
+                        <td className="py-2.5 px-3 text-right font-black text-rose-700">
+                          ₹{Number(viewingInvoice.balance_amount).toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Payment Timeline if recorded */}
+                {viewingInvoice.payments && viewingInvoice.payments.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                      Installment Receipts ({viewingInvoice.payments.length})
+                    </span>
+                    <div className="space-y-1.5">
+                      {viewingInvoice.payments.map((p) => (
+                        <div key={p.id} className="p-2 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between text-[11px]">
+                          <div>
+                            <strong className="font-mono text-[#8A064D]">{p.receipt_number}</strong>
+                            <span className="text-gray-500 ml-2">({p.payment_method.toUpperCase()})</span>
+                            <span className="text-gray-400 block text-[10px]">{formatDdMonthName(p.payment_date)}</span>
+                          </div>
+                          <span className="font-black text-emerald-800">₹{Number(p.amount_paid).toLocaleString('en-IN')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              </div>
             </div>
 
-            {/* Actions: Print & Share WhatsApp */}
-            <div className="flex items-center justify-between pt-4 border-t border-gray-100 print:hidden">
+            {/* Actions: Download PDF, Print & Share WhatsApp */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-gray-100 print:hidden">
               <button
                 type="button"
                 onClick={() => setViewingInvoice(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
               >
                 Close
               </button>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Download PDF Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ok = downloadStudentFeeInvoicePdf(viewingInvoice);
+                    if (ok) {
+                      showToast(`Official Invoice PDF downloaded for ${viewingInvoice.student_name}!`);
+                    } else {
+                      showToast(`Could not generate PDF. Please try Print Receipt.`);
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#2D041A] hover:bg-[#48082B] text-white shadow-sm border border-[#48082B] transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#F9E33A]" />
+                  <span>Download PDF</span>
+                </button>
+
+                {/* Print Receipt Button */}
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#2D041A] hover:bg-[#48082B] text-white shadow-sm border border-[#48082B] transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-sm border border-[#70043E] transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5 text-[#F9E33A]" />
                   <span>Print Receipt</span>
                 </button>
 
+                {/* Share WhatsApp Button */}
                 <button
                   type="button"
                   onClick={() => {
                     const inv = viewingInvoice;
+                    downloadStudentFeeInvoicePdf(inv);
                     setViewingInvoice(null);
                     setSharingInvoice(inv);
                   }}
@@ -1666,6 +1931,27 @@ For queries, contact: +91 98450 12345`;
                 </p>
               </div>
 
+            </div>
+
+            {/* Hidden invoice printable element for direct PDF export */}
+            <div id="sharing-invoice-pdf-card" className="sr-only p-6 bg-white border border-[#8A064D] rounded-2xl text-xs space-y-4">
+              <div className="text-center pb-3 border-b border-rose-100">
+                <h3 className="font-black text-base text-[#2D041A] uppercase">Laasya Cultural Academy</h3>
+                <p className="text-[10px] font-bold text-[#8A064D]">Official Student Fee Receipt & Invoice</p>
+                <p className="text-[10px] text-gray-500">Invoice: {sharingInvoice.invoice_number} • Date: {formatDdMonthName(sharingInvoice.due_date || sharingInvoice.created_at)}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div><strong>Student:</strong> {sharingInvoice.student_name} ({sharingInvoice.roll_number})</div>
+                <div><strong>Guardian:</strong> {sharingInvoice.parent_name || 'Parent'}</div>
+                <div><strong>Course:</strong> {sharingInvoice.course_title}</div>
+                <div><strong>Batch:</strong> {sharingInvoice.batch_name}</div>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-xl space-y-1">
+                <div className="flex justify-between"><span>Fee Period:</span><strong>{sharingInvoice.fee_period}</strong></div>
+                <div className="flex justify-between"><span>Total Invoiced:</span><strong>₹{Number(sharingInvoice.total_amount).toLocaleString('en-IN')}</strong></div>
+                <div className="flex justify-between text-emerald-700"><span>Paid Amount:</span><strong>₹{Number(sharingInvoice.paid_amount).toLocaleString('en-IN')}</strong></div>
+                <div className="flex justify-between text-rose-700 font-bold border-t border-gray-200 pt-1"><span>Balance Due:</span><span>₹{Number(sharingInvoice.balance_amount).toLocaleString('en-IN')}</span></div>
+              </div>
             </div>
 
           </div>

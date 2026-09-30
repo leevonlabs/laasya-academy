@@ -5,7 +5,9 @@ import { getSessions, updateSessionStatus } from '@/lib/academy';
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date') || undefined;
-  const sessions = await getSessions(date);
+  const startDate = searchParams.get('startDate') || undefined;
+  const endDate = searchParams.get('endDate') || undefined;
+  const sessions = await getSessions(date, startDate, endDate);
   return NextResponse.json(sessions);
 }
 

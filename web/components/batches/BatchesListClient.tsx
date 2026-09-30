@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Batch, Course, Trainer } from '@/lib/academy';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Batch, Course, Trainer, Room } from '@/lib/academy';
 import { 
   Calendar, 
   Plus, 
@@ -17,13 +17,23 @@ import {
   Eye,
   AlertCircle,
   GraduationCap,
-  Layers
+  Layers,
+  DoorOpen,
+  ChevronDown,
+  Loader2,
+  BookOpen,
+  Filter,
+  CheckSquare,
+  Square,
+  RotateCcw
 } from 'lucide-react';
+import SearchableRoomSelect from './SearchableRoomSelect';
 
 interface Props {
   initialBatches: Batch[];
   courses: Course[];
   trainers: Trainer[];
+  initialRooms?: Room[];
 }
 
 interface ScheduleEntry {
@@ -34,10 +44,25 @@ interface ScheduleEntry {
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export default function BatchesListClient({ initialBatches, courses, trainers }: Props) {
+export default function BatchesListClient({ initialBatches, courses, trainers, initialRooms = [] }: Props) {
   const [batches, setBatches] = useState<Batch[]>(initialBatches);
+  const [rooms, setRooms] = useState<Room[]>(initialRooms);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCourseFilter, setSelectedCourseFilter] = useState('All');
+  
+  // Searchable Multi-Select Course Filter State
+  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
+  const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
+  const [courseFilterSearch, setCourseFilterSearch] = useState('');
+  const courseDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Rooms Top Header Dropdown State
+  const [isRoomsDropdownOpen, setIsRoomsDropdownOpen] = useState(false);
+  const [roomHeaderSearch, setRoomHeaderSearch] = useState('');
+  const [isHeaderCreatingRoom, setIsHeaderCreatingRoom] = useState(false);
+  const [headerNewRoomName, setHeaderNewRoomName] = useState('');
+  const [headerNewRoomCapacity, setHeaderNewRoomCapacity] = useState(25);
+  const [headerRoomSaving, setHeaderRoomSaving] = useState(false);
+  const roomsDropdownRef = useRef<HTMLDivElement>(null);
 
   // Modals
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -52,6 +77,70 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
   const showFeedback = (type: 'success' | 'error', text: string) => {
     setFeedbackMsg({ type, text });
     setTimeout(() => setFeedbackMsg(null), 4000);
+  };
+
+  // Close top header rooms dropdown and course filter dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (roomsDropdownRef.current && !roomsDropdownRef.current.contains(event.target as Node)) {
+        setIsRoomsDropdownOpen(false);
+        setIsHeaderCreatingRoom(false);
+      }
+      if (courseDropdownRef.current && !courseDropdownRef.current.contains(event.target as Node)) {
+        setIsCourseDropdownOpen(false);
+      }
+    }
+    if (isRoomsDropdownOpen || isCourseDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isRoomsDropdownOpen, isCourseDropdownOpen]);
+
+  const toggleCourseFilter = (crsId: string) => {
+    setSelectedCourseIds(prev =>
+      prev.includes(crsId) ? prev.filter(id => id !== crsId) : [...prev, crsId]
+    );
+  };
+
+  const selectAllCoursesFilter = () => {
+    setSelectedCourseIds(courses.map(c => c.id));
+  };
+
+  const clearCoursesFilter = () => {
+    setSelectedCourseIds([]);
+  };
+
+  const removeSingleCourseFilter = (crsId: string) => {
+    setSelectedCourseIds(prev => prev.filter(id => id !== crsId));
+  };
+
+  const handleHeaderCreateRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = headerNewRoomName.trim();
+    if (!trimmed) {
+      showFeedback('error', 'Please enter a valid room name');
+      return;
+    }
+    setHeaderRoomSaving(true);
+    try {
+      const res = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed, capacity: Number(headerNewRoomCapacity) || 25 })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create room');
+      setRooms(prev => [...prev.filter(r => r.id !== data.room.id), data.room].sort((a, b) => a.name.localeCompare(b.name)));
+      setHeaderNewRoomName('');
+      setIsHeaderCreatingRoom(false);
+      showFeedback('success', `Room "${data.room.name}" created successfully!`);
+    } catch (err: any) {
+      showFeedback('error', err.message || 'Error creating room');
+    } finally {
+      setHeaderRoomSaving(false);
+    }
   };
 
   // -------------------------------------------------------------
@@ -203,9 +292,9 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
     }
   };
 
-  // Filtered Batches
+  // Filtered Batches based on multi-select courses and search query
   const filteredBatches = batches.filter(b => {
-    const matchesCourse = selectedCourseFilter === 'All' || b.course_id === selectedCourseFilter;
+    const matchesCourse = selectedCourseIds.length === 0 || selectedCourseIds.includes(b.course_id);
     const matchesSearch = 
       b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.course_title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -213,6 +302,23 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
       (b.room_or_hall || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCourse && matchesSearch;
   });
+
+  // Filter courses for multi-select dropdown search
+  const filteredCoursesForFilter = useMemo(() => {
+    if (!courseFilterSearch.trim()) return courses;
+    const q = courseFilterSearch.toLowerCase();
+    return courses.filter(c => 
+      c.title.toLowerCase().includes(q) || 
+      c.code.toLowerCase().includes(q) || 
+      c.category.toLowerCase().includes(q)
+    );
+  }, [courses, courseFilterSearch]);
+
+  // Academy summary stats
+  const totalEnrolled = useMemo(() => batches.reduce((sum, b) => sum + (b.enrolled_count || 0), 0), [batches]);
+  const totalCapacity = useMemo(() => batches.reduce((sum, b) => sum + (b.max_capacity || 25), 0), [batches]);
+  const activeBatchesCount = useMemo(() => batches.filter(b => b.is_active !== false).length, [batches]);
+  const fillRate = totalCapacity > 0 ? Math.round((totalEnrolled / totalCapacity) * 100) : 0;
 
   // Available gurus for current Add Course selection
   const addMatchingGurus = useMemo(() => {
@@ -424,13 +530,13 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
         </div>
       )}
 
-      {/* Header */}
+      {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs">
         <div>
-          <h1 className="text-2xl font-bold text-[#2D041A] flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-[#2D041A] flex items-center gap-2.5">
             <span>Class Batches & Schedules</span>
-            <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-full font-semibold">
-              {batches.length} Active Batches
+            <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-3 py-0.5 rounded-full font-bold shadow-2xs">
+              {batches.length} Batches
             </span>
           </h1>
           <p className="text-xs text-gray-500 mt-1">
@@ -439,20 +545,145 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-            <input
-              type="text"
-              placeholder="Search batches by name, course, Guru..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-gray-50 border border-[#F0D5E4] rounded-xl text-xs w-72 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
-            />
+          {/* Rooms Option Dropdown */}
+          <div className="relative" ref={roomsDropdownRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsRoomsDropdownOpen(!isRoomsDropdownOpen);
+                setIsHeaderCreatingRoom(false);
+              }}
+              className="bg-white hover:bg-gray-50 text-gray-700 border border-[#F0D5E4] px-4 py-2.5 rounded-2xl text-xs font-semibold shadow-2xs transition flex items-center gap-2 cursor-pointer hover:border-[#8A064D]/30"
+            >
+              <DoorOpen className="w-4 h-4 text-[#8A064D]" />
+              <span>Rooms</span>
+              <span className="text-[10px] bg-[#FFF2F8] text-[#8A064D] font-bold px-2 py-0.5 rounded-full border border-[#F0D5E4]">
+                {rooms.length}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-150 ${isRoomsDropdownOpen ? 'rotate-180 text-[#8A064D]' : ''}`} />
+            </button>
+
+            {isRoomsDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-[#F0D5E4] p-3 z-50 animate-in fade-in zoom-in-95 duration-100">
+                {/* Top Section: Header & Create Room button */}
+                <div className="pb-2.5 border-b border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#2D041A] flex items-center gap-1.5">
+                      <DoorOpen className="w-3.5 h-3.5 text-[#8A064D]" />
+                      Available Academy Rooms
+                    </span>
+                    {!isHeaderCreatingRoom && (
+                      <button
+                        type="button"
+                        onClick={() => setIsHeaderCreatingRoom(true)}
+                        className="text-[11px] font-bold text-[#8A064D] hover:text-[#70043E] bg-[#FFF2F8] hover:bg-[#FFE5F0] border border-[#F0D5E4] px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Create Room</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Top: Create Room Form */}
+                  {isHeaderCreatingRoom && (
+                    <form onSubmit={handleHeaderCreateRoom} className="bg-gray-50 p-2.5 rounded-xl border border-gray-200 mt-2 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-[#8A064D] uppercase tracking-wider">New Room Setup</span>
+                        <button
+                          type="button"
+                          onClick={() => { setIsHeaderCreatingRoom(false); setHeaderNewRoomName(''); }}
+                          className="p-0.5 text-gray-400 hover:text-gray-600 rounded"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        autoFocus
+                        required
+                        placeholder="Enter room / hall name..."
+                        value={headerNewRoomName}
+                        onChange={(e) => setHeaderNewRoomName(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium focus:ring-1 focus:ring-[#8A064D]"
+                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="Capacity"
+                          value={headerNewRoomCapacity}
+                          onChange={(e) => setHeaderNewRoomCapacity(Number(e.target.value))}
+                          className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs"
+                          title="Class capacity"
+                        />
+                        <button
+                          type="submit"
+                          disabled={headerRoomSaving}
+                          className="flex-1 bg-[#8A064D] hover:bg-[#70043E] text-white py-1 px-3 rounded-lg text-xs font-bold transition disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          {headerRoomSaving ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              <span>Saving...</span>
+                            </>
+                          ) : (
+                            <span>Save Room</span>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+
+                {/* Filter Search */}
+                <div className="py-2">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Filter available rooms..."
+                      value={roomHeaderSearch}
+                      onChange={(e) => setRoomHeaderSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-[#8A064D] focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Rooms List */}
+                <div className="max-h-56 overflow-y-auto space-y-1 scrollbar-thin">
+                  {rooms
+                    .filter(r => r.name.toLowerCase().includes(roomHeaderSearch.toLowerCase()))
+                    .map((r) => {
+                      const roomBatches = batches.filter(b => b.room_or_hall?.toLowerCase().trim() === r.name.toLowerCase().trim());
+                      return (
+                        <div
+                          key={r.id}
+                          className="p-2 hover:bg-[#FFF9FB] rounded-xl flex items-center justify-between transition border border-transparent hover:border-[#F0D5E4]"
+                        >
+                          <div className="min-w-0 pr-2">
+                            <p className="text-xs font-semibold text-[#2D041A] truncate">{r.name}</p>
+                            <p className="text-[10px] text-gray-400">Capacity: {r.capacity || 25} seats</p>
+                          </div>
+                          <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full shrink-0 font-medium">
+                            {roomBatches.length} {roomBatches.length === 1 ? 'batch' : 'batches'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  {rooms.filter(r => r.name.toLowerCase().includes(roomHeaderSearch.toLowerCase())).length === 0 && (
+                    <div className="py-3 text-center text-xs text-gray-400">
+                      No rooms found
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* Create Batch Trigger */}
           <button
             onClick={openAddModal}
-            className="bg-[#8A064D] hover:bg-[#70043E] text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-md transition flex items-center gap-1.5 cursor-pointer"
+            className="bg-[#8A064D] hover:bg-[#70043E] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-2 cursor-pointer active:scale-95"
           >
             <Plus className="w-4 h-4 text-[#F9E33A]" />
             <span>Create Batch</span>
@@ -460,39 +691,289 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
         </div>
       </div>
 
-      {/* Course Filter Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        <button
-          onClick={() => setSelectedCourseFilter('All')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-            selectedCourseFilter === 'All'
-              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/50'
-              : 'bg-white text-gray-600 border border-[#F0D5E4] hover:bg-gray-50'
-          }`}
-        >
-          All Courses ({batches.length})
-        </button>
-        {courses.map((crs) => {
-          const batchCount = batches.filter(b => b.course_id === crs.id).length;
-          return (
+      {/* Summary KPI Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center shrink-0">
+            <Layers className="w-5 h-5 text-[#8A064D]" />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Batches</p>
+            <p className="text-xl font-extrabold text-[#2D041A] leading-tight">{batches.length}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Active Slots</p>
+            <p className="text-xl font-extrabold text-emerald-700 leading-tight">{activeBatchesCount}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+            <Users className="w-5 h-5 text-amber-600" />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Enrolled Students</p>
+            <p className="text-xl font-extrabold text-amber-700 leading-tight">{totalEnrolled}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
+            <DoorOpen className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Hall Utilization</p>
+            <p className="text-xl font-extrabold text-purple-800 leading-tight">{fillRate}% <span className="text-xs font-semibold text-gray-400">({totalEnrolled}/{totalCapacity})</span></p>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Toolbar: Search Batches + Searchable Multi-Select Course Dropdown */}
+      <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          
+          {/* Left Group: Search Input + Course Filter Dropdown */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+            
+            {/* Search Input */}
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                placeholder="Search by batch, guru, room..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-[#F0D5E4] rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Course Filter: Searchable Multi-Select Dropdown */}
+            <div className="relative sm:w-80" ref={courseDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsCourseDropdownOpen(!isCourseDropdownOpen)}
+                className={`w-full px-4 py-2.5 rounded-2xl text-xs font-semibold flex items-center justify-between border transition cursor-pointer ${
+                  selectedCourseIds.length > 0
+                    ? 'bg-[#FFF2F8] border-[#8A064D] text-[#8A064D] shadow-xs'
+                    : 'bg-gray-50 hover:bg-gray-100/70 border-[#F0D5E4] text-gray-700'
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate pr-1">
+                  <BookOpen className={`w-4 h-4 shrink-0 ${selectedCourseIds.length > 0 ? 'text-[#8A064D]' : 'text-gray-400'}`} />
+                  <span className="truncate">
+                    {selectedCourseIds.length === 0
+                      ? `All Courses (${courses.length})`
+                      : selectedCourseIds.length === 1
+                      ? courses.find(c => c.id === selectedCourseIds[0])?.title || '1 Course Selected'
+                      : `${selectedCourseIds.length} Courses Selected`}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {selectedCourseIds.length > 0 && (
+                    <span className="bg-[#8A064D] text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                      {selectedCourseIds.length}
+                    </span>
+                  )}
+                  <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-150 ${isCourseDropdownOpen ? 'rotate-180 text-[#8A064D]' : ''}`} />
+                </div>
+              </button>
+
+              {/* Course Multi-Select Popover Menu */}
+              {isCourseDropdownOpen && (
+                <div className="absolute left-0 mt-2 w-88 sm:w-96 bg-white rounded-3xl shadow-2xl border border-[#F0D5E4] p-3.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                  
+                  {/* Search inside course filter */}
+                  <div className="relative mb-2.5">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Search courses by title, category, code..."
+                      value={courseFilterSearch}
+                      onChange={(e) => setCourseFilterSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-1 focus:ring-[#8A064D] focus:bg-white"
+                    />
+                    {courseFilterSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setCourseFilterSearch('')}
+                        className="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Actions Bar: Select All / Clear All */}
+                  <div className="flex items-center justify-between px-1 py-1.5 border-b border-gray-100 text-xs">
+                    <span className="text-gray-400 text-[11px] font-medium">
+                      {selectedCourseIds.length === 0
+                        ? 'All courses showing'
+                        : `${selectedCourseIds.length} of ${courses.length} selected`}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={selectAllCoursesFilter}
+                        className="text-[11px] font-bold text-[#8A064D] hover:underline cursor-pointer"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-gray-300">|</span>
+                      <button
+                        type="button"
+                        onClick={clearCoursesFilter}
+                        className="text-[11px] font-semibold text-gray-500 hover:text-rose-600 hover:underline cursor-pointer"
+                      >
+                        Reset All
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Course Checkbox Items List */}
+                  <div className="max-h-64 overflow-y-auto space-y-1 py-2 scrollbar-thin">
+                    {filteredCoursesForFilter.map((crs) => {
+                      const isSelected = selectedCourseIds.includes(crs.id);
+                      const crsBatchesCount = batches.filter(b => b.course_id === crs.id).length;
+                      return (
+                        <div
+                          key={crs.id}
+                          onClick={() => toggleCourseFilter(crs.id)}
+                          className={`flex items-center justify-between p-2 rounded-xl transition cursor-pointer select-none border ${
+                            isSelected
+                              ? 'bg-[#FFF2F8] border-[#F0D5E4]'
+                              : 'hover:bg-gray-50 border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <div className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 border transition ${
+                              isSelected 
+                                ? 'bg-[#8A064D] border-[#8A064D] text-white' 
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`text-xs truncate ${isSelected ? 'font-bold text-[#8A064D]' : 'font-medium text-gray-800'}`}>
+                                {crs.title}
+                              </p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.2 rounded font-mono">
+                                  {crs.code}
+                                </span>
+                                <span className="text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.2 rounded">
+                                  {crs.category}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                            crsBatchesCount > 0 ? 'bg-gray-100 text-gray-600' : 'bg-gray-50 text-gray-400'
+                          }`}>
+                            {crsBatchesCount} {crsBatchesCount === 1 ? 'batch' : 'batches'}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {filteredCoursesForFilter.length === 0 && (
+                      <div className="py-6 text-center text-xs text-gray-400">
+                        No courses found matching &quot;{courseFilterSearch}&quot;
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dropdown footer button */}
+                  <div className="pt-2 border-t border-gray-100 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsCourseDropdownOpen(false)}
+                      className="bg-[#8A064D] hover:bg-[#70043E] text-white text-xs font-bold px-4 py-1.5 rounded-xl transition cursor-pointer shadow-2xs"
+                    >
+                      Apply Filter
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          {/* Right Group: Results counter & Reset button */}
+          <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
+            <span className="text-xs font-semibold text-gray-500">
+              Showing <strong className="text-[#8A064D]">{filteredBatches.length}</strong> of {batches.length} batches
+            </span>
+            {(selectedCourseIds.length > 0 || searchQuery.trim() !== '') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCourseIds([]);
+                  setSearchQuery('');
+                }}
+                className="text-xs text-rose-600 hover:text-rose-800 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
+
+        </div>
+
+        {/* Selected Course Chips */}
+        {selectedCourseIds.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-gray-100">
+            <span className="text-[11px] font-bold text-gray-400 mr-1 flex items-center gap-1">
+              <Filter className="w-3 h-3 text-[#8A064D]" />
+              Active Filters:
+            </span>
+            {selectedCourseIds.map(crsId => {
+              const c = courses.find(item => item.id === crsId);
+              if (!c) return null;
+              return (
+                <span 
+                  key={crsId}
+                  className="inline-flex items-center gap-1.5 bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-1 rounded-xl text-xs font-bold shadow-2xs animate-in fade-in"
+                >
+                  <span>{c.title}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => removeSingleCourseFilter(crsId)}
+                    className="hover:text-rose-700 hover:bg-[#FFE5F0] rounded-full p-0.5 cursor-pointer transition"
+                    title={`Remove ${c.title} filter`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              );
+            })}
             <button
-              key={crs.id}
-              onClick={() => setSelectedCourseFilter(crs.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
-                selectedCourseFilter === crs.id
-                  ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/50'
-                  : 'bg-white text-gray-600 border border-[#F0D5E4] hover:bg-gray-50'
-              }`}
+              type="button"
+              onClick={clearCoursesFilter}
+              className="text-xs text-rose-600 hover:text-rose-800 font-bold px-2 py-0.5 hover:underline cursor-pointer ml-1"
             >
-              <span>{crs.title}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                selectedCourseFilter === crs.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
-              }`}>
-                {batchCount}
-              </span>
+              Clear all
             </button>
-          );
-        })}
+          </div>
+        )}
       </div>
 
       {/* Batches Grid */}
@@ -502,53 +983,69 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
           return (
             <div
               key={b.id}
-              className="bg-white rounded-3xl p-6 border border-[#F0D5E4] shadow-xs hover:shadow-md transition flex flex-col justify-between group"
+              className="bg-white rounded-3xl p-5.5 border border-[#F0D5E4] shadow-xs hover:shadow-xl hover:border-[#8A064D]/40 transition-all duration-200 flex flex-col justify-between group"
             >
               <div>
-                {/* Course Category Badge & Status */}
+                {/* Header: Course Category & Active Badge */}
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="text-[11px] font-semibold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-0.5 rounded-full">
-                    {b.course_category}
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#8A064D] bg-[#FFF2F8] border border-[#F0D5E4] px-3 py-0.5 rounded-full shadow-2xs">
+                    <Sparkles className="w-3 h-3 text-[#8A064D]" />
+                    <span>{b.course_category}</span>
                   </span>
-                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                  <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
                     b.is_active !== false 
                       ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' 
                       : 'text-amber-700 bg-amber-50 border border-amber-200'
                   }`}>
-                    {b.is_active !== false ? 'Active Slot' : 'Paused'}
+                    <span className={`w-1.5 h-1.5 rounded-full ${b.is_active !== false ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                    <span>{b.is_active !== false ? 'Active Slot' : 'Paused'}</span>
                   </span>
                 </div>
 
                 {/* Batch Name & Course */}
-                <h3 className="font-bold text-base text-[#2D041A] leading-tight group-hover:text-[#8A064D] transition">
+                <h3 className="font-bold text-lg text-[#2D041A] leading-tight group-hover:text-[#8A064D] transition">
                   {b.name}
                 </h3>
-                <p className="text-xs font-semibold text-[#8A064D] mt-0.5">
-                  Course: {b.course_title}
-                </p>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-[#8A064D] mt-1">
+                  <BookOpen className="w-3.5 h-3.5 shrink-0 opacity-80" />
+                  <span className="truncate">{b.course_title}</span>
+                </div>
 
-                {/* Guru & Room */}
-                <div className="mt-4 space-y-2 text-xs text-gray-600 bg-gray-50/70 p-3.5 rounded-2xl border border-gray-100">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5 text-[#8A064D]" />
-                    <span>Guru: <strong className="text-gray-900">{b.trainer_name}</strong></span>
+                {/* Faculty, Schedule & Hall Details */}
+                <div className="mt-4 space-y-2 text-xs text-gray-700 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-[#8A064D]" />
+                      <span>Guru</span>
+                    </span>
+                    <strong className="text-gray-900 font-semibold">{b.trainer_name}</strong>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5 text-[#8A064D]" />
-                    <span>Timing: <strong className="text-gray-900">{b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}</strong></span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-[#8A064D]" />
+                      <span>Timing</span>
+                    </span>
+                    <strong className="text-gray-900 font-semibold font-mono">
+                      {b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}
+                    </strong>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-[#8A064D]" />
-                    <span className="truncate">{b.room_or_hall || 'Main Hall'}</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-[#8A064D]" />
+                      <span>Hall / Room</span>
+                    </span>
+                    <strong className="text-gray-900 font-semibold truncate max-w-[140px] text-right">
+                      {b.room_or_hall || 'Main Hall'}
+                    </strong>
                   </div>
                 </div>
 
-                {/* Days of Week Badges */}
-                <div className="mt-3 flex flex-wrap gap-1">
+                {/* Class Days Pills */}
+                <div className="mt-3.5 flex flex-wrap gap-1.5">
                   {(b.days_of_week || []).map((day, idx) => (
                     <span 
                       key={idx}
-                      className="text-[10px] font-semibold bg-[#FFF9FB] text-gray-700 border border-rose-100 px-2 py-0.5 rounded-md"
+                      className="text-[10px] font-bold bg-[#FFF9FB] text-gray-700 border border-[#F0D5E4] px-2.5 py-0.5 rounded-lg shadow-2xs"
                     >
                       {day.substring(0, 3)}
                     </span>
@@ -558,15 +1055,15 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
 
               {/* Capacity Progress Bar & Action Buttons */}
               <div className="mt-5 pt-4 border-t border-gray-100">
-                <div className="flex justify-between text-xs mb-1.5">
+                <div className="flex justify-between items-center text-xs mb-1.5">
                   <span className="text-gray-500 font-medium">Batch Enrollment</span>
                   <span className="font-bold text-[#8A064D]">
-                    {b.enrolled_count || 0} / {b.max_capacity} Students
+                    {b.enrolled_count || 0} / {b.max_capacity} Seats ({fillPercentage}%)
                   </span>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden mb-4">
+                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden mb-4 p-0.5">
                   <div 
-                    className={`h-full rounded-full transition-all ${
+                    className={`h-full rounded-full transition-all duration-300 ${
                       fillPercentage >= 90 ? 'bg-rose-500' :
                       fillPercentage >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
                     }`}
@@ -575,10 +1072,10 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
                 </div>
 
                 {/* Actions: View Details, Edit, Delete */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between pt-1">
                   <button
                     onClick={() => setViewingBatch(b)}
-                    className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 hover:bg-[#8A064D] hover:text-white text-gray-700 text-xs font-medium transition cursor-pointer flex items-center gap-1"
+                    className="px-3.5 py-1.5 rounded-xl bg-gray-50 hover:bg-[#8A064D] text-gray-700 hover:text-white border border-gray-200 hover:border-[#8A064D] text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
                   >
                     <Eye className="w-3.5 h-3.5" />
                     <span>View Details</span>
@@ -588,24 +1085,49 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
                     <button
                       onClick={() => openEditModal(b)}
                       title="Edit Batch"
-                      className="p-1.5 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] hover:bg-[#8A064D] hover:text-white text-[#8A064D] transition cursor-pointer"
+                      className="p-2 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] hover:bg-[#8A064D] hover:text-white text-[#8A064D] transition cursor-pointer shadow-2xs"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setDeletingBatch(b)}
                       title="Delete Batch"
-                      className="p-1.5 rounded-xl bg-gray-50 border border-gray-200 hover:bg-rose-600 hover:text-white text-gray-400 hover:border-rose-600 transition cursor-pointer"
+                      className="p-2 rounded-xl bg-gray-50 border border-gray-200 hover:bg-rose-600 hover:text-white text-gray-400 hover:border-rose-600 transition cursor-pointer shadow-2xs"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
               </div>
-
             </div>
           );
         })}
+
+        {/* Empty State */}
+        {filteredBatches.length === 0 && (
+          <div className="col-span-full bg-white rounded-3xl p-12 border border-[#F0D5E4] text-center shadow-xs">
+            <div className="w-14 h-14 bg-[#FFF2F8] text-[#8A064D] rounded-2xl flex items-center justify-center mx-auto mb-3 border border-[#F0D5E4]">
+              <Layers className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-bold text-[#2D041A]">No Batches Found</h3>
+            <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+              No class batches match your selected course or search query. Try choosing different courses or resetting the filter.
+            </p>
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCourseIds([]);
+                  setSearchQuery('');
+                }}
+                className="bg-[#8A064D] hover:bg-[#70043E] text-white text-xs font-semibold px-4 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset All Filters</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ================================================================= */}
@@ -889,13 +1411,19 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Room / Hall Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Sangeetha Shala (Room 202)"
+                  <SearchableRoomSelect
                     value={addRoom}
-                    onChange={(e) => setAddRoom(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    onChange={(rName, rCap) => {
+                      setAddRoom(rName);
+                      if (rCap) setAddCapacity(rCap);
+                    }}
+                    rooms={rooms}
+                    onRoomCreated={(newRoom) => {
+                      setRooms(prev => [...prev.filter(r => r.id !== newRoom.id), newRoom].sort((a, b) => a.name.localeCompare(b.name)));
+                      setAddRoom(newRoom.name);
+                      if (newRoom.capacity) setAddCapacity(newRoom.capacity);
+                      showFeedback('success', `Room "${newRoom.name}" created and selected!`);
+                    }}
                   />
                 </div>
                 <div>
@@ -1069,12 +1597,19 @@ export default function BatchesListClient({ initialBatches, courses, trainers }:
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Room / Hall Name</label>
-                  <input
-                    type="text"
-                    required
+                  <SearchableRoomSelect
                     value={editRoom}
-                    onChange={(e) => setEditRoom(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    onChange={(rName, rCap) => {
+                      setEditRoom(rName);
+                      if (rCap) setEditCapacity(rCap);
+                    }}
+                    rooms={rooms}
+                    onRoomCreated={(newRoom) => {
+                      setRooms(prev => [...prev.filter(r => r.id !== newRoom.id), newRoom].sort((a, b) => a.name.localeCompare(b.name)));
+                      setEditRoom(newRoom.name);
+                      if (newRoom.capacity) setEditCapacity(newRoom.capacity);
+                      showFeedback('success', `Room "${newRoom.name}" created and selected!`);
+                    }}
                   />
                 </div>
                 <div>

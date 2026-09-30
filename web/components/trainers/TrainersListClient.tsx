@@ -2,23 +2,30 @@
 
 import React, { useState } from 'react';
 import { Trainer, Course, Batch } from '@/lib/academy';
+import PhotoUploadInput from '@/components/common/PhotoUploadInput';
 import { 
   Users, 
   Plus, 
   Mail, 
   Phone, 
   Calendar, 
-  X,
-  Search,
-  Sparkles,
-  Edit3,
-  Clock,
-  MapPin,
-  Check,
-  ChevronDown,
-  BookOpen,
-  GraduationCap,
-  Layers
+  X, 
+  Search, 
+  Sparkles, 
+  Edit3, 
+  Clock, 
+  MapPin, 
+  Check, 
+  ChevronDown, 
+  BookOpen, 
+  GraduationCap, 
+  Eye, 
+  Trash2, 
+  AlertCircle,
+  IndianRupee,
+  ShieldCheck,
+  DoorOpen,
+  CheckCircle2
 } from 'lucide-react';
 
 interface Props {
@@ -34,41 +41,75 @@ export default function TrainersListClient({
 }: Props) {
   const [trainers, setTrainers] = useState<Trainer[]>(initialTrainers);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [saving, setSaving] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
   // Add Guru Modal State
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [addFullName, setAddFullName] = useState('');
+  const [addAge, setAddAge] = useState<string>('');
+  const [addGender, setAddGender] = useState<'male' | 'female' | 'trans'>('female');
   const [addDisplayTitle, setAddDisplayTitle] = useState('');
+  const [addAvatarUrl, setAddAvatarUrl] = useState<string | null>(null);
   const [addSelectedCourses, setAddSelectedCourses] = useState<string[]>([]);
   const [addBio, setAddBio] = useState('');
   const [addEmail, setAddEmail] = useState('');
   const [addPhone, setAddPhone] = useState('');
+  const [addMonthlySalary, setAddMonthlySalary] = useState<number>(25000);
+  const [addIsActive, setAddIsActive] = useState<boolean>(true);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
   const [courseSearch, setCourseSearch] = useState('');
 
   // Edit Guru Modal State
   const [editingGuru, setEditingGuru] = useState<Trainer | null>(null);
   const [editFullName, setEditFullName] = useState('');
+  const [editAge, setEditAge] = useState<string>('');
+  const [editGender, setEditGender] = useState<'male' | 'female' | 'trans'>('female');
   const [editDisplayTitle, setEditDisplayTitle] = useState('');
+  const [editAvatarUrl, setEditAvatarUrl] = useState<string | null>(null);
   const [editSelectedCourses, setEditSelectedCourses] = useState<string[]>([]);
   const [editBio, setEditBio] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editMonthlySalary, setEditMonthlySalary] = useState<number>(25000);
   const [editIsActive, setEditIsActive] = useState(true);
   const [isEditCourseDropdownOpen, setIsEditCourseDropdownOpen] = useState(false);
   const [editCourseSearch, setEditCourseSearch] = useState('');
+
+  // Details Modal State
+  const [viewingGuru, setViewingGuru] = useState<Trainer | null>(null);
+  const [deletingGuru, setDeletingGuru] = useState<Trainer | null>(null);
 
   // Timetable Modal State
   const [timetableGuru, setTimetableGuru] = useState<Trainer | null>(null);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
-    setTimeout(() => setNotification(null), 3500);
+    setTimeout(() => setNotification(null), 4000);
   };
 
   // Helper to get batches for a trainer
   const getGuruBatches = (trainer: Trainer): Batch[] => {
+    if (trainer.assigned_batches && trainer.assigned_batches.length > 0) {
+      // Map trainer.assigned_batches to Batch format
+      return trainer.assigned_batches.map(ab => ({
+        id: ab.id,
+        course_id: ab.course_id,
+        course_title: ab.course_title,
+        course_category: ab.course_category || 'Classical Arts',
+        trainer_id: trainer.id,
+        trainer_name: trainer.full_name,
+        name: ab.name,
+        days_of_week: ab.days_of_week,
+        start_time: ab.start_time,
+        end_time: ab.end_time,
+        room_or_hall: ab.room_or_hall,
+        max_capacity: ab.max_capacity || 25,
+        is_active: true,
+        enrolled_count: ab.enrolled_count || 0
+      }));
+    }
+
     return batches.filter(b => 
       b.trainer_id === trainer.id || 
       (b.trainer_name && trainer.full_name && 
@@ -77,12 +118,25 @@ export default function TrainersListClient({
     );
   };
 
-  const filteredTrainers = trainers.filter(t => 
-    t.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (t.display_title && t.display_title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    t.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.specializations?.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Filter Trainers by Search and Status
+  const filteredTrainers = trainers.filter(t => {
+    const matchesStatus = 
+      statusFilter === 'all' ? true :
+      statusFilter === 'active' ? (t.is_active !== false) :
+      (t.is_active === false);
+
+    const matchesSearch = 
+      t.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.display_title && t.display_title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (t.phone && t.phone.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (t.email && t.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      t.specializations?.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    return matchesStatus && matchesSearch;
+  });
+
+  const activeCount = trainers.filter(t => t.is_active !== false).length;
+  const inactiveCount = trainers.filter(t => t.is_active === false).length;
 
   // Toggle course selection in Add modal
   const toggleAddCourse = (courseTitle: string) => {
@@ -106,10 +160,14 @@ export default function TrainersListClient({
   const openEditModal = (guru: Trainer) => {
     setEditingGuru(guru);
     setEditFullName(guru.full_name);
+    setEditAge(guru.age ? String(guru.age) : '');
+    setEditGender((guru.gender as any) || 'female');
     setEditDisplayTitle(guru.display_title || '');
+    setEditAvatarUrl(guru.avatar_url || null);
     setEditSelectedCourses(guru.specializations || []);
     setEditBio(guru.bio || '');
     setEditPhone(guru.phone || '');
+    setEditMonthlySalary(Number(guru.monthly_salary) || 25000);
     setEditIsActive(guru.is_active !== false);
     setIsEditCourseDropdownOpen(false);
   };
@@ -130,34 +188,52 @@ export default function TrainersListClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: addFullName.trim(),
+          age: addAge ? Number(addAge) : undefined,
+          gender: addGender,
           display_title: addDisplayTitle.trim() || 'Revered Guru & Mentor',
           specializations: addSelectedCourses,
           bio: addBio.trim(),
           email: addEmail.trim() || undefined,
           phone: addPhone.trim() || undefined,
+          avatar_url: addAvatarUrl || undefined,
+          monthly_salary: Number(addMonthlySalary) || 25000,
+          is_active: addIsActive
         })
       });
 
       if (res.ok) {
         const added = await res.json();
-        setTrainers(prev => [...prev, {
+        const newGuru: Trainer = {
           ...added,
           full_name: addFullName.trim(),
+          age: addAge ? Number(addAge) : undefined,
+          gender: addGender,
           display_title: addDisplayTitle.trim() || 'Revered Guru & Mentor',
           specializations: addSelectedCourses,
           bio: addBio.trim(),
+          avatar_url: addAvatarUrl || undefined,
           email: addEmail.trim() || `${addFullName.toLowerCase().replace(/[^a-z0-9]/g, '')}@laasyaacademy.com`,
           phone: addPhone.trim() || '+91 8151 998 899',
-          batches_assigned: 0
-        }]);
+          monthly_salary: Number(addMonthlySalary) || 25000,
+          salary_payment_status: 'pending',
+          is_active: addIsActive,
+          batches_assigned: 0,
+          assigned_batches: []
+        };
+        setTrainers(prev => [...prev, newGuru]);
         setIsAddOpen(false);
         setAddFullName('');
+        setAddAge('');
+        setAddGender('female');
         setAddDisplayTitle('');
+        setAddAvatarUrl(null);
         setAddSelectedCourses([]);
         setAddBio('');
         setAddEmail('');
         setAddPhone('');
-        showNotification(`Guru ${addFullName.trim()} successfully added to academy faculty!`);
+        setAddMonthlySalary(25000);
+        setAddIsActive(true);
+        showNotification(`Guru ${addFullName.trim()} successfully registered to academy faculty!`);
       } else {
         const err = await res.json();
         alert(`Failed to add Guru: ${err.error || 'Server error'}`);
@@ -184,11 +260,15 @@ export default function TrainersListClient({
         body: JSON.stringify({
           id: editingGuru.id,
           full_name: editFullName.trim(),
+          age: editAge ? Number(editAge) : undefined,
+          gender: editGender,
           display_title: editDisplayTitle.trim(),
           specializations: editSelectedCourses,
           bio: editBio.trim(),
           phone: editPhone.trim(),
-          is_active: editIsActive
+          avatar_url: editAvatarUrl !== undefined ? editAvatarUrl : null,
+          is_active: editIsActive,
+          monthly_salary: Number(editMonthlySalary) || 25000
         })
       });
 
@@ -198,15 +278,36 @@ export default function TrainersListClient({
             return {
               ...t,
               full_name: editFullName.trim(),
+              age: editAge ? Number(editAge) : undefined,
+              gender: editGender,
               display_title: editDisplayTitle.trim(),
               specializations: editSelectedCourses,
               bio: editBio.trim(),
               phone: editPhone.trim(),
-              is_active: editIsActive
+              avatar_url: editAvatarUrl || undefined,
+              is_active: editIsActive,
+              monthly_salary: Number(editMonthlySalary) || 25000
             };
           }
           return t;
         }));
+
+        if (viewingGuru && viewingGuru.id === editingGuru.id) {
+          setViewingGuru(prev => prev ? ({
+            ...prev,
+            full_name: editFullName.trim(),
+            age: editAge ? Number(editAge) : undefined,
+            gender: editGender,
+            display_title: editDisplayTitle.trim(),
+            specializations: editSelectedCourses,
+            bio: editBio.trim(),
+            phone: editPhone.trim(),
+            avatar_url: editAvatarUrl || undefined,
+            is_active: editIsActive,
+            monthly_salary: Number(editMonthlySalary) || 25000
+          }) : null);
+        }
+
         showNotification(`Guru details for ${editFullName.trim()} updated successfully!`);
         setEditingGuru(null);
       } else {
@@ -221,6 +322,33 @@ export default function TrainersListClient({
     }
   };
 
+  // Handle Delete Guru
+  const handleDeleteGuru = async () => {
+    if (!deletingGuru) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/trainers?id=${deletingGuru.id}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to delete Guru');
+      }
+
+      setTrainers(prev => prev.filter(t => t.id !== deletingGuru.id));
+      if (viewingGuru && viewingGuru.id === deletingGuru.id) {
+        setViewingGuru(null);
+      }
+      showNotification(`Guru "${deletingGuru.full_name}" has been removed successfully.`);
+      setDeletingGuru(null);
+    } catch (e: any) {
+      alert(`Error deleting Guru: ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Course filtering in modals
   const filteredCoursesForAdd = courses.filter(c => 
     c.title.toLowerCase().includes(courseSearch.toLowerCase()) ||
     c.category.toLowerCase().includes(courseSearch.toLowerCase())
@@ -233,26 +361,37 @@ export default function TrainersListClient({
 
   return (
     <div className="space-y-6">
-      
+
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed top-6 right-6 z-50 bg-[#2D041A] text-white px-5 py-3 rounded-2xl shadow-xl border border-[#F9E33A] flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-200">
-          <Sparkles className="w-5 h-5 text-[#F9E33A]" />
-          <span className="text-xs font-semibold">{notification}</span>
+        <div className="fixed top-6 right-6 z-70 bg-[#2D041A] text-white px-5 py-3.5 rounded-2xl shadow-2xl border-2 border-[#F9E33A] flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-200">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#8A064D] to-[#EBB128] flex items-center justify-center shrink-0 shadow-xs">
+            <CheckCircle2 className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <div className="text-[10px] font-black text-[#F9E33A] uppercase tracking-wider">Action Successful</div>
+            <div className="text-xs font-bold text-white mt-0.5">{notification}</div>
+          </div>
+          <button 
+            onClick={() => setNotification(null)}
+            className="p-1 hover:bg-white/10 rounded-lg transition ml-3 cursor-pointer text-white/70 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Top Header Card */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs">
         <div>
           <h1 className="text-2xl font-bold text-[#2D041A] flex items-center gap-2">
             <span>Faculty & Revered Gurus</span>
             <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-full font-bold">
-              {trainers.length} Gurus
+              {trainers.length} Faculty Masters
             </span>
           </h1>
           <p className="text-xs text-gray-500 mt-1">
-            Manage classical dance gurus, vocal masters, musical instrument mentors, and martial arts acharyas.
+            Manage classical dance gurus, vocal masters, instrumental mentors, monthly salaries, and batch timetables.
           </p>
         </div>
 
@@ -261,16 +400,16 @@ export default function TrainersListClient({
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
             <input
               type="text"
-              placeholder="Search by guru name, title, course..."
+              placeholder="Search by guru name, title, course, contact..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-[#F0D5E4] rounded-xl text-xs w-64 focus:outline-none focus:ring-2 focus:ring-[#8A064D]"
+              className="pl-9 pr-4 py-2 bg-gray-50 border border-[#F0D5E4] rounded-xl text-xs w-72 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
             />
           </div>
 
           <button
             onClick={() => setIsAddOpen(true)}
-            className="bg-[#8A064D] hover:bg-[#70043E] text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition flex items-center gap-1.5 cursor-pointer"
+            className="bg-[#8A064D] hover:bg-[#70043E] text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-md transition flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-[#F9E33A]" />
             <span>Add New Guru</span>
@@ -278,52 +417,119 @@ export default function TrainersListClient({
         </div>
       </div>
 
-      {/* Gurus Cards Grid */}
+      {/* Status Filter Pills */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setStatusFilter('all')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+            statusFilter === 'all'
+              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/50'
+              : 'bg-white text-gray-600 border border-[#F0D5E4] hover:bg-gray-50'
+          }`}
+        >
+          All Gurus ({trainers.length})
+        </button>
+        <button
+          onClick={() => setStatusFilter('active')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+            statusFilter === 'active'
+              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/50'
+              : 'bg-white text-gray-600 border border-[#F0D5E4] hover:bg-gray-50'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>Active ({activeCount})</span>
+        </button>
+        <button
+          onClick={() => setStatusFilter('inactive')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+            statusFilter === 'inactive'
+              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/50'
+              : 'bg-white text-gray-600 border border-[#F0D5E4] hover:bg-gray-50'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-zinc-400"></span>
+          <span>Inactive / On Leave ({inactiveCount})</span>
+        </button>
+      </div>
+
+      {/* =================================================================== */}
+      {/* GURUS CARDS GRID */}
+      {/* =================================================================== */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTrainers.map((t) => {
-          const guruBatches = getGuruBatches(t);
-          const activeBatchesCount = guruBatches.length || t.batches_assigned || 0;
+          const isSalaryPaid = t.salary_payment_status === 'paid';
 
           return (
             <div
               key={t.id}
-              className="bg-white rounded-3xl p-6 border border-[#F0D5E4] shadow-sm hover:shadow-md transition flex flex-col justify-between"
+              className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-sm hover:shadow-md transition flex flex-col justify-between"
             >
               <div>
-                {/* Profile Card Header */}
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#590231] text-[#F9E33A] font-bold text-base flex items-center justify-center shadow-md shrink-0">
-                      {t.full_name.charAt(0)}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-base text-[#2D041A] leading-tight">
-                        {t.full_name}
-                      </h3>
-                      <p className="text-xs font-semibold text-[#8A064D] mt-0.5 line-clamp-1">
-                        {t.display_title || 'Revered Guru & Mentor'}
-                      </p>
-                    </div>
+                {/* 1. TOP OF EACH GRID: Status Active/Inactive & Salary Payment Status Pending/Paid */}
+                <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-gray-100">
+                  {/* Status: Active or Inactive */}
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                      t.is_active !== false 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                        : 'bg-zinc-100 text-zinc-600 border-zinc-200'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${t.is_active !== false ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`}></span>
+                      {t.is_active !== false ? 'Active' : 'Inactive'}
+                    </span>
                   </div>
 
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    <button
-                      onClick={() => openEditModal(t)}
-                      className="p-1.5 rounded-xl bg-gray-50 hover:bg-[#FFF2F8] text-gray-500 hover:text-[#8A064D] border border-gray-200 hover:border-[#F0D5E4] transition flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
-                      title="Edit Guru Profile"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      <span>Edit</span>
-                    </button>
-                    <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full">
-                      {t.is_active !== false ? 'Active' : 'On Leave'}
+                  {/* Below Status / Header right: Salary Payment Status Pending or Paid with Red and Green */}
+                  <div>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                      isSalaryPaid
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                        : 'bg-rose-50 text-rose-700 border-rose-300'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSalaryPaid ? 'bg-emerald-600' : 'bg-rose-600'}`}></span>
+                      Salary: {isSalaryPaid ? 'Paid' : 'Pending'}
                     </span>
                   </div>
                 </div>
 
-                {/* Assigned Courses / Disciplines */}
-                <div className="mb-3.5">
-                  <span className="text-[10px] text-gray-400 uppercase font-semibold block mb-1">
+                {/* Guru Info with Profile Photo */}
+                <div className="flex items-start gap-3.5 mb-3.5">
+                  {t.avatar_url ? (
+                    <img
+                      src={t.avatar_url}
+                      alt={t.full_name}
+                      className="w-14 h-14 rounded-2xl object-cover border-2 border-[#F9E33A] shadow-xs shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-[#590231] text-[#F9E33A] font-black text-base flex items-center justify-center shrink-0 border border-rose-200/50 shadow-2xs">
+                      {t.full_name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    {/* 2. GURU FULL NAME (Primary heading) */}
+                    <h3 className="font-bold text-lg text-[#2D041A] leading-tight truncate">
+                      {t.full_name}
+                    </h3>
+
+                    {/* 3. DISPLAY TITLE AND CONTACT BELOW IT */}
+                    <p className="text-xs font-semibold text-[#8A064D] truncate mt-0.5">
+                      {t.display_title || 'Revered Guru & Mentor'}
+                    </p>
+                    {t.phone ? (
+                      <p className="text-xs text-gray-600 flex items-center gap-1.5 font-medium mt-1 truncate">
+                        <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <span>{t.phone}</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic mt-1">No contact phone</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* 4. ASSIGNED COURSES */}
+                <div className="mb-4">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1.5">
                     Assigned Courses ({t.specializations?.length || 0})
                   </span>
                   <div className="flex flex-wrap gap-1.5">
@@ -331,88 +537,50 @@ export default function TrainersListClient({
                       t.specializations.map((spec, i) => (
                         <span
                           key={i}
-                          className="text-[11px] font-medium bg-[#FFF9FB] text-[#8A064D] border border-rose-100 px-2.5 py-0.5 rounded-lg flex items-center gap-1"
+                          className="text-[11px] font-semibold bg-[#FFF8FA] text-[#8A064D] border border-rose-100 px-2.5 py-0.5 rounded-lg flex items-center gap-1"
                         >
-                          <BookOpen className="w-2.5 h-2.5 opacity-60" />
-                          {spec}
+                          <BookOpen className="w-2.5 h-2.5 text-[#8A064D]/60" />
+                          <span>{spec}</span>
                         </span>
                       ))
                     ) : (
-                      <span className="text-xs text-gray-400 italic">No courses tagged yet</span>
+                      <span className="text-xs text-gray-400 italic">No courses tagged</span>
                     )}
                   </div>
                 </div>
-
-                {/* Bio */}
-                <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed mb-4">
-                  {t.bio || 'Experienced artist and educator dedicated to fostering students artistic excellence.'}
-                </p>
-
-                {/* Timetable Schedule Snippet */}
-                <div className="bg-[#FAF7F9] border border-[#F0D5E4] rounded-2xl p-3 mb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-[#8A064D]" />
-                      <span className="text-xs font-bold text-[#2D041A]">
-                        Assigned Class Timetable
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-bold bg-[#8A064D] text-white px-2 py-0.5 rounded-full">
-                      {activeBatchesCount} {activeBatchesCount === 1 ? 'Batch' : 'Batches'}
-                    </span>
-                  </div>
-
-                  {guruBatches.length > 0 ? (
-                    <div className="space-y-1.5">
-                      {guruBatches.slice(0, 2).map((b) => (
-                        <div key={b.id} className="text-[11px] bg-white p-2 rounded-xl border border-gray-100 flex items-start justify-between gap-2 shadow-xs">
-                          <div>
-                            <span className="font-semibold text-gray-800 block line-clamp-1">
-                              {b.course_title}: {b.name}
-                            </span>
-                            <span className="text-gray-500 text-[10px] flex items-center gap-1 mt-0.5">
-                              <Calendar className="w-3 h-3 text-[#8A064D]" />
-                              {Array.isArray(b.days_of_week) ? b.days_of_week.join(', ') : b.days_of_week} • {b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200 shrink-0">
-                            {b.room_or_hall?.split('(')[0] || 'Studio'}
-                          </span>
-                        </div>
-                      ))}
-
-                      {guruBatches.length > 2 && (
-                        <p className="text-[10px] text-center text-gray-400 font-medium pt-0.5">
-                          + {guruBatches.length - 2} more active weekly classes
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-gray-400 italic py-1 text-center">
-                      No active class batches scheduled yet
-                    </p>
-                  )}
-                </div>
-
               </div>
 
-              {/* Card Footer: View Timetable & Contact */}
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+              {/* 5. ACTION BUTTONS: DETAILS, EDIT, AND VIEW TIMETABLE */}
+              <div className="pt-3 border-t border-gray-100 grid grid-cols-3 gap-2">
+                {/* Details Button */}
                 <button
-                  onClick={() => setTimetableGuru(t)}
-                  className="px-3 py-1.5 rounded-xl bg-[#FFF2F8] hover:bg-[#FFE3EF] text-[#8A064D] border border-[#F0D5E4] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  onClick={() => setViewingGuru(t)}
+                  className="py-2 px-2 rounded-xl bg-[#2D041A] hover:bg-[#1A020F] text-white text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                  title="View complete Guru profile and batch details"
                 >
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>View Timetable</span>
+                  <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
+                  <span>Details</span>
                 </button>
 
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  {t.phone && (
-                    <span className="text-[11px] text-gray-600 font-medium">
-                      {t.phone}
-                    </span>
-                  )}
-                </div>
+                {/* Edit Button */}
+                <button
+                  onClick={() => openEditModal(t)}
+                  className="py-2 px-2 rounded-xl bg-[#1E3A8A] hover:bg-[#172554] text-white text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                  title="Edit Guru profile and salary"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-blue-200" />
+                  <span>Edit</span>
+                </button>
+
+                {/* View Timetable Button */}
+                <button
+                  onClick={() => setTimetableGuru(t)}
+                  className="py-2 px-2 rounded-xl bg-[#8A064D] hover:bg-[#70043E] text-white text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                  title="View assigned classes timetable"
+                >
+                  <Calendar className="w-3.5 h-3.5 text-[#F9E33A]" />
+                  <span className="truncate">Timetable</span>
+                </button>
               </div>
 
             </div>
@@ -420,8 +588,305 @@ export default function TrainersListClient({
         })}
       </div>
 
+      {filteredTrainers.length === 0 && (
+        <div className="text-center py-16 bg-white rounded-3xl border border-[#F0D5E4] p-8">
+          <Users className="w-12 h-12 text-[#8A064D]/30 mx-auto mb-3" />
+          <h3 className="font-bold text-base text-[#2D041A]">No Gurus Found</h3>
+          <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+            No faculty masters match the selected filters or search keyword &quot;{searchQuery}&quot;.
+          </p>
+        </div>
+      )}
+
       {/* =================================================================== */}
-      {/* 1. ADD NEW GURU MODAL */}
+      {/* 1. DETAILS POPUP SUB-PAGE (MODAL) */}
+      {/* =================================================================== */}
+      {viewingGuru && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 my-8 max-h-[90vh] overflow-y-auto">
+            
+            {/* Modal Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-gray-100 mb-4">
+              <div className="flex items-center gap-3.5">
+                {viewingGuru.avatar_url ? (
+                  <img
+                    src={viewingGuru.avatar_url}
+                    alt={viewingGuru.full_name}
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-[#F9E33A] shadow-md shrink-0"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#590231] text-[#F9E33A] font-bold text-base flex items-center justify-center shadow-md shrink-0 border border-rose-200/50">
+                    {viewingGuru.full_name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <h3 className="font-bold text-lg text-[#2D041A] leading-tight">
+                    {viewingGuru.full_name}
+                  </h3>
+                  <p className="text-xs text-[#8A064D] font-semibold mt-0.5">
+                    {viewingGuru.display_title || 'Revered Guru & Mentor'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setViewingGuru(null)}
+                className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-[#8A064D] hover:text-[#590231] border border-rose-200 flex items-center justify-center transition shadow-2xs cursor-pointer"
+              >
+                <X className="w-4 h-4 stroke-[2.5]" />
+              </button>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+              {/* Teaching Status */}
+              <div className="bg-gray-50 border border-gray-200 p-3 rounded-2xl">
+                <span className="text-[10px] font-black text-[#590231] uppercase tracking-wider block mb-1">
+                  Faculty Status
+                </span>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                  viewingGuru.is_active !== false 
+                    ? 'bg-emerald-100 text-emerald-800' 
+                    : 'bg-zinc-200 text-zinc-700'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${viewingGuru.is_active !== false ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`}></span>
+                  {viewingGuru.is_active !== false ? 'Active Teaching' : 'On Sabbatical / Leave'}
+                </span>
+              </div>
+
+              {/* Salary Payment Status */}
+              <div className="bg-gray-50 border border-gray-200 p-3 rounded-2xl">
+                <span className="text-[10px] font-black text-[#590231] uppercase tracking-wider block mb-1">
+                  Salary Payment Status
+                </span>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                  viewingGuru.salary_payment_status === 'paid'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-rose-100 text-rose-800'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${viewingGuru.salary_payment_status === 'paid' ? 'bg-emerald-600' : 'bg-rose-600'}`}></span>
+                  {viewingGuru.salary_payment_status === 'paid' ? 'Paid' : 'Pending Payment'}
+                </span>
+              </div>
+
+              {/* Monthly Salary */}
+              <div className="bg-[#FFF2F8] border border-[#F0D5E4] p-3 rounded-2xl">
+                <span className="text-[10px] font-black text-[#8A064D] uppercase tracking-wider block mb-1">
+                  Monthly Base Salary
+                </span>
+                <span className="text-base font-extrabold text-[#2D041A] flex items-center">
+                  ₹{Number(viewingGuru.monthly_salary || 25000).toLocaleString('en-IN')}
+                  <span className="text-[10px] font-normal text-gray-500 ml-1">/ month</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Profile Content */}
+            <div className="space-y-4">
+              {/* Contact Information & Personal Details */}
+              <div className="bg-white p-3.5 rounded-2xl border border-gray-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Contact Phone</span>
+                  <span className="text-gray-900 font-bold flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-[#8A064D]" />
+                    {viewingGuru.phone || '+91 8151 998 899'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Official Email</span>
+                  <span className="text-gray-900 font-bold flex items-center gap-1.5 truncate">
+                    <Mail className="w-3.5 h-3.5 text-[#8A064D]" />
+                    {viewingGuru.email || `${viewingGuru.full_name.toLowerCase().replace(/[^a-z0-9]/g, '')}@laasyaacademy.com`}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Age</span>
+                  <span className="text-gray-900 font-bold flex items-center gap-1.5">
+                    {viewingGuru.age ? `${viewingGuru.age} Years` : '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Gender</span>
+                  <span className="text-gray-900 font-bold capitalize flex items-center gap-1.5">
+                    {viewingGuru.gender || '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Bio & Artistic Lineage */}
+              <div>
+                <span className="text-xs font-black text-[#590231] uppercase tracking-wide block mb-1.5">
+                  Bio & Artistic Lineage
+                </span>
+                <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 text-xs text-gray-800 font-semibold leading-relaxed">
+                  {viewingGuru.bio || 'Revered faculty member dedicated to classical arts instruction, student mentoring, and performance coaching.'}
+                </div>
+              </div>
+
+              {/* Assigned Disciplines */}
+              <div>
+                <span className="text-xs font-black text-[#590231] uppercase tracking-wide block mb-1.5">
+                  Assigned Courses & Disciplines ({viewingGuru.specializations?.length || 0})
+                </span>
+                <div className="flex flex-wrap gap-1.5 p-3 bg-white border border-[#F0D5E4] rounded-2xl">
+                  {viewingGuru.specializations && viewingGuru.specializations.length > 0 ? (
+                    viewingGuru.specializations.map((spec, i) => (
+                      <span
+                        key={i}
+                        className="text-xs font-semibold bg-[#FFF2F8] text-[#8A064D] border border-rose-200 px-3 py-1 rounded-xl flex items-center gap-1.5"
+                      >
+                        <BookOpen className="w-3 h-3" />
+                        {spec}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-gray-400 italic">No courses currently tagged</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Batch Details Section */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-[#2D041A] flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#8A064D]" />
+                    <span>Assigned Batch Details</span>
+                  </span>
+                  <span className="text-[10px] font-bold bg-[#8A064D] text-white px-2 py-0.5 rounded-full">
+                    {getGuruBatches(viewingGuru).length} Batches
+                  </span>
+                </div>
+
+                {(() => {
+                  const guruBatches = getGuruBatches(viewingGuru);
+
+                  if (guruBatches.length === 0) {
+                    return (
+                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 text-center">
+                        <p className="text-xs text-gray-500">No active batches assigned to this Guru yet.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {guruBatches.map(b => (
+                        <div key={b.id} className="p-3 bg-white rounded-xl border border-gray-200 flex items-center justify-between gap-3 text-xs shadow-2xs">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-[#2D041A]">{b.name}</span>
+                              <span className="text-[10px] bg-[#FFF2F8] text-[#8A064D] font-semibold px-2 py-0.2 rounded-md border border-rose-100">
+                                {b.course_title}
+                              </span>
+                            </div>
+                            <div className="text-gray-500 text-[11px] flex items-center gap-3 mt-1">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3 text-[#8A064D]" />
+                                {Array.isArray(b.days_of_week) ? b.days_of_week.join(', ') : b.days_of_week}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-gray-400" />
+                                {b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <DoorOpen className="w-3 h-3 text-gray-400" />
+                                {b.room_or_hall}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg shrink-0">
+                            {b.enrolled_count || 0} / {b.max_capacity} Seats
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Modal Actions Footer: Delete Guru, Edit Guru, Close */}
+            <div className="flex items-center justify-between pt-5 border-t border-gray-100 mt-5">
+              <button
+                type="button"
+                onClick={() => setDeletingGuru(viewingGuru)}
+                className="px-4 py-2.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Guru</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingGuru(null)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const g = viewingGuru;
+                    setViewingGuru(null);
+                    openEditModal(g);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-[#1E3A8A] hover:bg-[#172554] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-blue-200" />
+                  <span>Edit Details</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* 2. DELETE GURU CONFIRMATION MODAL */}
+      {/* =================================================================== */}
+      {deletingGuru && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-60 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-200 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 mb-3 text-rose-600">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center border border-rose-200">
+                <AlertCircle className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-gray-900">Delete Revered Guru</h3>
+                <p className="text-xs text-gray-500">Confirm permanent faculty removal</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed mb-4">
+              Are you sure you want to delete Guru <strong className="text-gray-900">{deletingGuru.full_name}</strong>? All assigned weekly class schedules and faculty records will be removed.
+            </p>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setDeletingGuru(null)}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={handleDeleteGuru}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-rose-700 hover:bg-rose-800 text-white shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{saving ? 'Deleting...' : 'Confirm Delete Guru'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* 3. ADD NEW GURU MODAL */}
       {/* =================================================================== */}
       {isAddOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -434,23 +899,32 @@ export default function TrainersListClient({
                   <span>Add New Guru / Faculty Master</span>
                 </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Enter Guru credentials, assign courses from the curriculum, and set display title.
+                  Enter Guru credentials, assign courses, and configure monthly salary.
                 </p>
               </div>
               <button
                 onClick={() => setIsAddOpen(false)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-[#8A064D] hover:text-[#590231] border border-rose-200 flex items-center justify-center transition shadow-2xs cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 stroke-[2.5]" />
               </button>
             </div>
 
             <form onSubmit={handleAddGuru} className="space-y-4">
               
+              {/* Profile Photo Upload */}
+              <PhotoUploadInput
+                value={addAvatarUrl}
+                onChange={setAddAvatarUrl}
+                label="Guru Profile Photo"
+                initials={addFullName ? addFullName.slice(0, 2).toUpperCase() : 'GU'}
+                maxSizeMB={1}
+              />
+
               {/* Field 1: Full Name */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  1. Guru Full Name <span className="text-rose-500">*</span>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Guru Full Name <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -458,15 +932,47 @@ export default function TrainersListClient({
                   placeholder="e.g. Guru Smt. Kalyani Devi or Vidwan Sri Ramesh"
                   value={addFullName}
                   onChange={(e) => setAddFullName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
+              </div>
+
+              {/* Age & Gender Fields */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Age (Years)
+                  </label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={100}
+                    placeholder="e.g. 35"
+                    value={addAge}
+                    onChange={(e) => setAddAge(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Gender
+                  </label>
+                  <select
+                    value={addGender}
+                    onChange={(e) => setAddGender(e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white cursor-pointer"
+                  >
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                    <option value="trans">Trans</option>
+                  </select>
+                </div>
               </div>
 
               {/* Field 2: Course (Multi-Select Dropdown) */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
-                  <span>2. Assigned Courses / Disciplines (Select Multiple) <span className="text-rose-500">*</span></span>
-                  <span className="text-[10px] text-[#8A064D] font-bold">
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5 flex items-center justify-between">
+                  <span>Assigned Courses / Disciplines (Select Multiple) <span className="text-rose-500">*</span></span>
+                  <span className="text-[10px] text-[#8A064D] font-extrabold">
                     {addSelectedCourses.length} Selected
                   </span>
                 </label>
@@ -477,13 +983,13 @@ export default function TrainersListClient({
                     {addSelectedCourses.map((cTitle) => (
                       <span
                         key={cTitle}
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold bg-white text-[#8A064D] border border-rose-200 px-2 py-0.5 rounded-lg shadow-2xs"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold bg-white text-[#8A064D] border border-rose-200 px-2 py-0.5 rounded-lg shadow-2xs"
                       >
                         {cTitle}
                         <button
                           type="button"
                           onClick={() => toggleAddCourse(cTitle)}
-                          className="text-gray-400 hover:text-rose-600 ml-0.5"
+                          className="text-gray-400 hover:text-rose-600 ml-0.5 cursor-pointer"
                         >
                           ×
                         </button>
@@ -497,12 +1003,12 @@ export default function TrainersListClient({
                   <button
                     type="button"
                     onClick={() => setIsCourseDropdownOpen(!isCourseDropdownOpen)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs flex items-center justify-between text-left transition"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs flex items-center justify-between text-left transition cursor-pointer font-bold text-[#1A010F]"
                   >
-                    <span className={addSelectedCourses.length > 0 ? "font-semibold text-gray-800" : "text-gray-400"}>
+                    <span className={addSelectedCourses.length > 0 ? "font-bold text-[#1A010F]" : "font-normal text-gray-400"}>
                       {addSelectedCourses.length > 0 
                         ? `${addSelectedCourses.length} Courses Selected (Click to change)` 
-                        : "Click to choose from all 18 academy courses..."}
+                        : "Click to choose from all academy courses..."}
                     </span>
                     <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isCourseDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
@@ -516,7 +1022,7 @@ export default function TrainersListClient({
                           placeholder="Type to filter courses (e.g. Dance, Vocal, Guitar)..."
                           value={courseSearch}
                           onChange={(e) => setCourseSearch(e.target.value)}
-                          className="w-full px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
+                          className="w-full px-3 py-1.5 text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
                         />
                       </div>
 
@@ -530,8 +1036,8 @@ export default function TrainersListClient({
                               onClick={() => toggleAddCourse(c.title)}
                               className={`flex items-center gap-2 p-2 rounded-xl text-left text-xs transition cursor-pointer ${
                                 isSelected
-                                  ? 'bg-[#FFF2F8] text-[#8A064D] font-bold border border-rose-200'
-                                  : 'hover:bg-gray-50 text-gray-700'
+                                    ? 'bg-[#FFF2F8] text-[#8A064D] font-bold border border-rose-200'
+                                    : 'hover:bg-gray-50 text-gray-700 font-semibold'
                               }`}
                             >
                               <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
@@ -549,7 +1055,7 @@ export default function TrainersListClient({
                         <button
                           type="button"
                           onClick={() => setIsCourseDropdownOpen(false)}
-                          className="text-xs font-bold text-[#8A064D] hover:underline"
+                          className="text-xs font-bold text-[#8A064D] hover:underline cursor-pointer"
                         >
                           Done Selecting
                         </button>
@@ -561,8 +1067,8 @@ export default function TrainersListClient({
 
               {/* Field 3: Display Title */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  3. Display Title / Designation <span className="text-rose-500">*</span>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Display Title / Designation <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -570,14 +1076,50 @@ export default function TrainersListClient({
                   placeholder="e.g. Senior Guru & Choreographer, Sangeetha Acharya, Director"
                   value={addDisplayTitle}
                   onChange={(e) => setAddDisplayTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
               </div>
 
-              {/* Field 4: Bio */}
+              {/* Field 4: Salary [per month] & Status */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Salary [per month] (₹) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-gray-500 text-xs font-bold">₹</span>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      step={500}
+                      placeholder="25000"
+                      value={addMonthlySalary}
+                      onChange={(e) => setAddMonthlySalary(Number(e.target.value))}
+                      className="w-full pl-8 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Initial Faculty Status
+                  </label>
+                  <select
+                    value={addIsActive ? 'active' : 'inactive'}
+                    onChange={(e) => setAddIsActive(e.target.value === 'active')}
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white cursor-pointer"
+                  >
+                    <option value="active">Active Teaching Guru</option>
+                    <option value="inactive">Inactive / On Leave</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Field 5: Bio */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  4. Bio & Artistic Lineage <span className="text-rose-500">*</span>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Bio & Artistic Lineage <span className="text-rose-500">*</span>
                 </label>
                 <textarea
                   rows={3}
@@ -585,30 +1127,30 @@ export default function TrainersListClient({
                   placeholder="Qualifications, guru lineage, temple performances, Trinity / RSL certifications, years of experience..."
                   value={addBio}
                   onChange={(e) => setAddBio(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
               </div>
 
               {/* Optional Contact fields */}
               <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Email (Optional)</label>
-                  <input
-                    type="email"
-                    placeholder="name@laasyaacademy.com"
-                    value={addEmail}
-                    onChange={(e) => setAddEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Phone (Optional)</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Contact Phone</label>
                   <input
                     type="text"
                     placeholder="+91 8151 998 899"
                     value={addPhone}
                     onChange={(e) => setAddPhone(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Email (Optional)</label>
+                  <input
+                    type="email"
+                    placeholder="name@laasyaacademy.com"
+                    value={addEmail}
+                    onChange={(e) => setAddEmail(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
               </div>
@@ -618,7 +1160,7 @@ export default function TrainersListClient({
                 <button
                   type="button"
                   onClick={() => setIsAddOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -638,7 +1180,7 @@ export default function TrainersListClient({
       )}
 
       {/* =================================================================== */}
-      {/* 2. EDIT GURU MODAL */}
+      {/* 4. EDIT GURU MODAL */}
       {/* =================================================================== */}
       {editingGuru && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -651,22 +1193,31 @@ export default function TrainersListClient({
                   <span>Edit Guru Profile</span>
                 </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Update full name, display title, assigned courses, and bio for {editingGuru.full_name}.
+                  Update full name, display title, monthly salary, status, and assigned courses for {editingGuru.full_name}.
                 </p>
               </div>
               <button
                 onClick={() => setEditingGuru(null)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-[#8A064D] hover:text-[#590231] border border-rose-200 flex items-center justify-center transition shadow-2xs cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 stroke-[2.5]" />
               </button>
             </div>
 
             <form onSubmit={handleUpdateGuru} className="space-y-4">
               
+              {/* Profile Photo Upload */}
+              <PhotoUploadInput
+                value={editAvatarUrl}
+                onChange={setEditAvatarUrl}
+                label="Guru Profile Photo"
+                initials={editFullName ? editFullName.slice(0, 2).toUpperCase() : 'GU'}
+                maxSizeMB={1}
+              />
+
               {/* Field 1: Full Name */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                   Guru Full Name <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -674,13 +1225,45 @@ export default function TrainersListClient({
                   required
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
+              </div>
+
+              {/* Age & Gender Fields */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Age (Years)
+                  </label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={100}
+                    placeholder="e.g. 35"
+                    value={editAge}
+                    onChange={(e) => setEditAge(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Gender
+                  </label>
+                  <select
+                    value={editGender}
+                    onChange={(e) => setEditGender(e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white cursor-pointer"
+                  >
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                    <option value="trans">Trans</option>
+                  </select>
+                </div>
               </div>
 
               {/* Field 2: Display Title */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                   Display Title / Designation <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -689,15 +1272,15 @@ export default function TrainersListClient({
                   placeholder="e.g. Senior Guru & Choreographer, Sangeetha Acharya"
                   value={editDisplayTitle}
                   onChange={(e) => setEditDisplayTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
               </div>
 
               {/* Field 3: Courses Multi-Select */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5 flex items-center justify-between">
                   <span>Assigned Courses / Disciplines (Select Multiple) <span className="text-rose-500">*</span></span>
-                  <span className="text-[10px] text-[#8A064D] font-bold">
+                  <span className="text-[10px] text-[#8A064D] font-extrabold">
                     {editSelectedCourses.length} Selected
                   </span>
                 </label>
@@ -708,13 +1291,13 @@ export default function TrainersListClient({
                     {editSelectedCourses.map((cTitle) => (
                       <span
                         key={cTitle}
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold bg-white text-[#8A064D] border border-rose-200 px-2 py-0.5 rounded-lg shadow-2xs"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold bg-white text-[#8A064D] border border-rose-200 px-2 py-0.5 rounded-lg shadow-2xs"
                       >
                         {cTitle}
                         <button
                           type="button"
                           onClick={() => toggleEditCourse(cTitle)}
-                          className="text-gray-400 hover:text-rose-600 ml-0.5"
+                          className="text-gray-400 hover:text-rose-600 ml-0.5 cursor-pointer"
                         >
                           ×
                         </button>
@@ -728,12 +1311,12 @@ export default function TrainersListClient({
                   <button
                     type="button"
                     onClick={() => setIsEditCourseDropdownOpen(!isEditCourseDropdownOpen)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs flex items-center justify-between text-left transition"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs flex items-center justify-between text-left transition cursor-pointer font-bold text-[#1A010F]"
                   >
-                    <span className="font-semibold text-gray-800">
+                    <span className={editSelectedCourses.length > 0 ? "font-bold text-[#1A010F]" : "font-normal text-gray-400"}>
                       {editSelectedCourses.length > 0 
                         ? `${editSelectedCourses.length} Courses Selected (Click to change)` 
-                        : "Click to choose from all 18 academy courses..."}
+                        : "Click to choose from all academy courses..."}
                     </span>
                     <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isEditCourseDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
@@ -747,7 +1330,7 @@ export default function TrainersListClient({
                           placeholder="Type to filter courses..."
                           value={editCourseSearch}
                           onChange={(e) => setEditCourseSearch(e.target.value)}
-                          className="w-full px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
+                          className="w-full px-3 py-1.5 text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
                         />
                       </div>
 
@@ -762,7 +1345,7 @@ export default function TrainersListClient({
                               className={`flex items-center gap-2 p-2 rounded-xl text-left text-xs transition cursor-pointer ${
                                 isSelected
                                   ? 'bg-[#FFF2F8] text-[#8A064D] font-bold border border-rose-200'
-                                  : 'hover:bg-gray-50 text-gray-700'
+                                  : 'hover:bg-gray-50 text-gray-700 font-semibold'
                               }`}
                             >
                               <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
@@ -780,7 +1363,7 @@ export default function TrainersListClient({
                         <button
                           type="button"
                           onClick={() => setIsEditCourseDropdownOpen(false)}
-                          className="text-xs font-bold text-[#8A064D] hover:underline"
+                          className="text-xs font-bold text-[#8A064D] hover:underline cursor-pointer"
                         >
                           Done Selecting
                         </button>
@@ -790,42 +1373,64 @@ export default function TrainersListClient({
                 </div>
               </div>
 
-              {/* Field 4: Bio */}
+              {/* Field 4: Salary [per month] & Status */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Salary [per month] (₹) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-gray-500 text-xs font-bold">₹</span>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      step={500}
+                      value={editMonthlySalary}
+                      onChange={(e) => setEditMonthlySalary(Number(e.target.value))}
+                      className="w-full pl-8 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Faculty Status (Active / Inactive)
+                  </label>
+                  <select
+                    value={editIsActive ? 'active' : 'inactive'}
+                    onChange={(e) => setEditIsActive(e.target.value === 'active')}
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white cursor-pointer"
+                  >
+                    <option value="active">Active Teaching Guru</option>
+                    <option value="inactive">Inactive / On Leave</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Field 5: Bio */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                   Bio / Profile Summary <span className="text-rose-500">*</span>
                 </label>
                 <textarea
-                  rows={4}
+                  rows={3}
                   required
                   value={editBio}
                   onChange={(e) => setEditBio(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
               </div>
 
-              {/* Phone & Status Row */}
-              <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Contact Phone</label>
-                  <input
-                    type="text"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Faculty Status</label>
-                  <select
-                    value={editIsActive ? 'active' : 'leave'}
-                    onChange={(e) => setEditIsActive(e.target.value === 'active')}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
-                  >
-                    <option value="active">Active Teaching Guru</option>
-                    <option value="leave">On Sabbatical / Leave</option>
-                  </select>
-                </div>
+              {/* Contact Phone */}
+              <div className="pt-1 border-t border-gray-100">
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Contact Phone</label>
+                <input
+                  type="text"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                />
               </div>
 
               {/* Action Buttons */}
@@ -833,7 +1438,7 @@ export default function TrainersListClient({
                 <button
                   type="button"
                   onClick={() => setEditingGuru(null)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -853,7 +1458,7 @@ export default function TrainersListClient({
       )}
 
       {/* =================================================================== */}
-      {/* 3. FULL TIMETABLE MODAL */}
+      {/* 5. FULL TIMETABLE MODAL */}
       {/* =================================================================== */}
       {timetableGuru && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -877,9 +1482,9 @@ export default function TrainersListClient({
 
               <button
                 onClick={() => setTimetableGuru(null)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-[#8A064D] hover:text-[#590231] border border-rose-200 flex items-center justify-center transition shadow-2xs cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 stroke-[2.5]" />
               </button>
             </div>
 

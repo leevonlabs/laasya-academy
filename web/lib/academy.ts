@@ -12,18 +12,45 @@ export interface Course {
   batch_count?: number;
 }
 
+export interface Room {
+  id: string;
+  name: string;
+  capacity: number;
+  created_at?: string;
+}
+
+export interface TrainerBatchInfo {
+  id: string;
+  name: string;
+  course_id: string;
+  course_title: string;
+  course_category?: string;
+  days_of_week: string[];
+  start_time: string;
+  end_time: string;
+  room_or_hall: string;
+  max_capacity?: number;
+  enrolled_count?: number;
+}
+
 export interface Trainer {
   id: string;
   profile_id: string;
   full_name: string;
   email: string;
   phone: string;
+  avatar_url?: string;
+  age?: number;
+  gender?: 'male' | 'female' | 'trans';
   specializations: string[];
   display_title?: string;
   bio: string;
   is_active: boolean;
   joined_date: string;
+  monthly_salary?: number;
+  salary_payment_status?: 'paid' | 'pending';
   batches_assigned?: number;
+  assigned_batches?: TrainerBatchInfo[];
 }
 
 export interface StudentEnrolledBatch {
@@ -49,6 +76,9 @@ export interface Student {
   full_name: string;
   email: string;
   phone: string;
+  avatar_url?: string;
+  age?: number;
+  gender?: 'male' | 'female' | 'trans';
   parent_name: string;
   parent_relation?: string;
   parent_contact?: string;
@@ -148,10 +178,55 @@ export async function getDashboardMetrics() {
 // -------------------------------------------------------------
 // COURSES
 // -------------------------------------------------------------
+// COURSES & CATEGORIES
+// -------------------------------------------------------------
+export async function getCourseCategories(): Promise<string[]> {
+  try {
+    const fromTable = await query<{ name: string }>('SELECT name FROM public.course_categories ORDER BY name ASC');
+    const fromCourses = await query<{ category: string }>('SELECT DISTINCT category FROM public.courses WHERE category IS NOT NULL AND category != \'\'');
+    
+    const set = new Set<string>();
+    fromTable.forEach(r => { if (r.name && r.name.trim()) set.add(r.name.trim()); });
+    fromCourses.forEach(r => { if (r.category && r.category.trim()) set.add(r.category.trim()); });
+    
+    return Array.from(set).sort();
+  } catch (err) {
+    console.error('Error in getCourseCategories:', err);
+    return [
+      'Classical Dance',
+      'Modern Dance & Fitness',
+      'Vocal & Music',
+      'Musical Instruments',
+      'Martial Arts',
+      'Fine Arts',
+      'Mind Sports'
+    ];
+  }
+}
+
+export async function createCourseCategory(name: string): Promise<string> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Category name cannot be empty');
+  await query(
+    `INSERT INTO public.course_categories (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`,
+    [trimmed]
+  );
+  return trimmed;
+}
+
+export async function deleteCourseCategory(name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Category name cannot be empty');
+  // Remove from categories table
+  await query(`DELETE FROM public.course_categories WHERE LOWER(name) = LOWER($1)`, [trimmed]);
+  // Remove category from courses so they become 'No Category'
+  await query(`UPDATE public.courses SET category = '' WHERE LOWER(category) = LOWER($1)`, [trimmed]);
+}
+
 export async function getCourses(category?: string): Promise<Course[]> {
   let sql = `
     SELECT 
-      c.id, c.title, c.code, c.category, c.description, 
+      c.id, c.title, c.code, COALESCE(c.category, '') as category, c.description, 
       c.duration_months, c.monthly_fee, c.is_active,
       COUNT(b.id)::int as batch_count
     FROM public.courses c
@@ -159,8 +234,12 @@ export async function getCourses(category?: string): Promise<Course[]> {
   `;
   const params: any[] = [];
   if (category && category !== 'All') {
-    sql += ` WHERE c.category = $1`;
-    params.push(category);
+    if (category === 'No Category') {
+      sql += ` WHERE (c.category IS NULL OR c.category = '' OR LOWER(c.category) = 'no category' OR LOWER(c.category) = 'uncategorized')`;
+    } else {
+      sql += ` WHERE c.category = $1`;
+      params.push(category);
+    }
   }
   sql += ` GROUP BY c.id ORDER BY c.category, c.title;`;
   return query<Course>(sql, params);
@@ -178,7 +257,7 @@ export async function createCourse(data: {
     INSERT INTO public.courses (title, code, category, description, duration_months, monthly_fee, is_active)
     VALUES ($1, $2, $3, $4, $5, $6, true)
     RETURNING *;
-  `, [data.title, data.code, data.category, data.description, data.duration_months, data.monthly_fee]);
+  `, [data.title, data.code, data.category || '', data.description, data.duration_months, data.monthly_fee]);
 }
 
 export async function updateCourse(id: string, data: {
@@ -194,7 +273,7 @@ export async function updateCourse(id: string, data: {
     UPDATE public.courses
     SET title = COALESCE($2, title),
         code = COALESCE($3, code),
-        category = COALESCE($4, category),
+        category = CASE WHEN $4::text IS NOT NULL THEN $4 ELSE category END,
         monthly_fee = COALESCE($5, monthly_fee),
         description = COALESCE($6, description),
         duration_months = COALESCE($7, duration_months),
@@ -203,8 +282,14 @@ export async function updateCourse(id: string, data: {
     WHERE id = $1
     RETURNING *;
   `, [
-    id, data.title, data.code, data.category, data.monthly_fee,
-    data.description, data.duration_months, data.is_active
+    id, 
+    data.title, 
+    data.code, 
+    data.category !== undefined ? data.category : null, 
+    data.monthly_fee,
+    data.description, 
+    data.duration_months, 
+    data.is_active
   ]);
 }
 
@@ -225,12 +310,39 @@ export async function getTrainers(): Promise<Trainer[]> {
   const sql = `
     SELECT 
       t.id, t.profile_id, p.full_name, p.email, p.phone,
+      COALESCE(t.avatar_url, p.avatar_url) as avatar_url,
+      COALESCE(t.age, p.age)::int as age,
+      COALESCE(t.gender, p.gender) as gender,
       t.specializations, t.display_title, t.bio, t.is_active, t.joined_date::text as joined_date,
-      COUNT(b.id)::int as batches_assigned
+      COALESCE(t.monthly_salary, 25000)::numeric as monthly_salary,
+      COALESCE(
+        (SELECT status FROM public.guru_salary_records WHERE trainer_id = t.id ORDER BY created_at DESC LIMIT 1),
+        'pending'
+      ) as salary_payment_status,
+      COUNT(b.id)::int as batches_assigned,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'id', b.id,
+            'name', b.name,
+            'course_id', b.course_id,
+            'course_title', c.title,
+            'course_category', c.category,
+            'days_of_week', b.days_of_week,
+            'start_time', b.start_time,
+            'end_time', b.end_time,
+            'room_or_hall', b.room_or_hall,
+            'max_capacity', b.max_capacity,
+            'enrolled_count', (SELECT COUNT(*)::int FROM public.batch_enrollments be WHERE be.batch_id = b.id AND be.status = 'active')
+          )
+        ) FILTER (WHERE b.id IS NOT NULL),
+        '[]'::json
+      ) as assigned_batches
     FROM public.trainers t
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batches b ON b.trainer_id = t.id
-    GROUP BY t.id, t.profile_id, p.full_name, p.email, p.phone, t.specializations, t.display_title, t.bio, t.is_active, t.joined_date
+    LEFT JOIN public.courses c ON c.id = b.course_id
+    GROUP BY t.id, t.profile_id, p.full_name, p.email, p.phone, t.avatar_url, p.avatar_url, t.age, p.age, t.gender, p.gender, t.specializations, t.display_title, t.bio, t.is_active, t.joined_date, t.monthly_salary
     ORDER BY p.full_name;
   `;
   return query<Trainer>(sql);
@@ -240,15 +352,24 @@ export async function createTrainer(data: {
   full_name: string;
   email?: string;
   phone?: string;
+  avatar_url?: string;
+  age?: number;
+  gender?: string;
   specializations: string[];
   display_title?: string;
   bio: string;
+  monthly_salary?: number;
+  is_active?: boolean;
 }) {
   const cleanEmail = (data.email && data.email.trim())
     ? data.email.toLowerCase().trim()
     : `${data.full_name.toLowerCase().replace(/[^a-z0-9]/g, '') || 'guru'}@laasyaacademy.com`;
   const cleanPhone = data.phone?.trim() || '+91 8151 998 899';
   const displayTitle = data.display_title?.trim() || 'Revered Guru & Mentor';
+  const monthlySalary = Number(data.monthly_salary) || 25000;
+  const isActive = data.is_active !== undefined ? data.is_active : true;
+  const age = data.age ? Number(data.age) : null;
+  const gender = data.gender ? data.gender.toLowerCase() : null;
 
   // Create in auth.users first
   const [authUser] = await query<{ id: string }>(`
@@ -267,26 +388,35 @@ export async function createTrainer(data: {
 
   // Insert profile
   await query(`
-    INSERT INTO public.profiles (id, full_name, email, phone, role)
-    VALUES ($1, $2, $3, $4, 'trainer')
-    ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, phone = EXCLUDED.phone;
-  `, [uid, data.full_name, cleanEmail, cleanPhone]);
+    INSERT INTO public.profiles (id, full_name, email, phone, role, avatar_url, age, gender)
+    VALUES ($1, $2, $3, $4, 'trainer', $5, $6, $7)
+    ON CONFLICT (id) DO UPDATE SET 
+      full_name = EXCLUDED.full_name, 
+      phone = EXCLUDED.phone, 
+      avatar_url = COALESCE(EXCLUDED.avatar_url, profiles.avatar_url),
+      age = COALESCE(EXCLUDED.age, profiles.age),
+      gender = COALESCE(EXCLUDED.gender, profiles.gender);
+  `, [uid, data.full_name, cleanEmail, cleanPhone, data.avatar_url || null, age, gender]);
 
   // Insert trainer
   return queryOne<Trainer>(`
-    INSERT INTO public.trainers (profile_id, specializations, display_title, bio, is_active)
-    VALUES ($1, $2, $3, $4, true)
+    INSERT INTO public.trainers (profile_id, specializations, display_title, bio, is_active, monthly_salary, avatar_url, age, gender)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *;
-  `, [uid, data.specializations, displayTitle, data.bio]);
+  `, [uid, data.specializations, displayTitle, data.bio, isActive, monthlySalary, data.avatar_url || null, age, gender]);
 }
 
 export async function updateTrainer(id: string, data: {
   full_name?: string;
   display_title?: string;
   phone?: string;
+  avatar_url?: string;
+  age?: number;
+  gender?: string;
   specializations?: string[];
   bio?: string;
   is_active?: boolean;
+  monthly_salary?: number;
 }) {
   const trainer = await queryOne<{ profile_id: string }>(
     'SELECT profile_id FROM public.trainers WHERE id = $1',
@@ -294,15 +424,26 @@ export async function updateTrainer(id: string, data: {
   );
   if (!trainer) throw new Error('Guru not found');
 
-  if (data.full_name || data.phone) {
-    await query(`
-      UPDATE public.profiles
-      SET full_name = COALESCE($2, full_name),
-          phone = COALESCE($3, phone),
-          updated_at = now()
-      WHERE id = $1
-    `, [trainer.profile_id, data.full_name, data.phone]);
-  }
+  const age = data.age !== undefined ? (data.age ? Number(data.age) : null) : undefined;
+  const gender = data.gender !== undefined ? (data.gender ? data.gender.toLowerCase() : null) : undefined;
+
+  await query(`
+    UPDATE public.profiles
+    SET full_name = COALESCE($2, full_name),
+        phone = COALESCE($3, phone),
+        avatar_url = COALESCE($4, avatar_url),
+        age = COALESCE($5, age),
+        gender = COALESCE($6, gender),
+        updated_at = now()
+    WHERE id = $1
+  `, [
+    trainer.profile_id, 
+    data.full_name, 
+    data.phone, 
+    data.avatar_url !== undefined ? data.avatar_url : null,
+    age !== undefined ? age : null,
+    gender !== undefined ? gender : null
+  ]);
 
   return queryOne<Trainer>(`
     UPDATE public.trainers
@@ -310,10 +451,59 @@ export async function updateTrainer(id: string, data: {
         specializations = COALESCE($3, specializations),
         bio = COALESCE($4, bio),
         is_active = COALESCE($5, is_active),
+        monthly_salary = COALESCE($6, monthly_salary),
+        avatar_url = COALESCE($7, avatar_url),
+        age = COALESCE($8, age),
+        gender = COALESCE($9, gender),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
-  `, [id, data.display_title, data.specializations, data.bio, data.is_active]);
+  `, [
+    id, 
+    data.display_title, 
+    data.specializations, 
+    data.bio, 
+    data.is_active, 
+    data.monthly_salary, 
+    data.avatar_url !== undefined ? data.avatar_url : null,
+    age !== undefined ? age : null,
+    gender !== undefined ? gender : null
+  ]);
+}
+
+export async function deleteTrainer(id: string) {
+  // Cascading cleanup of dependencies
+  await query(`DELETE FROM public.guru_salary_advances WHERE trainer_id = $1`, [id]);
+  await query(`DELETE FROM public.guru_salary_records WHERE trainer_id = $1`, [id]);
+  await query(`DELETE FROM public.class_sessions WHERE trainer_id = $1`, [id]);
+  await query(`DELETE FROM public.batches WHERE trainer_id = $1`, [id]);
+  const trainer = await queryOne<{ profile_id: string }>(`SELECT profile_id FROM public.trainers WHERE id = $1`, [id]);
+  const deleted = await queryOne<Trainer>(`DELETE FROM public.trainers WHERE id = $1 RETURNING *;`, [id]);
+  if (trainer?.profile_id) {
+    await query(`DELETE FROM public.profiles WHERE id = $1`, [trainer.profile_id]);
+    await query(`DELETE FROM auth.users WHERE id = $1`, [trainer.profile_id]);
+  }
+  return deleted;
+}
+
+// -------------------------------------------------------------
+// ROOMS
+// -------------------------------------------------------------
+export async function getRooms(): Promise<Room[]> {
+  return query<Room>('SELECT id, name, capacity, created_at FROM public.rooms ORDER BY name ASC');
+}
+
+export async function createRoom(name: string, capacity: number = 25): Promise<Room> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Room name cannot be empty');
+  const room = await queryOne<Room>(`
+    INSERT INTO public.rooms (name, capacity)
+    VALUES ($1, $2)
+    ON CONFLICT (name) DO UPDATE SET capacity = EXCLUDED.capacity
+    RETURNING *;
+  `, [trimmed, capacity]);
+  if (!room) throw new Error('Failed to create or update room');
+  return room;
 }
 
 // -------------------------------------------------------------
@@ -323,6 +513,9 @@ export async function getStudents(): Promise<Student[]> {
   const sql = `
     SELECT 
       s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone,
+      COALESCE(s.avatar_url, p.avatar_url) as avatar_url,
+      COALESCE(s.age, p.age)::int as age,
+      COALESCE(s.gender, p.gender) as gender,
       s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, 
       TO_CHAR(s.enrollment_date, 'YYYY-MM-DD') as enrollment_date,
       COALESCE(s.advance_paid, 0)::numeric as advance_paid,
@@ -338,7 +531,7 @@ export async function getStudents(): Promise<Student[]> {
     JOIN public.profiles p ON p.id = s.profile_id
     LEFT JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
     LEFT JOIN public.attendance a ON a.student_id = s.id
-    GROUP BY s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone, s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, s.enrollment_date, s.advance_paid
+    GROUP BY s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone, s.avatar_url, p.avatar_url, s.age, p.age, s.gender, p.gender, s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, s.enrollment_date, s.advance_paid
     ORDER BY 
       CASE WHEN s.roll_number ~ '^LCA-[0-9]+$' THEN CAST(SUBSTRING(s.roll_number FROM 5) AS INT) ELSE 999999 END ASC,
       p.full_name ASC;
@@ -480,6 +673,9 @@ export async function createStudent(data: {
   full_name: string;
   email: string;
   phone: string;
+  avatar_url?: string;
+  age?: number;
+  gender?: string;
   parent_name: string;
   parent_relation?: string;
   parent_contact?: string;
@@ -527,12 +723,19 @@ export async function createStudent(data: {
   `, [authEmail, data.full_name, data.phone]);
 
   const uid = authUser.id;
+  const age = data.age ? Number(data.age) : null;
+  const gender = data.gender ? data.gender.toLowerCase() : null;
 
   await query(`
-    INSERT INTO public.profiles (id, full_name, email, phone, role)
-    VALUES ($1, $2, $3, $4, 'student')
-    ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, phone = EXCLUDED.phone;
-  `, [uid, data.full_name, cleanEmail, data.phone]);
+    INSERT INTO public.profiles (id, full_name, email, phone, role, avatar_url, age, gender)
+    VALUES ($1, $2, $3, $4, 'student', $5, $6, $7)
+    ON CONFLICT (id) DO UPDATE SET 
+      full_name = EXCLUDED.full_name, 
+      phone = EXCLUDED.phone, 
+      avatar_url = COALESCE(EXCLUDED.avatar_url, profiles.avatar_url),
+      age = COALESCE(EXCLUDED.age, profiles.age),
+      gender = COALESCE(EXCLUDED.gender, profiles.gender);
+  `, [uid, data.full_name, cleanEmail, data.phone, data.avatar_url || null, age, gender]);
 
   const joiningDate = data.joining_date || new Date().toISOString().split('T')[0];
   const advancePaid = Number(data.advance_paid || 0);
@@ -540,9 +743,9 @@ export async function createStudent(data: {
   const student = await queryOne<Student>(`
     INSERT INTO public.students (
       profile_id, roll_number, parent_name, parent_relation,
-      parent_contact, address, emergency_contact, status, enrollment_date, advance_paid
+      parent_contact, address, emergency_contact, status, enrollment_date, advance_paid, avatar_url, age, gender
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9, $10, $11, $12)
     ON CONFLICT (profile_id) DO UPDATE SET
       parent_name = EXCLUDED.parent_name,
       parent_relation = EXCLUDED.parent_relation,
@@ -551,7 +754,10 @@ export async function createStudent(data: {
       emergency_contact = EXCLUDED.emergency_contact,
       status = 'active',
       enrollment_date = EXCLUDED.enrollment_date,
-      advance_paid = EXCLUDED.advance_paid
+      advance_paid = EXCLUDED.advance_paid,
+      avatar_url = COALESCE(EXCLUDED.avatar_url, students.avatar_url),
+      age = COALESCE(EXCLUDED.age, students.age),
+      gender = COALESCE(EXCLUDED.gender, students.gender)
     RETURNING *;
   `, [
     uid, 
@@ -562,7 +768,10 @@ export async function createStudent(data: {
     data.address || 'Kannamangala, Bangalore',
     data.emergency_contact || data.parent_contact || data.phone,
     joiningDate,
-    advancePaid
+    advancePaid,
+    data.avatar_url || null,
+    age,
+    gender
   ]);
 
   if (student && data.batch_ids && data.batch_ids.length > 0) {
@@ -580,7 +789,10 @@ export async function createStudent(data: {
     full_name: data.full_name,
     email: data.email,
     phone: data.phone,
-    advance_paid: advancePaid
+    advance_paid: advancePaid,
+    avatar_url: data.avatar_url || null,
+    age: age || undefined,
+    gender: (gender as any) || undefined
   };
 }
 
@@ -588,6 +800,9 @@ export async function updateStudent(id: string, data: {
   full_name?: string;
   email?: string;
   phone?: string;
+  avatar_url?: string;
+  age?: number;
+  gender?: string;
   parent_name?: string;
   parent_relation?: string;
   parent_contact?: string;
@@ -603,15 +818,29 @@ export async function updateStudent(id: string, data: {
   );
   if (!current) throw new Error('Student not found');
 
-  if (data.full_name || data.email || data.phone) {
+  const age = data.age !== undefined ? (data.age ? Number(data.age) : null) : undefined;
+  const gender = data.gender !== undefined ? (data.gender ? data.gender.toLowerCase() : null) : undefined;
+
+  if (data.full_name || data.email || data.phone || data.avatar_url !== undefined || age !== undefined || gender !== undefined) {
     await query(`
       UPDATE public.profiles
       SET full_name = COALESCE($2, full_name),
           email = COALESCE($3, email),
           phone = COALESCE($4, phone),
+          avatar_url = COALESCE($5, avatar_url),
+          age = COALESCE($6, age),
+          gender = COALESCE($7, gender),
           updated_at = now()
       WHERE id = $1;
-    `, [current.profile_id, data.full_name, data.email, data.phone]);
+    `, [
+      current.profile_id, 
+      data.full_name, 
+      data.email, 
+      data.phone, 
+      data.avatar_url !== undefined ? data.avatar_url : null,
+      age !== undefined ? age : null,
+      gender !== undefined ? gender : null
+    ]);
   }
 
   const updated = await queryOne<Student>(`
@@ -623,12 +852,18 @@ export async function updateStudent(id: string, data: {
         status = COALESCE($6, status),
         enrollment_date = COALESCE($7::date, enrollment_date),
         advance_paid = COALESCE($8, advance_paid),
+        avatar_url = COALESCE($9, avatar_url),
+        age = COALESCE($10, age),
+        gender = COALESCE($11, gender),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
   `, [
     id, data.parent_name, data.parent_relation, data.parent_contact, 
-    data.address, data.status, data.joining_date, data.advance_paid
+    data.address, data.status, data.joining_date, data.advance_paid,
+    data.avatar_url !== undefined ? data.avatar_url : null,
+    age !== undefined ? age : null,
+    gender !== undefined ? gender : null
   ]);
 
   // Update batch enrollments if batch_ids provided
@@ -643,8 +878,8 @@ export async function updateStudent(id: string, data: {
     }
   }
 
-  const prof = await queryOne<{ full_name: string; email: string; phone: string }>(
-    `SELECT full_name, email, phone FROM public.profiles WHERE id = $1`,
+  const prof = await queryOne<{ full_name: string; email: string; phone: string; avatar_url: string }>(
+    `SELECT full_name, email, phone, avatar_url FROM public.profiles WHERE id = $1`,
     [current.profile_id]
   );
 
@@ -652,7 +887,8 @@ export async function updateStudent(id: string, data: {
     ...updated,
     full_name: prof?.full_name || data.full_name,
     email: prof?.email || data.email,
-    phone: prof?.phone || data.phone
+    phone: prof?.phone || data.phone,
+    avatar_url: prof?.avatar_url || data.avatar_url || null
   };
 }
 
@@ -774,9 +1010,8 @@ export async function deleteBatch(id: string) {
 // -------------------------------------------------------------
 // SESSIONS & ATTENDANCE
 // -------------------------------------------------------------
-export async function getSessions(dateFilter?: string): Promise<ClassSession[]> {
-  const today = dateFilter || new Date().toISOString().split('T')[0];
-  const sql = `
+export async function getSessions(dateFilter?: string, startDate?: string, endDate?: string): Promise<ClassSession[]> {
+  let sql = `
     SELECT 
       s.id, s.batch_id, b.name as batch_name, c.title as course_title,
       p.full_name as trainer_name, TO_CHAR(s.session_date, 'YYYY-MM-DD') as session_date,
@@ -791,11 +1026,25 @@ export async function getSessions(dateFilter?: string): Promise<ClassSession[]> 
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batch_enrollments be ON be.batch_id = b.id AND be.status = 'active'
     LEFT JOIN public.attendance a ON a.session_id = s.id
-    WHERE s.session_date = $1
-    GROUP BY s.id, s.batch_id, b.name, c.title, p.full_name
-    ORDER BY s.start_time;
+    WHERE 1=1
   `;
-  return query<ClassSession>(sql, [today]);
+  const params: any[] = [];
+  if (startDate && endDate) {
+    sql += ` AND s.session_date >= $1 AND s.session_date <= $2`;
+    params.push(startDate, endDate);
+  } else if (dateFilter) {
+    sql += ` AND s.session_date = $1`;
+    params.push(dateFilter);
+  } else {
+    const today = new Date().toISOString().split('T')[0];
+    sql += ` AND s.session_date = $1`;
+    params.push(today);
+  }
+  sql += `
+    GROUP BY s.id, s.batch_id, b.name, c.title, p.full_name
+    ORDER BY s.session_date ASC, s.start_time ASC;
+  `;
+  return query<ClassSession>(sql, params);
 }
 
 export async function updateSessionStatus(sessionId: string, status: string, checkInCode?: string) {

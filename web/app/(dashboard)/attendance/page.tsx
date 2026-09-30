@@ -1,14 +1,15 @@
 import React from 'react';
-import { getAttendanceAuditRecords, getCourses, getBatches } from '@/lib/academy';
+import { getAttendanceAuditRecords, getCourses, getBatches, getStudents } from '@/lib/academy';
 import AttendanceListClient from '@/components/attendance/AttendanceListClient';
 
 export const revalidate = 0;
 
 export default async function AttendancePage() {
-  const [auditRecords, courses, batches] = await Promise.all([
+  const [auditRecords, courses, batches, students] = await Promise.all([
     getAttendanceAuditRecords(),
     getCourses(),
-    getBatches()
+    getBatches(),
+    getStudents()
   ]);
 
   return (
@@ -17,6 +18,7 @@ export default async function AttendancePage() {
         initialAuditRecords={auditRecords} 
         courses={courses} 
         batches={batches}
+        students={students}
       />
     </div>
   );

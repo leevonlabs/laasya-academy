@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Course } from '@/lib/academy';
 import { 
   Search, 
@@ -17,7 +17,14 @@ import {
   AlertCircle,
   Clock,
   Layers,
-  Award
+  Award,
+  Tag,
+  ChevronDown,
+  FolderPlus,
+  CheckCircle2,
+  HelpCircle,
+  TrendingUp,
+  AlertTriangle
 } from 'lucide-react';
 
 const COURSE_GURUS_MAP: Record<string, string> = {
@@ -43,25 +50,45 @@ const COURSE_GURUS_MAP: Record<string, string> = {
 
 interface Props {
   initialCourses: Course[];
+  initialCategories?: string[];
 }
 
-export default function CourseListClient({ initialCourses }: Props) {
+export default function CourseListClient({ initialCourses, initialCategories }: Props) {
   const [courses, setCourses] = useState<Course[]>(initialCourses);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   
-  // Dynamic categories list
-  const initialCategoryList = Array.from(new Set([
+  // Dynamic categories list initialized from DB & courses
+  const defaultCategoryList = [
     'Classical Dance',
     'Modern Dance & Fitness',
     'Vocal & Music',
     'Musical Instruments',
     'Martial Arts',
     'Fine Arts',
-    'Mind Sports',
-    ...initialCourses.map(c => c.category).filter(Boolean)
-  ]));
-  const [categories, setCategories] = useState<string[]>(initialCategoryList);
+    'Mind Sports'
+  ];
+
+  const [categories, setCategories] = useState<string[]>(() => {
+    const set = new Set<string>([
+      ...(initialCategories || []),
+      ...defaultCategoryList,
+      ...initialCourses.map(c => c.category).filter(Boolean)
+    ]);
+    return Array.from(set).sort();
+  });
+
+  // Searchable Category Dropdown state
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
+  // New Category Modal State
+  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+
+  // Delete Category Modal State
+  const [deletingCategoryName, setDeletingCategoryName] = useState<string | null>(null);
 
   // View Details Modal State
   const [viewingCourse, setViewingCourse] = useState<Course | null>(null);
@@ -78,7 +105,7 @@ export default function CourseListClient({ initialCourses }: Props) {
   const [isEditingNewCategory, setIsEditingNewCategory] = useState(false);
   const [customEditCategory, setCustomEditCategory] = useState('');
 
-  // Add Modal State
+  // Add Course Modal State
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newCode, setNewCode] = useState('');
@@ -89,17 +116,77 @@ export default function CourseListClient({ initialCourses }: Props) {
   const [newDuration, setNewDuration] = useState(12);
   const [newDesc, setNewDesc] = useState('');
 
-  // Delete Modal State
+  // Delete Course Modal State
   const [deletingCourse, setDeletingCourse] = useState<Course | null>(null);
 
-  // Status/feedback
+  // Status & Celebratory Toast
   const [saving, setSaving] = useState(false);
-  const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const showFeedback = (type: 'success' | 'error', text: string) => {
-    setFeedbackMsg({ type, text });
-    setTimeout(() => setFeedbackMsg(null), 4000);
+  const showCelebratoryToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4500);
   };
+
+  // Close category dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setIsCategoryDropdownOpen(false);
+      }
+    }
+    if (isCategoryDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isCategoryDropdownOpen]);
+
+  // Helper: check if a course has NO category
+  const isCourseUncategorized = (c: Course): boolean => {
+    return !c.category || c.category.trim() === '' || c.category.toLowerCase() === 'no category' || c.category.toLowerCase() === 'uncategorized';
+  };
+
+  // Count of courses without category
+  const coursesWithoutCategoryCount = useMemo(() => {
+    return courses.filter(isCourseUncategorized).length;
+  }, [courses]);
+
+  // Filtered courses
+  const filteredCourses = useMemo(() => {
+    return courses.filter((c) => {
+      const isNoCat = isCourseUncategorized(c);
+      
+      let matchesCategory = true;
+      if (selectedCategory === 'All') {
+        matchesCategory = true;
+      } else if (selectedCategory === 'No Category') {
+        matchesCategory = isNoCat;
+      } else {
+        matchesCategory = c.category === selectedCategory;
+      }
+
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch = !q ||
+        c.title.toLowerCase().includes(q) ||
+        c.code.toLowerCase().includes(q) ||
+        (c.category && c.category.toLowerCase().includes(q)) ||
+        (isNoCat && 'no category'.includes(q));
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [courses, selectedCategory, searchQuery]);
+
+  // Filtered categories for searchable dropdown
+  const filteredDropdownCategories = useMemo(() => {
+    if (!categorySearchQuery.trim()) return categories;
+    return categories.filter(cat => 
+      cat.toLowerCase().includes(categorySearchQuery.toLowerCase().trim())
+    );
+  }, [categories, categorySearchQuery]);
 
   // Helper to generate next unique code
   const generateNextCourseCode = (courseList: Course[]) => {
@@ -132,41 +219,102 @@ export default function CourseListClient({ initialCourses }: Props) {
     setEditingCourse(course);
     setEditTitle(course.title);
     setEditCode(course.code);
-    setEditCategory(course.category);
-    setEditFee(Number(course.monthly_fee));
-    setEditDuration(course.duration_months);
+    setEditCategory(course.category || '');
+    setEditFee(Number(course.monthly_fee) || 0);
+    setEditDuration(course.duration_months || 12);
     setEditDesc(course.description || '');
     setEditIsActive(course.is_active ?? true);
     setIsEditingNewCategory(false);
     setCustomEditCategory('');
   };
 
-  const handleSaveNewCategory = (mode: 'add' | 'edit') => {
-    const catName = mode === 'add' ? customNewCategory.trim() : customEditCategory.trim();
+  // Add New Category (From Dedicated Button / Modal)
+  const handleCreateCategorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const catName = newCategoryInput.trim();
     if (!catName) return;
-    if (!categories.includes(catName)) {
-      setCategories(prev => [...prev, catName]);
-    }
-    if (mode === 'add') {
-      setNewCategory(catName);
-      setIsCreatingNewCategory(false);
-      setCustomNewCategory('');
-    } else {
-      setEditCategory(catName);
-      setIsEditingNewCategory(false);
-      setCustomEditCategory('');
+
+    setSaving(true);
+    try {
+      const res = await fetch('/api/courses/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: catName })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to create category');
+      }
+
+      const data = await res.json();
+      if (data.categories) {
+        setCategories(data.categories);
+      } else if (!categories.includes(catName)) {
+        setCategories(prev => [...prev, catName].sort());
+      }
+
+      setIsAddCategoryOpen(false);
+      setNewCategoryInput('');
+      setSelectedCategory(catName);
+      showCelebratoryToast(`Category "${catName}" created successfully!`);
+    } catch (err: any) {
+      alert(err.message || 'Error creating category');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const filteredCourses = courses.filter((c) => {
-    const matchesCategory = selectedCategory === 'All' || c.category === selectedCategory;
-    const matchesSearch = 
-      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.category.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  // Delete Category
+  const handleConfirmDeleteCategory = async () => {
+    if (!deletingCategoryName) return;
+    setSaving(true);
 
+    try {
+      const res = await fetch(`/api/courses/categories?name=${encodeURIComponent(deletingCategoryName)}`, {
+        method: 'DELETE'
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to delete category');
+      }
+
+      const data = await res.json();
+      if (data.categories) {
+        setCategories(data.categories);
+      } else {
+        setCategories(prev => prev.filter(c => c !== deletingCategoryName));
+      }
+
+      // Update all courses in local state that had this category to have ''
+      setCourses(prev => prev.map(c => {
+        if (c.category === deletingCategoryName) {
+          return { ...c, category: '' };
+        }
+        return c;
+      }));
+
+      // If viewing course had this category, update it
+      if (viewingCourse && viewingCourse.category === deletingCategoryName) {
+        setViewingCourse({ ...viewingCourse, category: '' });
+      }
+
+      // If current filter was this category, switch to 'No Category'
+      if (selectedCategory === deletingCategoryName) {
+        setSelectedCategory('No Category');
+      }
+
+      showCelebratoryToast(`Category "${deletingCategoryName}" deleted. Assigned courses marked as No Category.`);
+      setDeletingCategoryName(null);
+    } catch (err: any) {
+      alert(err.message || 'Error deleting category');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Add Course
   const handleAddCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -175,8 +323,16 @@ export default function CourseListClient({ initialCourses }: Props) {
         ? customNewCategory.trim() 
         : newCategory;
 
-      if (isCreatingNewCategory && customNewCategory.trim() && !categories.includes(customNewCategory.trim())) {
-        setCategories(prev => [...prev, customNewCategory.trim()]);
+      if (isCreatingNewCategory && customNewCategory.trim()) {
+        await fetch('/api/courses/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: customNewCategory.trim() })
+        }).catch(() => {});
+
+        if (!categories.includes(customNewCategory.trim())) {
+          setCategories(prev => [...prev, customNewCategory.trim()].sort());
+        }
       }
 
       const res = await fetch('/api/courses', {
@@ -200,14 +356,15 @@ export default function CourseListClient({ initialCourses }: Props) {
       const added: Course = await res.json();
       setCourses(prev => [...prev, { ...added, batch_count: 0 }]);
       setIsAddOpen(false);
-      showFeedback('success', `Course "${added.title}" (${added.code}) created successfully!`);
+      showCelebratoryToast(`Course "${added.title}" (${added.code}) created successfully!`);
     } catch (e: any) {
-      showFeedback('error', e.message || 'Error creating course');
+      alert(e.message || 'Error creating course');
     } finally {
       setSaving(false);
     }
   };
 
+  // Save Edit Course
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCourse) return;
@@ -218,8 +375,16 @@ export default function CourseListClient({ initialCourses }: Props) {
         ? customEditCategory.trim()
         : editCategory;
 
-      if (isEditingNewCategory && customEditCategory.trim() && !categories.includes(customEditCategory.trim())) {
-        setCategories(prev => [...prev, customEditCategory.trim()]);
+      if (isEditingNewCategory && customEditCategory.trim()) {
+        await fetch('/api/courses/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: customEditCategory.trim() })
+        }).catch(() => {});
+
+        if (!categories.includes(customEditCategory.trim())) {
+          setCategories(prev => [...prev, customEditCategory.trim()].sort());
+        }
       }
 
       const res = await fetch('/api/courses', {
@@ -274,14 +439,15 @@ export default function CourseListClient({ initialCourses }: Props) {
       }
 
       setEditingCourse(null);
-      showFeedback('success', `Course "${editTitle}" updated successfully!`);
+      showCelebratoryToast(`Course "${editTitle}" updated successfully!`);
     } catch (e: any) {
-      showFeedback('error', e.message || 'Error updating course');
+      alert(e.message || 'Error updating course');
     } finally {
       setSaving(false);
     }
   };
 
+  // Delete Course
   const handleDeleteCourse = async () => {
     if (!deletingCourse) return;
     setSaving(true);
@@ -300,201 +466,511 @@ export default function CourseListClient({ initialCourses }: Props) {
       if (viewingCourse && viewingCourse.id === deletingCourse.id) {
         setViewingCourse(null);
       }
-      showFeedback('success', `Course "${deletingCourse.title}" deleted successfully.`);
+      showCelebratoryToast(`Course "${deletingCourse.title}" deleted successfully.`);
       setDeletingCourse(null);
     } catch (e: any) {
-      showFeedback('error', e.message || 'Error deleting course');
+      alert(e.message || 'Error deleting course');
     } finally {
       setSaving(false);
     }
   };
 
+  // Quick stats
+  const activeCount = courses.filter(c => c.is_active !== false).length;
+  const avgFee = courses.length > 0 
+    ? Math.round(courses.reduce((acc, c) => acc + (Number(c.monthly_fee) || 0), 0) / courses.length) 
+    : 0;
+
   return (
     <div className="space-y-6">
       
-      {/* Toast Feedback Notification */}
-      {feedbackMsg && (
-        <div className={`p-4 rounded-2xl flex items-center justify-between shadow-lg border transition-all animate-in fade-in slide-in-from-top-4 ${
-          feedbackMsg.type === 'success' 
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-900' 
-            : 'bg-rose-50 border-rose-200 text-rose-900'
-        }`}>
-          <div className="flex items-center gap-2.5">
-            {feedbackMsg.type === 'success' ? (
-              <Check className="w-5 h-5 text-emerald-600" />
-            ) : (
-              <AlertCircle className="w-5 h-5 text-rose-600" />
-            )}
-            <span className="text-xs font-semibold">{feedbackMsg.text}</span>
+      {/* ================================================================= */}
+      {/* CELEBRATORY SUCCESS TOAST POPUP */}
+      {/* ================================================================= */}
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-100 flex items-center gap-3 bg-white border border-emerald-200 px-5 py-3.5 rounded-2xl shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="w-8 h-8 rounded-full bg-linear-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-sm shrink-0">
+            <CheckCircle2 className="w-5 h-5" />
           </div>
-          <button 
-            onClick={() => setFeedbackMsg(null)}
-            className="p-1 hover:bg-black/5 rounded-lg transition"
+          <div>
+            <p className="text-xs font-black text-emerald-950 uppercase tracking-wide">Action Successful</p>
+            <p className="text-xs font-semibold text-emerald-800 mt-0.5">{toastMessage}</p>
+          </div>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="ml-3 p-1 rounded-lg text-emerald-600 hover:bg-emerald-50 transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Top Header & Search Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs">
-        <div>
-          <h1 className="text-2xl font-bold text-[#2D041A] flex items-center gap-2">
-            <span>Course Catalog & Curriculum</span>
-            <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-full font-semibold">
-              {courses.length} Disciplines
-            </span>
-          </h1>
-          <p className="text-xs text-gray-500 mt-1">
-            Manage course disciplines, duration, curriculum, categories, and monthly fees.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-            <input
-              type="text"
-              placeholder="Search course by name, code, category..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-gray-50 border border-[#F0D5E4] rounded-xl text-xs w-64 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
-            />
+      {/* ================================================================= */}
+      {/* TOP HEADER & SEARCH & ACTION BAR */}
+      {/* ================================================================= */}
+      <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-2xl font-black text-[#2D041A] tracking-tight">Course Curriculum & Catalog</h1>
+              <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-3 py-1 rounded-full font-bold">
+                {courses.length} Disciplines
+              </span>
+            </div>
+            <p className="text-xs font-medium text-gray-500 mt-1">
+              Configure course disciplines, monthly tuition fees, categories, assigned gurus, and syllabus.
+            </p>
           </div>
 
-          <button
-            onClick={openAddModal}
-            className="bg-[#8A064D] hover:bg-[#70043E] text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-md transition flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-[#F9E33A]" />
-            <span>Add Course</span>
-          </button>
+          {/* Action Buttons & Category Tools */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                placeholder="Search by course, code, guru..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9.5 pr-4 py-2 bg-gray-50 hover:bg-gray-100/70 border border-[#F0D5E4] rounded-2xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 w-56 md:w-64 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+              />
+            </div>
+
+            {/* SEARCHABLE CATEGORIES DROPDOWN WITH DELETE BUTTON */}
+            <div className="relative" ref={categoryDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                className={`px-3.5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 border cursor-pointer ${
+                  isCategoryDropdownOpen
+                    ? 'bg-[#FFF2F8] border-[#8A064D] text-[#8A064D] shadow-xs'
+                    : 'bg-white hover:bg-gray-50 border-[#F0D5E4] text-[#590231]'
+                }`}
+                title="Search and Manage Existing Categories"
+              >
+                <Tag className="w-3.5 h-3.5 text-[#8A064D]" />
+                <span>Categories ({categories.length})</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isCategoryDropdownOpen ? 'rotate-180 text-[#8A064D]' : ''}`} />
+              </button>
+
+              {/* Dropdown Menu */}
+              {isCategoryDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-3xl shadow-2xl border border-[#F0D5E4] p-4 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between pb-2.5 border-b border-gray-100 mb-3">
+                    <span className="text-[11px] font-black uppercase text-[#590231] tracking-wider">Existing Categories</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCategoryDropdownOpen(false);
+                        setIsAddCategoryOpen(true);
+                      }}
+                      className="text-[11px] font-bold text-[#8A064D] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add New</span>
+                    </button>
+                  </div>
+
+                  {/* Search within categories */}
+                  <div className="relative mb-3">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search categories..."
+                      value={categorySearchQuery}
+                      onChange={(e) => setCategorySearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A064D]"
+                    />
+                  </div>
+
+                  {/* Categories List */}
+                  <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+                    {/* All Categories Option */}
+                    <div
+                      onClick={() => {
+                        setSelectedCategory('All');
+                        setIsCategoryDropdownOpen(false);
+                      }}
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        selectedCategory === 'All' ? 'bg-[#FFF2F8] text-[#8A064D]' : 'hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      <span>All Categories</span>
+                      <span className="text-[10px] bg-gray-100 text-gray-500 font-semibold px-2 py-0.5 rounded-full">
+                        {courses.length}
+                      </span>
+                    </div>
+
+                    {/* Uncategorized Option if exists */}
+                    {coursesWithoutCategoryCount > 0 && (
+                      <div
+                        onClick={() => {
+                          setSelectedCategory('No Category');
+                          setIsCategoryDropdownOpen(false);
+                        }}
+                        className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer border border-red-300 ${
+                          selectedCategory === 'No Category' ? 'bg-red-500 text-white border-red-600' : 'bg-red-50 text-red-700 hover:bg-red-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                          <span>No Category</span>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          selectedCategory === 'No Category' ? 'bg-white/20 text-white' : 'bg-red-200 text-red-800'
+                        }`}>
+                          {coursesWithoutCategoryCount}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Dynamic categories from DB */}
+                    {filteredDropdownCategories.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-3">No categories found matching "{categorySearchQuery}"</p>
+                    ) : (
+                      filteredDropdownCategories.map((cat) => {
+                        const count = courses.filter(c => c.category === cat).length;
+                        const isSelected = selectedCategory === cat;
+                        return (
+                          <div
+                            key={cat}
+                            className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
+                              isSelected ? 'bg-[#FFF2F8] text-[#8A064D]' : 'hover:bg-gray-50 text-gray-700'
+                            }`}
+                          >
+                            <div 
+                              onClick={() => {
+                                setSelectedCategory(cat);
+                                setIsCategoryDropdownOpen(false);
+                              }}
+                              className="flex-1 flex items-center justify-between cursor-pointer mr-2"
+                            >
+                              <span className="truncate max-w-[160px]">{cat}</span>
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                isSelected ? 'bg-[#8A064D] text-white' : 'bg-gray-100 text-gray-500'
+                              }`}>
+                                {count}
+                              </span>
+                            </div>
+
+                            {/* DELETE CATEGORY BUTTON */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsCategoryDropdownOpen(false);
+                                setDeletingCategoryName(cat);
+                              }}
+                              className="p-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                              title={`Delete Category "${cat}"`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ADD NEW CATEGORY BUTTON */}
+            <button
+              onClick={() => setIsAddCategoryOpen(true)}
+              className="bg-white hover:bg-[#FFF2F8] border border-[#8A064D] text-[#8A064D] px-3.5 py-2.5 rounded-2xl text-xs font-black shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              title="Add a new course category"
+            >
+              <FolderPlus className="w-4 h-4 text-[#8A064D]" />
+              <span>+ New Category</span>
+            </button>
+
+            {/* ADD COURSE BUTTON */}
+            <button
+              onClick={openAddModal}
+              className="bg-[#8A064D] hover:bg-[#70043E] text-white px-4 py-2.5 rounded-2xl text-xs font-black shadow-md transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-[#F9E33A]" />
+              <span>Add Course</span>
+            </button>
+          </div>
+        </div>
+
+        {/* STATS METRIC PILLS */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-gray-100">
+          <div className="bg-[#FFF9FB] p-3 rounded-2xl border border-rose-100/70 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-[#8A064D]">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Total Disciplines</span>
+              <span className="text-base font-black text-[#2D041A]">{courses.length}</span>
+            </div>
+          </div>
+
+          <div className="bg-[#FFF9FB] p-3 rounded-2xl border border-rose-100/70 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700">
+              <Tag className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Total Categories</span>
+              <span className="text-base font-black text-[#2D041A]">{categories.length}</span>
+            </div>
+          </div>
+
+          <div className={`p-3 rounded-2xl border flex items-center gap-3 ${
+            coursesWithoutCategoryCount > 0 
+              ? 'bg-red-50 border-red-200' 
+              : 'bg-[#FFF9FB] border-rose-100/70'
+          }`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+              coursesWithoutCategoryCount > 0 ? 'bg-red-200 text-red-700' : 'bg-emerald-100 text-emerald-700'
+            }`}>
+              {coursesWithoutCategoryCount > 0 ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Category Status</span>
+              {coursesWithoutCategoryCount > 0 ? (
+                <span className="text-base font-black text-red-700 flex items-center gap-1">
+                  {coursesWithoutCategoryCount} Unassigned
+                </span>
+              ) : (
+                <span className="text-base font-black text-emerald-700">All Categorized</span>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-[#FFF9FB] p-3 rounded-2xl border border-rose-100/70 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700">
+              <IndianRupee className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Avg. Monthly Fee</span>
+              <span className="text-base font-black text-[#2D041A]">₹{avgFee.toLocaleString('en-IN')}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Category Filter Pills */}
+      {/* ================================================================= */}
+      {/* CATEGORIES ROW FILTER (WITH "NO CATEGORY" RED HIGHLIGHT BOUNDARIES) */}
+      {/* ================================================================= */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {/* All Categories Pill */}
         <button
           onClick={() => setSelectedCategory('All')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
             selectedCategory === 'All'
-              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/50'
-              : 'bg-white text-gray-600 border border-[#F0D5E4] hover:bg-gray-50'
+              ? 'bg-[#8A064D] text-white shadow-md ring-2 ring-[#F9E33A]/60'
+              : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
           }`}
         >
-          All Categories ({courses.length})
+          <span>All Disciplines</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+            selectedCategory === 'All' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+          }`}>
+            {courses.length}
+          </span>
         </button>
+
+        {/* "NO CATEGORY" ROW FILTER PILL WITH RED HIGHLIGHT BOUNDARIES */}
+        {coursesWithoutCategoryCount > 0 && (
+          <button
+            onClick={() => setSelectedCategory('No Category')}
+            className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 border-2 border-red-500 shadow-sm ${
+              selectedCategory === 'No Category'
+                ? 'bg-red-600 text-white border-red-700 ring-2 ring-red-400/50 shadow-md scale-102'
+                : 'bg-red-50 text-red-700 hover:bg-red-100 ring-1 ring-red-300/40 animate-pulse'
+            }`}
+          >
+            <AlertCircle className={`w-3.5 h-3.5 ${selectedCategory === 'No Category' ? 'text-white' : 'text-red-600'}`} />
+            <span>No Category</span>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+              selectedCategory === 'No Category' ? 'bg-white/20 text-white' : 'bg-red-200 text-red-900'
+            }`}>
+              {coursesWithoutCategoryCount}
+            </span>
+          </button>
+        )}
+
+        {/* Existing Categories Pills */}
         {categories.map((cat) => {
           const count = courses.filter(c => c.category === cat).length;
+          const isSelected = selectedCategory === cat;
           return (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
-                selectedCategory === cat
-                  ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/50'
-                  : 'bg-white text-gray-600 border border-[#F0D5E4] hover:bg-gray-50'
+              className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                isSelected
+                  ? 'bg-[#8A064D] text-white shadow-md ring-2 ring-[#F9E33A]/60'
+                  : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
               }`}
             >
               <span>{cat}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                selectedCategory === cat ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
               }`}>
                 {count}
               </span>
             </button>
           );
         })}
+
+        {/* Quick Add Category Pill */}
+        <button
+          onClick={() => setIsAddCategoryOpen(true)}
+          className="px-3 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1 text-[#8A064D] bg-[#FFF2F8] hover:bg-[#FFE6F2] border border-dashed border-[#8A064D]"
+          title="Create a new category"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>New Category</span>
+        </button>
       </div>
 
-      {/* Courses Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredCourses.map((c) => (
-          <div
-            key={c.id}
-            className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-xs hover:shadow-md hover:border-[#8A064D]/50 transition flex flex-col justify-between group"
-          >
-            <div>
-              {/* Header Badges */}
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <span className="text-[11px] font-mono font-bold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg">
-                  {c.code}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-medium text-gray-600 bg-gray-50 border border-gray-100 px-2.5 py-0.5 rounded-full">
-                    {c.category}
-                  </span>
-                  {c.is_active === false && (
-                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                      Inactive
+      {/* ================================================================= */}
+      {/* COURSES CARDS GRID */}
+      {/* ================================================================= */}
+      {filteredCourses.length === 0 ? (
+        <div className="bg-white rounded-3xl p-12 text-center border border-[#F0D5E4] shadow-xs">
+          <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <h3 className="font-black text-gray-800 text-base">No courses found</h3>
+          <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+            {selectedCategory === 'No Category' 
+              ? 'Great! There are currently no courses without a category.'
+              : `No courses matching category "${selectedCategory}" or search query.`}
+          </p>
+          {selectedCategory !== 'All' && (
+            <button
+              onClick={() => {
+                setSelectedCategory('All');
+                setSearchQuery('');
+              }}
+              className="mt-4 px-4 py-2 bg-[#8A064D] text-white text-xs font-bold rounded-xl shadow-sm hover:bg-[#70043E] transition cursor-pointer"
+            >
+              View All Courses
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredCourses.map((c) => {
+            const hasNoCat = isCourseUncategorized(c);
+            return (
+              <div
+                key={c.id}
+                className={`bg-white rounded-3xl p-5 border shadow-xs hover:shadow-md transition flex flex-col justify-between group ${
+                  hasNoCat 
+                    ? 'border-red-300 ring-1 ring-red-400/25 hover:border-red-500' 
+                    : 'border-[#F0D5E4] hover:border-[#8A064D]/50'
+                }`}
+              >
+                <div>
+                  {/* Header Badges */}
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="text-[11px] font-mono font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg">
+                      {c.code}
                     </span>
+                    <div className="flex items-center gap-1.5">
+                      {/* IF NO CATEGORY: RED HIGHLIGHT BOUNDARIES */}
+                      {hasNoCat ? (
+                        <span className="text-[11px] font-black text-red-700 bg-red-50 border-2 border-red-500 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-xs animate-pulse">
+                          <AlertCircle className="w-3 h-3 text-red-600" />
+                          <span>No Category</span>
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-black text-[#590231] bg-[#FFF2F8] border border-rose-100 px-2.5 py-0.5 rounded-full">
+                          {c.category}
+                        </span>
+                      )}
+
+                      {c.is_active === false && (
+                        <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Title */}
+                  <h3 className="text-base font-black text-[#2D041A] group-hover:text-[#8A064D] transition">
+                    {c.title}
+                  </h3>
+
+                  {/* Assigned Guru Badge */}
+                  <div className="mt-2 py-1.5 px-3 rounded-2xl bg-[#FFF9FB] border border-rose-100 flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-[#8A064D]">Assigned Guru</span>
+                    <span className="text-xs font-bold text-[#1A010F] truncate ml-2">
+                      {COURSE_GURUS_MAP[c.title] || 'Senior Faculty Guru'}
+                    </span>
+                  </div>
+
+                  {/* Uncategorized Warning note if applicable */}
+                  {hasNoCat && (
+                    <div className="mt-2 p-2 bg-red-50/80 rounded-xl border border-red-200 text-[11px] text-red-800 font-semibold flex items-center justify-between">
+                      <span>⚠️ Category not assigned</span>
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(c)}
+                        className="text-red-700 font-black hover:underline text-[10px]"
+                      >
+                        Set Category →
+                      </button>
+                    </div>
                   )}
+
+                  {/* Description */}
+                  <p className="text-xs font-medium text-gray-600 mt-2.5 line-clamp-2 leading-relaxed">
+                    {c.description || 'Comprehensive syllabus crafted for classical & contemporary mastery.'}
+                  </p>
                 </div>
+
+                {/* Bottom Meta & Action Buttons */}
+                <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase font-black tracking-wider block">Monthly Fee</span>
+                    <span className="text-base font-black text-[#8A064D] flex items-center">
+                      ₹{Number(c.monthly_fee).toLocaleString('en-IN')}
+                      <span className="text-[10px] font-bold text-gray-400 ml-1">/ mo</span>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* View Details Button */}
+                    <button
+                      onClick={() => setViewingCourse(c)}
+                      title="View Complete Course Details"
+                      className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 hover:bg-[#8A064D] hover:text-white text-gray-700 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Details</span>
+                    </button>
+
+                    {/* Edit Button */}
+                    <button
+                      onClick={() => openEditModal(c)}
+                      title="Edit Course Details"
+                      className="p-1.5 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] hover:bg-[#8A064D] hover:text-white text-[#8A064D] transition cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Delete Button */}
+                    <button
+                      onClick={() => setDeletingCourse(c)}
+                      title="Delete Course"
+                      className="p-1.5 rounded-xl bg-gray-50 border border-gray-200 hover:bg-rose-600 hover:text-white text-gray-400 hover:border-rose-600 transition cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
               </div>
-
-              {/* Title */}
-              <h3 className="text-base font-bold text-[#2D041A] group-hover:text-[#8A064D] transition">
-                {c.title}
-              </h3>
-
-              {/* Assigned Guru Badge */}
-              <div className="mt-2 py-1.5 px-3 rounded-xl bg-[#FFF9FB] border border-rose-100 flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase text-[#8A064D]">Assigned Guru</span>
-                <span className="text-xs font-bold text-gray-800 truncate ml-2">
-                  {COURSE_GURUS_MAP[c.title] || 'Senior Faculty Guru'}
-                </span>
-              </div>
-
-              {/* Description */}
-              <p className="text-xs text-gray-600 mt-2.5 line-clamp-2 leading-relaxed">
-                {c.description || 'Comprehensive training syllabus developed for beginner to advanced learners.'}
-              </p>
-            </div>
-
-            {/* Bottom Meta & Action Buttons */}
-            <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] text-gray-400 uppercase font-semibold block">Monthly Fee</span>
-                <span className="text-base font-bold text-[#8A064D] flex items-center">
-                  ₹{Number(c.monthly_fee).toLocaleString('en-IN')}
-                  <span className="text-[10px] font-normal text-gray-400 ml-1">/ mo</span>
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {/* View Details Button */}
-                <button
-                  onClick={() => setViewingCourse(c)}
-                  title="View Complete Course Details"
-                  className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 hover:bg-[#8A064D] hover:text-white text-gray-700 text-xs font-medium transition cursor-pointer flex items-center gap-1"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>View Details</span>
-                </button>
-
-                {/* Edit Button */}
-                <button
-                  onClick={() => openEditModal(c)}
-                  title="Edit Course Details"
-                  className="p-1.5 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] hover:bg-[#8A064D] hover:text-white text-[#8A064D] transition cursor-pointer"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                </button>
-
-                {/* Delete Button */}
-                <button
-                  onClick={() => setDeletingCourse(c)}
-                  title="Delete Course"
-                  className="p-1.5 rounded-xl bg-gray-50 border border-gray-200 hover:bg-rose-600 hover:text-white text-gray-400 hover:border-rose-600 transition cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ================================================================= */}
       {/* 1. VIEW DETAILS MODAL */}
@@ -504,17 +980,25 @@ export default function CourseListClient({ initialCourses }: Props) {
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-5">
               <div>
-                <span className="text-[10px] font-mono font-bold text-[#8A064D] bg-[#FFF2F8] px-2 py-0.5 rounded-md border border-rose-100">
+                <span className="text-[10px] font-mono font-black text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-md border border-rose-100">
                   {viewingCourse.code}
                 </span>
-                <h3 className="font-bold text-lg text-[#2D041A] mt-1">{viewingCourse.title}</h3>
-                <span className="text-xs text-gray-500">{viewingCourse.category}</span>
+                <h3 className="font-black text-xl text-[#2D041A] mt-1">{viewingCourse.title}</h3>
+                {isCourseUncategorized(viewingCourse) ? (
+                  <span className="inline-block mt-1 text-[11px] font-black text-red-700 bg-red-50 border-2 border-red-500 px-2.5 py-0.5 rounded-full">
+                    ⚠️ No Category
+                  </span>
+                ) : (
+                  <span className="text-xs font-bold text-[#8A064D]">{viewingCourse.category}</span>
+                )}
               </div>
+
+              {/* Circular Modal Close Button */}
               <button
                 onClick={() => setViewingCourse(null)}
-                className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-[#590231] text-slate-500 hover:text-white border border-slate-200 hover:border-[#590231] flex items-center justify-center transition-all cursor-pointer shadow-xs"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 stroke-[2.5]" />
               </button>
             </div>
 
@@ -522,16 +1006,16 @@ export default function CourseListClient({ initialCourses }: Props) {
               {/* Highlight Grid */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-rose-100">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Monthly Fee</span>
-                  <span className="text-lg font-bold text-[#8A064D] mt-0.5 flex items-center">
+                  <span className="text-[10px] font-black text-[#590231] uppercase tracking-wider block">Monthly Fee</span>
+                  <span className="text-lg font-black text-[#8A064D] mt-0.5 flex items-center">
                     ₹{Number(viewingCourse.monthly_fee).toLocaleString('en-IN')}
-                    <span className="text-xs font-normal text-gray-500 ml-1">/ month</span>
+                    <span className="text-xs font-bold text-gray-500 ml-1">/ month</span>
                   </span>
                 </div>
 
                 <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-100">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Course Duration</span>
-                  <span className="text-lg font-bold text-gray-800 mt-0.5 flex items-center gap-1">
+                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider block">Course Duration</span>
+                  <span className="text-lg font-black text-gray-800 mt-0.5 flex items-center gap-1">
                     <Clock className="w-4 h-4 text-[#8A064D]" />
                     <span>{viewingCourse.duration_months} Months</span>
                   </span>
@@ -541,33 +1025,33 @@ export default function CourseListClient({ initialCourses }: Props) {
               {/* Guru & Batches Info */}
               <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-100 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-gray-500">Assigned Faculty Guru</span>
-                  <span className="font-bold text-gray-900">{COURSE_GURUS_MAP[viewingCourse.title] || 'Senior Faculty'}</span>
+                  <span className="font-bold text-gray-500">Assigned Faculty Guru</span>
+                  <span className="font-black text-[#1A010F]">{COURSE_GURUS_MAP[viewingCourse.title] || 'Senior Faculty'}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-gray-500">Active Batches</span>
-                  <span className="font-bold text-[#8A064D] bg-[#FFF2F8] px-2 py-0.5 rounded-md">
+                  <span className="font-bold text-gray-500">Active Batches</span>
+                  <span className="font-black text-[#8A064D] bg-[#FFF2F8] px-2 py-0.5 rounded-md">
                     {viewingCourse.batch_count || 1} Batch{(viewingCourse.batch_count || 1) > 1 ? 'es' : ''} Running
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-gray-500">Status</span>
-                  <span className={`font-bold px-2 py-0.5 rounded-md text-[11px] ${
+                  <span className="font-bold text-gray-500">Status</span>
+                  <span className={`font-black px-2 py-0.5 rounded-md text-[11px] ${
                     viewingCourse.is_active !== false 
                       ? 'bg-emerald-50 text-emerald-700' 
                       : 'bg-rose-50 text-rose-700'
                   }`}>
-                    {viewingCourse.is_active !== false ? 'Active & Open for Admission' : 'Suspended'}
+                    {viewingCourse.is_active !== false ? 'Active & Open for Admission' : 'Inactive'}
                   </span>
                 </div>
               </div>
 
               {/* Full Description */}
               <div>
-                <label className="text-xs font-bold text-[#2D041A] block mb-1.5">
+                <label className="text-xs font-black text-[#590231] uppercase tracking-wide block mb-1.5">
                   Complete Course Syllabus & Description
                 </label>
-                <div className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 text-xs text-gray-700 leading-relaxed max-h-40 overflow-y-auto">
+                <div className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 text-xs font-medium text-gray-800 leading-relaxed max-h-40 overflow-y-auto">
                   {viewingCourse.description || 'No detailed syllabus text provided.'}
                 </div>
               </div>
@@ -581,7 +1065,7 @@ export default function CourseListClient({ initialCourses }: Props) {
                     setViewingCourse(null);
                     setDeletingCourse(c);
                   }}
-                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition flex items-center gap-1.5"
+                  className="px-3.5 py-2 rounded-xl text-xs font-black text-rose-600 hover:bg-rose-50 transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Delete Course</span>
@@ -591,7 +1075,7 @@ export default function CourseListClient({ initialCourses }: Props) {
                   <button
                     type="button"
                     onClick={() => setViewingCourse(null)}
-                    className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                   >
                     Close
                   </button>
@@ -602,7 +1086,7 @@ export default function CourseListClient({ initialCourses }: Props) {
                       setViewingCourse(null);
                       openEditModal(c);
                     }}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 rounded-xl text-xs font-black bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition flex items-center gap-1.5 cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>Edit Course Details</span>
@@ -615,38 +1099,40 @@ export default function CourseListClient({ initialCourses }: Props) {
       )}
 
       {/* ================================================================= */}
-      {/* 2. EDIT COURSE MODAL (Allows editing ALL details including code) */}
+      {/* 2. EDIT COURSE MODAL */}
       {/* ================================================================= */}
       {editingCourse && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
               <div>
-                <h3 className="font-bold text-base text-[#2D041A]">Edit Course: {editingCourse.title}</h3>
-                <p className="text-xs text-gray-500">Edit all course parameters, syllabus, code, and pricing.</p>
+                <h3 className="font-black text-lg text-[#2D041A]">Edit Course: {editingCourse.title}</h3>
+                <p className="text-xs font-medium text-gray-500">Modify course title, code, category, syllabus, and fee.</p>
               </div>
               <button
                 onClick={() => setEditingCourse(null)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-[#590231] text-slate-500 hover:text-white border border-slate-200 hover:border-[#590231] flex items-center justify-center transition-all cursor-pointer shadow-xs"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 stroke-[2.5]" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="space-y-3.5">
+            <form onSubmit={handleSaveEdit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Course Title</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Course Title *
+                  </label>
                   <input
                     type="text"
                     required
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                     Course Code <span className="text-[10px] text-[#8A064D]">(Editable)</span>
                   </label>
                   <input
@@ -654,14 +1140,24 @@ export default function CourseListClient({ initialCourses }: Props) {
                     required
                     value={editCode}
                     onChange={(e) => setEditCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
               </div>
 
               {/* Category Dropdown + Add New Option */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Category</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
+                    Category *
+                  </label>
+                  {!editCategory && (
+                    <span className="text-[10px] font-black text-red-600 bg-red-50 border border-red-300 px-2 py-0.2 rounded-md">
+                      ⚠️ Currently No Category
+                    </span>
+                  )}
+                </div>
+
                 {!isEditingNewCategory ? (
                   <div className="flex items-center gap-2">
                     <select
@@ -673,12 +1169,15 @@ export default function CourseListClient({ initialCourses }: Props) {
                           setEditCategory(e.target.value);
                         }
                       }}
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                      className={`w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] ${
+                        !editCategory ? 'border-red-400 bg-red-50/30' : 'border-gray-200'
+                      }`}
                     >
+                      <option value="">-- No Category (Unassigned) --</option>
                       {categories.map((cat) => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
-                      <option value="__NEW__">➕ Create and Save New Category...</option>
+                      <option value="__NEW__">➕ Create New Category...</option>
                     </select>
                   </div>
                 ) : (
@@ -688,14 +1187,23 @@ export default function CourseListClient({ initialCourses }: Props) {
                       placeholder="Enter new category name..."
                       value={customEditCategory}
                       onChange={(e) => setCustomEditCategory(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-[#8A064D] rounded-xl text-xs focus:outline-none"
+                      className="w-full px-3 py-2 bg-white border border-[#8A064D] rounded-xl text-xs font-bold text-[#1A010F] focus:outline-none"
                     />
                     <button
                       type="button"
-                      onClick={() => handleSaveNewCategory('edit')}
-                      className="px-3 py-2 bg-[#8A064D] text-white rounded-xl text-xs font-semibold whitespace-nowrap"
+                      onClick={() => {
+                        if (customEditCategory.trim()) {
+                          setEditCategory(customEditCategory.trim());
+                          if (!categories.includes(customEditCategory.trim())) {
+                            setCategories(prev => [...prev, customEditCategory.trim()].sort());
+                          }
+                          setIsEditingNewCategory(false);
+                          setCustomEditCategory('');
+                        }
+                      }}
+                      className="px-3 py-2 bg-[#8A064D] text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer"
                     >
-                      Save Category
+                      Set
                     </button>
                     <button
                       type="button"
@@ -710,8 +1218,8 @@ export default function CourseListClient({ initialCourses }: Props) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Monthly Fee (INR ₹)
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Monthly Fee (INR ₹) *
                   </label>
                   <input
                     type="number"
@@ -719,12 +1227,12 @@ export default function CourseListClient({ initialCourses }: Props) {
                     min={0}
                     value={editFee}
                     onChange={(e) => setEditFee(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Duration (Months)
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Duration (Months) *
                   </label>
                   <input
                     type="number"
@@ -732,25 +1240,28 @@ export default function CourseListClient({ initialCourses }: Props) {
                     min={1}
                     value={editDuration}
                     onChange={(e) => setEditDuration(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                   Course Description & Curriculum Details
                 </label>
                 <textarea
                   rows={3}
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
                 />
               </div>
 
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                <span className="text-xs font-semibold text-gray-700">Course Active Status</span>
+                <div>
+                  <span className="text-xs font-black text-[#590231] block">Course Active Status</span>
+                  <span className="text-[10px] text-gray-500 font-medium">Inactive courses won't appear in public admissions</span>
+                </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -766,14 +1277,14 @@ export default function CourseListClient({ initialCourses }: Props) {
                 <button
                   type="button"
                   onClick={() => setEditingCourse(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer"
+                  className="px-5 py-2 rounded-xl text-xs font-black bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer"
                 >
                   {saving ? 'Saving...' : 'Save All Changes'}
                 </button>
@@ -791,47 +1302,51 @@ export default function CourseListClient({ initialCourses }: Props) {
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
               <div>
-                <h3 className="font-bold text-base text-[#2D041A]">Add New Academy Course</h3>
-                <p className="text-xs text-gray-500">Unique course code generated automatically.</p>
+                <h3 className="font-black text-lg text-[#2D041A]">Add New Academy Course</h3>
+                <p className="text-xs font-medium text-gray-500">Unique course code generated automatically.</p>
               </div>
               <button
                 onClick={() => setIsAddOpen(false)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-[#590231] text-slate-500 hover:text-white border border-slate-200 hover:border-[#590231] flex items-center justify-center transition-all cursor-pointer shadow-xs"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 stroke-[2.5]" />
               </button>
             </div>
 
-            <form onSubmit={handleAddCourse} className="space-y-3.5">
+            <form onSubmit={handleAddCourse} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Course Title</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Course Title *
+                  </label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Kathak Classical"
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Course Code <span className="text-[10px] text-emerald-600 font-normal">(Auto-generated)</span>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Course Code <span className="text-[10px] text-emerald-600 font-normal">(Auto)</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={newCode}
                     onChange={(e) => setNewCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-black text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
               </div>
 
               {/* Category Dropdown + Add New Option */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Category</label>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Category *
+                </label>
                 {!isCreatingNewCategory ? (
                   <div className="flex items-center gap-2">
                     <select
@@ -843,12 +1358,13 @@ export default function CourseListClient({ initialCourses }: Props) {
                           setNewCategory(e.target.value);
                         }
                       }}
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
                     >
+                      <option value="">-- No Category (Unassigned) --</option>
                       {categories.map((cat) => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
-                      <option value="__NEW__">➕ Create and Save New Category...</option>
+                      <option value="__NEW__">➕ Create New Category...</option>
                     </select>
                   </div>
                 ) : (
@@ -858,14 +1374,23 @@ export default function CourseListClient({ initialCourses }: Props) {
                       placeholder="Type new category (e.g. Heritage Crafts)..."
                       value={customNewCategory}
                       onChange={(e) => setCustomNewCategory(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-[#8A064D] rounded-xl text-xs focus:outline-none"
+                      className="w-full px-3 py-2 bg-white border border-[#8A064D] rounded-xl text-xs font-bold text-[#1A010F] focus:outline-none"
                     />
                     <button
                       type="button"
-                      onClick={() => handleSaveNewCategory('add')}
-                      className="px-3 py-2 bg-[#8A064D] text-white rounded-xl text-xs font-semibold whitespace-nowrap"
+                      onClick={() => {
+                        if (customNewCategory.trim()) {
+                          setNewCategory(customNewCategory.trim());
+                          if (!categories.includes(customNewCategory.trim())) {
+                            setCategories(prev => [...prev, customNewCategory.trim()].sort());
+                          }
+                          setIsCreatingNewCategory(false);
+                          setCustomNewCategory('');
+                        }
+                      }}
+                      className="px-3 py-2 bg-[#8A064D] text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer"
                     >
-                      Save Category
+                      Set
                     </button>
                     <button
                       type="button"
@@ -880,37 +1405,43 @@ export default function CourseListClient({ initialCourses }: Props) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Monthly Fee (₹)</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Monthly Fee (₹) *
+                  </label>
                   <input
                     type="number"
                     required
                     min={0}
                     value={newFee}
                     onChange={(e) => setNewFee(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Duration (Months)</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Duration (Months) *
+                  </label>
                   <input
                     type="number"
                     required
                     min={1}
                     value={newDuration}
                     onChange={(e) => setNewDuration(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Course Description & Curriculum</label>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Course Description & Curriculum
+                </label>
                 <textarea
                   rows={3}
                   placeholder="Complete description of the course syllabus, target age, prerequisites..."
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D]"
                 />
               </div>
 
@@ -918,14 +1449,14 @@ export default function CourseListClient({ initialCourses }: Props) {
                 <button
                   type="button"
                   onClick={() => setIsAddOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer"
+                  className="px-5 py-2 rounded-xl text-xs font-black bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer"
                 >
                   {saving ? 'Creating Course...' : 'Save & Publish Course'}
                 </button>
@@ -936,16 +1467,123 @@ export default function CourseListClient({ initialCourses }: Props) {
       )}
 
       {/* ================================================================= */}
-      {/* 4. DELETE CONFIRMATION MODAL */}
+      {/* 4. NEW CATEGORY MODAL */}
+      {/* ================================================================= */}
+      {isAddCategoryOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#FFF2F8] text-[#8A064D] flex items-center justify-center">
+                  <FolderPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-[#2D041A]">Add New Category</h3>
+                  <p className="text-[11px] font-medium text-gray-500">Create a new discipline grouping</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAddCategoryOpen(false)}
+                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-[#590231] text-slate-500 hover:text-white border border-slate-200 hover:border-[#590231] flex items-center justify-center transition-all cursor-pointer shadow-xs"
+              >
+                <X className="w-4 h-4 stroke-[2.5]" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCategorySubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Category Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Theatre Arts, Folk Lore, Calligraphy..."
+                  value={newCategoryInput}
+                  onChange={(e) => setNewCategoryInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddCategoryOpen(false);
+                    setNewCategoryInput('');
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving || !newCategoryInput.trim()}
+                  className="px-5 py-2 rounded-xl text-xs font-black bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer"
+                >
+                  {saving ? 'Creating...' : 'Create Category'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* 5. DELETE CATEGORY CONFIRMATION MODAL */}
+      {/* ================================================================= */}
+      {deletingCategoryName && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-100 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600 mb-3">
+              <div className="p-2.5 bg-rose-50 rounded-2xl">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-black text-base text-[#2D041A]">Delete Category</h3>
+                <p className="text-xs font-bold text-rose-600">{deletingCategoryName}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Are you sure you want to delete category <strong className="text-gray-900">"{deletingCategoryName}"</strong>?
+            </p>
+            <div className="mt-3 p-3 bg-red-50 rounded-2xl border border-red-200 text-xs font-semibold text-red-800">
+              ⚠️ Note: Existing courses in this category will NOT be deleted, but will have their category removed and be marked as <strong>"No Category"</strong> with red highlight boundaries.
+            </div>
+
+            <div className="flex justify-end gap-2.5 mt-5">
+              <button
+                type="button"
+                onClick={() => setDeletingCategoryName(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={handleConfirmDeleteCategory}
+                className="px-5 py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-700 text-white shadow-md transition disabled:opacity-50 cursor-pointer"
+              >
+                {saving ? 'Deleting...' : 'Yes, Delete Category'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* 6. DELETE COURSE CONFIRMATION MODAL */}
       {/* ================================================================= */}
       {deletingCourse && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-100 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center gap-3 text-rose-600 mb-3">
               <div className="p-2.5 bg-rose-50 rounded-2xl">
-                <Trash2 className="w-5 h-5" />
+                <Trash2 className="w-5 h-5 text-rose-600" />
               </div>
-              <h3 className="font-bold text-base text-[#2D041A]">Confirm Course Deletion</h3>
+              <h3 className="font-black text-base text-[#2D041A]">Confirm Course Deletion</h3>
             </div>
 
             <p className="text-xs text-gray-600 leading-relaxed">
@@ -957,7 +1595,7 @@ export default function CourseListClient({ initialCourses }: Props) {
               <button
                 type="button"
                 onClick={() => setDeletingCourse(null)}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -965,7 +1603,7 @@ export default function CourseListClient({ initialCourses }: Props) {
                 type="button"
                 disabled={saving}
                 onClick={handleDeleteCourse}
-                className="px-5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-md transition disabled:opacity-50 cursor-pointer"
+                className="px-5 py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-700 text-white shadow-md transition disabled:opacity-50 cursor-pointer"
               >
                 {saving ? 'Deleting...' : 'Yes, Delete Course'}
               </button>

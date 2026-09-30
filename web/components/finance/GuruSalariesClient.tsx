@@ -7,6 +7,8 @@ import {
   FinancialSummary 
 } from '@/lib/finance';
 import { Trainer } from '@/lib/academy';
+import MonthPicker from '@/components/common/MonthPicker';
+import { downloadGuruSalarySlipPdf } from '@/lib/pdf';
 import { 
   Banknote, 
   Plus, 
@@ -34,7 +36,8 @@ import {
   FileText,
   Check,
   Briefcase,
-  ChevronRight
+  ChevronRight,
+  MessageCircle
 } from 'lucide-react';
 
 interface Props {
@@ -457,19 +460,12 @@ export default function GuruSalariesClient({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Month Dropdown */}
-          <div className="relative">
-            <select
-              value={selectedMonth}
-              onChange={(e) => handleMonthChange(e.target.value)}
-              disabled={loadingMonth}
-              className="px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 hover:bg-gray-100 transition focus:outline-none focus:ring-2 focus:ring-[#8A064D] cursor-pointer"
-            >
-              <option value="March 2026">Payroll: March 2026</option>
-              <option value="February 2026">Payroll: February 2026</option>
-              <option value="April 2026">Payroll: April 2026 (Upcoming)</option>
-            </select>
-          </div>
+          {/* Month Picker (Reference Image 1) */}
+          <MonthPicker
+            value={selectedMonth}
+            onChange={(monthLabel) => handleMonthChange(monthLabel)}
+            disabled={loadingMonth}
+          />
 
           {/* Export CSV */}
           <button
@@ -657,7 +653,6 @@ export default function GuruSalariesClient({
               <thead>
                 <tr className="bg-[#FFF9FB] border-b border-[#F0D5E4] text-[#2D041A] font-bold">
                   <th className="py-3.5 px-4">Guru / Faculty</th>
-                  <th className="py-3.5 px-3">Classes</th>
                   <th className="py-3.5 px-3">Base Salary</th>
                   <th className="py-3.5 px-3">Adjustments (Bonus / Deductions)</th>
                   <th className="py-3.5 px-3">Net Salary</th>
@@ -668,7 +663,7 @@ export default function GuruSalariesClient({
               <tbody className="divide-y divide-gray-100">
                 {filteredRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-gray-400">
+                    <td colSpan={6} className="py-12 text-center text-gray-400">
                       No Guru salary records match your search or filter.
                     </td>
                   </tr>
@@ -721,24 +716,6 @@ export default function GuruSalariesClient({
                               </div>
                             </div>
                           </div>
-                        </td>
-
-                        {/* Classes Assigned vs Conducted */}
-                        <td className="py-3.5 px-3">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-gray-800">
-                              {r.classes_conducted}
-                            </span>
-                            <span className="text-gray-400">/</span>
-                            <span className="text-gray-500">
-                              {r.classes_assigned}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-emerald-600 font-semibold block">
-                            {r.classes_assigned > 0
-                              ? `${Math.round((r.classes_conducted / r.classes_assigned) * 100)}% conducted`
-                              : '100%'}
-                          </span>
                         </td>
 
                         {/* Base Salary */}
@@ -1288,21 +1265,65 @@ export default function GuruSalariesClient({
           <div className="bg-white rounded-3xl max-w-xl w-full p-8 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 my-6">
             
             {/* Modal Actions */}
-            <div className="flex justify-between items-center mb-6 pb-3 border-b border-gray-100 print:hidden">
+            <div className="flex flex-wrap justify-between items-center gap-2 mb-6 pb-3 border-b border-gray-100 print:hidden">
               <span className="text-xs font-bold text-gray-500 uppercase">
                 Official Guru Salary Voucher
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Download PDF Button */}
                 <button
+                  type="button"
+                  onClick={() => {
+                    const ok = downloadGuruSalarySlipPdf(slipRecord);
+                    if (ok) {
+                      showToast(`Salary voucher PDF downloaded for ${slipRecord.guru_name}!`);
+                    } else {
+                      showToast(`Could not generate PDF. Please try Print Payslip.`);
+                    }
+                  }}
+                  className="px-3.5 py-1.5 bg-[#2D041A] hover:bg-[#48082B] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#F9E33A]" />
+                  <span>Download PDF</span>
+                </button>
+
+                {/* WhatsApp Share Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    downloadGuruSalarySlipPdf(slipRecord);
+
+                    let cleanPhone = (slipRecord.phone || '').replace(/\D/g, '');
+                    if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
+
+                    const msg = `✨ *LAASYA CULTURAL ACADEMY* ✨\n_Faculty Honorarium & Salary Voucher_\n\nNamaste *${slipRecord.guru_name}* ji,\nYour salary for *${slipRecord.payroll_month}* has been processed.\n\n• Base Salary: ₹${Number(slipRecord.base_salary).toLocaleString('en-IN')}\n• Bonus / Incentive: ₹${Number(slipRecord.bonus_amount || 0).toLocaleString('en-IN')}\n• Deductions & Advances: ₹${(Number(slipRecord.deduction_amount || 0) + Number(slipRecord.advance_deducted || 0)).toLocaleString('en-IN')}\n• *Net Disbursed: ₹${Number(slipRecord.net_salary).toLocaleString('en-IN')}*\n• Payment Mode: ${(slipRecord.payment_method || 'Bank Transfer').toUpperCase()}\n• Txn Ref: ${slipRecord.transaction_reference || 'DIRECT-BANK-NEFT'}\n• Status: *PAID & SETTLED*\n\n📄 The official PDF payslip has been downloaded to your device for sharing.\nThank you for your dedicated teaching and guidance at Laasya! 🙏`;
+
+                    const waUrl = cleanPhone 
+                      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
+                      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+                    window.open(waUrl, '_blank');
+                  }}
+                  className="px-3.5 py-1.5 bg-[#064E3B] hover:bg-[#065F46] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Share WhatsApp</span>
+                </button>
+
+                {/* Print Button */}
+                <button
+                  type="button"
                   onClick={() => window.print()}
-                  className="px-3.5 py-1.5 bg-[#8A064D] hover:bg-[#70043E] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                  className="px-3.5 py-1.5 bg-[#8A064D] hover:bg-[#70043E] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5 text-[#F9E33A]" />
                   <span>Print Payslip</span>
                 </button>
+
+                {/* Close Button */}
                 <button
+                  type="button"
                   onClick={() => setSlipRecord(null)}
-                  className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                  className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1310,7 +1331,7 @@ export default function GuruSalariesClient({
             </div>
 
             {/* Printable Payslip Container */}
-            <div className="border-2 border-[#8A064D] rounded-2xl p-6 bg-white relative">
+            <div id="guru-salary-slip-content" className="border-2 border-[#8A064D] rounded-2xl p-6 bg-white relative">
               
               {/* Academy Crest Header */}
               <div className="text-center pb-4 border-b border-rose-100">
@@ -1465,18 +1486,6 @@ export default function GuruSalariesClient({
                 <div className="flex justify-between items-center text-[11px] text-gray-500 pt-2 border-t border-rose-100 mt-2">
                   <span>Payment Mode: <strong className="uppercase text-gray-700">{slipRecord.payment_method || 'Bank Transfer'}</strong></span>
                   <span>Txn Ref: <strong className="font-mono text-gray-700">{slipRecord.transaction_reference || 'DIRECT-BANK-NEFT'}</strong></span>
-                </div>
-              </div>
-
-              {/* Signatures */}
-              <div className="flex justify-between items-end pt-8 mt-4 text-[10px] text-gray-500">
-                <div className="text-center border-t border-gray-400 pt-1 w-36">
-                  <span className="font-bold text-gray-800 text-[11px] block">{slipRecord.guru_name}</span>
-                  <span className="text-[9px] text-gray-400">Guru Signature / Acknowledgement</span>
-                </div>
-                <div className="text-center border-t border-gray-400 pt-1 w-36">
-                  <span className="font-bold text-gray-800 text-[11px] block">Managing Director</span>
-                  <span className="text-[9px] text-gray-400">Authorized Signatory</span>
                 </div>
               </div>
 

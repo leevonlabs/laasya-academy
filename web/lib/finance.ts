@@ -517,7 +517,25 @@ export async function getGuruSalaryRecords(month?: string): Promise<GuruSalaryRe
       CASE WHEN s.status = 'pending' THEN 1 WHEN s.status = 'processing' THEN 2 ELSE 3 END,
       p.full_name ASC;
   `;
-  const records = await query<GuruSalaryRecord>(sql, [filterMonth]);
+  let records = await query<GuruSalaryRecord>(sql, [filterMonth]);
+
+  if (records.length === 0) {
+    const trainers = await query<{ id: string; monthly_salary: number }>(
+      'SELECT id, COALESCE(monthly_salary, 25000)::numeric as monthly_salary FROM public.trainers WHERE is_active = true'
+    );
+    for (const t of trainers) {
+      const sal = Number(t.monthly_salary) || 25000;
+      await query(`
+        INSERT INTO public.guru_salary_records (
+          trainer_id, payroll_month, base_salary, classes_assigned, classes_conducted,
+          bonus_amount, deduction_amount, advance_deducted, net_salary, status
+        ) VALUES ($1, $2, $3, 16, 16, 0, 0, 0, $3, 'pending')
+        ON CONFLICT (trainer_id, payroll_month) DO NOTHING;
+      `, [t.id, filterMonth, sal]);
+    }
+    records = await query<GuruSalaryRecord>(sql, [filterMonth]);
+  }
+
   return JSON.parse(JSON.stringify(records));
 }
 
