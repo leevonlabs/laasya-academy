@@ -433,9 +433,12 @@ export async function getStudents(): Promise<Student[]> {
     });
   }
 
-  // Calculate current month's due date in MM/YY format (e.g. 09/26)
+  // Calculate current month's due date formatted as "dd and month name" (e.g. "30 Sep", "30 aug")
   const now = new Date();
-  const currentMonthDueDate = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`;
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const day = lastDay.getDate();
+  const month = lastDay.toLocaleString('en-US', { month: 'short' });
+  const currentMonthDueDate = `${day} ${month}`; // e.g. "30 Sep"
 
   for (const st of students) {
     st.enrolled_batches = enrollMap.get(st.id) || [];
@@ -447,15 +450,11 @@ export async function getStudents(): Promise<Student[]> {
     const advPaid = Number(st.advance_paid || 0);
     const invData = invoiceMap.get(st.id);
 
-    let rawDue = 0;
-    let isOverdue = false;
-
-    if (invData) {
-      rawDue = Math.max(0, invData.balance - advPaid);
-      isOverdue = invData.hasOverdue || (invData.balance > totalMonthly);
-    } else {
-      // If no invoices generated yet, current month's fee is pending
-      rawDue = Math.max(0, totalMonthly - advPaid);
+    // Due amount: total monthly amount to be paid (for current month) - advance that paid
+    let rawDue = totalMonthly - advPaid;
+    if (invData && invData.balance > totalMonthly) {
+      // If student has accumulated overdue invoices from past months
+      rawDue = invData.balance - advPaid;
     }
 
     st.due_amount = rawDue;
@@ -463,11 +462,11 @@ export async function getStudents(): Promise<Student[]> {
 
     // Color indicator logic:
     // Green: Zero or negative due amount (fully paid or advance payment)
-    // Yellow: Current month's fee is pending and payable by month-end
-    // Red: Fee remains unpaid for more than one month
+    // Yellow: Less than or equal to current monthly amount (and > 0)
+    // Red: More than current month amount
     if (rawDue <= 0) {
       st.due_status = 'green';
-    } else if (rawDue > totalMonthly || isOverdue) {
+    } else if (rawDue > totalMonthly) {
       st.due_status = 'red';
     } else {
       st.due_status = 'yellow';

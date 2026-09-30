@@ -105,11 +105,47 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
   const nextAutoId = useMemo(() => getNextStudentId(students), [students]);
 
-  // Current month due date in MM/YY format (e.g. 09/26)
+  // Current month due date formatted as "dd and month name" (e.g. "30 Sep", "30 aug")
   const currentMonthDueDate = useMemo(() => {
     const now = new Date();
-    return `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`;
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const day = lastDay.getDate();
+    const month = lastDay.toLocaleString('en-US', { month: 'short' });
+    return `${day} ${month}`; // e.g. "30 Sep"
   }, []);
+
+  // Format any raw date into "dd and month name" (e.g. "30 Sep" or "30 Sep 2026")
+  const formatDdMonthName = (dateStr?: string | null, includeYear = true) => {
+    if (!dateStr) return '—';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const day = d.getDate();
+      const month = d.toLocaleString('en-US', { month: 'short' });
+      return includeYear ? `${day} ${month} ${d.getFullYear()}` : `${day} ${month}`;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatDueDateDisplay = (rawDueDate?: string | null) => {
+    if (!rawDueDate) return currentMonthDueDate;
+    const trimmed = rawDueDate.trim();
+    if (/^\d{1,2}\s+[a-zA-Z]+$/i.test(trimmed)) {
+      return trimmed;
+    }
+    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+      try {
+        const d = new Date(trimmed);
+        const day = d.getDate();
+        const month = d.toLocaleString('en-US', { month: 'short' });
+        return `${day} ${month}`;
+      } catch {
+        return trimmed;
+      }
+    }
+    return currentMonthDueDate;
+  };
 
   // Filter students based on status and search query
   const filteredStudents = useMemo(() => {
@@ -262,7 +298,8 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
       const totalMonthly = enrolledBatchObjects.reduce((acc, b) => acc + (b.monthly_fee || 0), 0);
       const adv = Number(advancePaid || 0);
-      const due = Math.max(0, totalMonthly - adv);
+      // Formula: total monthly fee to be paid (for current month) - advance that paid
+      const due = totalMonthly - adv;
 
       const fullStudent: Student = {
         ...created,
@@ -279,7 +316,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         total_monthly_fee: totalMonthly,
         due_amount: due,
         due_date: currentMonthDueDate,
-        due_status: due <= 0 ? 'green' : 'yellow',
+        due_status: due <= 0 ? 'green' : due > totalMonthly ? 'red' : 'yellow',
         enrolled_batches_count: selectedBatchIds.length,
         attendance_rate: 100,
         enrolled_batches: enrolledBatchObjects
@@ -348,7 +385,8 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
       const totalMonthly = updatedBatchObjects.reduce((acc, b) => acc + (b.monthly_fee || 0), 0);
       const adv = Number(editAdvancePaid || 0);
-      const due = Math.max(0, totalMonthly - adv);
+      // Formula: total monthly fee to be paid (for current month) - advance that paid
+      const due = totalMonthly - adv;
 
       setStudents(prev =>
         prev.map(s =>
@@ -435,28 +473,41 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     }
   };
 
-  // Helper for due amount color styling
+  // Helper for due amount color styling and formatted values
   const getDueAmountDisplay = (s: Student) => {
-    const due = s.due_amount !== undefined ? s.due_amount : (s.total_monthly_fee || 0);
-    const status = s.due_status || (due <= 0 ? 'green' : 'yellow');
+    const monthly = Number(s.total_monthly_fee || 0);
+    const adv = Number(s.advance_paid || 0);
+    // Formula: total monthly amount to be paid (for current month) - advance that paid
+    const due = s.due_amount !== undefined ? Number(s.due_amount) : (monthly - adv);
 
-    if (status === 'green') {
+    // Green: Zero or negative due amount (fully paid or advance payment)
+    if (due <= 0) {
+      const text = due < 0 
+        ? `-₹${Math.abs(due).toLocaleString('en-IN')}` 
+        : '₹0';
       return {
-        text: `₹${due.toLocaleString('en-IN')}`,
-        badgeClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-        dotClass: 'bg-emerald-500'
+        due,
+        text,
+        badgeClass: 'bg-emerald-50 text-emerald-800 border border-emerald-300 font-extrabold shadow-2xs',
+        dotClass: 'bg-emerald-600'
       };
-    } else if (status === 'red') {
+    } 
+    // Red: Fee remains unpaid for more than one month (more than current month amount)
+    else if (due > monthly) {
       return {
+        due,
         text: `₹${due.toLocaleString('en-IN')}`,
-        badgeClass: 'bg-rose-50 text-rose-700 border border-rose-200',
-        dotClass: 'bg-rose-500'
+        badgeClass: 'bg-rose-50 text-rose-800 border border-rose-300 font-extrabold shadow-2xs',
+        dotClass: 'bg-rose-600'
       };
-    } else {
+    } 
+    // Yellow: Current month's fee is pending (and <= current monthly amount)
+    else {
       return {
+        due,
         text: `₹${due.toLocaleString('en-IN')}`,
-        badgeClass: 'bg-amber-50 text-amber-700 border border-amber-200',
-        dotClass: 'bg-amber-500'
+        badgeClass: 'bg-amber-50 text-amber-900 border border-amber-300 font-extrabold shadow-2xs',
+        dotClass: 'bg-amber-600'
       };
     }
   };
@@ -656,55 +707,57 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                     </div>
 
                     {/* Fee Details Box: Total Monthly Fee, Due Amount with Color, Due Date */}
-                    <div className="mt-4 p-3.5 bg-gray-50/80 rounded-2xl border border-gray-100 space-y-2">
+                    <div className="mt-4 p-3.5 bg-gray-50/90 rounded-2xl border border-gray-100 space-y-2.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500 font-medium">Total Monthly Fee:</span>
-                        <span className="font-bold text-[#2D041A]">
+                        <span className="text-gray-500 font-semibold">Total Monthly Fee:</span>
+                        <span className="font-extrabold text-[#2D041A] text-sm">
                           ₹{monthlyFee.toLocaleString('en-IN')}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500 font-medium">Due Amount:</span>
-                        <span className={`font-bold px-2 py-0.5 rounded-lg text-xs flex items-center gap-1.5 ${dueInfo.badgeClass}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${dueInfo.dotClass}`} />
+                        <span className="text-gray-500 font-semibold">Due Amount:</span>
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold flex items-center gap-1.5 ${dueInfo.badgeClass}`}>
+                          <span className={`w-2 h-2 rounded-full ${dueInfo.dotClass}`} />
                           <span>{dueInfo.text}</span>
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500 font-medium">Due Date:</span>
-                        <span className="font-mono font-bold text-gray-700">
-                          {s.due_date || currentMonthDueDate}
+                        <span className="text-gray-500 font-semibold">Due Date:</span>
+                        <span className="font-mono font-bold text-gray-800 bg-white px-2 py-0.5 rounded-lg border border-gray-200 text-xs shadow-2xs">
+                          {formatDueDateDisplay(s.due_date)}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Action Buttons Below: Details, Edit, Delete */}
-                  <div className="mt-5 pt-3.5 border-t border-gray-100 flex items-center justify-between gap-2">
+                  {/* Action Buttons Below: Details, Edit, Delete with dark, high-contrast, premium colors */}
+                  <div className="mt-5 pt-3.5 border-t border-gray-100 flex items-center gap-2">
                     <button
                       onClick={() => setDetailStudent(s)}
-                      className="flex-1 py-2 px-3 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="flex-1 py-2 px-3 rounded-xl bg-[#2D041A] hover:bg-[#48082B] active:scale-95 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs border border-[#48082B] cursor-pointer"
+                      title="View Complete Student Details"
                     >
-                      <Eye className="w-3.5 h-3.5 text-gray-500" />
+                      <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
                       <span>Details</span>
                     </button>
 
                     <button
                       onClick={() => handleOpenEdit(s)}
-                      className="flex-1 py-2 px-3 rounded-xl border border-gray-200 bg-white hover:bg-[#FFF9FB] text-gray-800 hover:text-[#8A064D] hover:border-[#8A064D] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="flex-1 py-2 px-3 rounded-xl bg-[#1E3A8A] hover:bg-[#1D4ED8] active:scale-95 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs border border-[#1E3A8A] cursor-pointer"
+                      title="Edit Student Information"
                     >
-                      <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                      <Edit3 className="w-3.5 h-3.5 text-sky-200" />
                       <span>Edit</span>
                     </button>
 
                     <button
                       onClick={() => setDeletingStudent(s)}
-                      className="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                      className="py-2 px-3 rounded-xl bg-[#881337] hover:bg-[#9F1239] active:scale-95 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-xs border border-[#881337] cursor-pointer"
                       title="Delete Student"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3.5 h-3.5 text-rose-200" />
                       <span>Delete</span>
                     </button>
                   </div>
@@ -775,40 +828,42 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                         </td>
 
                         <td className="py-3.5 px-4 text-center">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold text-xs ${dueInfo.badgeClass}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${dueInfo.dotClass}`} />
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-extrabold ${dueInfo.badgeClass}`}>
+                            <span className={`w-2 h-2 rounded-full ${dueInfo.dotClass}`} />
                             <span>{dueInfo.text}</span>
                           </span>
                         </td>
 
-                        <td className="py-3.5 px-4 text-center font-mono font-bold text-gray-700">
-                          {s.due_date || currentMonthDueDate}
+                        <td className="py-3.5 px-4 text-center font-mono font-bold text-gray-800">
+                          {formatDueDateDisplay(s.due_date)}
                         </td>
 
                         <td className="py-3.5 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => setDetailStudent(s)}
-                              className="px-2.5 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                              className="px-3 py-1.5 rounded-xl bg-[#2D041A] hover:bg-[#48082B] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs border border-[#48082B] cursor-pointer"
+                              title="View Details"
                             >
-                              <Eye className="w-3.5 h-3.5" />
+                              <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
                               <span>Details</span>
                             </button>
 
                             <button
                               onClick={() => handleOpenEdit(s)}
-                              className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-[#FFF9FB] text-gray-800 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                              className="px-3 py-1.5 rounded-xl bg-[#1E3A8A] hover:bg-[#1D4ED8] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs border border-[#1E3A8A] cursor-pointer"
+                              title="Edit Details"
                             >
-                              <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                              <Edit3 className="w-3.5 h-3.5 text-sky-200" />
                               <span>Edit</span>
                             </button>
 
                             <button
                               onClick={() => setDeletingStudent(s)}
-                              className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 transition cursor-pointer"
+                              className="px-2.5 py-1.5 rounded-xl bg-[#881337] hover:bg-[#9F1239] active:scale-95 text-white transition flex items-center gap-1 shadow-xs border border-[#881337] cursor-pointer"
                               title="Delete Student"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-3.5 h-3.5 text-rose-200" />
                             </button>
                           </div>
                         </td>
@@ -879,16 +934,24 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   </div>
 
                   <div className="bg-white p-3 rounded-xl border border-rose-100">
-                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Current Due</span>
-                    <span className="text-base font-bold text-[#8A064D] mt-0.5 block">
-                      ₹{(detailStudent.due_amount || 0).toLocaleString('en-IN')}
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block">Due Amount</span>
+                    <span className={`text-base font-extrabold mt-0.5 block ${
+                      (detailStudent.due_amount ?? 0) <= 0 
+                        ? 'text-emerald-700' 
+                        : (detailStudent.due_amount ?? 0) > (detailStudent.total_monthly_fee || 0) 
+                        ? 'text-rose-700' 
+                        : 'text-amber-700'
+                    }`}>
+                      {(detailStudent.due_amount ?? 0) < 0 
+                        ? `-₹${Math.abs(detailStudent.due_amount ?? 0).toLocaleString('en-IN')}` 
+                        : `₹${(detailStudent.due_amount ?? 0).toLocaleString('en-IN')}`}
                     </span>
                   </div>
 
                   <div className="bg-white p-3 rounded-xl border border-rose-100">
                     <span className="text-[10px] text-gray-400 uppercase font-semibold block">Due Date</span>
                     <span className="text-base font-mono font-bold text-gray-800 mt-0.5 block">
-                      {detailStudent.due_date || currentMonthDueDate}
+                      {formatDueDateDisplay(detailStudent.due_date)}
                     </span>
                   </div>
                 </div>
@@ -920,7 +983,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                     <span className="text-gray-400 block text-[10px] uppercase font-semibold">Joining Date:</span>
                     <span className="font-semibold text-gray-900 flex items-center gap-1.5 mt-0.5">
                       <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
-                      <span>{detailStudent.enrollment_date || '2026-09-28'}</span>
+                      <span>{formatDdMonthName(detailStudent.enrollment_date)}</span>
                     </span>
                   </div>
 
@@ -1000,9 +1063,9 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                     setDetailStudent(null);
                     setDeletingStudent(s);
                   }}
-                  className="px-3.5 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#881337] hover:bg-[#9F1239] active:scale-95 text-white shadow-xs border border-[#881337] transition flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-3.5 h-3.5 text-rose-200" />
                   <span>Delete Student</span>
                 </button>
 
@@ -1010,7 +1073,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   <button
                     type="button"
                     onClick={() => setDetailStudent(null)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition"
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition cursor-pointer"
                   >
                     Close
                   </button>
@@ -1021,9 +1084,9 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                       setDetailStudent(null);
                       handleOpenEdit(s);
                     }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-[#1E3A8A] hover:bg-[#1D4ED8] active:scale-95 text-white shadow-md border border-[#1E3A8A] transition flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Edit3 className="w-3.5 h-3.5" />
+                    <Edit3 className="w-3.5 h-3.5 text-sky-200" />
                     <span>Edit Details</span>
                   </button>
                 </div>
@@ -1552,7 +1615,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 type="button"
                 disabled={deleting}
                 onClick={handleDeleteStudent}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-md transition disabled:opacity-50 cursor-pointer"
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-[#881337] hover:bg-[#9F1239] text-white shadow-md transition disabled:opacity-50 cursor-pointer"
               >
                 {deleting ? 'Deleting...' : 'Yes, Delete Student'}
               </button>
