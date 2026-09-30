@@ -37,7 +37,7 @@ export default function LoginPage() {
         throw new Error(data.error || 'Failed to sign in.');
       }
 
-      router.push('/');
+      router.push('/overview');
       router.refresh();
     } catch (err: any) {
       setError(err.message);
