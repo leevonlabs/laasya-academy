@@ -340,6 +340,127 @@ export async function createStudentFeeInvoice(data: {
   ]);
 }
 
+export async function updateStudentFeeInvoice(id: string, data: {
+  fee_period?: string;
+  due_date?: string;
+  total_amount?: number;
+  discount_amount?: number;
+  notes?: string;
+  status?: 'paid' | 'partial' | 'pending' | 'overdue';
+}) {
+  const current = await queryOne<StudentFeeInvoice>(`
+    SELECT * FROM public.student_fee_invoices WHERE id = $1
+  `, [id]);
+  if (!current) throw new Error('Invoice not found');
+
+  const total = data.total_amount !== undefined ? Number(data.total_amount) : Number(current.total_amount);
+  const discount = data.discount_amount !== undefined ? Number(data.discount_amount) : Number(current.discount_amount);
+  const paid = Number(current.paid_amount || 0);
+  const netDue = Math.max(0, total - discount);
+  const balance = Math.max(0, netDue - paid);
+  
+  let newStatus = current.status;
+  if (data.status) {
+    newStatus = data.status;
+  } else {
+    if (balance <= 0) newStatus = 'paid';
+    else if (paid > 0) newStatus = 'partial';
+    else newStatus = 'pending';
+  }
+
+  const updated = await queryOne<StudentFeeInvoice>(`
+    UPDATE public.student_fee_invoices
+    SET fee_period = COALESCE($2, fee_period),
+        due_date = COALESCE($3::date, due_date),
+        total_amount = $4,
+        discount_amount = $5,
+        balance_amount = $6,
+        status = $7,
+        notes = COALESCE($8, notes),
+        updated_at = now()
+    WHERE id = $1
+    RETURNING *;
+  `, [
+    id,
+    data.fee_period || null,
+    data.due_date || null,
+    total,
+    discount,
+    balance,
+    newStatus,
+    data.notes !== undefined ? data.notes : null
+  ]);
+
+  return updated;
+}
+
+export async function collectStudentFee(data: {
+  student_id: string;
+  amount_paid: number;
+  payment_method: 'upi' | 'cash' | 'bank_transfer' | 'card' | 'cheque';
+  transaction_reference?: string;
+  fee_period?: string;
+  remarks?: string;
+  receipt_issued_by?: string;
+}) {
+  // Check if student has pending or partial invoices
+  const unpaidInvoice = await queryOne<StudentFeeInvoice>(`
+    SELECT * FROM public.student_fee_invoices 
+    WHERE student_id = $1 AND status IN ('pending', 'partial', 'overdue')
+    ORDER BY due_date ASC
+    LIMIT 1;
+  `, [data.student_id]);
+
+  if (unpaidInvoice) {
+    // Record payment against existing unpaid invoice
+    return recordStudentFeePayment({
+      invoice_id: unpaidInvoice.id,
+      amount_paid: data.amount_paid,
+      payment_method: data.payment_method,
+      transaction_reference: data.transaction_reference,
+      remarks: data.remarks,
+      receipt_issued_by: data.receipt_issued_by
+    });
+  }
+
+  // If no unpaid invoice exists, find student's batch or create fresh invoice
+  const enroll = await queryOne<{ batch_id: string; course_id: string; monthly_fee: number }>(`
+    SELECT be.batch_id, b.course_id, c.monthly_fee
+    FROM public.batch_enrollments be
+    JOIN public.batches b ON b.id = be.batch_id
+    JOIN public.courses c ON c.id = b.course_id
+    WHERE be.student_id = $1 AND be.status = 'active'
+    LIMIT 1;
+  `, [data.student_id]);
+
+  const now = new Date();
+  const monthName = now.toLocaleString('en-US', { month: 'long' });
+  const period = data.fee_period || `${monthName} ${now.getFullYear()}`;
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+  const newInvoice = await createStudentFeeInvoice({
+    student_id: data.student_id,
+    course_id: enroll?.course_id,
+    batch_id: enroll?.batch_id,
+    fee_period: period,
+    due_date: lastDay,
+    total_amount: data.amount_paid,
+    discount_amount: 0,
+    notes: data.remarks || 'Collected at academy desk'
+  });
+
+  if (!newInvoice) throw new Error('Failed to create invoice');
+
+  return recordStudentFeePayment({
+    invoice_id: newInvoice.id,
+    amount_paid: data.amount_paid,
+    payment_method: data.payment_method,
+    transaction_reference: data.transaction_reference,
+    remarks: data.remarks,
+    receipt_issued_by: data.receipt_issued_by
+  });
+}
+
 export async function sendFeeReminderNotification(invoiceId: string, channel: 'whatsapp' | 'sms' | 'email') {
   const invoice = await queryOne<StudentFeeInvoice>(`
     SELECT 
