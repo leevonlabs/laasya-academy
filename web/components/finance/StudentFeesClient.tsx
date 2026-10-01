@@ -647,7 +647,7 @@ For queries, contact: +91 8151 998 899`;
         <div className="flex items-center bg-[#FDF2F7] p-1.5 rounded-2xl border border-[#F0D5E4] shadow-inner">
           <button
             onClick={() => setActiveTab('collections')}
-            className={`px-5 py-2.5 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+            className={`px-6 py-3 rounded-xl text-sm font-black transition flex items-center gap-2.5 cursor-pointer ${
               activeTab === 'collections'
                 ? 'bg-[#8A064D] text-white shadow-md ring-2 ring-[#F9E33A]/40'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
@@ -655,7 +655,7 @@ For queries, contact: +91 8151 998 899`;
           >
             <Users className="w-4 h-4 text-[#F9E33A]" />
             <span>Collections</span>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+            <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
               activeTab === 'collections' ? 'bg-white/20 text-white' : 'bg-gray-200/80 text-gray-700'
             }`}>
               {collectionsData.length}
@@ -664,7 +664,7 @@ For queries, contact: +91 8151 998 899`;
 
           <button
             onClick={() => setActiveTab('payments')}
-            className={`px-5 py-2.5 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+            className={`px-6 py-3 rounded-xl text-sm font-black transition flex items-center gap-2.5 cursor-pointer ${
               activeTab === 'payments'
                 ? 'bg-[#8A064D] text-white shadow-md ring-2 ring-[#F9E33A]/40'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
@@ -672,7 +672,7 @@ For queries, contact: +91 8151 998 899`;
           >
             <CreditCard className="w-4 h-4 text-[#F9E33A]" />
             <span>Payments</span>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+            <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
               activeTab === 'payments' ? 'bg-white/20 text-white' : 'bg-gray-200/80 text-gray-700'
             }`}>
               {invoices.length}
@@ -688,38 +688,38 @@ For queries, contact: +91 8151 998 899`;
         <div className="space-y-6">
 
           {/* Month & Year Selection Filter for Collections Audit */}
-          <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center shrink-0">
+          <div className="bg-white p-4.5 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center shrink-0">
                 <Calendar className="w-5 h-5 text-[#8A064D]" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Collection Period Audit</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-black text-[#2D041A]">{MONTHS[collectionsMonth].full} {collectionsYear}</span>
-                  <span className="text-[10px] bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2 py-0.5 rounded-full font-bold">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Collection Period Audit</span>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base font-black text-[#2D041A]">{MONTHS[collectionsMonth].full} {collectionsYear}</span>
+                  <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-full font-bold">
                     Due: {collectionsMonthDueDate}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2.5">
               {/* Year Navigator */}
               <div className="flex items-center bg-gray-50 border border-gray-200 rounded-2xl p-1">
                 <button
                   type="button"
                   onClick={() => setCollectionsYear(y => y - 1)}
-                  className="px-2 py-1 hover:bg-white text-gray-600 rounded-xl transition cursor-pointer font-black text-xs"
+                  className="px-2.5 py-1 hover:bg-white text-gray-600 rounded-xl transition cursor-pointer font-black text-xs"
                   title="Previous Year"
                 >
                   «
                 </button>
-                <span className="px-3 text-xs font-black text-[#2D041A]">{collectionsYear}</span>
+                <span className="px-3.5 text-xs font-black text-[#2D041A]">{collectionsYear}</span>
                 <button
                   type="button"
                   onClick={() => setCollectionsYear(y => y + 1)}
-                  className="px-2 py-1 hover:bg-white text-gray-600 rounded-xl transition cursor-pointer font-black text-xs"
+                  className="px-2.5 py-1 hover:bg-white text-gray-600 rounded-xl transition cursor-pointer font-black text-xs"
                   title="Next Year"
                 >
                   »
@@ -735,7 +735,7 @@ For queries, contact: +91 8151 998 899`;
                       key={m.short}
                       type="button"
                       onClick={() => setCollectionsMonth(m.num)}
-                      className={`px-2.5 py-1.2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                         isSelected
                           ? 'bg-[#8A064D] text-white shadow-xs'
                           : 'text-gray-600 hover:text-gray-900 hover:bg-white'
@@ -757,10 +757,10 @@ For queries, contact: +91 8151 998 899`;
                 <span className="text-xs font-bold uppercase tracking-wider">Total Active Learners</span>
                 <Users className="w-5 h-5 text-[#8A064D]" />
               </div>
-              <div className="text-2xl font-black text-[#2D041A]">
+              <div className="text-3xl font-extrabold text-[#2D041A]">
                 {collectionsSummary.totalStudents}
               </div>
-              <span className="text-[11px] text-gray-500 font-medium mt-1 block">
+              <span className="text-xs text-gray-500 font-medium mt-1.5 block">
                 {collectionsSummary.settledCount} Fully Paid • {collectionsSummary.pendingCount} Pending
               </span>
             </div>
@@ -770,10 +770,10 @@ For queries, contact: +91 8151 998 899`;
                 <span className="text-xs font-bold uppercase tracking-wider">Expected Monthly Fee</span>
                 <IndianRupee className="w-5 h-5 text-blue-600" />
               </div>
-              <div className="text-2xl font-black text-[#2D041A]">
+              <div className="text-3xl font-extrabold text-[#2D041A]">
                 ₹{collectionsSummary.totalMonthlyExpected.toLocaleString('en-IN')}
               </div>
-              <span className="text-[11px] text-gray-500 font-medium mt-1 block">
+              <span className="text-xs text-gray-500 font-medium mt-1.5 block">
                 Total sum of joined course fees
               </span>
             </div>
@@ -783,10 +783,10 @@ For queries, contact: +91 8151 998 899`;
                 <span className="text-xs font-bold uppercase tracking-wider">Total Fee Collected</span>
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               </div>
-              <div className="text-2xl font-black text-emerald-800">
+              <div className="text-3xl font-extrabold text-emerald-800">
                 ₹{collectionsSummary.totalPaid.toLocaleString('en-IN')}
               </div>
-              <span className="text-[11px] text-emerald-700 font-semibold mt-1 block">
+              <span className="text-xs text-emerald-700 font-semibold mt-1.5 block">
                 {collectionsSummary.collectionRate}% of monthly target collected
               </span>
             </div>
@@ -796,10 +796,10 @@ For queries, contact: +91 8151 998 899`;
                 <span className="text-xs font-bold uppercase tracking-wider">Balance Due Outstanding</span>
                 <AlertCircle className="w-5 h-5 text-rose-600" />
               </div>
-              <div className="text-2xl font-black text-rose-700">
+              <div className="text-3xl font-extrabold text-rose-700">
                 ₹{collectionsSummary.totalDue.toLocaleString('en-IN')}
               </div>
-              <span className="text-[11px] text-rose-600 font-semibold mt-1 block">
+              <span className="text-xs text-rose-600 font-semibold mt-1.5 block">
                 Due by {collectionsMonthDueDate}
               </span>
             </div>
@@ -807,13 +807,13 @@ For queries, contact: +91 8151 998 899`;
           </div>
 
           {/* Collections Search Bar & Top Filter Tabs */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-[#F0D5E4]">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4.5 rounded-3xl border border-[#F0D5E4]">
             
             {/* Filter Tabs: All Students, Pending Due, Partial Payments, Paid & Settled */}
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setCollectionsStatusFilter('all')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                   collectionsStatusFilter === 'all'
                     ? 'bg-[#8A064D] text-white shadow-xs'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -824,7 +824,7 @@ For queries, contact: +91 8151 998 899`;
 
               <button
                 onClick={() => setCollectionsStatusFilter('pending')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   collectionsStatusFilter === 'pending'
                     ? 'bg-[#8A064D] text-white shadow-xs'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -832,12 +832,12 @@ For queries, contact: +91 8151 998 899`;
               >
                 <span className="w-2 h-2 rounded-full bg-rose-500" />
                 <span>Pending Due</span>
-                <span className="text-[10px] opacity-80">({collectionsSummary.pendingCount})</span>
+                <span className="text-xs opacity-80">({collectionsSummary.pendingCount})</span>
               </button>
 
               <button
                 onClick={() => setCollectionsStatusFilter('partial')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   collectionsStatusFilter === 'partial'
                     ? 'bg-[#8A064D] text-white shadow-xs'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -845,12 +845,12 @@ For queries, contact: +91 8151 998 899`;
               >
                 <span className="w-2 h-2 rounded-full bg-amber-500" />
                 <span>Partial Payments</span>
-                <span className="text-[10px] opacity-80">({collectionsSummary.partialCount})</span>
+                <span className="text-xs opacity-80">({collectionsSummary.partialCount})</span>
               </button>
 
               <button
                 onClick={() => setCollectionsStatusFilter('paid')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   collectionsStatusFilter === 'paid'
                     ? 'bg-[#8A064D] text-white shadow-xs'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -858,7 +858,7 @@ For queries, contact: +91 8151 998 899`;
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 <span>Paid & Settled</span>
-                <span className="text-[10px] opacity-80">({collectionsSummary.settledCount})</span>
+                <span className="text-xs opacity-80">({collectionsSummary.settledCount})</span>
               </button>
             </div>
 
@@ -870,7 +870,7 @@ For queries, contact: +91 8151 998 899`;
                 placeholder="Search student name, ID..."
                 value={collectionsSearch}
                 onChange={(e) => setCollectionsSearch(e.target.value)}
-                className="w-full pl-9 pr-3.5 py-2 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
               />
             </div>
 
@@ -881,16 +881,16 @@ For queries, contact: +91 8151 998 899`;
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-[#FFF9FB] border-b border-[#F0D5E4] text-[#2D041A] font-bold">
-                    <th className="py-3.5 px-5">Student Name & ID</th>
-                    <th className="py-3.5 px-4 text-right">Total Monthly Fee</th>
-                    <th className="py-3.5 px-4 text-right">Total Paid Amount</th>
-                    <th className="py-3.5 px-4 text-right">Balance Due</th>
-                    <th className="py-3.5 px-4 text-center">Status</th>
-                    <th className="py-3.5 px-5 text-right">Action</th>
+                  <tr className="bg-[#FFF9FB] border-b border-[#F0D5E4] text-[#590231] font-bold text-xs uppercase tracking-wider">
+                    <th className="py-4 px-5">Student Name & ID</th>
+                    <th className="py-4 px-5 text-right">Total Monthly Fee</th>
+                    <th className="py-4 px-5 text-right">Total Paid Amount</th>
+                    <th className="py-4 px-5 text-right">Balance Due</th>
+                    <th className="py-4 px-5 text-center">Status</th>
+                    <th className="py-4 px-5 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 text-sm">
                   {filteredCollections.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-12 text-center text-gray-400">
@@ -908,15 +908,15 @@ For queries, contact: +91 8151 998 899`;
                         <tr key={row.studentId} className="hover:bg-[#FFFDFC] transition">
                           
                           {/* 1. Student Name & ID */}
-                          <td className="py-3.5 px-5">
+                          <td className="py-4 px-5">
                             <div className="flex items-center gap-3">
-                              <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2 py-0.5 rounded-lg shrink-0">
+                              <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg shrink-0">
                                 {row.rollNumber}
                               </span>
                               <div>
-                                <span className="font-bold text-gray-900 block text-xs">{row.studentName}</span>
-                                <span className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
-                                  <Phone className="w-3 h-3 text-emerald-600" />
+                                <span className="font-bold text-gray-900 block text-sm">{row.studentName}</span>
+                                <span className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
+                                  <Phone className="w-3.5 h-3.5 text-emerald-600" />
                                   <span>{row.phone}</span>
                                 </span>
                               </div>
@@ -924,17 +924,17 @@ For queries, contact: +91 8151 998 899`;
                           </td>
 
                           {/* 2. Total Monthly Fee */}
-                          <td className="py-3.5 px-4 text-right font-extrabold text-[#2D041A]">
+                          <td className="py-4 px-5 text-right font-extrabold text-[#2D041A] text-sm">
                             ₹{row.totalMonthlyFee.toLocaleString('en-IN')}
                           </td>
 
                           {/* 3. Total Paid Amount */}
-                          <td className="py-3.5 px-4 text-right font-extrabold text-emerald-700">
+                          <td className="py-4 px-5 text-right font-extrabold text-emerald-700 text-sm">
                             ₹{row.totalPaidAmount.toLocaleString('en-IN')}
                           </td>
 
                           {/* 4. Balance Due */}
-                          <td className="py-3.5 px-4 text-right font-black">
+                          <td className="py-4 px-5 text-right font-black text-sm">
                             {row.balanceDue <= 0 ? (
                               <span className="text-emerald-700">
                                 {row.balanceDue < 0 ? `-₹${Math.abs(row.balanceDue).toLocaleString('en-IN')}` : '₹0'}
@@ -947,21 +947,21 @@ For queries, contact: +91 8151 998 899`;
                           </td>
 
                           {/* 5. Status */}
-                          <td className="py-3.5 px-4 text-center">
+                          <td className="py-4 px-5 text-center">
                             {isPaid && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-0.5 rounded-full shadow-2xs">
+                              <span className="inline-flex items-center gap-1 text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1 rounded-full shadow-2xs">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                                 <span>{row.statusLabel}</span>
                               </span>
                             )}
                             {isPartial && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full shadow-2xs">
+                              <span className="inline-flex items-center gap-1 text-xs font-extrabold bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-full shadow-2xs">
                                 <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
                                 <span>Partial Paid</span>
                               </span>
                             )}
                             {!isPaid && !isPartial && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300 px-2.5 py-0.5 rounded-full shadow-2xs">
+                              <span className="inline-flex items-center gap-1 text-xs font-extrabold bg-rose-100 text-rose-800 border border-rose-300 px-3 py-1 rounded-full shadow-2xs">
                                 <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
                                 <span>{row.statusLabel}</span>
                               </span>
@@ -969,10 +969,10 @@ For queries, contact: +91 8151 998 899`;
                           </td>
 
                           {/* 6. Action: ONLY Collect Button */}
-                          <td className="py-3.5 px-5 text-right">
+                          <td className="py-4 px-5 text-right">
                             <button
                               onClick={() => handleOpenCollect(row)}
-                              className="px-3.5 py-1.5 rounded-xl bg-[#2D041A] hover:bg-[#48082B] active:scale-95 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs border border-[#48082B] cursor-pointer ml-auto"
+                              className="px-4 py-2 rounded-xl bg-[#2D041A] hover:bg-[#48082B] active:scale-95 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs border border-[#48082B] cursor-pointer ml-auto"
                               title={`Collect fee from ${row.studentName}`}
                             >
                               <IndianRupee className="w-3.5 h-3.5 text-[#F9E33A]" />
@@ -1006,10 +1006,10 @@ For queries, contact: +91 8151 998 899`;
                 <span className="text-xs font-bold uppercase tracking-wider">Total Payments Received</span>
                 <Receipt className="w-5 h-5 text-[#8A064D]" />
               </div>
-              <div className="text-2xl font-black text-[#2D041A]">
+              <div className="text-3xl font-extrabold text-[#2D041A]">
                 {paymentsSummary.totalPaymentsCount}
               </div>
-              <span className="text-[11px] text-gray-500 font-medium mt-1 block">
+              <span className="text-xs text-gray-500 font-medium mt-1.5 block">
                 {paymentsSummary.paidCount} Full Settled • {paymentsSummary.partialCount} Partial
               </span>
             </div>
@@ -1019,10 +1019,10 @@ For queries, contact: +91 8151 998 899`;
                 <span className="text-xs font-bold uppercase tracking-wider">Total Amount Received</span>
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               </div>
-              <div className="text-2xl font-black text-emerald-800">
+              <div className="text-3xl font-extrabold text-emerald-800">
                 ₹{paymentsSummary.totalPaid.toLocaleString('en-IN')}
               </div>
-              <span className="text-[11px] text-emerald-700 font-semibold mt-1 block">
+              <span className="text-xs text-emerald-700 font-semibold mt-1.5 block">
                 Total money collected from students
               </span>
             </div>
@@ -1032,10 +1032,10 @@ For queries, contact: +91 8151 998 899`;
                 <span className="text-xs font-bold uppercase tracking-wider">Paying Students</span>
                 <Users className="w-5 h-5 text-blue-600" />
               </div>
-              <div className="text-2xl font-black text-[#2D041A]">
+              <div className="text-3xl font-extrabold text-[#2D041A]">
                 {new Set(filteredInvoices.map(i => i.student_id)).size}
               </div>
-              <span className="text-[11px] text-gray-500 font-medium mt-1 block">
+              <span className="text-xs text-gray-500 font-medium mt-1.5 block">
                 Active student learners with paid fees
               </span>
             </div>
@@ -1045,10 +1045,10 @@ For queries, contact: +91 8151 998 899`;
                 <span className="text-xs font-bold uppercase tracking-wider">Remaining Invoice Due</span>
                 <AlertCircle className="w-5 h-5 text-amber-600" />
               </div>
-              <div className="text-2xl font-black text-amber-700">
+              <div className="text-3xl font-extrabold text-amber-700">
                 ₹{paymentsSummary.totalDue.toLocaleString('en-IN')}
               </div>
-              <span className="text-[11px] text-amber-600 font-semibold mt-1 block">
+              <span className="text-xs text-amber-600 font-semibold mt-1.5 block">
                 Remaining balance on partial receipts
               </span>
             </div>
@@ -1056,14 +1056,14 @@ For queries, contact: +91 8151 998 899`;
           </div>
 
           {/* Payments Filters: Status Tabs, Student Dropdown, Date Range Filter & Search Bar */}
-          <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] space-y-3">
+          <div className="bg-white p-4.5 rounded-3xl border border-[#F0D5E4] space-y-3.5">
             
             {/* Row 1: Filter Tabs (Pending Due REMOVED per user instruction) & Search */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setPaymentsStatusFilter('all')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                     paymentsStatusFilter === 'all'
                       ? 'bg-[#8A064D] text-white shadow-xs'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -1074,7 +1074,7 @@ For queries, contact: +91 8151 998 899`;
 
                 <button
                   onClick={() => setPaymentsStatusFilter('paid')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                     paymentsStatusFilter === 'paid'
                       ? 'bg-[#8A064D] text-white shadow-xs'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -1082,12 +1082,12 @@ For queries, contact: +91 8151 998 899`;
                 >
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   <span>Paid & Settled</span>
-                  <span className="text-[10px] opacity-80">({paymentsSummary.paidCount})</span>
+                  <span className="text-xs opacity-80">({paymentsSummary.paidCount})</span>
                 </button>
 
                 <button
                   onClick={() => setPaymentsStatusFilter('partial')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                     paymentsStatusFilter === 'partial'
                       ? 'bg-[#8A064D] text-white shadow-xs'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -1095,7 +1095,7 @@ For queries, contact: +91 8151 998 899`;
                 >
                   <span className="w-2 h-2 rounded-full bg-amber-500" />
                   <span>Partial Payments</span>
-                  <span className="text-[10px] opacity-80">({paymentsSummary.partialCount})</span>
+                  <span className="text-xs opacity-80">({paymentsSummary.partialCount})</span>
                 </button>
               </div>
 
@@ -1107,7 +1107,7 @@ For queries, contact: +91 8151 998 899`;
                   placeholder="Search student name, invoice #..."
                   value={paymentsSearch}
                   onChange={(e) => setPaymentsSearch(e.target.value)}
-                  className="w-full pl-9 pr-3.5 py-2 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
               </div>
             </div>
@@ -1121,7 +1121,7 @@ For queries, contact: +91 8151 998 899`;
                   <button
                     type="button"
                     onClick={() => setIsPaymentsStudentDropdownOpen(!isPaymentsStudentDropdownOpen)}
-                    className={`px-3.5 py-2 bg-white hover:bg-gray-50 border rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer ${
+                    className={`px-4 py-2.5 bg-white hover:bg-gray-50 border rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer ${
                       paymentsStudentFilter !== 'all' ? 'border-[#8A064D] text-[#8A064D] bg-[#FFF2F8]' : 'border-[#F0D5E4] text-gray-800'
                     }`}
                   >
@@ -1225,7 +1225,7 @@ For queries, contact: +91 8151 998 899`;
                     setPaymentEndDate('');
                     setPaymentsStudentFilter('all');
                   }}
-                  className="text-xs font-bold text-rose-600 hover:underline px-2 py-1 cursor-pointer"
+                  className="text-xs font-bold text-rose-600 hover:underline px-2.5 py-1.5 cursor-pointer"
                 >
                   Reset Filters
                 </button>
@@ -1239,16 +1239,16 @@ For queries, contact: +91 8151 998 899`;
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-[#FFF9FB] border-b border-[#F0D5E4] text-[#2D041A] font-bold">
-                    <th className="py-3.5 px-5">Student Name & ID</th>
-                    <th className="py-3.5 px-4">Invoice Number</th>
-                    <th className="py-3.5 px-4 text-right">Amount Paid</th>
-                    <th className="py-3.5 px-4 text-right">Due</th>
-                    <th className="py-3.5 px-4 text-center">Status</th>
-                    <th className="py-3.5 px-5 text-right">Actions</th>
+                  <tr className="bg-[#FFF9FB] border-b border-[#F0D5E4] text-[#590231] font-bold text-xs uppercase tracking-wider">
+                    <th className="py-4 px-5">Student Name & ID</th>
+                    <th className="py-4 px-5">Invoice Number</th>
+                    <th className="py-4 px-5 text-right">Amount Paid</th>
+                    <th className="py-4 px-5 text-right">Due</th>
+                    <th className="py-4 px-5 text-center">Status</th>
+                    <th className="py-4 px-5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 text-sm">
                   {filteredInvoices.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-12 text-center text-gray-400">
@@ -1266,14 +1266,14 @@ For queries, contact: +91 8151 998 899`;
                         <tr key={inv.id} className="hover:bg-[#FFFDFC] transition">
                           
                           {/* 1. Student Name & ID */}
-                          <td className="py-3.5 px-5">
+                          <td className="py-4 px-5">
                             <div className="flex items-center gap-3">
-                              <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2 py-0.5 rounded-lg shrink-0">
+                              <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg shrink-0">
                                 {inv.roll_number}
                               </span>
                               <div>
-                                <span className="font-bold text-gray-900 block text-xs">{inv.student_name}</span>
-                                <span className="text-[10px] text-gray-500 block mt-0.5">
+                                <span className="font-bold text-gray-900 block text-sm">{inv.student_name}</span>
+                                <span className="text-xs text-gray-500 block mt-0.5">
                                   {inv.course_title}
                                 </span>
                               </div>
@@ -1281,20 +1281,20 @@ For queries, contact: +91 8151 998 899`;
                           </td>
 
                           {/* 2. Invoice Number & Due Date in DD/MM/YY format */}
-                          <td className="py-3.5 px-4 font-mono font-bold text-[#8A064D]">
-                            <div>{inv.invoice_number}</div>
-                            <span className="text-[10px] text-gray-500 font-sans font-medium block mt-0.5">
+                          <td className="py-4 px-5 font-mono font-bold text-[#8A064D]">
+                            <div className="text-sm">{inv.invoice_number}</div>
+                            <span className="text-xs text-gray-500 font-sans font-medium block mt-0.5">
                               Due: {formatMonthEndDdMmYy(inv.due_date || inv.fee_period || inv.created_at)}
                             </span>
                           </td>
 
                           {/* 3. Amount Paid */}
-                          <td className="py-3.5 px-4 text-right font-extrabold text-emerald-700">
+                          <td className="py-4 px-5 text-right font-extrabold text-emerald-700 text-sm">
                             ₹{Number(inv.paid_amount).toLocaleString('en-IN')}
                           </td>
 
                           {/* 4. Due (Balance Amount) */}
-                          <td className="py-3.5 px-4 text-right font-black">
+                          <td className="py-4 px-5 text-right font-black text-sm">
                             {Number(inv.balance_amount) <= 0 ? (
                               <span className="text-emerald-700">₹0</span>
                             ) : (
@@ -1305,21 +1305,21 @@ For queries, contact: +91 8151 998 899`;
                           </td>
 
                           {/* 5. Status */}
-                          <td className="py-3.5 px-4 text-center">
+                          <td className="py-4 px-5 text-center">
                             {isPaid && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-0.5 rounded-full shadow-2xs">
+                              <span className="inline-flex items-center gap-1 text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1 rounded-full shadow-2xs">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                                 <span>Paid Full</span>
                               </span>
                             )}
                             {isPartial && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full shadow-2xs">
+                              <span className="inline-flex items-center gap-1 text-xs font-extrabold bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-full shadow-2xs">
                                 <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
                                 <span>Partial</span>
                               </span>
                             )}
                             {!isPaid && !isPartial && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300 px-2.5 py-0.5 rounded-full shadow-2xs">
+                              <span className="inline-flex items-center gap-1 text-xs font-extrabold bg-rose-100 text-rose-800 border border-rose-300 px-3 py-1 rounded-full shadow-2xs">
                                 <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
                                 <span>Pending Due</span>
                               </span>
@@ -1327,13 +1327,13 @@ For queries, contact: +91 8151 998 899`;
                           </td>
 
                           {/* 6. Actions: Edit, View, Share Invoice [WhatsApp] */}
-                          <td className="py-3.5 px-5 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
+                          <td className="py-4 px-5 text-right">
+                            <div className="flex items-center justify-end gap-2">
                               
                               {/* Edit Button */}
                               <button
                                 onClick={() => handleOpenEditInvoice(inv)}
-                                className="px-2.5 py-1.5 rounded-xl bg-[#1E3A8A] hover:bg-[#1D4ED8] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs border border-[#1E3A8A] cursor-pointer"
+                                className="px-3 py-1.5 rounded-xl bg-[#1E3A8A] hover:bg-[#1D4ED8] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs border border-[#1E3A8A] cursor-pointer"
                                 title="Edit Invoice Details"
                               >
                                 <Edit3 className="w-3.5 h-3.5 text-sky-200" />
@@ -1343,7 +1343,7 @@ For queries, contact: +91 8151 998 899`;
                               {/* View Button */}
                               <button
                                 onClick={() => setViewingInvoice(inv)}
-                                className="px-2.5 py-1.5 rounded-xl bg-[#2D041A] hover:bg-[#48082B] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs border border-[#48082B] cursor-pointer"
+                                className="px-3 py-1.5 rounded-xl bg-[#2D041A] hover:bg-[#48082B] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs border border-[#48082B] cursor-pointer"
                                 title="View Complete Invoice & Receipt"
                               >
                                 <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
@@ -1353,7 +1353,7 @@ For queries, contact: +91 8151 998 899`;
                               {/* Share Invoice [WhatsApp] Button */}
                               <button
                                 onClick={() => setSharingInvoice(inv)}
-                                className="px-3 py-1.5 rounded-xl bg-[#064E3B] hover:bg-[#065F46] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs border border-[#047857] cursor-pointer"
+                                className="px-3.5 py-1.5 rounded-xl bg-[#064E3B] hover:bg-[#065F46] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs border border-[#047857] cursor-pointer"
                                 title="Share Invoice on WhatsApp"
                               >
                                 <MessageCircle className="w-3.5 h-3.5 text-emerald-300" />

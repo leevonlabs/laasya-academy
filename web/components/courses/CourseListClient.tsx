@@ -526,13 +526,13 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Search Input */}
             <div className="relative">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search by course, code, guru..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9.5 pr-4 py-2 bg-gray-50 hover:bg-gray-100/70 border border-[#F0D5E4] rounded-2xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 w-56 md:w-64 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                className="pl-10 pr-4 py-2.5 bg-gray-50 hover:bg-gray-100/70 border border-[#F0D5E4] rounded-2xl text-sm font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 w-60 md:w-72 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
               />
             </div>
 
@@ -541,14 +541,14 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
               <button
                 type="button"
                 onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                className={`px-3.5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 border cursor-pointer ${
+                className={`px-4 py-2.5 rounded-2xl text-sm font-black transition flex items-center gap-2 border cursor-pointer ${
                   isCategoryDropdownOpen
                     ? 'bg-[#FFF2F8] border-[#8A064D] text-[#8A064D] shadow-xs'
                     : 'bg-white hover:bg-gray-50 border-[#F0D5E4] text-[#590231]'
                 }`}
                 title="Search and Manage Existing Categories"
               >
-                <Tag className="w-3.5 h-3.5 text-[#8A064D]" />
+                <Tag className="w-4 h-4 text-[#8A064D]" />
                 <span>Categories ({categories.length})</span>
                 <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isCategoryDropdownOpen ? 'rotate-180 text-[#8A064D]' : ''}`} />
               </button>
@@ -678,7 +678,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
             {/* ADD NEW CATEGORY BUTTON */}
             <button
               onClick={() => setIsAddCategoryOpen(true)}
-              className="bg-white hover:bg-[#FFF2F8] border border-[#8A064D] text-[#8A064D] px-3.5 py-2.5 rounded-2xl text-xs font-black shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              className="bg-white hover:bg-[#FFF2F8] border border-[#8A064D] text-[#8A064D] px-4.5 py-2.5 rounded-2xl text-sm font-black shadow-xs transition flex items-center gap-2 cursor-pointer"
               title="Add a new course category"
             >
               <FolderPlus className="w-4 h-4 text-[#8A064D]" />
@@ -688,7 +688,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
             {/* ADD COURSE BUTTON */}
             <button
               onClick={openAddModal}
-              className="bg-[#8A064D] hover:bg-[#70043E] text-white px-4 py-2.5 rounded-2xl text-xs font-black shadow-md transition flex items-center gap-1.5 cursor-pointer"
+              className="bg-[#8A064D] hover:bg-[#70043E] text-white px-5 py-2.5 rounded-2xl text-sm font-black shadow-md transition flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4 text-[#F9E33A]" />
               <span>Add Course</span>
@@ -759,14 +759,14 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
         {/* All Categories Pill */}
         <button
           onClick={() => setSelectedCategory('All')}
-          className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+          className={`px-5 py-2.5 rounded-2xl text-sm font-black whitespace-nowrap transition cursor-pointer flex items-center gap-2 ${
             selectedCategory === 'All'
               ? 'bg-[#8A064D] text-white shadow-md ring-2 ring-[#F9E33A]/60'
               : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
           }`}
         >
           <span>All Disciplines</span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+          <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
             selectedCategory === 'All' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
           }`}>
             {courses.length}
@@ -777,15 +777,15 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
         {coursesWithoutCategoryCount > 0 && (
           <button
             onClick={() => setSelectedCategory('No Category')}
-            className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 border-2 border-red-500 shadow-sm ${
+            className={`px-5 py-2.5 rounded-2xl text-sm font-black whitespace-nowrap transition cursor-pointer flex items-center gap-2 border-2 border-red-500 shadow-sm ${
               selectedCategory === 'No Category'
                 ? 'bg-red-600 text-white border-red-700 ring-2 ring-red-400/50 shadow-md scale-102'
                 : 'bg-red-50 text-red-700 hover:bg-red-100 ring-1 ring-red-300/40 animate-pulse'
             }`}
           >
-            <AlertCircle className={`w-3.5 h-3.5 ${selectedCategory === 'No Category' ? 'text-white' : 'text-red-600'}`} />
+            <AlertCircle className={`w-4 h-4 ${selectedCategory === 'No Category' ? 'text-white' : 'text-red-600'}`} />
             <span>No Category</span>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+            <span className={`text-xs px-2.5 py-0.5 rounded-full font-black ${
               selectedCategory === 'No Category' ? 'bg-white/20 text-white' : 'bg-red-200 text-red-900'
             }`}>
               {coursesWithoutCategoryCount}
@@ -801,14 +801,14 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+              className={`px-5 py-2.5 rounded-2xl text-sm font-black whitespace-nowrap transition cursor-pointer flex items-center gap-2 ${
                 isSelected
                   ? 'bg-[#8A064D] text-white shadow-md ring-2 ring-[#F9E33A]/60'
                   : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
               }`}
             >
               <span>{cat}</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+              <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
                 isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
               }`}>
                 {count}
@@ -820,10 +820,10 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
         {/* Quick Add Category Pill */}
         <button
           onClick={() => setIsAddCategoryOpen(true)}
-          className="px-3 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1 text-[#8A064D] bg-[#FFF2F8] hover:bg-[#FFE6F2] border border-dashed border-[#8A064D]"
+          className="px-4 py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 text-[#8A064D] bg-[#FFF2F8] hover:bg-[#FFE6F2] border border-dashed border-[#8A064D]"
           title="Create a new category"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-4 h-4" />
           <span>New Category</span>
         </button>
       </div>
@@ -867,25 +867,25 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
               >
                 <div>
                   {/* Header Badges */}
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-[11px] font-mono font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg">
+                  <div className="flex items-center justify-between gap-2 mb-3.5">
+                    <span className="text-xs font-mono font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-3 py-1 rounded-xl shadow-2xs">
                       {c.code}
                     </span>
                     <div className="flex items-center gap-1.5">
                       {/* IF NO CATEGORY: RED HIGHLIGHT BOUNDARIES */}
                       {hasNoCat ? (
-                        <span className="text-[11px] font-black text-red-700 bg-red-50 border-2 border-red-500 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-xs animate-pulse">
-                          <AlertCircle className="w-3 h-3 text-red-600" />
+                        <span className="text-xs font-black text-red-700 bg-red-50 border-2 border-red-500 px-3 py-1 rounded-full flex items-center gap-1 shadow-xs animate-pulse">
+                          <AlertCircle className="w-3.5 h-3.5 text-red-600" />
                           <span>No Category</span>
                         </span>
                       ) : (
-                        <span className="text-[11px] font-black text-[#590231] bg-[#FFF2F8] border border-rose-100 px-2.5 py-0.5 rounded-full">
+                        <span className="text-xs font-bold text-[#590231] bg-[#FFF2F8] border border-rose-100 px-3 py-1 rounded-full shadow-2xs">
                           {c.category}
                         </span>
                       )}
 
                       {c.is_active === false && (
-                        <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                        <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
                           Inactive
                         </span>
                       )}
@@ -893,26 +893,26 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                   </div>
 
                   {/* Title */}
-                  <h3 className="text-base font-black text-[#2D041A] group-hover:text-[#8A064D] transition">
+                  <h3 className="text-lg font-bold text-[#2D041A] group-hover:text-[#8A064D] transition">
                     {c.title}
                   </h3>
 
                   {/* Assigned Guru Badge */}
-                  <div className="mt-2 py-1.5 px-3 rounded-2xl bg-[#FFF9FB] border border-rose-100 flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-[#8A064D]">Assigned Guru</span>
-                    <span className="text-xs font-bold text-[#1A010F] truncate ml-2">
+                  <div className="mt-2.5 py-2 px-3.5 rounded-2xl bg-[#FFF9FB] border border-rose-100 flex items-center justify-between">
+                    <span className="text-xs font-black uppercase text-[#8A064D]">Assigned Guru</span>
+                    <span className="text-sm font-bold text-[#1A010F] truncate ml-2">
                       {COURSE_GURUS_MAP[c.title] || 'Senior Faculty Guru'}
                     </span>
                   </div>
 
                   {/* Uncategorized Warning note if applicable */}
                   {hasNoCat && (
-                    <div className="mt-2 p-2 bg-red-50/80 rounded-xl border border-red-200 text-[11px] text-red-800 font-semibold flex items-center justify-between">
+                    <div className="mt-2 p-2 bg-red-50/80 rounded-xl border border-red-200 text-xs text-red-800 font-semibold flex items-center justify-between">
                       <span>⚠️ Category not assigned</span>
                       <button
                         type="button"
                         onClick={() => openEditModal(c)}
-                        className="text-red-700 font-black hover:underline text-[10px]"
+                        className="text-red-700 font-black hover:underline text-xs"
                       >
                         Set Category →
                       </button>
@@ -920,7 +920,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                   )}
 
                   {/* Description */}
-                  <p className="text-xs font-medium text-gray-600 mt-2.5 line-clamp-2 leading-relaxed">
+                  <p className="text-sm font-medium text-gray-600 mt-2.5 line-clamp-2 leading-relaxed">
                     {c.description || 'Comprehensive syllabus crafted for classical & contemporary mastery.'}
                   </p>
                 </div>
@@ -928,21 +928,21 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 {/* Bottom Meta & Action Buttons */}
                 <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] text-gray-400 uppercase font-black tracking-wider block">Monthly Fee</span>
-                    <span className="text-base font-black text-[#8A064D] flex items-center">
+                    <span className="text-xs text-gray-500 uppercase font-black tracking-wider block">Monthly Fee</span>
+                    <span className="text-lg font-extrabold text-[#8A064D] flex items-center">
                       ₹{Number(c.monthly_fee).toLocaleString('en-IN')}
-                      <span className="text-[10px] font-bold text-gray-400 ml-1">/ mo</span>
+                      <span className="text-xs font-bold text-gray-400 ml-1">/ mo</span>
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     {/* View Details Button */}
                     <button
                       onClick={() => setViewingCourse(c)}
                       title="View Complete Course Details"
-                      className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 hover:bg-[#8A064D] hover:text-white text-gray-700 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                      className="px-3.5 py-2 rounded-xl bg-gray-50 border border-gray-200 hover:bg-[#8A064D] hover:text-white text-gray-700 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
                     >
-                      <Eye className="w-3.5 h-3.5" />
+                      <Eye className="w-4 h-4" />
                       <span>Details</span>
                     </button>
 
@@ -950,18 +950,18 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                     <button
                       onClick={() => openEditModal(c)}
                       title="Edit Course Details"
-                      className="p-1.5 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] hover:bg-[#8A064D] hover:text-white text-[#8A064D] transition cursor-pointer"
+                      className="p-2 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] hover:bg-[#8A064D] hover:text-white text-[#8A064D] transition cursor-pointer shadow-2xs"
                     >
-                      <Edit3 className="w-3.5 h-3.5" />
+                      <Edit3 className="w-4 h-4" />
                     </button>
 
                     {/* Delete Button */}
                     <button
                       onClick={() => setDeletingCourse(c)}
                       title="Delete Course"
-                      className="p-1.5 rounded-xl bg-gray-50 border border-gray-200 hover:bg-rose-600 hover:text-white text-gray-400 hover:border-rose-600 transition cursor-pointer"
+                      className="p-2 rounded-xl bg-gray-50 border border-gray-200 hover:bg-rose-600 hover:text-white text-gray-400 hover:border-rose-600 transition cursor-pointer shadow-2xs"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>

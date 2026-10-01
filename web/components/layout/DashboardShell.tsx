@@ -184,11 +184,11 @@ export default function DashboardShell({ user, children }: Props) {
               </div>
               {!isCollapsed && (
                 <div className="overflow-hidden min-w-0">
-                  <p className="text-xs font-semibold text-white truncate">
+                  <p className="text-sm font-bold text-white truncate">
                     {user.fullName || 'Academy Director'}
                   </p>
-                  <p className="text-[10px] text-[#F9E33A] truncate font-medium">
-                    Owner / Administrator
+                  <p className="text-xs text-[#F9E33A] truncate font-semibold">
+                    Owner & Director
                   </p>
                 </div>
               )}
@@ -216,19 +216,19 @@ export default function DashboardShell({ user, children }: Props) {
             {/* Quick Toggle Button in Header */}
             <button
               onClick={toggleCollapse}
-              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-[#8A064D] bg-[#FFF2F8] hover:bg-[#FCE7F3] border border-[#F0D5E4] transition cursor-pointer"
+              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold text-[#8A064D] bg-[#FFF2F8] hover:bg-[#FCE7F3] border border-[#F0D5E4] transition cursor-pointer"
               title={isCollapsed ? "Expand sidebar" : "Minimize sidebar"}
             >
-              {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+              {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
               <span>{isCollapsed ? "Expand Menu" : "Minimize Menu"}</span>
             </button>
 
             <div className="hidden sm:block">
-              <span className="text-xs font-bold text-[#8A064D] uppercase tracking-wider">
+              <span className="text-sm font-bold text-[#8A064D] uppercase tracking-wider">
                 Laasya Cultural Academy Portal
               </span>
               <span className="mx-2 text-gray-300">•</span>
-              <span className="text-xs text-gray-500 font-medium">
+              <span className="text-xs text-gray-600 font-semibold">
                 Vindhyagiri, Bangalore
               </span>
             </div>

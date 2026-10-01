@@ -354,18 +354,18 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
       {/* =================================================================== */}
       {/* 2. TOP TABS SWITCHER */}
       {/* =================================================================== */}
-      <div className="bg-white p-2 rounded-2xl border border-[#F0D5E4] shadow-xs flex items-center gap-2">
+      <div className="bg-white p-2 rounded-2xl border border-[#F0D5E4] shadow-xs flex items-center gap-2.5">
         <button
           onClick={() => setActiveTab('course_wise')}
-          className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 py-3.5 px-5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2.5 cursor-pointer ${
             activeTab === 'course_wise'
               ? 'bg-[#8A064D] text-white shadow-md'
               : 'text-gray-600 hover:text-[#8A064D] hover:bg-gray-50'
           }`}
         >
-          <BookOpen className="w-4 h-4" />
+          <BookOpen className="w-4.5 h-4.5" />
           <span>Tab 1: Course-Wise Attendance</span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+          <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
             activeTab === 'course_wise' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
           }`}>
             Course & Batch Drill-down
@@ -374,15 +374,15 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
 
         <button
           onClick={() => setActiveTab('complete')}
-          className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 py-3.5 px-5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2.5 cursor-pointer ${
             activeTab === 'complete'
               ? 'bg-[#8A064D] text-white shadow-md'
               : 'text-gray-600 hover:text-[#8A064D] hover:bg-gray-50'
           }`}
         >
-          <Layers className="w-4 h-4" />
+          <Layers className="w-4.5 h-4.5" />
           <span>Tab 2: Complete Attendance</span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+          <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
             activeTab === 'complete' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
           }`}>
             All Students Across Academy
@@ -403,26 +403,26 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
               {/* Grid Header & Filters */}
               <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-base font-bold text-[#2D041A] flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-[#2D041A] flex items-center gap-2.5">
                     <span>Academy Courses</span>
-                    <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-rose-100 px-2.5 py-0.5 rounded-full font-semibold">
+                    <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-rose-100 px-3 py-1 rounded-full font-bold">
                       {courses.length} Disciplines
                     </span>
                   </h2>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs text-gray-500 mt-1">
                     Click any course card below to view its available batches, timings, and live student attendance sheets.
                   </p>
                 </div>
 
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       placeholder="Search courses..."
                       value={gridSearchQuery}
                       onChange={(e) => setGridSearchQuery(e.target.value)}
-                      className="pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs w-64 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                      className="pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm w-64 focus:ring-2 focus:ring-[#8A064D] focus:bg-white font-medium"
                     />
                   </div>
                 </div>
@@ -434,7 +434,7 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
                   <button
                     key={cat}
                     onClick={() => setGridSelectedCategory(cat)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
                       gridSelectedCategory === cat
                         ? 'bg-[#8A064D] text-white shadow-xs'
                         : 'bg-white text-gray-600 border border-[#F0D5E4] hover:bg-gray-50'
@@ -459,31 +459,31 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
                     >
                       <div>
                         {/* Top Badges */}
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[11px] font-mono font-bold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-0.5 rounded-lg">
+                        <div className="flex items-center justify-between mb-3.5">
+                          <span className="text-xs font-mono font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-3 py-1 rounded-xl shadow-2xs">
                             {crs.code}
                           </span>
-                          <span className="text-[10px] font-semibold text-gray-500 bg-gray-50 border border-gray-100 px-2.5 py-0.5 rounded-full">
+                          <span className="text-xs font-bold text-gray-600 bg-gray-50 border border-gray-200 px-2.5 py-0.5 rounded-full">
                             {crs.category}
                           </span>
                         </div>
 
                         {/* Title */}
-                        <h3 className="text-base font-bold text-[#2D041A] group-hover:text-[#8A064D] transition">
+                        <h3 className="text-lg font-bold text-[#2D041A] group-hover:text-[#8A064D] transition">
                           {crs.title}
                         </h3>
 
                         {/* Guru Name */}
-                        <div className="mt-2.5 py-1.5 px-3 rounded-xl bg-[#FFF9FB] border border-rose-100 flex items-center justify-between">
-                          <span className="text-[10px] font-bold uppercase text-[#8A064D]">Assigned Guru</span>
-                          <span className="text-xs font-bold text-gray-800 truncate ml-2">
+                        <div className="mt-2.5 py-2 px-3.5 rounded-xl bg-[#FFF9FB] border border-rose-100 flex items-center justify-between">
+                          <span className="text-xs font-bold uppercase text-[#8A064D]">Assigned Guru</span>
+                          <span className="text-sm font-bold text-gray-800 truncate ml-2">
                             {guruName}
                           </span>
                         </div>
 
                         {/* Fee & Duration */}
-                        <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
-                          <span>Monthly Fee: <strong className="text-[#8A064D]">₹{Number(crs.monthly_fee).toLocaleString('en-IN')}</strong></span>
+                        <div className="mt-3.5 flex items-center justify-between text-xs text-gray-600">
+                          <span>Monthly Fee: <strong className="text-[#8A064D] text-sm">₹{Number(crs.monthly_fee).toLocaleString('en-IN')}</strong></span>
                           <span>{crs.duration_months} Months</span>
                         </div>
                       </div>
@@ -494,9 +494,9 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
                           {courseBatchesCount} Batch{courseBatchesCount !== 1 ? 'es' : ''} Available
                         </span>
 
-                        <span className="text-xs font-bold text-[#8A064D] group-hover:text-[#590231] flex items-center gap-1">
+                        <span className="text-sm font-bold text-[#8A064D] group-hover:text-[#590231] flex items-center gap-1.5">
                           <span>View Batches & Attendance</span>
-                          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </span>
                       </div>
                     </div>
@@ -1051,76 +1051,76 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="bg-gray-50/80 text-gray-500 border-b border-gray-100 font-semibold uppercase tracking-wider text-[10px]">
-                    <th className="py-3 px-4">Student Name</th>
-                    <th className="py-3 px-4">Course</th>
-                    <th className="py-3 px-4">Batch</th>
-                    <th className="py-3 px-4">Attendance Date</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4">Verification Method</th>
-                    <th className="py-3 px-4">Remarks</th>
+                  <tr className="bg-[#FFF9FB] text-[#590231] border-b border-[#F0D5E4] font-bold uppercase tracking-wider text-xs">
+                    <th className="py-4 px-5">Student Name</th>
+                    <th className="py-4 px-5">Course</th>
+                    <th className="py-4 px-5">Batch</th>
+                    <th className="py-4 px-5">Attendance Date</th>
+                    <th className="py-4 px-5">Status</th>
+                    <th className="py-4 px-5">Verification Method</th>
+                    <th className="py-4 px-5">Remarks</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 text-sm">
                   {filteredCompleteRecords.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="py-12 text-center text-gray-400">
                         <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                        <p className="font-semibold">No attendance records found for the selected date range.</p>
-                        <p className="text-[11px] text-gray-400 mt-1">Try selecting "Last 30 Days" or "All Time" to view past records.</p>
+                        <p className="font-semibold text-gray-600">No attendance records found for the selected date range.</p>
+                        <p className="text-xs text-gray-400 mt-1">Try selecting "Last 30 Days" or "All Time" to view past records.</p>
                       </td>
                     </tr>
                   ) : (
                     filteredCompleteRecords.map((r) => (
                       <tr key={r.id} className="hover:bg-[#FFFDFC] transition">
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-gray-900">{r.student_name}</div>
-                          <div className="text-[10px] font-mono text-gray-400">{r.roll_number}</div>
+                        <td className="py-4 px-5">
+                          <div className="font-bold text-gray-900 text-sm">{r.student_name}</div>
+                          <div className="text-xs font-mono text-gray-500 mt-0.5">{r.roll_number}</div>
                         </td>
-                        <td className="py-3.5 px-4">
-                          <span className="font-semibold text-[#8A064D]">{r.course_title}</span>
-                          <span className="block text-[10px] text-gray-400 font-mono">{r.course_code}</span>
+                        <td className="py-4 px-5">
+                          <span className="font-bold text-[#8A064D] text-sm">{r.course_title}</span>
+                          <span className="block text-xs text-gray-400 font-mono mt-0.5">{r.course_code}</span>
                         </td>
-                        <td className="py-3.5 px-4 font-medium text-gray-800">
+                        <td className="py-4 px-5 font-medium text-gray-800 text-sm">
                           {r.batch_name}
                         </td>
-                        <td className="py-3.5 px-4 font-medium text-gray-900 whitespace-nowrap">
+                        <td className="py-4 px-5 font-medium text-gray-900 text-sm whitespace-nowrap">
                           {r.session_date}
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="py-4 px-5">
                           {r.status === 'present' && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-2xs">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               <span>Present</span>
                             </span>
                           )}
                           {r.status === 'absent' && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full shadow-2xs">
                               <XCircle className="w-3.5 h-3.5" />
                               <span>Absent</span>
                             </span>
                           )}
                           {r.status === 'late' && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full shadow-2xs">
                               <Clock className="w-3.5 h-3.5" />
                               <span>Late</span>
                             </span>
                           )}
                         </td>
-                        <td className="py-3.5 px-4">
-                          <div className="text-gray-700 font-medium text-[11px]">
+                        <td className="py-4 px-5">
+                          <div className="text-gray-800 font-medium text-xs">
                             {r.check_in_method === 'trainer_manual' ? 'Guru Verified' :
                              r.check_in_method === 'student_code' ? 'PIN Check-in' :
                              r.check_in_method === 'student_qr' ? 'QR Scanner' :
                              r.check_in_method || 'Verified'}
                           </div>
                           {r.check_in_time && (
-                            <div className="text-[10px] text-gray-400 font-mono">
+                            <div className="text-xs text-gray-400 font-mono mt-0.5">
                               {r.check_in_time.substring(11, 16)} IST
                             </div>
                           )}
                         </td>
-                        <td className="py-3.5 px-4 text-gray-500 text-[11px]">
+                        <td className="py-4 px-5 text-gray-500 text-xs">
                           {r.remarks || '—'}
                         </td>
                       </tr>

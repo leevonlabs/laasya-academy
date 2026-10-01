@@ -60,6 +60,10 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
 
     final name = _profile?['full_name'] ?? 'Ananya Rao';
     final roll = _profile?['roll_number'] ?? 'LCA-10021';
+    final age = _profile?['age'] ?? 16;
+    final gender = _profile?['gender'] ?? 'Female';
+    final avatarUrl = _profile?['avatar_url'] as String?;
+    final dueAmount = _profile?['due_amount'] ?? 0;
     final todaySchedule = _schedule.where((s) => s['is_today'] == true).toList();
 
     return RefreshIndicator(
@@ -107,9 +111,12 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                         ),
                       ],
                     ),
-                    child: const CircleAvatar(
-                      backgroundColor: Color(0xFFD4AF37),
-                      child: Icon(Icons.person, size: 36, color: Colors.white),
+                    child: ClipOval(
+                      child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                          ? (avatarUrl.startsWith('data:')
+                              ? const CircleAvatar(backgroundColor: Color(0xFFD4AF37), child: Icon(Icons.person, size: 36, color: Colors.white))
+                              : Image.network(avatarUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(backgroundColor: Color(0xFFD4AF37), child: Icon(Icons.person, size: 36, color: Colors.white))))
+                          : const CircleAvatar(backgroundColor: Color(0xFFD4AF37), child: Icon(Icons.person, size: 36, color: Colors.white)),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -131,21 +138,46 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.5)),
-                          ),
-                          child: Text(
-                            'Roll No: $roll • Active Learner',
-                            style: const TextStyle(
-                              color: LaasyaColors.accentGold,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.5)),
+                              ),
+                              child: Text(
+                                'Roll No: $roll • $age Yrs ($gender)',
+                                style: const TextStyle(
+                                  color: LaasyaColors.accentGold,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: (dueAmount > 0) ? const Color(0xFF9B1C1C).withOpacity(0.3) : const Color(0xFF03543F).withOpacity(0.35),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: (dueAmount > 0) ? const Color(0xFFF98080) : const Color(0xFF31C48D),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                (dueAmount > 0) ? 'Due: ₹$dueAmount' : 'Fee Paid',
+                                style: TextStyle(
+                                  color: (dueAmount > 0) ? const Color(0xFFFFD2D2) : const Color(0xFFBCF0DA),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

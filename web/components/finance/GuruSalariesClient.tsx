@@ -470,7 +470,7 @@ export default function GuruSalariesClient({
           {/* Export CSV */}
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer"
+            className="px-4.5 py-2.5 rounded-2xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-bold transition flex items-center gap-2 shadow-xs cursor-pointer"
           >
             <Download className="w-4 h-4 text-gray-500" />
             <span>Export CSV</span>
@@ -479,7 +479,7 @@ export default function GuruSalariesClient({
           {/* Issue Advance Button */}
           <button
             onClick={() => setIsAdvanceModalOpen(true)}
-            className="px-4 py-2.5 rounded-2xl bg-[#2D041A] hover:bg-[#430928] text-white text-xs font-bold transition flex items-center gap-2 shadow-md cursor-pointer"
+            className="px-5 py-2.5 rounded-2xl bg-[#2D041A] hover:bg-[#430928] text-white text-sm font-bold transition flex items-center gap-2 shadow-md cursor-pointer"
           >
             <Plus className="w-4 h-4 text-[#F9E33A]" />
             <span>Issue Salary Advance</span>
@@ -493,15 +493,15 @@ export default function GuruSalariesClient({
         {/* Total Monthly Payroll */}
         <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs relative overflow-hidden group">
           <div className="flex items-center justify-between text-gray-500 text-xs font-semibold mb-2">
-            <span>Monthly Net Payroll</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Monthly Net Payroll</span>
             <div className="p-2 rounded-2xl bg-[#FCE7F3] text-[#8A064D]">
               <Banknote className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-[#2D041A] tracking-tight">
+          <div className="text-3xl font-extrabold text-[#2D041A] tracking-tight">
             ₹{totalBilledSalaries.toLocaleString('en-IN')}
           </div>
-          <div className="flex items-center gap-1.5 mt-2 text-[11px] text-gray-500">
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-500">
             <span className="font-semibold text-gray-800">{records.length} Gurus</span>
             <span>on active payroll</span>
           </div>
@@ -511,16 +511,16 @@ export default function GuruSalariesClient({
         {/* Total Salaries Paid */}
         <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between text-gray-500 text-xs font-semibold mb-2">
-            <span>Salaries Disbursed</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Salaries Disbursed</span>
             <div className="p-2 rounded-2xl bg-emerald-50 text-emerald-600">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-emerald-700 tracking-tight">
+          <div className="text-3xl font-extrabold text-emerald-700 tracking-tight">
             ₹{totalPaidSalaries.toLocaleString('en-IN')}
           </div>
-          <div className="flex items-center gap-1.5 mt-2 text-[11px] text-emerald-600 font-bold">
-            <span className="px-1.5 py-0.5 rounded-md bg-emerald-100">{paidCount} Paid</span>
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-emerald-600 font-bold">
+            <span className="px-2 py-0.5 rounded-md bg-emerald-100">{paidCount} Paid</span>
             <span className="text-gray-400 font-normal">of {records.length} Gurus</span>
           </div>
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
@@ -529,16 +529,16 @@ export default function GuruSalariesClient({
         {/* Pending Disbursals */}
         <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between text-gray-500 text-xs font-semibold mb-2">
-            <span>Pending Disbursals</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Pending Disbursals</span>
             <div className="p-2 rounded-2xl bg-amber-50 text-amber-600">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-amber-600 tracking-tight">
+          <div className="text-3xl font-extrabold text-amber-600 tracking-tight">
             ₹{totalPendingSalaries.toLocaleString('en-IN')}
           </div>
-          <div className="flex items-center gap-1.5 mt-2 text-[11px] text-amber-600 font-bold">
-            <span className="px-1.5 py-0.5 rounded-md bg-amber-100">{pendingCount} Pending</span>
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-600 font-bold">
+            <span className="px-2 py-0.5 rounded-md bg-amber-100">{pendingCount} Pending</span>
             <span className="text-gray-400 font-normal">due for settlement</span>
           </div>
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
@@ -547,15 +547,15 @@ export default function GuruSalariesClient({
         {/* Active Salary Advances */}
         <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between text-gray-500 text-xs font-semibold mb-2">
-            <span>Active Salary Advances</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Active Salary Advances</span>
             <div className="p-2 rounded-2xl bg-purple-50 text-purple-600">
               <CreditCard className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-purple-700 tracking-tight">
+          <div className="text-3xl font-extrabold text-purple-700 tracking-tight">
             ₹{totalActiveAdvances.toLocaleString('en-IN')}
           </div>
-          <div className="flex items-center gap-1.5 mt-2 text-[11px] text-purple-600 font-semibold">
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-purple-600 font-semibold">
             <span>Recoverable across payroll</span>
           </div>
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-500" />
@@ -564,30 +564,30 @@ export default function GuruSalariesClient({
       </div>
 
       {/* VIEW SELECTOR & SEARCH BAR */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-3xl border border-[#F0D5E4]">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4.5 rounded-3xl border border-[#F0D5E4]">
         
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-2xl self-start sm:self-auto">
+        <div className="flex items-center gap-1.5 bg-gray-100 p-1.5 rounded-2xl self-start sm:self-auto">
           <button
             onClick={() => setActiveTab('salaries')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-4.5 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeTab === 'salaries'
                 ? 'bg-[#8A064D] text-white shadow-xs'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Banknote className="w-3.5 h-3.5" />
+            <Banknote className="w-4 h-4" />
             <span>Monthly Payroll ({records.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('advances')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-4.5 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeTab === 'advances'
                 ? 'bg-[#8A064D] text-white shadow-xs'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <CreditCard className="w-3.5 h-3.5" />
+            <CreditCard className="w-4 h-4" />
             <span>Salary Advances ({advances.length})</span>
           </button>
         </div>
@@ -601,7 +601,7 @@ export default function GuruSalariesClient({
               placeholder="Search Guru, title, style..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3.5 py-2 bg-gray-50 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#8A064D] font-medium"
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8A064D] font-medium"
             />
           </div>
 
@@ -609,7 +609,7 @@ export default function GuruSalariesClient({
             <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-2xl border border-gray-200">
               <button
                 onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
                   statusFilter === 'all'
                     ? 'bg-white text-gray-900 shadow-xs'
                     : 'text-gray-500 hover:text-gray-800'
@@ -619,7 +619,7 @@ export default function GuruSalariesClient({
               </button>
               <button
                 onClick={() => setStatusFilter('pending')}
-                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
                   statusFilter === 'pending'
                     ? 'bg-amber-100 text-amber-800 shadow-xs'
                     : 'text-gray-500 hover:text-gray-800'
@@ -629,7 +629,7 @@ export default function GuruSalariesClient({
               </button>
               <button
                 onClick={() => setStatusFilter('paid')}
-                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
                   statusFilter === 'paid'
                     ? 'bg-emerald-100 text-emerald-800 shadow-xs'
                     : 'text-gray-500 hover:text-gray-800'
@@ -651,16 +651,16 @@ export default function GuruSalariesClient({
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-[#FFF9FB] border-b border-[#F0D5E4] text-[#2D041A] font-bold">
-                  <th className="py-3.5 px-4">Guru / Faculty</th>
-                  <th className="py-3.5 px-3">Base Salary</th>
-                  <th className="py-3.5 px-3">Adjustments (Bonus / Deductions)</th>
-                  <th className="py-3.5 px-3">Net Salary</th>
-                  <th className="py-3.5 px-3">Status</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
+                <tr className="bg-[#FFF9FB] border-b border-[#F0D5E4] text-[#590231] font-bold text-xs uppercase tracking-wider">
+                  <th className="py-4 px-5">Guru / Faculty</th>
+                  <th className="py-4 px-5">Base Salary</th>
+                  <th className="py-4 px-5">Adjustments (Bonus / Deductions)</th>
+                  <th className="py-4 px-5">Net Salary</th>
+                  <th className="py-4 px-5">Status</th>
+                  <th className="py-4 px-5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 text-sm">
                 {filteredRecords.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-gray-400">
@@ -687,29 +687,29 @@ export default function GuruSalariesClient({
                         className="hover:bg-[#FFFDFC] transition group"
                       >
                         {/* Guru Info */}
-                        <td className="py-3.5 px-4">
+                        <td className="py-4 px-5">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#430928] text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
+                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#430928] text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
                               {initials}
                             </div>
                             <div>
-                              <div className="font-bold text-gray-900 group-hover:text-[#8A064D] transition">
+                              <div className="font-bold text-gray-900 group-hover:text-[#8A064D] transition text-sm">
                                 {r.guru_name}
                               </div>
-                              <div className="text-[11px] text-gray-500 leading-tight">
+                              <div className="text-xs text-gray-500 leading-tight">
                                 {r.display_title}
                               </div>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {(r.specializations || []).slice(0, 2).map((s, idx) => (
                                   <span
                                     key={idx}
-                                    className="px-1.5 py-0.5 rounded-md text-[9px] font-semibold bg-gray-100 text-gray-600"
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-600"
                                   >
                                     {s}
                                   </span>
                                 ))}
                                 {(r.specializations || []).length > 2 && (
-                                  <span className="text-[9px] text-gray-400">
+                                  <span className="text-[10px] text-gray-400">
                                     +{(r.specializations || []).length - 2}
                                   </span>
                                 )}
@@ -719,15 +719,15 @@ export default function GuruSalariesClient({
                         </td>
 
                         {/* Base Salary */}
-                        <td className="py-3.5 px-3 font-semibold text-gray-700">
+                        <td className="py-4 px-5 font-semibold text-gray-700 text-sm">
                           ₹{Number(r.base_salary).toLocaleString('en-IN')}
                         </td>
 
                         {/* Adjustments */}
-                        <td className="py-3.5 px-3">
+                        <td className="py-4 px-5">
                           <div className="space-y-1">
                             {hasBonus && (
-                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
                                 <span>+₹{Number(r.bonus_amount).toLocaleString('en-IN')}</span>
                                 {r.bonus_reason && (
                                   <span className="text-emerald-600 font-normal">({r.bonus_reason})</span>
@@ -736,7 +736,7 @@ export default function GuruSalariesClient({
                             )}
 
                             {hasDeduction && (
-                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
+                              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
                                 <span>-₹{Number(r.deduction_amount).toLocaleString('en-IN')}</span>
                                 {r.deduction_reason && (
                                   <span className="text-rose-600 font-normal">({r.deduction_reason})</span>
@@ -745,62 +745,62 @@ export default function GuruSalariesClient({
                             )}
 
                             {hasAdvanceDeduction && (
-                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-200">
+                              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200">
                                 <span>-₹{Number(r.advance_deducted).toLocaleString('en-IN')}</span>
                                 <span className="text-purple-600 font-normal">(Advance)</span>
                               </div>
                             )}
 
                             {!hasBonus && !hasDeduction && !hasAdvanceDeduction && (
-                              <span className="text-gray-400 text-[11px] italic">No adjustments</span>
+                              <span className="text-gray-400 text-xs italic">No adjustments</span>
                             )}
                           </div>
                         </td>
 
                         {/* Net Salary */}
-                        <td className="py-3.5 px-3">
+                        <td className="py-4 px-5">
                           <span className="font-extrabold text-sm text-[#2D041A]">
                             ₹{Number(r.net_salary).toLocaleString('en-IN')}
                           </span>
                         </td>
 
                         {/* Status */}
-                        <td className="py-3.5 px-3">
+                        <td className="py-4 px-5">
                           {isPaid ? (
                             <div>
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                                 <span>Paid</span>
                               </span>
-                              <div className="text-[10px] text-gray-500 mt-0.5">
+                              <div className="text-xs text-gray-500 mt-1">
                                 {r.payment_date} • {r.payment_method?.toUpperCase()}
                               </div>
                             </div>
                           ) : r.status === 'processing' ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
-                              <Clock className="w-3 h-3 text-blue-600" />
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+                              <Clock className="w-3.5 h-3.5 text-blue-600" />
                               <span>Processing</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                              <Clock className="w-3 h-3 text-amber-600" />
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
                               <span>Pending</span>
                             </span>
                           )}
                         </td>
 
                         {/* Actions */}
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                        <td className="py-4 px-5 text-right">
+                          <div className="flex items-center justify-end gap-2">
                             
                             {/* If Pending, Pay Button */}
                             {!isPaid && (
                               <button
                                 onClick={() => openPaymentModal(r)}
-                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition flex items-center gap-1 shadow-xs cursor-pointer"
+                                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                                 title="Process and record salary payment"
                               >
-                                <Check className="w-3 h-3" />
+                                <Check className="w-3.5 h-3.5" />
                                 <span>Pay</span>
                               </button>
                             )}
@@ -808,10 +808,10 @@ export default function GuruSalariesClient({
                             {/* Adjustments Button */}
                             <button
                               onClick={() => openAdjustmentsModal(r)}
-                              className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-[11px] transition flex items-center gap-1 shadow-xs cursor-pointer"
+                              className="px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-xs transition flex items-center gap-1 shadow-xs cursor-pointer"
                               title="Edit bonuses, deductions and advance recovery"
                             >
-                              <Edit3 className="w-3 h-3 text-gray-500" />
+                              <Edit3 className="w-3.5 h-3.5 text-gray-500" />
                               <span>Adjust</span>
                             </button>
 

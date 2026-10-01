@@ -52,9 +52,15 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final name = _profile?['full_name'] ?? 'Guru Smt. Radhika Sharma';
-    final designation = _profile?['designation'] ?? 'Senior Guru & Choreographer';
-    final specialization = _profile?['specialization'] ?? 'Bharathanatyam Classical Dance';
+    final name = _profile?['full_name'] ?? 'Smt. Anusha Sumesh';
+    final designation = _profile?['designation'] ?? 'Head Guru & Choreographer';
+    final specialization = _profile?['specialization'] ?? 'Bharatanatyam Classical Dance';
+    final age = _profile?['age'] ?? 36;
+    final gender = _profile?['gender'] ?? 'Female';
+    final avatarUrl = _profile?['avatar_url'] as String?;
+    final monthlySalary = _profile?['monthly_salary'] ?? 45000;
+    final salaryPaymentStatus = (_profile?['salary_payment_status'] ?? 'paid').toString().toLowerCase();
+    final bool isPaid = salaryPaymentStatus == 'paid';
     final batchCount = _profile?['assigned_batches_count'] ?? _batches.length;
     final studentCount = _profile?['total_students_count'] ?? 42;
 
@@ -96,7 +102,17 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                       border: Border.all(color: LaasyaColors.accentGold, width: 2.5),
                       color: const Color(0xFFD4AF37),
                     ),
-                    child: const Icon(Icons.person, color: Colors.white, size: 36),
+                    child: ClipOval(
+                      child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                          ? (avatarUrl.startsWith('data:')
+                              ? const Icon(Icons.person, color: Colors.white, size: 36)
+                              : Image.network(
+                                  avatarUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 36),
+                                ))
+                          : const Icon(Icons.person, color: Colors.white, size: 36),
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -116,14 +132,49 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text(
-                          '$designation • $specialization',
+                          '$designation • $specialization • $age Yrs ($gender)',
                           style: const TextStyle(
                             color: LaasyaColors.accentGold,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: isPaid ? const Color(0xFF03543F).withOpacity(0.4) : const Color(0xFF9B1C1C).withOpacity(0.4),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: isPaid ? const Color(0xFF31C48D) : const Color(0xFFF98080),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isPaid ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+                                    size: 11,
+                                    color: isPaid ? const Color(0xFFBCF0DA) : const Color(0xFFFFD2D2),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '₹$monthlySalary/mo • ${isPaid ? "Salary Paid" : "Pending"}',
+                                    style: TextStyle(
+                                      color: isPaid ? const Color(0xFFBCF0DA) : const Color(0xFFFFD2D2),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

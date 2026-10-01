@@ -94,17 +94,23 @@ class SupabaseService {
     }
 
     // -------------------------------------------------------------------------
-    // Faculty & Revered Gurus
+    // Faculty & Revered Gurus (Trainer Login)
     // -------------------------------------------------------------------------
     if (identifier.contains('amos') || identifier.contains('director') || identifier.contains('8151998899')) {
       _cachedProfile = {
         'id': 'guru-amos',
-        'full_name': 'Amos P Ovung',
+        'full_name': 'Guru Amos P Ovung',
         'email': 'amos@laasyaacademy.com',
         'phone': '+91 8151 998 899',
         'role': 'trainer',
+        'age': 40,
+        'gender': 'Male',
+        'avatar_url': null,
+        'monthly_salary': 40000,
+        'salary_payment_status': 'paid',
         'specialization': 'Violin, Guitar, Keyboard & Western Music',
         'designation': 'Director & Multi-Instrumentalist (Trinity / RSL Topper)',
+        'assigned_room': 'Saraswathi Nilayam (Hall 2)',
         'assigned_batches_count': 4,
         'total_students_count': 52,
       };
@@ -116,21 +122,52 @@ class SupabaseService {
         'email': 'manikandan@laasyaacademy.com',
         'phone': '+91 98765 00003',
         'role': 'trainer',
+        'age': 52,
+        'gender': 'Male',
+        'avatar_url': null,
+        'monthly_salary': 38000,
+        'salary_payment_status': 'paid',
         'specialization': 'Carnatic Vocal & Classical Music',
         'designation': 'Title "Sangeetha Acharya" • 15+ Yrs Palakkad Disciple',
+        'assigned_room': 'Sangeetha Shala (Room 102)',
         'assigned_batches_count': 3,
         'total_students_count': 35,
       };
       return _cachedProfile;
-    } else if (identifier.contains('guru') || identifier.contains('anusha') || identifier.contains('trainer') || identifier.contains('11111') || identifier.contains('dance')) {
+    } else if (identifier.contains('vijay') || identifier.contains('karatte') || identifier.contains('martial')) {
+      _cachedProfile = {
+        'id': 'guru-vijay',
+        'full_name': 'Sensei Vijay Kumar Olekar',
+        'email': 'vijay@laasyaacademy.com',
+        'phone': '+91 98765 00010',
+        'role': 'trainer',
+        'age': 35,
+        'gender': 'Male',
+        'avatar_url': null,
+        'monthly_salary': 32000,
+        'salary_payment_status': 'pending',
+        'specialization': 'Karatte & Self Defense Disciplines',
+        'designation': 'Sensei (2nd Dan Black Belt)',
+        'assigned_room': 'Veera Kalari Koodam',
+        'assigned_batches_count': 2,
+        'total_students_count': 28,
+      };
+      return _cachedProfile;
+    } else if (identifier.contains('guru') || identifier.contains('anusha') || identifier.contains('trainer') || identifier.contains('11111') || identifier.contains('dance') || identifier.contains('radhika')) {
       _cachedProfile = {
         'id': 'guru-anusha',
         'full_name': 'Smt. Anusha Sumesh',
         'email': 'anusha@laasyaacademy.com',
         'phone': '+91 98765 00004',
         'role': 'trainer',
+        'age': 36,
+        'gender': 'Female',
+        'avatar_url': null,
+        'monthly_salary': 45000,
+        'salary_payment_status': 'paid',
         'specialization': 'Bharatanatyam Classical Dance',
-        'designation': 'Founder & Bharatanatyam Master (Guruvayoor Arangetram)',
+        'designation': 'Founder & Head Guru (Guruvayoor Arangetram)',
+        'assigned_room': 'Natya Mandapam (Room 101)',
         'assigned_batches_count': 4,
         'total_students_count': 42,
       };
@@ -138,9 +175,33 @@ class SupabaseService {
     }
 
     // -------------------------------------------------------------------------
-    // Students (by Roll No, Phone, or Name)
+    // Students (Student Login by Mobile, Roll No, or Email)
     // -------------------------------------------------------------------------
-    if (identifier.contains('10022') || identifier.contains('sneha')) {
+    if (identifier.contains('aditi') || identifier.contains('lca-6') || identifier.contains('9845012345')) {
+      _cachedProfile = {
+        'id': 'st-aditi',
+        'full_name': 'Aditi Sundaram',
+        'email': 'aditi.sundaram@laasyastudent.com',
+        'phone': '+91 98450 12345',
+        'role': 'student',
+        'roll_number': 'LCA-6',
+        'course': 'Bharathanatyam',
+        'course_category': 'Classical Dance',
+        'age': 16,
+        'gender': 'Female',
+        'avatar_url': null,
+        'parent_name': 'Sri Sundaram V.',
+        'parent_phone': '+91 98450 00006',
+        'address': 'Flat 402, Shanthi Vihar, Bangalore',
+        'batch': 'Bharathanatyam - Batch A (Beginners)',
+        'room_or_hall': 'Natya Mandapam (Room 101)',
+        'total_monthly_fee': 2000,
+        'advance_paid': 2000,
+        'due_amount': 0,
+        'due_status': 'green',
+      };
+      return _cachedProfile;
+    } else if (identifier.contains('10022') || identifier.contains('sneha')) {
       _cachedProfile = {
         'id': 'st-mock-2',
         'full_name': 'Sneha Reddy',
@@ -149,11 +210,43 @@ class SupabaseService {
         'role': 'student',
         'roll_number': 'LCA-10022',
         'course': 'Bharathanatyam',
+        'course_category': 'Classical Dance',
         'age': 15,
+        'gender': 'Female',
+        'avatar_url': null,
         'parent_name': 'Dr. K. V. Reddy',
         'parent_phone': '+91 99123 00002',
         'address': 'Plot 45, Jubilee Hills, Hyderabad',
         'batch': 'Batch A (Beginners)',
+        'room_or_hall': 'Natya Mandapam (Room 101)',
+        'total_monthly_fee': 2000,
+        'advance_paid': 0,
+        'due_amount': 2000,
+        'due_status': 'red',
+      };
+      return _cachedProfile;
+    } else if (identifier.contains('aryan') || identifier.contains('lca-14') || identifier.contains('9845000014')) {
+      _cachedProfile = {
+        'id': 'st-aryan',
+        'full_name': 'Aryan Sharma',
+        'email': 'aryan.sharma@laasyastudent.com',
+        'phone': '+91 98450 00014',
+        'role': 'student',
+        'roll_number': 'LCA-14',
+        'course': 'Art and Craft',
+        'course_category': 'Fine Arts',
+        'age': 14,
+        'gender': 'Male',
+        'avatar_url': null,
+        'parent_name': 'Sri Rajesh Sharma',
+        'parent_phone': '+91 98450 99914',
+        'address': 'No. 88, Indiranagar, Bangalore',
+        'batch': 'Primary Batch',
+        'room_or_hall': 'Chitra Kala Bhavan',
+        'total_monthly_fee': 1800,
+        'advance_paid': 1800,
+        'due_amount': 0,
+        'due_status': 'green',
       };
       return _cachedProfile;
     } else if (identifier.contains('10023') || identifier.contains('meera')) {
@@ -165,27 +258,19 @@ class SupabaseService {
         'role': 'student',
         'roll_number': 'LCA-10023',
         'course': 'Carnatic Music',
+        'course_category': 'Vocal & Music',
         'age': 17,
+        'gender': 'Female',
+        'avatar_url': null,
         'parent_name': 'Sri Govind Nambiar',
         'parent_phone': '+91 99123 00003',
         'address': 'Villa 12, Banjara Hills, Hyderabad',
         'batch': 'Morning Ragas',
-      };
-      return _cachedProfile;
-    } else if (identifier.contains('10024') || identifier.contains('kiran')) {
-      _cachedProfile = {
-        'id': 'st-mock-4',
-        'full_name': 'Kiran Kumar',
-        'email': 'kiran.kumar@example.com',
-        'phone': '+91 99123 45684',
-        'role': 'student',
-        'roll_number': 'LCA-10024',
-        'course': 'Kuchipudi',
-        'age': 16,
-        'parent_name': 'Sri Venkateshwarlu',
-        'parent_phone': '+91 99123 00004',
-        'address': 'Flat 302, Madhapur, Hyderabad',
-        'batch': 'Batch B',
+        'room_or_hall': 'Sangeetha Shala (Room 102)',
+        'total_monthly_fee': 2000,
+        'advance_paid': 1000,
+        'due_amount': 1000,
+        'due_status': 'yellow',
       };
       return _cachedProfile;
     } else {
@@ -196,13 +281,21 @@ class SupabaseService {
         'email': identifier.contains('@') ? identifier : 'ananya.rao@example.com',
         'phone': '+91 99123 45678',
         'role': 'student',
-        'roll_number': 'LCA-10021',
+        'roll_number': 'LCA-1',
         'course': 'Bharathanatyam',
+        'course_category': 'Classical Dance',
         'age': 16,
+        'gender': 'Female',
+        'avatar_url': null,
         'parent_name': 'Sri Ramesh Rao',
         'parent_phone': '+91 99123 00001',
         'address': 'No. 204, Gachibowli, Hyderabad',
-        'batch': 'Batch A (Beginners)',
+        'batch': 'Bharathanatyam - Batch A (Beginners)',
+        'room_or_hall': 'Natya Mandapam (Room 101)',
+        'total_monthly_fee': 2000,
+        'advance_paid': 1000,
+        'due_amount': 1000,
+        'due_status': 'yellow',
       };
       return _cachedProfile;
     }
@@ -242,14 +335,45 @@ class SupabaseService {
       final user = _client!.auth.currentUser;
       if (user != null) {
         try {
-          final data = await _client!
+          final profileData = await _client!
               .from('profiles')
               .select()
               .eq('id', user.id)
               .maybeSingle();
-          _cachedProfile = data;
-          return data;
-        } catch (_) {}
+          if (profileData != null) {
+            final role = profileData['role'] ?? 'student';
+            if (role == 'trainer') {
+              final trainer = await _client!.from('trainers').select().eq('profile_id', user.id).maybeSingle();
+              if (trainer != null) {
+                profileData['monthly_salary'] = trainer['monthly_salary'];
+                profileData['salary_payment_status'] = trainer['salary_payment_status'] ?? 'paid';
+                profileData['specialization'] = trainer['display_title'] ?? trainer['bio'];
+                profileData['age'] = trainer['age'] ?? profileData['age'];
+                profileData['gender'] = trainer['gender'] ?? profileData['gender'];
+                profileData['avatar_url'] = trainer['avatar_url'] ?? profileData['avatar_url'];
+              }
+            } else if (role == 'student') {
+              final student = await _client!.from('students').select().eq('profile_id', user.id).maybeSingle();
+              if (student != null) {
+                profileData['roll_number'] = student['roll_number'];
+                profileData['age'] = student['age'] ?? profileData['age'];
+                profileData['gender'] = student['gender'] ?? profileData['gender'];
+                profileData['avatar_url'] = student['avatar_url'] ?? profileData['avatar_url'];
+                profileData['parent_name'] = student['parent_name'];
+                profileData['parent_phone'] = student['parent_contact'];
+                profileData['address'] = student['address'];
+                profileData['advance_paid'] = student['advance_paid'] ?? 0;
+                profileData['total_monthly_fee'] = student['total_monthly_fee'] ?? 2000;
+                profileData['due_amount'] = student['due_amount'] ?? 0;
+                profileData['due_status'] = student['due_status'] ?? 'green';
+              }
+            }
+            _cachedProfile = profileData;
+            return profileData;
+          }
+        } catch (e) {
+          debugPrint('Profile fetch error: $e');
+        }
       }
     }
     return _cachedProfile;
@@ -261,6 +385,9 @@ class SupabaseService {
     String? emergencyContact,
     String? address,
     String? bio,
+    int? age,
+    String? gender,
+    String? avatarUrl,
   }) async {
     if (_cachedProfile != null) {
       _cachedProfile!['full_name'] = fullName;
@@ -268,6 +395,9 @@ class SupabaseService {
       if (emergencyContact != null) _cachedProfile!['parent_phone'] = emergencyContact;
       if (address != null) _cachedProfile!['address'] = address;
       if (bio != null) _cachedProfile!['specialization'] = bio;
+      if (age != null) _cachedProfile!['age'] = age;
+      if (gender != null) _cachedProfile!['gender'] = gender;
+      if (avatarUrl != null) _cachedProfile!['avatar_url'] = avatarUrl;
     }
     return true;
   }

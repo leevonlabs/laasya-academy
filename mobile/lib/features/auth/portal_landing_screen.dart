@@ -53,6 +53,14 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
     });
   }
 
+  void _quickLoginWithAccount(String id, String pass) {
+    setState(() {
+      _identifierController.text = id;
+      _passwordController.text = pass;
+    });
+    _handleLogin();
+  }
+
   Future<void> _handleLogin() async {
     setState(() {
       _isLoading = true;
@@ -510,45 +518,121 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
 
                     const SizedBox(height: 26),
 
+                    const SizedBox(height: 24),
+
                     // =========================================================
-                    // 9. DEMO HELPER: "Demo: ... · Fill in"
+                    // 9. QUICK DEMO ACCOUNTS (1-TAP SWITCH & LOGIN)
                     // =========================================================
-                    GestureDetector(
-                      onTap: _autoFillDemo,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.06),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withOpacity(0.12)),
-                        ),
-                        child: Text.rich(
-                          TextSpan(
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.28),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFEBB128).withOpacity(0.35)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              TextSpan(
-                                text: _isStudent
-                                    ? 'Demo: 9845012345 / student123 · '
-                                    : 'Demo: anusha@laasyaacademy.com / Guru@123 · ',
+                              Text(
+                                _isStudent ? '⚡ Quick Student Accounts' : '⚡ Quick Guru Faculty Accounts',
                                 style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w400,
+                                  color: Color(0xFFEBB128),
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const TextSpan(
-                                text: 'Fill in',
-                                style: TextStyle(
-                                  color: Color(0xFFEBB128),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  decoration: TextDecoration.underline,
-                                  decorationColor: Color(0xFFEBB128),
+                              GestureDetector(
+                                onTap: _autoFillDemo,
+                                child: const Text(
+                                  'Autofill Default',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                    decoration: TextDecoration.underline,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                          textAlign: TextAlign.center,
-                        ),
+                          const SizedBox(height: 10),
+                          if (_isStudent) ...[
+                            _demoAccountTile(
+                              name: 'Aditi Sundaram',
+                              meta: 'Bharathanatyam • Age 16 • Room 101',
+                              badge: 'Fee Paid',
+                              badgeBg: const Color(0xFFDEF7EC),
+                              badgeFg: const Color(0xFF03543F),
+                              onTap: () => _quickLoginWithAccount('9845012345', 'student123'),
+                            ),
+                            const SizedBox(height: 6),
+                            _demoAccountTile(
+                              name: 'Ananya Rao',
+                              meta: 'Bharathanatyam • Age 16 • Room 101',
+                              badge: 'Partial Due: ₹1,000',
+                              badgeBg: const Color(0xFFFEF3C7),
+                              badgeFg: const Color(0xFF92400E),
+                              onTap: () => _quickLoginWithAccount('9912345678', 'student123'),
+                            ),
+                            const SizedBox(height: 6),
+                            _demoAccountTile(
+                              name: 'Sneha Reddy',
+                              meta: 'Bharathanatyam • Age 15 • Room 101',
+                              badge: 'Due: ₹2,000',
+                              badgeBg: const Color(0xFFFDE8E8),
+                              badgeFg: const Color(0xFF9B1C1C),
+                              onTap: () => _quickLoginWithAccount('9912345680', 'student123'),
+                            ),
+                            const SizedBox(height: 6),
+                            _demoAccountTile(
+                              name: 'Aryan Sharma',
+                              meta: 'Art & Craft • Age 14 • Chitra Kala Bhavan',
+                              badge: 'Fine Arts',
+                              badgeBg: const Color(0xFFE1EFFE),
+                              badgeFg: const Color(0xFF1E429F),
+                              onTap: () => _quickLoginWithAccount('9845000014', 'student123'),
+                            ),
+                          ] else ...[
+                            _demoAccountTile(
+                              name: 'Smt. Anusha Sumesh',
+                              meta: 'Head Dance Guru • Room 101 • ₹45k/mo',
+                              badge: 'Salary Paid',
+                              badgeBg: const Color(0xFFDEF7EC),
+                              badgeFg: const Color(0xFF03543F),
+                              onTap: () => _quickLoginWithAccount('anusha@laasyaacademy.com', 'Guru@123'),
+                            ),
+                            const SizedBox(height: 6),
+                            _demoAccountTile(
+                              name: 'Guru Amos P Ovung',
+                              meta: 'Western Music & Violin • Hall 2 • ₹40k/mo',
+                              badge: 'Salary Paid',
+                              badgeBg: const Color(0xFFDEF7EC),
+                              badgeFg: const Color(0xFF03543F),
+                              onTap: () => _quickLoginWithAccount('amos@laasyaacademy.com', 'Amos@123'),
+                            ),
+                            const SizedBox(height: 6),
+                            _demoAccountTile(
+                              name: 'Shri H. Manikandan',
+                              meta: 'Carnatic Music • Room 102 • ₹38k/mo',
+                              badge: 'Salary Paid',
+                              badgeBg: const Color(0xFFDEF7EC),
+                              badgeFg: const Color(0xFF03543F),
+                              onTap: () => _quickLoginWithAccount('manikandan@laasyaacademy.com', 'Mani@123'),
+                            ),
+                            const SizedBox(height: 6),
+                            _demoAccountTile(
+                              name: 'Sensei Vijay Kumar',
+                              meta: 'Karate & Self Defense • Kalari • ₹32k/mo',
+                              badge: 'Pending Due',
+                              badgeBg: const Color(0xFFFDE8E8),
+                              badgeFg: const Color(0xFF9B1C1C),
+                              onTap: () => _quickLoginWithAccount('vijay@laasyaacademy.com', 'Vijay@123'),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -557,6 +641,77 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _demoAccountTile({
+    required String name,
+    required String meta,
+    required String badge,
+    required Color badgeBg,
+    required Color badgeFg,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withOpacity(0.09)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    meta,
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 10.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: badgeBg,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                badge,
+                style: TextStyle(
+                  color: badgeFg,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 11,
+              color: Color(0xFFEBB128),
+            ),
+          ],
         ),
       ),
     );

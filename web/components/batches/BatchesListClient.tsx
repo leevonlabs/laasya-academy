@@ -983,69 +983,69 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
           return (
             <div
               key={b.id}
-              className="bg-white rounded-3xl p-5.5 border border-[#F0D5E4] shadow-xs hover:shadow-xl hover:border-[#8A064D]/40 transition-all duration-200 flex flex-col justify-between group"
+              className="bg-white rounded-3xl p-6 border border-[#F0D5E4] shadow-xs hover:shadow-xl hover:border-[#8A064D]/40 transition-all duration-200 flex flex-col justify-between group"
             >
               <div>
                 {/* Header: Course Category & Active Badge */}
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#8A064D] bg-[#FFF2F8] border border-[#F0D5E4] px-3 py-0.5 rounded-full shadow-2xs">
-                    <Sparkles className="w-3 h-3 text-[#8A064D]" />
+                <div className="flex items-center justify-between gap-2 mb-3.5">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#8A064D] bg-[#FFF2F8] border border-[#F0D5E4] px-3.5 py-1 rounded-full shadow-2xs">
+                    <Sparkles className="w-3.5 h-3.5 text-[#8A064D]" />
                     <span>{b.course_category}</span>
                   </span>
-                  <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full ${
                     b.is_active !== false 
                       ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' 
                       : 'text-amber-700 bg-amber-50 border border-amber-200'
                   }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${b.is_active !== false ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                    <span className={`w-2 h-2 rounded-full ${b.is_active !== false ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
                     <span>{b.is_active !== false ? 'Active Slot' : 'Paused'}</span>
                   </span>
                 </div>
 
                 {/* Batch Name & Course */}
-                <h3 className="font-bold text-lg text-[#2D041A] leading-tight group-hover:text-[#8A064D] transition">
+                <h3 className="font-bold text-xl text-[#2D041A] leading-tight group-hover:text-[#8A064D] transition">
                   {b.name}
                 </h3>
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-[#8A064D] mt-1">
-                  <BookOpen className="w-3.5 h-3.5 shrink-0 opacity-80" />
+                <div className="flex items-center gap-2 text-sm font-bold text-[#8A064D] mt-1.5">
+                  <BookOpen className="w-4 h-4 shrink-0 opacity-80" />
                   <span className="truncate">{b.course_title}</span>
                 </div>
 
                 {/* Faculty, Schedule & Hall Details */}
-                <div className="mt-4 space-y-2 text-xs text-gray-700 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100">
+                <div className="mt-4 space-y-2.5 text-sm text-gray-800 bg-gray-50/90 p-4 rounded-2xl border border-gray-150">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-500 flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5 text-[#8A064D]" />
+                    <span className="text-gray-600 flex items-center gap-2 font-medium">
+                      <Users className="w-4 h-4 text-[#8A064D]" />
                       <span>Guru</span>
                     </span>
-                    <strong className="text-gray-900 font-semibold">{b.trainer_name}</strong>
+                    <strong className="text-gray-900 font-bold">{b.trainer_name}</strong>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-500 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-[#8A064D]" />
+                    <span className="text-gray-600 flex items-center gap-2 font-medium">
+                      <Clock className="w-4 h-4 text-[#8A064D]" />
                       <span>Timing</span>
                     </span>
-                    <strong className="text-gray-900 font-semibold font-mono">
+                    <strong className="text-gray-900 font-bold font-mono">
                       {b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}
                     </strong>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-500 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-[#8A064D]" />
+                    <span className="text-gray-600 flex items-center gap-2 font-medium">
+                      <MapPin className="w-4 h-4 text-[#8A064D]" />
                       <span>Hall / Room</span>
                     </span>
-                    <strong className="text-gray-900 font-semibold truncate max-w-[140px] text-right">
+                    <strong className="text-gray-900 font-bold truncate max-w-[160px] text-right">
                       {b.room_or_hall || 'Main Hall'}
                     </strong>
                   </div>
                 </div>
 
                 {/* Class Days Pills */}
-                <div className="mt-3.5 flex flex-wrap gap-1.5">
+                <div className="mt-4 flex flex-wrap gap-2">
                   {(b.days_of_week || []).map((day, idx) => (
                     <span 
                       key={idx}
-                      className="text-[10px] font-bold bg-[#FFF9FB] text-gray-700 border border-[#F0D5E4] px-2.5 py-0.5 rounded-lg shadow-2xs"
+                      className="text-xs font-bold bg-[#FFF9FB] text-gray-800 border border-[#F0D5E4] px-3 py-1 rounded-xl shadow-2xs"
                     >
                       {day.substring(0, 3)}
                     </span>
@@ -1054,14 +1054,14 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
               </div>
 
               {/* Capacity Progress Bar & Action Buttons */}
-              <div className="mt-5 pt-4 border-t border-gray-100">
-                <div className="flex justify-between items-center text-xs mb-1.5">
-                  <span className="text-gray-500 font-medium">Batch Enrollment</span>
-                  <span className="font-bold text-[#8A064D]">
+              <div className="mt-6 pt-4.5 border-t border-gray-100">
+                <div className="flex justify-between items-center text-sm mb-2">
+                  <span className="text-gray-600 font-semibold">Batch Enrollment</span>
+                  <span className="font-extrabold text-[#8A064D]">
                     {b.enrolled_count || 0} / {b.max_capacity} Seats ({fillPercentage}%)
                   </span>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden mb-4 p-0.5">
+                <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden mb-5 p-0.5">
                   <div 
                     className={`h-full rounded-full transition-all duration-300 ${
                       fillPercentage >= 90 ? 'bg-rose-500' :
@@ -1075,26 +1075,26 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 <div className="flex items-center justify-between pt-1">
                   <button
                     onClick={() => setViewingBatch(b)}
-                    className="px-3.5 py-1.5 rounded-xl bg-gray-50 hover:bg-[#8A064D] text-gray-700 hover:text-white border border-gray-200 hover:border-[#8A064D] text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    className="px-4 py-2 rounded-xl bg-gray-50 hover:bg-[#8A064D] text-gray-800 hover:text-white border border-gray-200 hover:border-[#8A064D] text-sm font-bold transition cursor-pointer flex items-center gap-2 shadow-2xs"
                   >
-                    <Eye className="w-3.5 h-3.5" />
+                    <Eye className="w-4 h-4" />
                     <span>View Details</span>
                   </button>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => openEditModal(b)}
                       title="Edit Batch"
-                      className="p-2 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] hover:bg-[#8A064D] hover:text-white text-[#8A064D] transition cursor-pointer shadow-2xs"
+                      className="p-2.5 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] hover:bg-[#8A064D] hover:text-white text-[#8A064D] transition cursor-pointer shadow-2xs"
                     >
-                      <Edit3 className="w-3.5 h-3.5" />
+                      <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => setDeletingBatch(b)}
                       title="Delete Batch"
-                      className="p-2 rounded-xl bg-gray-50 border border-gray-200 hover:bg-rose-600 hover:text-white text-gray-400 hover:border-rose-600 transition cursor-pointer shadow-2xs"
+                      className="p-2.5 rounded-xl bg-gray-50 border border-gray-200 hover:bg-rose-600 hover:text-white text-gray-400 hover:border-rose-600 transition cursor-pointer shadow-2xs"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>

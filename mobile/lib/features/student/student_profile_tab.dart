@@ -179,14 +179,42 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
     }
 
     final name = _profile?['full_name'] ?? 'Ananya Rao';
-    final roll = _profile?['roll_number'] ?? 'LCA-10021';
+    final roll = _profile?['roll_number'] ?? 'LCA-1';
     final phone = _profile?['phone'] ?? '+91 99123 45678';
     final parentName = _profile?['parent_name'] ?? 'Sri Ramesh Rao';
     final parentPhone = _profile?['parent_phone'] ?? '+91 99123 00001';
     final age = _profile?['age'] ?? 16;
+    final gender = _profile?['gender'] ?? 'Female';
     final address = _profile?['address'] ?? 'No. 204, Gachibowli, Hyderabad';
     final course = _profile?['course'] ?? 'Bharathanatyam';
-    final batch = _profile?['batch'] ?? 'Batch A (Beginners)';
+    final category = _profile?['course_category'] ?? 'Classical Dance';
+    final batch = _profile?['batch'] ?? 'Bharathanatyam - Batch A (Beginners)';
+    final room = _profile?['room_or_hall'] ?? 'Natya Mandapam (Room 101)';
+    final avatarUrl = _profile?['avatar_url'] as String?;
+
+    // Fee attributes
+    final totalFee = _profile?['total_monthly_fee'] ?? 2000;
+    final advancePaid = _profile?['advance_paid'] ?? 1000;
+    final dueAmount = _profile?['due_amount'] ?? 1000;
+    final dueStatus = _profile?['due_status'] ?? 'yellow';
+
+    Color dueBadgeBg;
+    Color dueBadgeText;
+    String dueLabel;
+
+    if (dueStatus == 'green' || (dueAmount is num && dueAmount <= 0)) {
+      dueBadgeBg = const Color(0xFFDEF7EC);
+      dueBadgeText = const Color(0xFF03543F);
+      dueLabel = 'Fee Paid / No Due';
+    } else if (dueStatus == 'yellow' || (dueAmount is num && dueAmount < totalFee)) {
+      dueBadgeBg = const Color(0xFFFEF3C7);
+      dueBadgeText = const Color(0xFF92400E);
+      dueLabel = 'Partial Paid: ₹$dueAmount Due';
+    } else {
+      dueBadgeBg = const Color(0xFFFDE8E8);
+      dueBadgeText = const Color(0xFF9B1C1C);
+      dueLabel = 'Pending Due: ₹$dueAmount';
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8FA),
@@ -256,14 +284,24 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                   Row(
                     children: [
                       Container(
-                        width: 64,
-                        height: 64,
+                        width: 68,
+                        height: 68,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: LaasyaColors.accentGold, width: 2),
+                          border: Border.all(color: LaasyaColors.accentGold, width: 2.2),
                           color: const Color(0xFFD4AF37),
                         ),
-                        child: const Icon(Icons.person, color: Colors.white, size: 38),
+                        child: ClipOval(
+                          child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                              ? (avatarUrl.startsWith('data:') 
+                                  ? const Icon(Icons.person, color: Colors.white, size: 40)
+                                  : Image.network(
+                                      avatarUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 40),
+                                    ))
+                              : const Icon(Icons.person, color: Colors.white, size: 40),
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -276,13 +314,17 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Roll No: $roll',
-                              style: const TextStyle(color: LaasyaColors.accentGold, fontSize: 13, fontWeight: FontWeight.bold),
+                              'Roll No: $roll • $age Yrs ($gender)',
+                              style: const TextStyle(color: LaasyaColors.accentGold, fontSize: 12.5, fontWeight: FontWeight.bold),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 3),
                             Text(
-                              '$course • $batch',
+                              '$course ($category)',
                               style: const TextStyle(color: Colors.white70, fontSize: 11),
+                            ),
+                            Text(
+                              '$batch • $room',
+                              style: const TextStyle(color: Colors.white60, fontSize: 10),
                             ),
                           ],
                         ),
@@ -293,10 +335,122 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
 
             // =================================================================
-            // 2. PERSONAL DETAILS CARD
+            // 2. FEE STATUS & TUITION DUE SUMMARY
+            // =================================================================
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFF0D5E4)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.currency_rupee_rounded, color: LaasyaColors.primary, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'Tuition Fee & Dues Status',
+                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: dueBadgeBg,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          dueLabel,
+                          style: TextStyle(color: dueBadgeText, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF9FB),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFF0D5E4)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Monthly Fee', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 2),
+                              Text('₹$totalFee', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF9FB),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFF0D5E4)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Paid / Advance', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 2),
+                              Text('₹$advancePaid', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF9FB),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFF0D5E4)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Balance Due', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 2),
+                              Text('₹$dueAmount', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: dueBadgeText)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // =================================================================
+            // 3. PERSONAL DETAILS CARD
             // =================================================================
             _sectionCard(
               title: 'Personal & Contact Details',
@@ -306,8 +460,9 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                 onPressed: _showEditProfileDialog,
               ),
               children: [
-                _infoRow(Icons.cake_outlined, 'Age', '$age Years'),
+                _infoRow(Icons.cake_outlined, 'Age & Gender', '$age Years • $gender'),
                 _infoRow(Icons.phone_outlined, 'Student Mobile', phone),
+                _infoRow(Icons.meeting_room_outlined, 'Assigned Room', room),
                 _infoRow(Icons.location_on_outlined, 'Residence Address', address),
               ],
             ),
