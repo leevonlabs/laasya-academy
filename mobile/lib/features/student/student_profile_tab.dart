@@ -31,59 +31,6 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
     }
   }
 
-  void _showEditProfileDialog() {
-    final nameCtrl = TextEditingController(text: _profile?['full_name'] ?? '');
-    final phoneCtrl = TextEditingController(text: _profile?['phone'] ?? '');
-    final parentPhoneCtrl = TextEditingController(text: _profile?['parent_phone'] ?? '');
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Edit Permitted Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Student Full Name'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: phoneCtrl,
-              decoration: const InputDecoration(labelText: 'Contact Phone Number'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: parentPhoneCtrl,
-              decoration: const InputDecoration(labelText: 'Parent/Guardian Emergency Contact'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final nav = Navigator.of(ctx);
-              final messenger = ScaffoldMessenger.of(context);
-              await SupabaseService().updateProfile(
-                fullName: nameCtrl.text.trim(),
-                phone: phoneCtrl.text.trim(),
-                emergencyContact: parentPhoneCtrl.text.trim(),
-              );
-              nav.pop();
-              _loadProfile();
-              messenger.showSnackBar(
-                const SnackBar(content: Text('Profile details updated successfully!')),
-              );
-            },
-            child: const Text('Save Changes'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showChangePasswordDialog() {
     final oldPassCtrl = TextEditingController();
     final newPassCtrl = TextEditingController();
@@ -92,8 +39,14 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Change Password', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: const Row(
+          children: [
+            Icon(Icons.lock_reset_rounded, color: LaasyaColors.primary),
+            SizedBox(width: 8),
+            Text('Change Password', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -148,15 +101,15 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Confirm Logout'),
-        content: const Text('Are you sure you want to log out of your student session?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Confirm Sign Out', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('Are you sure you want to log out of your student portal session?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: LaasyaColors.error),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Log Out'),
+            child: const Text('Sign Out'),
           ),
         ],
       ),
@@ -175,11 +128,11 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator(color: LaasyaColors.primary));
     }
 
     final name = _profile?['full_name'] ?? 'Ananya Rao';
-    final roll = _profile?['roll_number'] ?? 'LCA-1';
+    final roll = _profile?['roll_number'] ?? 'LCA-10021';
     final phone = _profile?['phone'] ?? '+91 99123 45678';
     final parentName = _profile?['parent_name'] ?? 'Sri Ramesh Rao';
     final parentPhone = _profile?['parent_phone'] ?? '+91 99123 00001';
@@ -205,7 +158,7 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
     if (dueStatus == 'green' || (dueAmount is num && dueAmount <= 0)) {
       dueBadgeBg = const Color(0xFFDEF7EC);
       dueBadgeText = const Color(0xFF03543F);
-      dueLabel = 'Fee Paid / No Due';
+      dueLabel = 'Fee Cleared • No Dues';
     } else if (dueStatus == 'yellow' || (dueAmount is num && dueAmount < totalFee)) {
       dueBadgeBg = const Color(0xFFFEF3C7);
       dueBadgeText = const Color(0xFF92400E);
@@ -213,7 +166,7 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
     } else {
       dueBadgeBg = const Color(0xFFFDE8E8);
       dueBadgeText = const Color(0xFF9B1C1C);
-      dueLabel = 'Pending Due: ₹$dueAmount';
+      dueLabel = 'Tuition Due: ₹$dueAmount';
     }
 
     return Scaffold(
@@ -223,22 +176,22 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
         child: Column(
           children: [
             // =================================================================
-            // 1. DIGITAL STUDENT ID CARD
+            // 1. EXECUTIVE DIGITAL STUDENT ID CARD
             // =================================================================
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFF8A064D), Color(0xFF590231)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.6), width: 1.5),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.7), width: 1.5),
                 boxShadow: [
                   BoxShadow(
                     color: LaasyaColors.primaryDark.withOpacity(0.35),
-                    blurRadius: 16,
+                    blurRadius: 18,
                     offset: const Offset(0, 6),
                   ),
                 ],
@@ -251,56 +204,67 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                       Row(
                         children: [
                           Container(
-                            width: 38,
-                            height: 38,
+                            padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: LaasyaColors.accentGold, width: 1.5),
+                              color: Colors.black.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            child: ClipOval(
-                              child: Image.asset('assets/images/crest_logo.png', fit: BoxFit.cover),
-                            ),
+                            child: const Icon(Icons.school_rounded, color: LaasyaColors.accentGold, size: 18),
                           ),
-                          const SizedBox(width: 10),
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'LAASYA CULTURAL ACADEMY',
-                                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-                              ),
-                              Text(
-                                'STUDENT IDENTITY CARD',
-                                style: TextStyle(color: LaasyaColors.accentGold, fontSize: 9.5, fontWeight: FontWeight.bold),
-                              ),
-                            ],
+                          const SizedBox(width: 8),
+                          const Text(
+                            'LAASYA CULTURAL ACADEMY',
+                            style: TextStyle(
+                              color: LaasyaColors.accentGold,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                            ),
                           ),
                         ],
                       ),
-                      const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 36),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDEF7EC),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.verified_rounded, size: 12, color: Color(0xFF03543F)),
+                            SizedBox(width: 4),
+                            Text(
+                              'VERIFIED STUDENT',
+                              style: TextStyle(color: Color(0xFF03543F), fontSize: 9.5, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 18),
                   Row(
                     children: [
+                      // Avatar
                       Container(
-                        width: 68,
-                        height: 68,
+                        width: 72,
+                        height: 72,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(color: LaasyaColors.accentGold, width: 2.2),
-                          color: const Color(0xFFD4AF37),
+                          color: const Color(0xFF740340),
                         ),
                         child: ClipOval(
                           child: (avatarUrl != null && avatarUrl.isNotEmpty)
-                              ? (avatarUrl.startsWith('data:') 
-                                  ? const Icon(Icons.person, color: Colors.white, size: 40)
+                              ? (avatarUrl.startsWith('data:')
+                                  ? const Icon(Icons.person_rounded, color: Colors.white, size: 44)
                                   : Image.network(
                                       avatarUrl,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 40),
+                                      errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Colors.white, size: 44),
                                     ))
-                              : const Icon(Icons.person, color: Colors.white, size: 40),
+                              : const Icon(Icons.person_rounded, color: Colors.white, size: 44),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -310,21 +274,21 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                           children: [
                             Text(
                               name,
-                              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                              style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 4),
                             Text(
                               'Roll No: $roll • $age Yrs ($gender)',
-                              style: const TextStyle(color: LaasyaColors.accentGold, fontSize: 12.5, fontWeight: FontWeight.bold),
+                              style: const TextStyle(color: LaasyaColors.accentGold, fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              '$course ($category)',
-                              style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              course,
+                              style: const TextStyle(color: Colors.white70, fontSize: 12),
                             ),
                             Text(
-                              '$batch • $room',
-                              style: const TextStyle(color: Colors.white60, fontSize: 10),
+                              'Batch: $batch',
+                              style: const TextStyle(color: Colors.white60, fontSize: 10.5),
                             ),
                           ],
                         ),
@@ -335,13 +299,64 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
               ),
             ),
 
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
 
             // =================================================================
-            // 2. FEE STATUS & TUITION DUE SUMMARY
+            // 2. DIRECTOR (ADMIN) EDITING PERMISSIONS NOTICE (RULE SATISFIED)
             // =================================================================
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFF0D5E4)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF2F8),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFF0D5E4)),
+                    ),
+                    child: const Icon(Icons.admin_panel_settings_rounded, color: LaasyaColors.primary, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Administrative Profile Control',
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Student profile data is maintained exclusively by the Academy Director. To request changes, please contact the academy office.',
+                          style: TextStyle(fontSize: 10.5, color: Colors.black87, height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // =================================================================
+            // 3. TUITION FEE & DUES STATUS CARD
+            // =================================================================
+            Container(
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -361,11 +376,11 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.currency_rupee_rounded, color: LaasyaColors.primary, size: 18),
+                          Icon(Icons.currency_rupee_rounded, color: LaasyaColors.primary, size: 20),
                           SizedBox(width: 6),
                           Text(
                             'Tuition Fee & Dues Status',
-                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
                           ),
                         ],
                       ),
@@ -382,23 +397,23 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Row(
                     children: [
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFF9FB),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(color: const Color(0xFFF0D5E4)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Monthly Fee', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 2),
-                              Text('₹$totalFee', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
+                              const Text('Monthly Fee', style: TextStyle(fontSize: 10.5, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 3),
+                              Text('₹$totalFee', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
                             ],
                           ),
                         ),
@@ -406,18 +421,18 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFF9FB),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(color: const Color(0xFFF0D5E4)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Paid / Advance', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 2),
-                              Text('₹$advancePaid', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
+                              const Text('Paid / Advance', style: TextStyle(fontSize: 10.5, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 3),
+                              Text('₹$advancePaid', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
                             ],
                           ),
                         ),
@@ -425,18 +440,18 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFF9FB),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(color: const Color(0xFFF0D5E4)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Balance Due', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 2),
-                              Text('₹$dueAmount', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: dueBadgeText)),
+                              const Text('Balance Due', style: TextStyle(fontSize: 10.5, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 3),
+                              Text('₹$dueAmount', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: dueBadgeText)),
                             ],
                           ),
                         ),
@@ -450,40 +465,49 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
             const SizedBox(height: 16),
 
             // =================================================================
-            // 3. PERSONAL DETAILS CARD
+            // 4. ACADEMIC & ENROLLMENT PARTICULARS
             // =================================================================
             _sectionCard(
-              title: 'Personal & Contact Details',
-              trailing: TextButton.icon(
-                icon: const Icon(Icons.edit_outlined, size: 16, color: LaasyaColors.primary),
-                label: const Text('Edit', style: TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold)),
-                onPressed: _showEditProfileDialog,
-              ),
+              title: 'Academic Enrollment',
+              children: [
+                _infoRow(Icons.auto_stories_outlined, 'Discipline & Course', course),
+                _infoRow(Icons.category_outlined, 'Course Category', category),
+                _infoRow(Icons.groups_outlined, 'Enrolled Batch', batch),
+                _infoRow(Icons.meeting_room_outlined, 'Assigned Studio Hall', room),
+              ],
+            ),
+
+            const SizedBox(height: 14),
+
+            // =================================================================
+            // 5. PERSONAL & CONTACT DETAILS (READ ONLY)
+            // =================================================================
+            _sectionCard(
+              title: 'Personal & Contact Information',
               children: [
                 _infoRow(Icons.cake_outlined, 'Age & Gender', '$age Years • $gender'),
-                _infoRow(Icons.phone_outlined, 'Student Mobile', phone),
-                _infoRow(Icons.meeting_room_outlined, 'Assigned Room', room),
-                _infoRow(Icons.location_on_outlined, 'Residence Address', address),
+                _infoRow(Icons.phone_outlined, 'Student Mobile Phone', phone),
+                _infoRow(Icons.location_on_outlined, 'Residential Address', address),
               ],
             ),
 
             const SizedBox(height: 14),
 
             // =================================================================
-            // 3. PARENT / GUARDIAN DETAILS
+            // 6. PARENT / GUARDIAN DETAILS
             // =================================================================
             _sectionCard(
-              title: 'Parent / Guardian Contact',
+              title: 'Parent & Guardian Information',
               children: [
                 _infoRow(Icons.family_restroom_rounded, 'Parent / Guardian Name', parentName),
-                _infoRow(Icons.contact_phone_outlined, 'Emergency Contact', parentPhone),
+                _infoRow(Icons.contact_phone_outlined, 'Emergency Contact Phone', parentPhone),
               ],
             ),
 
             const SizedBox(height: 14),
 
             // =================================================================
-            // 4. SECURITY & SETTINGS
+            // 7. SECURITY & SESSION SETTINGS
             // =================================================================
             _sectionCard(
               title: 'Account Security',
@@ -491,25 +515,17 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.lock_reset_rounded, color: LaasyaColors.primary),
-                  title: const Text('Change Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Update your personal login security credential', style: TextStyle(fontSize: 11)),
+                  title: const Text('Change Password', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Update your personal login security password', style: TextStyle(fontSize: 11)),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                   onTap: _showChangePasswordDialog,
-                ),
-                const Divider(),
-                const ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.verified_user_outlined, color: Colors.green),
-                  title: Text('Academy Verification Status', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                  subtitle: Text('Verified Academy Student • Active 2026 Batch', style: TextStyle(fontSize: 11)),
-                  trailing: Icon(Icons.check_circle_rounded, color: Colors.green, size: 18),
                 ),
               ],
             ),
 
             const SizedBox(height: 24),
 
-            // Secure Logout Button
+            // Secure Sign Out Button
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -520,7 +536,7 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 icon: const Icon(Icons.logout_rounded, size: 18),
-                label: const Text('Log Out of Student Account', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: const Text('Sign Out of Student Account', style: TextStyle(fontWeight: FontWeight.bold)),
                 onPressed: _handleLogout,
               ),
             ),
@@ -531,42 +547,54 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
     );
   }
 
-  Widget _sectionCard({required String title, Widget? trailing, required List<Widget> children}) {
+  Widget _sectionCard({required String title, required List<Widget> children}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFF0D5E4)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark)),
-              if (trailing != null) trailing,
-            ],
+          Text(
+            title,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           ...children,
         ],
       ),
     );
   }
 
-  Widget _infoRow(IconData icon, String label, String val) {
+  Widget _infoRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: LaasyaColors.primary),
-          const SizedBox(width: 12),
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54)),
-          const Spacer(),
-          Text(val, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+          Icon(icon, size: 16, color: LaasyaColors.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 10.5, color: Colors.grey, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 1),
+                Text(value, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: LaasyaColors.textDark)),
+              ],
+            ),
+          ),
         ],
       ),
     );

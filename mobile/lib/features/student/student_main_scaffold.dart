@@ -23,7 +23,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
       StudentDashboardTab(
         onNavigateToCourses: () => setState(() => _currentIndex = 1),
         onNavigateToSchedule: () => setState(() => _currentIndex = 2),
-        onNavigateToCheckIn: () => setState(() => _currentIndex = 3),
+        onNavigateToAttendance: () => setState(() => _currentIndex = 3),
       ),
       const StudentCoursesTab(),
       const StudentScheduleTab(),
@@ -35,7 +35,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
       'Student Dashboard',
       'My Enrolled Courses',
       'Class Timetable',
-      'Attendance & Check-In',
+      'Attendance Records',
       'Student Profile & ID',
     ];
 

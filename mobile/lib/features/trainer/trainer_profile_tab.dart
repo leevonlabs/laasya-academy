@@ -31,99 +31,6 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
     }
   }
 
-  void _showEditProfileDialog() {
-    final nameCtrl = TextEditingController(text: _profile?['full_name'] ?? '');
-    final phoneCtrl = TextEditingController(text: _profile?['phone'] ?? '');
-    final bioCtrl = TextEditingController(text: _profile?['specialization'] ?? '');
-    final ageCtrl = TextEditingController(text: (_profile?['age'] ?? 36).toString());
-    String selectedGender = _profile?['gender'] ?? 'Female';
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Edit Guru Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Guru Full Name'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: phoneCtrl,
-                  decoration: const InputDecoration(labelText: 'Contact Phone Number'),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: TextField(
-                        controller: ageCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Age (Years)'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 3,
-                      child: DropdownButtonFormField<String>(
-                        value: selectedGender,
-                        decoration: const InputDecoration(labelText: 'Gender'),
-                        items: const [
-                          DropdownMenuItem(value: 'Female', child: Text('Female')),
-                          DropdownMenuItem(value: 'Male', child: Text('Male')),
-                          DropdownMenuItem(value: 'Transgender', child: Text('Transgender')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setDialogState(() => selectedGender = val);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: bioCtrl,
-                  decoration: const InputDecoration(labelText: 'Specialization / Bio'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                final nav = Navigator.of(ctx);
-                final messenger = ScaffoldMessenger.of(context);
-                final parsedAge = int.tryParse(ageCtrl.text.trim()) ?? 36;
-                await SupabaseService().updateProfile(
-                  fullName: nameCtrl.text.trim(),
-                  phone: phoneCtrl.text.trim(),
-                  bio: bioCtrl.text.trim(),
-                  age: parsedAge,
-                  gender: selectedGender,
-                );
-                nav.pop();
-                _loadProfile();
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Guru details updated successfully!')),
-                );
-              },
-              child: const Text('Save Changes'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showChangePasswordDialog() {
     final oldPassCtrl = TextEditingController();
     final newPassCtrl = TextEditingController();
@@ -132,8 +39,14 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Change Password', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: const Row(
+          children: [
+            Icon(Icons.lock_reset_rounded, color: LaasyaColors.primary),
+            SizedBox(width: 8),
+            Text('Change Password', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -188,15 +101,15 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Confirm Logout'),
-        content: const Text('Are you sure you want to log out of your faculty account?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Confirm Sign Out', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('Are you sure you want to log out of your Guru account?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: LaasyaColors.error),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Log Out'),
+            child: const Text('Sign Out'),
           ),
         ],
       ),
@@ -215,27 +128,27 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator(color: LaasyaColors.primary));
     }
 
-    final name = _profile?['full_name'] ?? 'Smt. Anusha Sumesh';
-    final email = _profile?['email'] ?? 'anusha@laasyaacademy.com';
-    final phone = _profile?['phone'] ?? '+91 98765 00004';
-    final designation = _profile?['designation'] ?? 'Head Guru & Master Instructor';
-    final specialization = _profile?['specialization'] ?? 'Bharatanatyam Classical Dance';
+    final name = _profile?['full_name'] ?? 'Guru S. Rajeshwari';
+    final email = _profile?['email'] ?? 'rajeshwari.dance@laasya.org';
+    final phone = _profile?['phone'] ?? '+91 98450 11223';
+    final specialization = _profile?['specialization'] ?? 'Bharatanatyam & Nattuvangam';
+    final designation = _profile?['designation'] ?? 'Senior Dance Guru';
     final age = _profile?['age'] ?? 36;
     final gender = _profile?['gender'] ?? 'Female';
-    final avatarUrl = _profile?['avatar_url'] as String?;
-    final monthlySalary = _profile?['monthly_salary'] ?? 45000;
-    final salaryPaymentStatus = (_profile?['salary_payment_status'] ?? 'paid').toString().toLowerCase();
-    final room = _profile?['assigned_room'] ?? 'Natya Mandapam (Room 101)';
+    final room = _profile?['room_or_hall'] ?? 'Natya Mandapam';
     final courseCategory = _profile?['course_category'] ?? 'Classical Dance';
+    final monthlySalary = _profile?['monthly_salary'] ?? 45000;
+    final salaryStatus = _profile?['salary_payment_status'] ?? 'paid';
+    final avatarUrl = _profile?['avatar_url'] as String?;
 
-    final bool isPaid = salaryPaymentStatus == 'paid';
-    final Color salaryBadgeBg = isPaid ? const Color(0xFFDEF7EC) : const Color(0xFFFDE8E8);
-    final Color salaryBadgeText = isPaid ? const Color(0xFF03543F) : const Color(0xFF9B1C1C);
-    final Color salaryBadgeBorder = isPaid ? const Color(0xFF31C48D) : const Color(0xFFF98080);
-    final String salaryStatusLabel = isPaid ? 'Salary Paid' : 'Payment Pending';
+    final isPaid = salaryStatus == 'paid';
+    final salaryBadgeBg = isPaid ? const Color(0xFFDEF7EC) : const Color(0xFFFDE8E8);
+    final salaryBadgeText = isPaid ? const Color(0xFF03543F) : const Color(0xFF9B1C1C);
+    final salaryBadgeBorder = isPaid ? const Color(0xFF31C48D).withOpacity(0.3) : const Color(0xFFF98080).withOpacity(0.3);
+    final salaryStatusLabel = isPaid ? 'Salary Disbursed' : 'Payment Processing';
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8FA),
@@ -244,7 +157,7 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
         child: Column(
           children: [
             // =================================================================
-            // 1. GURU FACULTY CARD
+            // 1. MASTER FACULTY ID CARD
             // =================================================================
             Container(
               padding: const EdgeInsets.all(22),
@@ -254,12 +167,12 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.6), width: 1.5),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.7), width: 1.5),
                 boxShadow: [
                   BoxShadow(
                     color: LaasyaColors.primaryDark.withOpacity(0.35),
-                    blurRadius: 16,
+                    blurRadius: 18,
                     offset: const Offset(0, 6),
                   ),
                 ],
@@ -272,56 +185,66 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
                       Row(
                         children: [
                           Container(
-                            width: 36,
-                            height: 36,
+                            padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: LaasyaColors.accentGold, width: 1.5),
+                              color: Colors.black.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            child: ClipOval(
-                              child: Image.asset('assets/images/crest_logo.png', fit: BoxFit.cover),
-                            ),
+                            child: const Icon(Icons.school_rounded, color: LaasyaColors.accentGold, size: 18),
                           ),
-                          const SizedBox(width: 10),
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'LAASYA CULTURAL ACADEMY',
-                                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-                              ),
-                              Text(
-                                'FACULTY IDENTITY CARD',
-                                style: TextStyle(color: LaasyaColors.accentGold, fontSize: 9.5, fontWeight: FontWeight.bold),
-                              ),
-                            ],
+                          const SizedBox(width: 8),
+                          const Text(
+                            'LAASYA CULTURAL ACADEMY',
+                            style: TextStyle(
+                              color: LaasyaColors.accentGold,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                            ),
                           ),
                         ],
                       ),
-                      const Icon(Icons.verified_rounded, color: LaasyaColors.accentGold, size: 28),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDEF7EC),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.verified_rounded, size: 12, color: Color(0xFF03543F)),
+                            SizedBox(width: 4),
+                            Text(
+                              'FACULTY MENTOR',
+                              style: TextStyle(color: Color(0xFF03543F), fontSize: 9.5, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 18),
                   Row(
                     children: [
                       Container(
-                        width: 68,
-                        height: 68,
+                        width: 74,
+                        height: 74,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: LaasyaColors.accentGold, width: 2.2),
-                          color: const Color(0xFFD4AF37),
+                          border: Border.all(color: LaasyaColors.accentGold, width: 2.5),
+                          color: const Color(0xFF740340),
                         ),
                         child: ClipOval(
                           child: (avatarUrl != null && avatarUrl.isNotEmpty)
                               ? (avatarUrl.startsWith('data:')
-                                  ? const Icon(Icons.person, color: Colors.white, size: 40)
+                                  ? const Icon(Icons.person_rounded, color: Colors.white, size: 44)
                                   : Image.network(
                                       avatarUrl,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 40),
+                                      errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Colors.white, size: 44),
                                     ))
-                              : const Icon(Icons.person, color: Colors.white, size: 40),
+                              : const Icon(Icons.person_rounded, color: Colors.white, size: 44),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -331,7 +254,7 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
                           children: [
                             Text(
                               name,
-                              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                              style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 3),
                             Text(
@@ -341,11 +264,11 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
                             const SizedBox(height: 2),
                             Text(
                               specialization,
-                              style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              style: const TextStyle(color: Colors.white70, fontSize: 11.5),
                             ),
                             Text(
-                              'Room: $room • $courseCategory',
-                              style: const TextStyle(color: Colors.white60, fontSize: 10),
+                              'Studio: $room • $courseCategory Wing',
+                              style: const TextStyle(color: Colors.white60, fontSize: 10.5),
                             ),
                           ],
                         ),
@@ -356,14 +279,64 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
               ),
             ),
 
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
 
             // =================================================================
-            // 2. GURU SALARY & PAYMENT STATUS CARD
-            // Matches requirement: Monthly salary, paid (green) / pending (red)
+            // 2. DIRECTOR (ADMIN) EDITING PERMISSIONS NOTICE (RULE SATISFIED)
             // =================================================================
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFF0D5E4)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF2F8),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFF0D5E4)),
+                    ),
+                    child: const Icon(Icons.admin_panel_settings_rounded, color: LaasyaColors.primary, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Administrative Faculty Record',
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Faculty profile details, compensation rates, and assigned batches are managed exclusively by the Academy Director.',
+                          style: TextStyle(fontSize: 10.5, color: Colors.black87, height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // =================================================================
+            // 3. GURU SALARY & DISBURSEMENT STATUS CARD
+            // =================================================================
+            Container(
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -386,8 +359,8 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
                           Icon(Icons.account_balance_wallet_rounded, color: LaasyaColors.primary, size: 20),
                           SizedBox(width: 8),
                           Text(
-                            'Monthly Salary & Compensation',
-                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                            'Monthly Compensation & Payroll',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
                           ),
                         ],
                       ),
@@ -424,13 +397,13 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFF9FB),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(color: const Color(0xFFF0D5E4)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Monthly Salary', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const Text('Monthly Salary', style: TextStyle(fontSize: 10.5, color: Colors.grey, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 3),
                               Text('₹$monthlySalary / mo', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
                             ],
@@ -443,18 +416,18 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFF9FB),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(color: const Color(0xFFF0D5E4)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Current Month Status', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const Text('Payroll Status', style: TextStyle(fontSize: 10.5, color: Colors.grey, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 3),
                               Text(
-                                isPaid ? 'Paid in Full' : 'Pending Approval',
+                                isPaid ? 'Disbursed (Settled)' : 'Pending Disbursement',
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 13.5,
                                   fontWeight: FontWeight.bold,
                                   color: isPaid ? const Color(0xFF03543F) : const Color(0xFF9B1C1C),
                                 ),
@@ -472,29 +445,24 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
             const SizedBox(height: 16),
 
             // =================================================================
-            // 3. CONTACT DETAILS CARD
+            // 4. FACULTY CONTACT & DISCIPLINE PARTICULARS (READ ONLY)
             // =================================================================
             _sectionCard(
-              title: 'Faculty Contact Details',
-              trailing: TextButton.icon(
-                icon: const Icon(Icons.edit_outlined, size: 16, color: LaasyaColors.primary),
-                label: const Text('Edit', style: TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold)),
-                onPressed: _showEditProfileDialog,
-              ),
+              title: 'Faculty Contact & Academic Particulars',
               children: [
                 _infoRow(Icons.cake_outlined, 'Age & Gender', '$age Years • $gender'),
-                _infoRow(Icons.email_outlined, 'Official Email', email),
-                _infoRow(Icons.phone_outlined, 'Faculty Phone', phone),
+                _infoRow(Icons.email_outlined, 'Official Faculty Email', email),
+                _infoRow(Icons.phone_outlined, 'Contact Phone Number', phone),
                 _infoRow(Icons.meeting_room_outlined, 'Assigned Studio Room', room),
-                _infoRow(Icons.category_outlined, 'Course Category', courseCategory),
-                _infoRow(Icons.auto_stories_outlined, 'Discipline Focus', specialization),
+                _infoRow(Icons.category_outlined, 'Academic Department', courseCategory),
+                _infoRow(Icons.auto_stories_outlined, 'Specialization & Focus', specialization),
               ],
             ),
 
             const SizedBox(height: 14),
 
             // =================================================================
-            // 4. ASSIGNED BATCHES & TEACHING SUMMARY
+            // 5. TEACHING RESPONSIBILITIES
             // =================================================================
             _sectionCard(
               title: 'Teaching Responsibilities',
@@ -502,22 +470,22 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
                 _infoRow(Icons.groups_rounded, 'Active Assigned Batches', '3 Batches'),
                 _infoRow(Icons.school_rounded, 'Total Students Mentored', '42 Students'),
                 _infoRow(Icons.location_city_rounded, 'Primary Studio Hall', room),
-                _infoRow(Icons.account_balance_outlined, 'Academy Department', '$courseCategory Wing'),
+                _infoRow(Icons.account_balance_outlined, 'Academy Department Wing', '$courseCategory Wing'),
               ],
             ),
 
             const SizedBox(height: 14),
 
             // =================================================================
-            // 5. SECURITY & PASSWORDS
+            // 6. GURU ACCOUNT SECURITY
             // =================================================================
             _sectionCard(
-              title: 'Guru Security',
+              title: 'Account Security',
               children: [
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.lock_reset_rounded, color: LaasyaColors.primary),
-                  title: const Text('Change Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  title: const Text('Change Password', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
                   subtitle: const Text('Update your Guru portal login password', style: TextStyle(fontSize: 11)),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                   onTap: _showChangePasswordDialog,
@@ -527,7 +495,7 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
 
             const SizedBox(height: 24),
 
-            // Secure Logout Button
+            // Secure Sign Out Button
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -538,7 +506,7 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 icon: const Icon(Icons.logout_rounded, size: 18),
-                label: const Text('Log Out of Guru Account', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: const Text('Sign Out of Guru Account', style: TextStyle(fontWeight: FontWeight.bold)),
                 onPressed: _handleLogout,
               ),
             ),
@@ -549,42 +517,54 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
     );
   }
 
-  Widget _sectionCard({required String title, Widget? trailing, required List<Widget> children}) {
+  Widget _sectionCard({required String title, required List<Widget> children}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFF0D5E4)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark)),
-              if (trailing != null) trailing,
-            ],
+          Text(
+            title,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           ...children,
         ],
       ),
     );
   }
 
-  Widget _infoRow(IconData icon, String label, String val) {
+  Widget _infoRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: LaasyaColors.primary),
-          const SizedBox(width: 12),
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54)),
-          const Spacer(),
-          Text(val, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+          Icon(icon, size: 16, color: LaasyaColors.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 10.5, color: Colors.grey, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 1),
+                Text(value, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: LaasyaColors.textDark)),
+              ],
+            ),
+          ),
         ],
       ),
     );

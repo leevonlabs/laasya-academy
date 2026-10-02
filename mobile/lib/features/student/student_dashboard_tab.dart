@@ -5,13 +5,13 @@ import '../../core/services/supabase_service.dart';
 class StudentDashboardTab extends StatefulWidget {
   final VoidCallback onNavigateToCourses;
   final VoidCallback onNavigateToSchedule;
-  final VoidCallback onNavigateToCheckIn;
+  final VoidCallback onNavigateToAttendance;
 
   const StudentDashboardTab({
     super.key,
     required this.onNavigateToCourses,
     required this.onNavigateToSchedule,
-    required this.onNavigateToCheckIn,
+    required this.onNavigateToAttendance,
   });
 
   @override
@@ -293,18 +293,17 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                       SizedBox(
                         width: double.infinity,
                         height: 44,
-                        child: ElevatedButton.icon(
-                          onPressed: widget.onNavigateToCheckIn,
-                          icon: const Icon(Icons.pin_outlined, size: 18, color: Colors.black),
+                        child: OutlinedButton.icon(
+                          onPressed: widget.onNavigateToAttendance,
+                          icon: const Icon(Icons.verified_user_rounded, size: 18, color: LaasyaColors.primary),
                           label: const Text(
-                            'Check In for This Class (Enter PIN)',
-                            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
+                            'Attendance: Trainer Roll-Call Managed',
+                            style: TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
                           ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: LaasyaColors.accentGold,
-                            foregroundColor: Colors.black,
-                            elevation: 0,
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFF0D5E4)),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            backgroundColor: const Color(0xFFFFF9FB),
                           ),
                         ),
                       ),
@@ -434,7 +433,7 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
                 ),
                 GestureDetector(
-                  onTap: widget.onNavigateToCheckIn,
+                  onTap: widget.onNavigateToAttendance,
                   child: const Text(
                     'Full Record →',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: LaasyaColors.primary),

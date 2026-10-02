@@ -258,7 +258,6 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
             else
               ..._todaySessions.map((sess) {
                 final batch = sess['batches'];
-                final pin = sess['check_in_code'] ?? '482910';
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -295,17 +294,17 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFEF3C7),
+                              color: const Color(0xFFDEF7EC),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFFDE68A)),
+                              border: Border.all(color: const Color(0xFF31C48D).withOpacity(0.3)),
                             ),
-                            child: Row(
+                            child: const Row(
                               children: [
-                                const Icon(Icons.key_rounded, size: 13, color: Color(0xFF92400E)),
-                                const SizedBox(width: 4),
+                                Icon(Icons.how_to_reg_rounded, size: 13, color: Color(0xFF03543F)),
+                                SizedBox(width: 4),
                                 Text(
-                                  'Active PIN: $pin',
-                                  style: const TextStyle(color: Color(0xFF92400E), fontWeight: FontWeight.bold, fontSize: 11),
+                                  'Trainer Roll-Call',
+                                  style: TextStyle(color: Color(0xFF03543F), fontWeight: FontWeight.bold, fontSize: 11),
                                 ),
                               ],
                             ),
