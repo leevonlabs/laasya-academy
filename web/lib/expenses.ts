@@ -290,7 +290,19 @@ export async function updateExpense(
 
   // Fetch current old values
   const current = await queryOne<Expense>(`
-    SELECT * FROM public.expenses WHERE id = $1;
+    SELECT 
+      id,
+      expense_date::text as expense_date,
+      category,
+      description,
+      amount,
+      payment_method,
+      vendor,
+      reference_number,
+      attachment_url,
+      attachment_name,
+      is_deleted
+    FROM public.expenses WHERE id = $1;
   `, [id]);
 
   if (!current) {
@@ -308,7 +320,12 @@ export async function updateExpense(
     }
   };
 
-  compareField('expense_date', current.expense_date?.split('T')[0], data.expense_date);
+  const oldDateRaw = current.expense_date as any;
+  const oldDateStr = oldDateRaw
+    ? (typeof oldDateRaw === 'string' ? oldDateRaw.split('T')[0] : (oldDateRaw instanceof Date ? oldDateRaw.toISOString().split('T')[0] : String(oldDateRaw)))
+    : '';
+
+  compareField('expense_date', oldDateStr, data.expense_date);
   compareField('category', current.category, data.category);
   compareField('description', current.description, data.description);
   compareField('amount', current.amount, data.amount);
