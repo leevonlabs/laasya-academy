@@ -24,9 +24,12 @@ import {
   TrendingUp,
   Download,
   Eye,
-  FileCheck
+  FileCheck,
+  User,
+  Hash
 } from 'lucide-react';
 import { Expense, ExpenseSummary, ExpenseAuditLog } from '@/lib/expenses';
+import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
 
 interface CategoryItem {
   id: string;
@@ -42,15 +45,25 @@ interface Props {
 
 export default function ExpensesClient({ initialExpenses, initialSummary, categories: initialCategories }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
-  const [summary, setSummary] = useState<ExpenseSummary>(initialSummary);
   const [categories, setCategories] = useState<CategoryItem[]>(initialCategories);
 
-  // Filters state
+  // Default to Current Month for Date Range and Top Summary
+  const { defaultStartDate, defaultEndDate } = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const start = new Date(y, m, 1).toISOString().split('T')[0];
+    const end = new Date(y, m + 1, 0).toISOString().split('T')[0];
+    return { defaultStartDate: start, defaultEndDate: end };
+  }, []);
+
+  // Filters state - Default to Current Month
+  const [startDate, setStartDate] = useState(defaultStartDate);
+  const [endDate, setEndDate] = useState(defaultEndDate);
   const [searchQuery, setSearchQuery] = useState('');
+  const [vendorSearchQuery, setVendorSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedMethod, setSelectedMethod] = useState('all');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,22 +72,22 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [historyExpense, setHistoryExpense] = useState<Expense | null>(null);
-  const [historyLogs, setHistoryLogs] = useState<ExpenseAuditLog[]>([]);
-  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [detailsExpense, setDetailsExpense] = useState<Expense | null>(null);
+  const [detailsLogs, setDetailsLogs] = useState<ExpenseAuditLog[]>([]);
+  const [isDetailsLoading, setIsDetailsLoading] = useState(false);
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
 
   // Custom Category Add State
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  // Form state
+  // Form state - Clean, no prefilled values in cells for new expense
   const [formData, setFormData] = useState({
-    expense_date: new Date().toISOString().split('T')[0],
-    category: 'Rent',
+    expense_date: '',
+    category: '',
     description: '',
     amount: '',
-    payment_method: 'UPI' as 'Cash' | 'UPI' | 'Bank transfer' | 'Other',
+    payment_method: '' as 'Cash' | 'UPI' | 'Bank transfer' | 'Other' | '',
     vendor: '',
     reference_number: '',
     attachment_name: '',
@@ -98,14 +111,21 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
     return expenses.filter(exp => {
       if (exp.is_deleted) return false;
 
-      // Search match
+      // General Search match (description, reference, category)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchDesc = exp.description.toLowerCase().includes(q);
-        const matchVendor = (exp.vendor || '').toLowerCase().includes(q);
         const matchRef = (exp.reference_number || '').toLowerCase().includes(q);
         const matchCat = exp.category.toLowerCase().includes(q);
-        if (!matchDesc && !matchVendor && !matchRef && !matchCat) return false;
+        const matchVen = (exp.vendor || '').toLowerCase().includes(q);
+        if (!matchDesc && !matchRef && !matchCat && !matchVen) return false;
+      }
+
+      // Dedicated Vendor Column Search
+      if (vendorSearchQuery.trim()) {
+        const vq = vendorSearchQuery.toLowerCase();
+        const matchVendor = (exp.vendor || '').toLowerCase().includes(vq);
+        if (!matchVendor) return false;
       }
 
       // Category filter
@@ -128,30 +148,14 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
 
       return true;
     });
-  }, [expenses, searchQuery, selectedCategory, selectedMethod, startDate, endDate]);
+  }, [expenses, searchQuery, vendorSearchQuery, selectedCategory, selectedMethod, startDate, endDate]);
 
-  // Dynamic summary based on filtered records
+  // Dynamic summary based on filtered records (Current month by default)
   const dynamicSummary = useMemo(() => {
     const total = filteredExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
     const count = filteredExpenses.length;
-
-    const catTotals: Record<string, number> = {};
-    for (const e of filteredExpenses) {
-      catTotals[e.category] = (catTotals[e.category] || 0) + (Number(e.amount) || 0);
-    }
-
-    let top: { name: string; amount: number } | null = null;
-    let max = 0;
-    for (const [name, amt] of Object.entries(catTotals)) {
-      if (amt > max) {
-        max = amt;
-        top = { name, amount: amt };
-      }
-    }
-
     return {
       totalAmount: total,
-      topCategory: top,
       expenseCount: count
     };
   }, [filteredExpenses]);
@@ -165,29 +169,31 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
 
   const hasActiveFilters = Boolean(
     searchQuery || 
+    vendorSearchQuery ||
     selectedCategory !== 'all' || 
     selectedMethod !== 'all' || 
-    startDate || 
-    endDate
+    startDate !== defaultStartDate || 
+    endDate !== defaultEndDate
   );
 
   const clearFilters = () => {
     setSearchQuery('');
+    setVendorSearchQuery('');
     setSelectedCategory('all');
     setSelectedMethod('all');
-    setStartDate('');
-    setEndDate('');
+    setStartDate(defaultStartDate);
+    setEndDate(defaultEndDate);
     setCurrentPage(1);
   };
 
-  // Open add modal
+  // Open add modal with NO PREFILLED DETAILS in any cell
   const openAddModal = () => {
     setFormData({
-      expense_date: new Date().toISOString().split('T')[0],
-      category: categories[0]?.name || 'Rent',
+      expense_date: '',
+      category: '',
       description: '',
       amount: '',
-      payment_method: 'UPI',
+      payment_method: '',
       vendor: '',
       reference_number: '',
       attachment_name: '',
@@ -197,15 +203,15 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
     setIsAddModalOpen(true);
   };
 
-  // Open edit modal
+  // Open edit modal (loads existing record details)
   const openEditModal = (exp: Expense) => {
     setEditingExpense(exp);
     setFormData({
-      expense_date: exp.expense_date.split('T')[0],
-      category: exp.category,
-      description: exp.description,
-      amount: String(exp.amount),
-      payment_method: exp.payment_method,
+      expense_date: exp.expense_date ? exp.expense_date.split('T')[0] : '',
+      category: exp.category || '',
+      description: exp.description || '',
+      amount: String(exp.amount || ''),
+      payment_method: exp.payment_method as any,
       vendor: exp.vendor || '',
       reference_number: exp.reference_number || '',
       attachment_name: exp.attachment_name || '',
@@ -214,7 +220,26 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
     setFormErrors({});
   };
 
-  // Handle File Upload (Simulated receipt storage)
+  // View Details Modal (Includes full description and audit change history)
+  const openDetailsModal = async (exp: Expense) => {
+    setDetailsExpense(exp);
+    setIsDetailsLoading(true);
+    try {
+      const res = await fetch(`/api/expenses/${exp.id}/history`);
+      const json = await res.json();
+      if (json.success && json.history) {
+        setDetailsLogs(json.history);
+      } else {
+        setDetailsLogs([]);
+      }
+    } catch {
+      setDetailsLogs([]);
+    } finally {
+      setIsDetailsLoading(false);
+    }
+  };
+
+  // Handle File Upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -262,17 +287,20 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
   // Validate form
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (!formData.expense_date) {
-      errors.expense_date = 'Date is required';
+    if (!formData.category || !formData.category.trim()) {
+      errors.category = 'Please select a category';
+    }
+    if (!formData.description || !formData.description.trim()) {
+      errors.description = 'Description is required';
     }
     if (!formData.amount || isNaN(Number(formData.amount)) || Number(formData.amount) <= 0) {
       errors.amount = 'Amount must be greater than 0';
     }
-    if (!formData.category || !formData.category.trim()) {
-      errors.category = 'Category is required';
+    if (!formData.expense_date) {
+      errors.expense_date = 'Date is required';
     }
-    if (!formData.description || !formData.description.trim()) {
-      errors.description = 'Description is required';
+    if (!formData.payment_method) {
+      errors.payment_method = 'Please select a payment method';
     }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -335,25 +363,6 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
       showToast('Network error while updating expense', 'error');
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  // View Audit History
-  const openHistoryModal = async (exp: Expense) => {
-    setHistoryExpense(exp);
-    setIsHistoryLoading(true);
-    try {
-      const res = await fetch(`/api/expenses/${exp.id}/history`);
-      const json = await res.json();
-      if (json.success) {
-        setHistoryLogs(json.history);
-      } else {
-        setHistoryLogs([]);
-      }
-    } catch {
-      setHistoryLogs([]);
-    } finally {
-      setIsHistoryLoading(false);
     }
   };
 
@@ -426,55 +435,40 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
         </button>
       </div>
 
-      {/* 3 Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      {/* Top Summary Cards (Current Month By Default, Top Category Card Removed) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         
-        {/* Total This Period */}
+        {/* Total This Period / Current Month */}
         <div className="bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-6 border border-[#F0D5E4] shadow-xs relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-[#FFF2F8] rounded-bl-full -z-0 opacity-70" />
+          <div className="absolute top-0 right-0 w-28 h-28 bg-[#FFF2F8] rounded-bl-full -z-0 opacity-70" />
           <div className="flex items-center justify-between mb-3 relative z-10">
             <span className="text-xs font-black text-[#8A064D] uppercase tracking-wider">
-              Total This Period
+              {startDate === defaultStartDate && endDate === defaultEndDate 
+                ? 'Total Spent This Month' 
+                : 'Total Spent in Selected Period'}
             </span>
             <div className="p-2.5 rounded-xl bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4]">
               <DollarSign className="w-5 h-5" />
             </div>
           </div>
           <div className="text-3xl md:text-4xl font-black text-[#590231] tracking-tight relative z-10">
-            ₹{dynamicSummary.totalAmount.toLocaleString('en-IN')}
+            ₹{dynamicSummary.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </div>
           <p className="text-xs font-semibold text-gray-500 mt-2 relative z-10">
-            {hasActiveFilters ? 'Across currently filtered results' : 'Total recorded academy expenditures'}
+            {startDate === defaultStartDate && endDate === defaultEndDate 
+              ? 'Current month total expenditure summary' 
+              : `Aggregated spending from ${startDate || 'start'} to ${endDate || 'present'}`}
           </p>
         </div>
 
-        {/* Top Category */}
+        {/* Count of Expenses / Current Month */}
         <div className="bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-6 border border-[#F0D5E4] shadow-xs relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-[#FEF9C3]/50 rounded-bl-full -z-0" />
-          <div className="flex items-center justify-between mb-3 relative z-10">
-            <span className="text-xs font-black text-[#854D0E] uppercase tracking-wider">
-              Top Category Spend
-            </span>
-            <div className="p-2.5 rounded-xl bg-[#FEF9C3] text-[#854D0E] border border-[#F9E33A]/40">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-2xl md:text-3xl font-black text-[#590231] truncate tracking-tight relative z-10">
-            {dynamicSummary.topCategory ? dynamicSummary.topCategory.name : 'None'}
-          </div>
-          <p className="text-xs font-semibold text-gray-600 mt-2 relative z-10">
-            {dynamicSummary.topCategory 
-              ? `₹${dynamicSummary.topCategory.amount.toLocaleString('en-IN')} spent in this category`
-              : 'No category data recorded'}
-          </p>
-        </div>
-
-        {/* Count of Expenses */}
-        <div className="bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-6 border border-[#F0D5E4] shadow-xs relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-[#FFF2F8] rounded-bl-full -z-0 opacity-70" />
+          <div className="absolute top-0 right-0 w-28 h-28 bg-[#FFF2F8] rounded-bl-full -z-0 opacity-70" />
           <div className="flex items-center justify-between mb-3 relative z-10">
             <span className="text-xs font-black text-[#8A064D] uppercase tracking-wider">
-              Count of Expenses
+              {startDate === defaultStartDate && endDate === defaultEndDate 
+                ? 'Expense Count This Month' 
+                : 'Expense Count in Selected Period'}
             </span>
             <div className="p-2.5 rounded-xl bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4]">
               <FileCheck className="w-5 h-5" />
@@ -484,7 +478,9 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
             {dynamicSummary.expenseCount}
           </div>
           <p className="text-xs font-semibold text-gray-500 mt-2 relative z-10">
-            {dynamicSummary.expenseCount === 1 ? '1 expense record found' : `${dynamicSummary.expenseCount} expense records found`}
+            {dynamicSummary.expenseCount === 1 
+              ? '1 expense record logged' 
+              : `${dynamicSummary.expenseCount} expense records logged`}
           </p>
         </div>
 
@@ -493,11 +489,35 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
       {/* Search and Filters Section */}
       <div className="bg-white rounded-3xl p-6 border border-[#F0D5E4] shadow-xs space-y-4">
         
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+        {/* Row 1: Search Inputs (Dedicated Vendor Search + General Search) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           
-          {/* Search Box */}
-          <div className="relative flex-1">
-            <Search className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
+          {/* Vendor Search Bar (Dedicated per User Request) */}
+          <div className="relative">
+            <Building className="w-4 h-4 text-[#8A064D] absolute left-4 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={vendorSearchQuery}
+              onChange={(e) => {
+                setVendorSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search by Vendor..."
+              className="w-full pl-11 pr-8 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800 focus:outline-none focus:border-[#8A064D] focus:ring-1 focus:ring-[#8A064D] placeholder-gray-400"
+            />
+            {vendorSearchQuery && (
+              <button 
+                onClick={() => setVendorSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* General Keyword Search Box */}
+          <div className="relative">
+            <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
@@ -505,28 +525,28 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Search by description, vendor, reference or category..."
-              className="w-full pl-12 pr-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-bold text-gray-800 focus:outline-none focus:border-[#8A064D] focus:ring-1 focus:ring-[#8A064D] placeholder-gray-400"
+              placeholder="Search description, ref, cat..."
+              className="w-full pl-11 pr-8 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800 focus:outline-none focus:border-[#8A064D] focus:ring-1 focus:ring-[#8A064D] placeholder-gray-400"
             />
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
           {/* Category Filter */}
-          <div className="w-full sm:w-56">
+          <div>
             <select
               value={selectedCategory}
               onChange={(e) => {
                 setSelectedCategory(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
+              className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
             >
               <option value="all">All Categories</option>
               {categories.map(c => (
@@ -536,14 +556,14 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
           </div>
 
           {/* Payment Method Filter */}
-          <div className="w-full sm:w-52">
+          <div>
             <select
               value={selectedMethod}
               onChange={(e) => {
                 setSelectedMethod(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
+              className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
             >
               <option value="all">All Payment Methods</option>
               <option value="UPI">UPI</option>
@@ -555,45 +575,38 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
 
         </div>
 
-        {/* Date Range Row */}
+        {/* Row 2: Regular Date Range Quick Filter (Current Month by Default) & Clear Filters */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#F0D5E4]/60">
           
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs font-bold text-[#8A064D] uppercase tracking-wider flex items-center gap-1.5">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-black text-[#8A064D] uppercase tracking-wider flex items-center gap-1.5">
               <Calendar className="w-4 h-4" />
-              Date Range:
+              Date Period:
             </span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
+            {/* Our Regular Date Range Quick Filter Component */}
+            <DateRangeQuickFilter
+              startDate={startDate}
+              endDate={endDate}
+              align="left"
+              onApply={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
                 setCurrentPage(1);
               }}
-              className="px-3 py-1.5 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
-            />
-            <span className="text-xs text-gray-400 font-bold">to</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3 py-1.5 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
+              placeholder="Select Date Range"
             />
           </div>
 
           {/* Active Filters Badges & Clear Button */}
           {hasActiveFilters && (
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-gray-500">Active filters applied</span>
+              <span className="text-xs font-semibold text-gray-500">Filters applied</span>
               <button
                 onClick={clearFilters}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-[#8A064D] text-xs font-black transition cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
-                <span>Clear filters</span>
+                <span>Reset to Current Month</span>
               </button>
             </div>
           )}
@@ -602,7 +615,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
 
       </div>
 
-      {/* Expense List Table */}
+      {/* Expense List Table (Description column is hidden from table) */}
       <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
         
         {filteredExpenses.length === 0 ? (
@@ -619,21 +632,21 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
               </h3>
               <p className="text-xs text-gray-500 mt-1">
                 {hasActiveFilters 
-                  ? 'Try clearing active search or date filters to view all records.' 
+                  ? 'Try expanding your date range or clearing search criteria to view records.' 
                   : 'Keep your academy accounts clear and compliant by logging your expenditures.'}
               </p>
             </div>
             {hasActiveFilters ? (
               <button
                 onClick={clearFilters}
-                className="px-5 py-2.5 rounded-xl bg-[#8A064D] text-white text-xs font-bold hover:bg-[#590231] transition"
+                className="px-5 py-2.5 rounded-xl bg-[#8A064D] text-white text-xs font-bold hover:bg-[#590231] transition cursor-pointer"
               >
-                Clear all filters
+                Reset filters to current month
               </button>
             ) : (
               <button
                 onClick={openAddModal}
-                className="px-6 py-3 rounded-2xl bg-[#8A064D] text-white text-sm font-bold hover:bg-[#590231] shadow-md transition flex items-center gap-2"
+                className="px-6 py-3 rounded-2xl bg-[#8A064D] text-white text-sm font-bold hover:bg-[#590231] shadow-md transition flex items-center gap-2 cursor-pointer"
               >
                 <Plus className="w-4 h-4 text-[#F9E33A]" />
                 <span>Record your first expense</span>
@@ -648,7 +661,6 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                   <tr className="bg-[#FFF2F8] text-[#590231] border-b border-[#F0D5E4] text-xs font-black uppercase tracking-wider">
                     <th className="py-4 px-5">Date</th>
                     <th className="py-4 px-5">Category</th>
-                    <th className="py-4 px-5">Description</th>
                     <th className="py-4 px-5">Vendor</th>
                     <th className="py-4 px-5">Method</th>
                     <th className="py-4 px-5 text-right">Amount</th>
@@ -677,21 +689,16 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                           </span>
                         </td>
 
-                        {/* Description */}
-                        <td className="py-4 px-5 max-w-xs">
-                          <div className="font-bold text-gray-900 leading-snug">
-                            {exp.description}
-                          </div>
-                          {exp.reference_number && (
-                            <div className="text-[11px] font-semibold text-gray-400 mt-0.5">
-                              Ref: {exp.reference_number}
-                            </div>
-                          )}
-                        </td>
-
                         {/* Vendor */}
-                        <td className="py-4 px-5 font-semibold text-gray-700 whitespace-nowrap">
-                          {exp.vendor || '—'}
+                        <td className="py-4 px-5 font-semibold text-gray-800 whitespace-nowrap">
+                          {exp.vendor ? (
+                            <span className="inline-flex items-center gap-1.5 font-bold text-gray-800">
+                              <Building className="w-3.5 h-3.5 text-[#8A064D]" />
+                              {exp.vendor}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 italic">None</span>
+                          )}
                         </td>
 
                         {/* Method */}
@@ -728,32 +735,33 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                           )}
                         </td>
 
-                        {/* Actions */}
+                        {/* Actions (Replaced View History with View Details) */}
                         <td className="py-4 px-5 text-center whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-1.5">
+                          <div className="flex items-center justify-center gap-2">
                             
+                            {/* View Details Button (Primary Action) */}
+                            <button
+                              onClick={() => openDetailsModal(exp)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF2F8] hover:bg-[#8A064D] text-[#8A064D] hover:text-white border border-[#F0D5E4] hover:border-[#8A064D] text-xs font-bold transition shadow-2xs cursor-pointer"
+                              title="View Full Expense Details & Audit History"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>View Details</span>
+                            </button>
+
                             {/* Edit Button */}
                             <button
                               onClick={() => openEditModal(exp)}
-                              className="p-1.5 rounded-lg text-gray-600 hover:text-[#8A064D] hover:bg-[#FFF2F8] border border-transparent hover:border-[#F0D5E4] transition"
+                              className="p-1.5 rounded-xl text-gray-600 hover:text-[#8A064D] hover:bg-[#FFF2F8] border border-transparent hover:border-[#F0D5E4] transition cursor-pointer"
                               title="Edit Expense"
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
 
-                            {/* History Button */}
-                            <button
-                              onClick={() => openHistoryModal(exp)}
-                              className="p-1.5 rounded-lg text-gray-600 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-200 transition"
-                              title="View Change History"
-                            >
-                              <History className="w-4 h-4" />
-                            </button>
-
                             {/* Delete Button */}
                             <button
                               onClick={() => setDeletingExpense(exp)}
-                              className="p-1.5 rounded-lg text-gray-600 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition"
+                              className="p-1.5 rounded-xl text-gray-600 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition cursor-pointer"
                               title="Remove Expense"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -780,17 +788,19 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                   <button
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    className="p-2 rounded-xl bg-white border border-[#F0D5E4] text-gray-700 font-bold hover:bg-[#FFF2F8] disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    className="p-2 rounded-xl border border-[#F0D5E4] bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition cursor-pointer"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
+
                   <span className="text-xs font-black text-[#590231] px-2">
                     Page {currentPage} of {totalPages}
                   </span>
+
                   <button
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    className="p-2 rounded-xl bg-white border border-[#F0D5E4] text-gray-700 font-bold hover:bg-[#FFF2F8] disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    className="p-2 rounded-xl border border-[#F0D5E4] bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition cursor-pointer"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -802,7 +812,180 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
 
       </div>
 
-      {/* ADD / EDIT EXPENSE MODAL */}
+      {/* VIEW DETAILS MODAL (Displays Full Description, Metadata, & Change History) */}
+      {detailsExpense && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full border border-[#F0D5E4] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-8">
+            
+            {/* Modal Header */}
+            <div className="bg-[#590231] px-6 py-5 text-white flex items-center justify-between border-b border-[#8A064D]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#8A064D] flex items-center justify-center text-[#F9E33A] border border-[#F9E33A]/40">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-lg text-white">Expense Details & History</h3>
+                  <p className="text-xs text-rose-200 font-semibold">
+                    Category: {detailsExpense.category} • Date: {detailsExpense.expense_date ? new Date(detailsExpense.expense_date).toLocaleDateString('en-GB') : '—'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDetailsExpense(null)}
+                className="p-1.5 rounded-xl text-rose-200 hover:text-white hover:bg-[#8A064D] transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+              
+              {/* Highlighted Full Description Section */}
+              <div className="bg-[#FFF9FB] p-5 rounded-2xl border border-[#F0D5E4]">
+                <span className="text-xs font-black text-[#8A064D] uppercase tracking-wider block mb-2">
+                  Full Description
+                </span>
+                <p className="text-sm font-bold text-gray-900 leading-relaxed whitespace-pre-wrap">
+                  {detailsExpense.description}
+                </p>
+              </div>
+
+              {/* Particulars Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                
+                <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase block">Amount</span>
+                  <span className="text-lg font-black text-[#590231] mt-1 block">
+                    ₹{Number(detailsExpense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase block">Payment Method</span>
+                  <span className="text-sm font-black text-gray-800 mt-1 block">
+                    {detailsExpense.payment_method}
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase block">Vendor / Payee</span>
+                  <span className="text-sm font-black text-gray-800 mt-1 block truncate">
+                    {detailsExpense.vendor || 'Not specified'}
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase block">Reference Number</span>
+                  <span className="text-sm font-black text-gray-800 mt-1 block truncate">
+                    {detailsExpense.reference_number || 'None'}
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase block">Logged By</span>
+                  <span className="text-sm font-black text-gray-800 mt-1 block truncate">
+                    {detailsExpense.created_by || 'Director'}
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase block">Receipt Attachment</span>
+                  {detailsExpense.attachment_name ? (
+                    <button
+                      onClick={() => {
+                        if (detailsExpense.attachment_url) {
+                          window.open(detailsExpense.attachment_url, '_blank');
+                        } else {
+                          alert(`Attachment file: ${detailsExpense.attachment_name}`);
+                        }
+                      }}
+                      className="text-xs font-bold text-[#8A064D] hover:underline mt-1 flex items-center gap-1 truncate"
+                    >
+                      <Paperclip className="w-3.5 h-3.5" />
+                      <span>{detailsExpense.attachment_name}</span>
+                    </button>
+                  ) : (
+                    <span className="text-sm font-semibold text-gray-400 mt-1 block">None</span>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Audit & Change History Logs */}
+              <div className="border-t border-[#F0D5E4] pt-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-black text-sm text-[#590231] flex items-center gap-2">
+                    <History className="w-4 h-4 text-[#8A064D]" />
+                    <span>Change & Audit History</span>
+                  </h4>
+                  <span className="text-xs font-semibold text-gray-500">
+                    {detailsLogs.length} change log(s)
+                  </span>
+                </div>
+
+                {isDetailsLoading ? (
+                  <div className="py-6 text-center text-xs font-bold text-gray-500">
+                    Loading change log history...
+                  </div>
+                ) : detailsLogs.length === 0 ? (
+                  <div className="py-6 text-center text-xs font-bold text-gray-500 bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
+                    No modifications recorded. This expense retains its original values created by {detailsExpense.created_by}.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {detailsLogs.map((log) => (
+                      <div key={log.id} className="p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-black text-[#8A064D] uppercase tracking-wide">
+                            Field Modified: {log.field_name}
+                          </span>
+                          <span className="text-[11px] font-semibold text-gray-400">
+                            {new Date(log.changed_at).toLocaleString('en-GB')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="line-through text-red-500 font-semibold">{log.old_value || 'None'}</span>
+                          <span className="text-gray-400 font-bold">➔</span>
+                          <span className="font-bold text-emerald-700">{log.new_value || 'None'}</span>
+                        </div>
+                        <div className="text-[10px] text-gray-500 pt-0.5 font-semibold">
+                          Changed by: {log.changed_by}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  const expToEdit = detailsExpense;
+                  setDetailsExpense(null);
+                  openEditModal(expToEdit);
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-gray-100 text-[#8A064D] border border-[#F0D5E4] text-xs font-bold transition cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Edit This Expense</span>
+              </button>
+
+              <button
+                onClick={() => setDetailsExpense(null)}
+                className="px-5 py-2 rounded-xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-bold transition cursor-pointer"
+              >
+                Close Details
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* RECORD NEW EXPENSE / EDIT MODAL (No prefilled details in cells for new expense) */}
       {(isAddModalOpen || editingExpense) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-xl w-full border border-[#F0D5E4] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -820,7 +1003,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                   setIsAddModalOpen(false);
                   setEditingExpense(null);
                 }}
-                className="p-1 rounded-lg text-rose-200 hover:text-white hover:bg-[#8A064D] transition"
+                className="p-1 rounded-lg text-rose-200 hover:text-white hover:bg-[#8A064D] transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -838,7 +1021,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                   <button
                     type="button"
                     onClick={() => setShowAddCategory(!showAddCategory)}
-                    className="text-xs font-bold text-[#8A064D] hover:underline"
+                    className="text-xs font-bold text-[#8A064D] hover:underline cursor-pointer"
                   >
                     {showAddCategory ? 'Cancel Custom' : '+ Add Custom Category'}
                   </button>
@@ -856,7 +1039,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                     <button
                       type="button"
                       onClick={handleAddCustomCategory}
-                      className="px-3 py-2 rounded-xl bg-[#8A064D] text-white text-xs font-bold hover:bg-[#590231]"
+                      className="px-3 py-2 rounded-xl bg-[#8A064D] text-white text-xs font-bold hover:bg-[#590231] cursor-pointer"
                     >
                       Save Category
                     </button>
@@ -867,6 +1050,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                     onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
                     className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
                   >
+                    <option value="">— Select Category —</option>
                     {categories.map(c => (
                       <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
@@ -877,7 +1061,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                 )}
               </div>
 
-              {/* Description */}
+              {/* Description (Empty by default) */}
               <div>
                 <label className="text-xs font-black text-[#590231] uppercase tracking-wider block mb-1">
                   Description *
@@ -886,7 +1070,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                   rows={2}
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Detail what this expense was for (e.g. October Studio Rent)..."
+                  placeholder="Enter detailed description of spending..."
                   className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
                 />
                 {formErrors.description && (
@@ -897,7 +1081,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
               {/* Amount & Date in Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                {/* Amount */}
+                {/* Amount (Empty by default) */}
                 <div>
                   <label className="text-xs font-black text-[#590231] uppercase tracking-wider block mb-1">
                     Amount (₹) *
@@ -919,7 +1103,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                   )}
                 </div>
 
-                {/* Date */}
+                {/* Expense Date (Empty by default) */}
                 <div>
                   <label className="text-xs font-black text-[#590231] uppercase tracking-wider block mb-1">
                     Expense Date *
@@ -940,7 +1124,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
               {/* Payment Method & Vendor */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                {/* Payment Method */}
+                {/* Payment Method (No prefill) */}
                 <div>
                   <label className="text-xs font-black text-[#590231] uppercase tracking-wider block mb-1">
                     Payment Method *
@@ -950,14 +1134,18 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                     onChange={(e) => setFormData(prev => ({ ...prev, payment_method: e.target.value as any }))}
                     className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
                   >
+                    <option value="">— Select Payment Method —</option>
                     <option value="UPI">UPI</option>
                     <option value="Cash">Cash</option>
                     <option value="Bank transfer">Bank transfer</option>
                     <option value="Other">Other</option>
                   </select>
+                  {formErrors.payment_method && (
+                    <p className="text-xs font-bold text-red-600 mt-1">{formErrors.payment_method}</p>
+                  )}
                 </div>
 
-                {/* Vendor (Optional) */}
+                {/* Vendor (Optional, empty by default) */}
                 <div>
                   <label className="text-xs font-black text-gray-600 uppercase tracking-wider block mb-1">
                     Vendor / Payee (Optional)
@@ -966,7 +1154,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                     type="text"
                     value={formData.vendor}
                     onChange={(e) => setFormData(prev => ({ ...prev, vendor: e.target.value }))}
-                    placeholder="e.g. BESCOM, Chowdiah Hall..."
+                    placeholder="Enter vendor / store name..."
                     className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
                   />
                 </div>
@@ -976,7 +1164,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
               {/* Reference Number & Attachment */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                {/* Reference Number (Optional) */}
+                {/* Reference Number (Optional, empty by default) */}
                 <div>
                   <label className="text-xs font-black text-gray-600 uppercase tracking-wider block mb-1">
                     Reference / Transaction No. (Optional)
@@ -985,12 +1173,12 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                     type="text"
                     value={formData.reference_number}
                     onChange={(e) => setFormData(prev => ({ ...prev, reference_number: e.target.value }))}
-                    placeholder="UPI ID, NEFT ref, cash voucher..."
+                    placeholder="UPI Ref, Cheque No, Transaction ID..."
                     className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
                   />
                 </div>
 
-                {/* Attachment Upload (Receipt Photo or PDF) */}
+                {/* Attachment Upload (Optional) */}
                 <div>
                   <label className="text-xs font-black text-gray-600 uppercase tracking-wider block mb-1">
                     Receipt Photo or PDF (Optional)
@@ -1012,7 +1200,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, attachment_name: '', attachment_url: '' }))}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl"
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl cursor-pointer"
                         title="Remove file"
                       >
                         <X className="w-4 h-4" />
@@ -1034,7 +1222,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                     setIsAddModalOpen(false);
                     setEditingExpense(null);
                   }}
-                  className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-bold text-sm hover:bg-gray-100 transition"
+                  className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-bold text-sm hover:bg-gray-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1053,80 +1241,6 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
               </div>
 
             </form>
-
-          </div>
-        </div>
-      )}
-
-      {/* CHANGE HISTORY AUDIT MODAL */}
-      {historyExpense && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full border border-[#F0D5E4] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            
-            <div className="bg-[#590231] px-6 py-4 text-white flex items-center justify-between border-b border-[#8A064D]">
-              <div className="flex items-center gap-2.5">
-                <History className="w-5 h-5 text-[#F9E33A]" />
-                <h3 className="font-black text-lg text-white">Expense Audit & Change History</h3>
-              </div>
-              <button
-                onClick={() => setHistoryExpense(null)}
-                className="p-1 rounded-lg text-rose-200 hover:text-white hover:bg-[#8A064D]"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              <div>
-                <h4 className="font-black text-base text-[#590231]">{historyExpense.description}</h4>
-                <p className="text-xs text-gray-500 font-semibold">
-                  Category: {historyExpense.category} • Current Amount: ₹{Number(historyExpense.amount).toLocaleString('en-IN')}
-                </p>
-              </div>
-
-              {isHistoryLoading ? (
-                <div className="py-8 text-center text-xs font-bold text-gray-500">
-                  Loading change log history...
-                </div>
-              ) : historyLogs.length === 0 ? (
-                <div className="py-8 text-center text-xs font-bold text-gray-500 bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
-                  No edits recorded yet. This expense retains its original values created by {historyExpense.created_by}.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {historyLogs.map((log) => (
-                    <div key={log.id} className="p-3.5 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-black text-[#8A064D] uppercase tracking-wide">
-                          Modified: {log.field_name}
-                        </span>
-                        <span className="text-[11px] font-semibold text-gray-400">
-                          {new Date(log.changed_at).toLocaleString('en-GB')}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 pt-1">
-                        <span className="line-through text-red-500 font-semibold">{log.old_value || 'None'}</span>
-                        <span className="text-gray-400">➔</span>
-                        <span className="font-bold text-emerald-700">{log.new_value || 'None'}</span>
-                      </div>
-                      <div className="text-[10px] text-gray-500 pt-0.5 font-semibold">
-                        Changed by: {log.changed_by}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="pt-3 border-t border-[#F0D5E4] flex justify-end">
-                <button
-                  onClick={() => setHistoryExpense(null)}
-                  className="px-5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold"
-                >
-                  Close History
-                </button>
-              </div>
-
-            </div>
 
           </div>
         </div>
@@ -1157,7 +1271,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
               <button
                 type="button"
                 onClick={() => setDeletingExpense(null)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-bold text-xs hover:bg-gray-100 transition"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-bold text-xs hover:bg-gray-100 transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -1166,7 +1280,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                 type="button"
                 disabled={isSubmitting}
                 onClick={handleConfirmDelete}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs shadow-md transition disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs shadow-md transition disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? 'Removing...' : 'Confirm Removal'}
               </button>

@@ -26,6 +26,7 @@ import {
   Info
 } from 'lucide-react';
 import { Announcement } from '@/lib/announcements';
+import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
 
 interface Course {
   id: string;
@@ -534,23 +535,20 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
               </select>
             </div>
 
-            {/* Date Range */}
+            {/* Date Range Quick Filter */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-[#8A064D] uppercase flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" /> Date:
               </span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="px-2.5 py-1 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
-              />
-              <span className="text-xs text-gray-400 font-bold">to</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="px-2.5 py-1 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
+              <DateRangeQuickFilter
+                startDate={startDate}
+                endDate={endDate}
+                align="left"
+                onApply={({ startDate: s, endDate: e }) => {
+                  setStartDate(s);
+                  setEndDate(e);
+                }}
+                placeholder="Select Publish Date Range"
               />
             </div>
 

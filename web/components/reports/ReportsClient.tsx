@@ -35,6 +35,7 @@ import {
   IncomeExpensesReportSummary, 
   IncomeExpensesReportRow 
 } from '@/lib/reports';
+import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
 
 interface Props {
   courses: Course[];
@@ -616,15 +617,20 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
             </span>
           </div>
 
-          {/* Timestamp Display Rule: Always show the selected date range and the time the report was generated */}
-          <div className="flex items-center gap-3 text-xs font-semibold text-gray-500">
-            <span className="flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
-              Range: <strong>{startDate || 'Start'}</strong> to <strong>{endDate || 'Present'}</strong>
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1 text-emerald-800 font-bold">
-              <Clock className="w-3.5 h-3.5" />
+          {/* Timestamp & Date Range Quick Filter */}
+          <div className="flex flex-wrap items-center gap-3">
+            <DateRangeQuickFilter
+              startDate={startDate}
+              endDate={endDate}
+              align="right"
+              onApply={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+              }}
+              placeholder="Select Report Date Range"
+            />
+            <span className="flex items-center gap-1 text-emerald-800 font-bold text-xs bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200">
+              <Clock className="w-3.5 h-3.5 text-emerald-600" />
               Generated: {currentGeneratedAt ? new Date(currentGeneratedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'Live'}
             </span>
           </div>
@@ -681,22 +687,18 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                 </select>
               </div>
 
-              {/* Date Pickers in 4th col */}
-              <div className="flex items-center gap-1 pt-4">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-1/2 px-2 py-1.5 rounded-lg bg-[#FFF9FB] border border-[#F0D5E4] text-[11px] font-bold"
-                  title="From date"
-                />
-                <span className="text-xs text-gray-400">to</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-1/2 px-2 py-1.5 rounded-lg bg-[#FFF9FB] border border-[#F0D5E4] text-[11px] font-bold"
-                  title="To date"
+              {/* Date Filter in 4th col */}
+              <div>
+                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Session Date Range</label>
+                <DateRangeQuickFilter
+                  startDate={startDate}
+                  endDate={endDate}
+                  align="right"
+                  onApply={({ startDate: s, endDate: e }) => {
+                    setStartDate(s);
+                    setEndDate(e);
+                  }}
+                  placeholder="Select Date Range"
                 />
               </div>
             </>
@@ -748,21 +750,18 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                 </select>
               </div>
 
-              <div className="flex items-center gap-1 pt-4">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-1/2 px-2 py-1.5 rounded-lg bg-[#FFF9FB] border border-[#F0D5E4] text-[11px] font-bold"
-                  title="Due from"
-                />
-                <span className="text-xs text-gray-400">to</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-1/2 px-2 py-1.5 rounded-lg bg-[#FFF9FB] border border-[#F0D5E4] text-[11px] font-bold"
-                  title="Due to"
+              {/* Date Filter in 4th col */}
+              <div>
+                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Due / Payment Date Range</label>
+                <DateRangeQuickFilter
+                  startDate={startDate}
+                  endDate={endDate}
+                  align="right"
+                  onApply={({ startDate: s, endDate: e }) => {
+                    setStartDate(s);
+                    setEndDate(e);
+                  }}
+                  placeholder="Select Date Range"
                 />
               </div>
             </>
@@ -831,21 +830,16 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
             <>
               <div className="md:col-span-2">
                 <label className="text-xs font-black text-gray-600 uppercase block mb-1">Accounting Period Range</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800"
-                  />
-                  <span className="text-xs font-bold text-gray-400">to</span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800"
-                  />
-                </div>
+                <DateRangeQuickFilter
+                  startDate={startDate}
+                  endDate={endDate}
+                  align="left"
+                  onApply={({ startDate: s, endDate: e }) => {
+                    setStartDate(s);
+                    setEndDate(e);
+                  }}
+                  placeholder="Select Accounting Date Range"
+                />
               </div>
 
               <div className="md:col-span-2 flex items-center justify-end pt-4 gap-2">
