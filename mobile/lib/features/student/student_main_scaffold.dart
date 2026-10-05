@@ -4,7 +4,7 @@ import 'student_dashboard_tab.dart';
 import 'student_courses_tab.dart';
 import 'student_schedule_tab.dart';
 import 'student_attendance_tab.dart';
-import 'student_profile_tab.dart';
+import 'student_settings_tab.dart';
 import 'student_notifications_screen.dart';
 
 class StudentMainScaffold extends StatefulWidget {
@@ -28,7 +28,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
       const StudentCoursesTab(),
       const StudentScheduleTab(),
       const StudentAttendanceTab(),
-      const StudentProfileTab(),
+      const StudentSettingsTab(),
     ];
 
     final titles = [
@@ -36,7 +36,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
       'My Enrolled Courses',
       'Class Timetable',
       'Attendance Records',
-      'Student Profile & ID',
+      'Settings',
     ];
 
     return Scaffold(
@@ -139,9 +139,9 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
               label: 'Attendance',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline_rounded),
-              activeIcon: Icon(Icons.person_rounded),
-              label: 'Profile',
+              icon: Icon(Icons.settings_outlined),
+              activeIcon: Icon(Icons.settings_rounded),
+              label: 'Settings',
             ),
           ],
         ),

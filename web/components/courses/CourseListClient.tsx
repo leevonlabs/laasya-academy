@@ -24,7 +24,10 @@ import {
   CheckCircle2,
   HelpCircle,
   TrendingUp,
-  AlertTriangle
+  AlertTriangle,
+  Image as ImageIcon,
+  Upload,
+  User
 } from 'lucide-react';
 
 const COURSE_GURUS_MAP: Record<string, string> = {
@@ -47,6 +50,64 @@ const COURSE_GURUS_MAP: Record<string, string> = {
   'Yoga': 'Acharya Sathish Kale (Yoga Acharya)',
   'Chess': 'Coach Sai Krishna (State Medalist)',
 };
+
+const DEFAULT_COURSE_IMAGES: Record<string, string> = {
+  'Bharathanatyam': 'https://images.unsplash.com/photo-1617196034183-421b4917c92d?auto=format&fit=crop&w=800&q=80',
+  'Kuchupudi': 'https://images.unsplash.com/photo-1582234372722-50d7ccc30ebd?auto=format&fit=crop&w=800&q=80',
+  'Mohiniyatam': 'https://images.unsplash.com/photo-1547153760-18fc86324498?auto=format&fit=crop&w=800&q=80',
+  'Semi Classical': 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=800&q=80',
+  'Western Dance': 'https://images.unsplash.com/photo-1535525153412-5a42439a210d?auto=format&fit=crop&w=800&q=80',
+  'Zumba': 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80',
+  'Gymnastic': 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=800&q=80',
+  'Carnatic Music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
+  'Violin': 'https://images.unsplash.com/photo-1612225330812-01a9c6b355ec?auto=format&fit=crop&w=800&q=80',
+  'Keyboard': 'https://images.unsplash.com/photo-1520523839898-50712140e698?auto=format&fit=crop&w=800&q=80',
+  'Guitar': 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=800&q=80',
+  'Ukulele': 'https://images.unsplash.com/photo-1568219656418-15c329312bf1?auto=format&fit=crop&w=800&q=80',
+  'Drawing': 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=800&q=80',
+  'Art and Craft': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=800&q=80',
+  'Kalari': 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80',
+  'Karatte': 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=800&q=80',
+  'Yoga': 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800&q=80',
+  'Chess': 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&w=800&q=80'
+};
+
+const CATEGORY_DEFAULT_IMAGES: Record<string, string> = {
+  'Classical Dance': 'https://images.unsplash.com/photo-1617196034183-421b4917c92d?auto=format&fit=crop&w=800&q=80',
+  'Modern Dance & Fitness': 'https://images.unsplash.com/photo-1535525153412-5a42439a210d?auto=format&fit=crop&w=800&q=80',
+  'Vocal & Music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
+  'Musical Instruments': 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=800&q=80',
+  'Martial Arts': 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=800&q=80',
+  'Fine Arts': 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=800&q=80',
+  'Mind Sports': 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&w=800&q=80'
+};
+
+const SUGGESTED_COURSE_IMAGES = [
+  { label: 'Classical Dance', url: 'https://images.unsplash.com/photo-1617196034183-421b4917c92d?auto=format&fit=crop&w=800&q=80' },
+  { label: 'Western Dance', url: 'https://images.unsplash.com/photo-1535525153412-5a42439a210d?auto=format&fit=crop&w=800&q=80' },
+  { label: 'Carnatic Vocal', url: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80' },
+  { label: 'Violin / Strings', url: 'https://images.unsplash.com/photo-1612225330812-01a9c6b355ec?auto=format&fit=crop&w=800&q=80' },
+  { label: 'Keyboard / Piano', url: 'https://images.unsplash.com/photo-1520523839898-50712140e698?auto=format&fit=crop&w=800&q=80' },
+  { label: 'Guitar', url: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=800&q=80' },
+  { label: 'Drawing & Art', url: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=800&q=80' },
+  { label: 'Craft & Design', url: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=800&q=80' },
+  { label: 'Martial Arts', url: 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=800&q=80' },
+  { label: 'Yoga & Fitness', url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800&q=80' },
+  { label: 'Chess & Mind', url: 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&w=800&q=80' }
+];
+
+function getCourseImage(course: Course): string {
+  if (course.image_url && course.image_url.trim()) {
+    return course.image_url.trim();
+  }
+  if (DEFAULT_COURSE_IMAGES[course.title]) {
+    return DEFAULT_COURSE_IMAGES[course.title];
+  }
+  if (course.category && CATEGORY_DEFAULT_IMAGES[course.category]) {
+    return CATEGORY_DEFAULT_IMAGES[course.category];
+  }
+  return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80';
+}
 
 interface Props {
   initialCourses: Course[];
@@ -101,6 +162,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
   const [editFee, setEditFee] = useState<number>(0);
   const [editDuration, setEditDuration] = useState<number>(12);
   const [editDesc, setEditDesc] = useState<string>('');
+  const [editImageUrl, setEditImageUrl] = useState<string>('');
   const [editIsActive, setEditIsActive] = useState<boolean>(true);
   const [isEditingNewCategory, setIsEditingNewCategory] = useState(false);
   const [customEditCategory, setCustomEditCategory] = useState('');
@@ -115,6 +177,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
   const [newFee, setNewFee] = useState(2000);
   const [newDuration, setNewDuration] = useState(12);
   const [newDesc, setNewDesc] = useState('');
+  const [newImageUrl, setNewImageUrl] = useState('');
 
   // Delete Course Modal State
   const [deletingCourse, setDeletingCourse] = useState<Course | null>(null);
@@ -212,6 +275,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
     setNewFee(2000);
     setNewDuration(12);
     setNewDesc('');
+    setNewImageUrl('');
     setIsAddOpen(true);
   };
 
@@ -223,6 +287,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
     setEditFee(Number(course.monthly_fee) || 0);
     setEditDuration(course.duration_months || 12);
     setEditDesc(course.description || '');
+    setEditImageUrl(course.image_url || getCourseImage(course));
     setEditIsActive(course.is_active ?? true);
     setIsEditingNewCategory(false);
     setCustomEditCategory('');
@@ -344,7 +409,8 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
           category: finalCategory,
           monthly_fee: Number(newFee),
           duration_months: Number(newDuration),
-          description: newDesc.trim()
+          description: newDesc.trim(),
+          image_url: newImageUrl.trim() || undefined
         })
       });
 
@@ -354,7 +420,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
       }
 
       const added: Course = await res.json();
-      setCourses(prev => [...prev, { ...added, batch_count: 0 }]);
+      setCourses(prev => [...prev, { ...added, batch_count: 0, image_url: newImageUrl.trim() || added.image_url }]);
       setIsAddOpen(false);
       showCelebratoryToast(`Course "${added.title}" (${added.code}) created successfully!`);
     } catch (e: any) {
@@ -398,7 +464,8 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
           monthly_fee: Number(editFee),
           duration_months: Number(editDuration),
           description: editDesc.trim(),
-          is_active: editIsActive
+          is_active: editIsActive,
+          image_url: editImageUrl.trim() || undefined
         })
       });
 
@@ -419,7 +486,8 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 monthly_fee: Number(editFee),
                 duration_months: Number(editDuration),
                 description: editDesc.trim(),
-                is_active: editIsActive
+                is_active: editIsActive,
+                image_url: editImageUrl.trim() || c.image_url
               }
             : c
         )
@@ -434,7 +502,8 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
           monthly_fee: Number(editFee),
           duration_months: Number(editDuration),
           description: editDesc.trim(),
-          is_active: editIsActive
+          is_active: editIsActive,
+          image_url: editImageUrl.trim() || viewingCourse.image_url
         });
       }
 
@@ -475,11 +544,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
     }
   };
 
-  // Quick stats
-  const activeCount = courses.filter(c => c.is_active !== false).length;
-  const avgFee = courses.length > 0 
-    ? Math.round(courses.reduce((acc, c) => acc + (Number(c.monthly_fee) || 0), 0) / courses.length) 
-    : 0;
+
 
   return (
     <div className="space-y-6">
@@ -511,10 +576,10 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
       <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               <h1 className="text-2xl font-black text-[#2D041A] tracking-tight">Course Curriculum & Catalog</h1>
-              <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-3 py-1 rounded-full font-bold">
-                {courses.length} Disciplines
+              <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-3.5 py-1 rounded-full font-bold shadow-2xs">
+                Total Courses: {courses.length}
               </span>
             </div>
             <p className="text-xs font-medium text-gray-500 mt-1">
@@ -522,19 +587,42 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
             </p>
           </div>
 
-          {/* Action Buttons & Category Tools */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search by course, code, guru..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2.5 bg-gray-50 hover:bg-gray-100/70 border border-[#F0D5E4] rounded-2xl text-sm font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 w-60 md:w-72 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-              />
-            </div>
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* ADD NEW CATEGORY BUTTON */}
+            <button
+              onClick={() => setIsAddCategoryOpen(true)}
+              className="bg-white hover:bg-[#FFF2F8] border border-[#8A064D] text-[#8A064D] px-4.5 py-2.5 rounded-2xl text-sm font-black shadow-xs transition flex items-center gap-2 cursor-pointer"
+              title="Add a new course category"
+            >
+              <FolderPlus className="w-4 h-4 text-[#8A064D]" />
+              <span>+ New Category</span>
+            </button>
+
+            {/* ADD COURSE BUTTON */}
+            <button
+              onClick={openAddModal}
+              className="bg-[#8A064D] hover:bg-[#70043E] text-white px-5 py-2.5 rounded-2xl text-sm font-black shadow-md transition flex items-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-[#F9E33A]" />
+              <span>Add Course</span>
+            </button>
+          </div>
+        </div>
+
+        {/* SEARCH AND FILTER BAR (REPLACES SUMMARY ROW) */}
+        <div className="pt-4 border-t border-[#F0D5E4]/60 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search by course, code, guru..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 hover:bg-gray-100/70 border border-[#F0D5E4] rounded-2xl text-sm font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+            />
+          </div>
 
             {/* SEARCHABLE CATEGORIES DROPDOWN WITH DELETE BUTTON */}
             <div className="relative" ref={categoryDropdownRef}>
@@ -674,81 +762,6 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 </div>
               )}
             </div>
-
-            {/* ADD NEW CATEGORY BUTTON */}
-            <button
-              onClick={() => setIsAddCategoryOpen(true)}
-              className="bg-white hover:bg-[#FFF2F8] border border-[#8A064D] text-[#8A064D] px-4.5 py-2.5 rounded-2xl text-sm font-black shadow-xs transition flex items-center gap-2 cursor-pointer"
-              title="Add a new course category"
-            >
-              <FolderPlus className="w-4 h-4 text-[#8A064D]" />
-              <span>+ New Category</span>
-            </button>
-
-            {/* ADD COURSE BUTTON */}
-            <button
-              onClick={openAddModal}
-              className="bg-[#8A064D] hover:bg-[#70043E] text-white px-5 py-2.5 rounded-2xl text-sm font-black shadow-md transition flex items-center gap-2 cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-[#F9E33A]" />
-              <span>Add Course</span>
-            </button>
-          </div>
-        </div>
-
-        {/* STATS METRIC PILLS */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-gray-100">
-          <div className="bg-[#FFF9FB] p-3 rounded-2xl border border-rose-100/70 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-[#8A064D]">
-              <BookOpen className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Total Disciplines</span>
-              <span className="text-base font-black text-[#2D041A]">{courses.length}</span>
-            </div>
-          </div>
-
-          <div className="bg-[#FFF9FB] p-3 rounded-2xl border border-rose-100/70 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700">
-              <Tag className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Total Categories</span>
-              <span className="text-base font-black text-[#2D041A]">{categories.length}</span>
-            </div>
-          </div>
-
-          <div className={`p-3 rounded-2xl border flex items-center gap-3 ${
-            coursesWithoutCategoryCount > 0 
-              ? 'bg-red-50 border-red-200' 
-              : 'bg-[#FFF9FB] border-rose-100/70'
-          }`}>
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-              coursesWithoutCategoryCount > 0 ? 'bg-red-200 text-red-700' : 'bg-emerald-100 text-emerald-700'
-            }`}>
-              {coursesWithoutCategoryCount > 0 ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-            </div>
-            <div>
-              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Category Status</span>
-              {coursesWithoutCategoryCount > 0 ? (
-                <span className="text-base font-black text-red-700 flex items-center gap-1">
-                  {coursesWithoutCategoryCount} Unassigned
-                </span>
-              ) : (
-                <span className="text-base font-black text-emerald-700">All Categorized</span>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-[#FFF9FB] p-3 rounded-2xl border border-rose-100/70 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700">
-              <IndianRupee className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Avg. Monthly Fee</span>
-              <span className="text-base font-black text-[#2D041A]">₹{avgFee.toLocaleString('en-IN')}</span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -859,79 +872,89 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
             return (
               <div
                 key={c.id}
-                className={`bg-white rounded-3xl p-5 border shadow-xs hover:shadow-md transition flex flex-col justify-between group ${
+                className={`bg-white rounded-3xl p-5 border shadow-xs hover:shadow-md transition flex flex-col justify-between group overflow-hidden ${
                   hasNoCat 
                     ? 'border-red-300 ring-1 ring-red-400/25 hover:border-red-500' 
                     : 'border-[#F0D5E4] hover:border-[#8A064D]/50'
                 }`}
               >
                 <div>
-                  {/* Header Badges */}
-                  <div className="flex items-center justify-between gap-2 mb-3.5">
-                    <span className="text-xs font-mono font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-3 py-1 rounded-xl shadow-2xs">
-                      {c.code}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {/* IF NO CATEGORY: RED HIGHLIGHT BOUNDARIES */}
-                      {hasNoCat ? (
-                        <span className="text-xs font-black text-red-700 bg-red-50 border-2 border-red-500 px-3 py-1 rounded-full flex items-center gap-1 shadow-xs animate-pulse">
-                          <AlertCircle className="w-3.5 h-3.5 text-red-600" />
-                          <span>No Category</span>
-                        </span>
-                      ) : (
-                        <span className="text-xs font-bold text-[#590231] bg-[#FFF2F8] border border-rose-100 px-3 py-1 rounded-full shadow-2xs">
-                          {c.category}
-                        </span>
-                      )}
+                  {/* Course Cover Image Banner */}
+                  <div className="relative w-full h-44 overflow-hidden rounded-2xl bg-slate-100 mb-4 group/img">
+                    <img
+                      src={getCourseImage(c)}
+                      alt={c.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=800&q=80';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30 pointer-events-none" />
 
-                      {c.is_active === false && (
-                        <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                          Inactive
-                        </span>
-                      )}
+                    {/* Overlaid Badges */}
+                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-auto">
+                      <span className="text-xs font-mono font-black text-white bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-xl shadow-xs border border-white/20">
+                        {c.code}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {hasNoCat ? (
+                          <span className="text-xs font-black text-red-100 bg-red-600/90 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1 shadow-xs border border-red-400">
+                            <AlertCircle className="w-3.5 h-3.5 text-white" />
+                            <span>No Category</span>
+                          </span>
+                        ) : (
+                          <span className="text-xs font-bold text-white bg-[#8A064D]/90 backdrop-blur-md px-3 py-1 rounded-full shadow-xs border border-white/20">
+                            {c.category}
+                          </span>
+                        )}
+
+                        {c.is_active === false && (
+                          <span className="text-xs font-bold text-amber-200 bg-amber-950/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-amber-400/30">
+                            Inactive
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Title */}
-                  <h3 className="text-lg font-bold text-[#2D041A] group-hover:text-[#8A064D] transition">
+                  {/* Title (Serif Font) */}
+                  <h3 className="font-serif text-xl font-black text-[#2D041A] group-hover:text-[#8A064D] transition-colors leading-snug tracking-tight">
                     {c.title}
                   </h3>
 
-                  {/* Assigned Guru Badge */}
-                  <div className="mt-2.5 py-2 px-3.5 rounded-2xl bg-[#FFF9FB] border border-rose-100 flex items-center justify-between">
-                    <span className="text-xs font-black uppercase text-[#8A064D]">Assigned Guru</span>
-                    <span className="text-sm font-bold text-[#1A010F] truncate ml-2">
+                  {/* Guru Name (Sans Font, Avatar, No 'Assigned Guru' text) */}
+                  <div className="mt-2.5 flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D] shrink-0">
+                      <User className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-sans text-xs md:text-sm font-bold text-[#8A064D] truncate">
                       {COURSE_GURUS_MAP[c.title] || 'Senior Faculty Guru'}
                     </span>
                   </div>
 
                   {/* Uncategorized Warning note if applicable */}
                   {hasNoCat && (
-                    <div className="mt-2 p-2 bg-red-50/80 rounded-xl border border-red-200 text-xs text-red-800 font-semibold flex items-center justify-between">
+                    <div className="mt-3 p-2 bg-red-50/90 rounded-xl border border-red-200 text-xs text-red-800 font-semibold flex items-center justify-between">
                       <span>⚠️ Category not assigned</span>
                       <button
                         type="button"
                         onClick={() => openEditModal(c)}
-                        className="text-red-700 font-black hover:underline text-xs"
+                        className="text-red-700 font-black hover:underline text-xs cursor-pointer"
                       >
                         Set Category →
                       </button>
                     </div>
                   )}
-
-                  {/* Description */}
-                  <p className="text-sm font-medium text-gray-600 mt-2.5 line-clamp-2 leading-relaxed">
-                    {c.description || 'Comprehensive syllabus crafted for classical & contemporary mastery.'}
-                  </p>
                 </div>
 
                 {/* Bottom Meta & Action Buttons */}
-                <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
+                <div className="mt-5 pt-4 border-t border-[#F0D5E4]/60 flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-gray-500 uppercase font-black tracking-wider block">Monthly Fee</span>
-                    <span className="text-lg font-extrabold text-[#8A064D] flex items-center">
+                    <span className="text-[10px] text-[#6E3955] uppercase font-black tracking-wider block">Monthly Fee</span>
+                    <span className="text-lg font-black text-[#8A064D] flex items-center tabular-nums">
                       ₹{Number(c.monthly_fee).toLocaleString('en-IN')}
-                      <span className="text-xs font-bold text-gray-400 ml-1">/ mo</span>
+                      <span className="text-xs font-bold text-[#6E3955] ml-1">/ mo</span>
                     </span>
                   </div>
 
@@ -940,9 +963,9 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                     <button
                       onClick={() => setViewingCourse(c)}
                       title="View Complete Course Details"
-                      className="px-3.5 py-2 rounded-xl bg-gray-50 border border-gray-200 hover:bg-[#8A064D] hover:text-white text-gray-700 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                      className="px-3.5 py-2 rounded-xl bg-[#2D041A] hover:bg-[#48082B] text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-2xs border border-[#48082B]"
                     >
-                      <Eye className="w-4 h-4" />
+                      <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
                       <span>Details</span>
                     </button>
 
@@ -950,18 +973,18 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                     <button
                       onClick={() => openEditModal(c)}
                       title="Edit Course Details"
-                      className="p-2 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] hover:bg-[#8A064D] hover:text-white text-[#8A064D] transition cursor-pointer shadow-2xs"
+                      className="p-2 rounded-xl bg-[#FFF5F9] border border-[#E8BFD5] hover:bg-[#FCE7F3] text-[#8A064D] transition cursor-pointer shadow-2xs"
                     >
-                      <Edit3 className="w-4 h-4" />
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
 
                     {/* Delete Button */}
                     <button
                       onClick={() => setDeletingCourse(c)}
                       title="Delete Course"
-                      className="p-2 rounded-xl bg-gray-50 border border-gray-200 hover:bg-rose-600 hover:text-white text-gray-400 hover:border-rose-600 transition cursor-pointer shadow-2xs"
+                      className="p-2 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition cursor-pointer shadow-2xs"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -977,29 +1000,54 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
       {/* ================================================================= */}
       {viewingCourse && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-5">
-              <div>
-                <span className="text-[10px] font-mono font-black text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-md border border-rose-100">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            {/* Modal Image Header Banner */}
+            <div className="relative w-full h-48 rounded-2xl overflow-hidden mb-4 bg-slate-100">
+              <img
+                src={getCourseImage(viewingCourse)}
+                alt={viewingCourse.title}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=800&q=80';
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/20" />
+              <div className="absolute bottom-3.5 left-4 right-4 text-white">
+                <span className="text-[10px] font-mono font-black text-white bg-black/60 backdrop-blur-md px-2.5 py-0.5 rounded-md border border-white/20">
                   {viewingCourse.code}
                 </span>
-                <h3 className="font-black text-xl text-[#2D041A] mt-1">{viewingCourse.title}</h3>
-                {isCourseUncategorized(viewingCourse) ? (
-                  <span className="inline-block mt-1 text-[11px] font-black text-red-700 bg-red-50 border-2 border-red-500 px-2.5 py-0.5 rounded-full">
-                    ⚠️ No Category
-                  </span>
-                ) : (
-                  <span className="text-xs font-bold text-[#8A064D]">{viewingCourse.category}</span>
-                )}
+                <h3 className="font-serif font-black text-2xl text-white mt-1 leading-tight drop-shadow-sm">
+                  {viewingCourse.title}
+                </h3>
               </div>
-
-              {/* Circular Modal Close Button */}
               <button
                 onClick={() => setViewingCourse(null)}
-                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-[#590231] text-slate-500 hover:text-white border border-slate-200 hover:border-[#590231] flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 hover:bg-[#8A064D] text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-sm border border-white/20"
               >
                 <X className="w-4 h-4 stroke-[2.5]" />
               </button>
+            </div>
+
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+              <div>
+                <span className="text-xs font-semibold text-gray-500">Category:</span>
+                {isCourseUncategorized(viewingCourse) ? (
+                  <span className="ml-2 text-[11px] font-black text-red-700 bg-red-50 border-2 border-red-500 px-2.5 py-0.5 rounded-full">
+                    ⚠️ No Category
+                  </span>
+                ) : (
+                  <span className="ml-2 text-xs font-bold text-[#8A064D] bg-[#FFF2F8] px-3 py-1 rounded-full border border-rose-100">
+                    {viewingCourse.category}
+                  </span>
+                )}
+              </div>
+              <span className={`font-black px-2.5 py-0.5 rounded-full text-[11px] ${
+                viewingCourse.is_active !== false 
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+              }`}>
+                {viewingCourse.is_active !== false ? 'Active & Open' : 'Inactive'}
+              </span>
             </div>
 
             <div className="space-y-4">
@@ -1051,7 +1099,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 <label className="text-xs font-black text-[#590231] uppercase tracking-wide block mb-1.5">
                   Complete Course Syllabus & Description
                 </label>
-                <div className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 text-xs font-medium text-gray-800 leading-relaxed max-h-40 overflow-y-auto">
+                <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-rose-100/70 text-xs font-medium text-gray-800 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-line">
                   {viewingCourse.description || 'No detailed syllabus text provided.'}
                 </div>
               </div>
@@ -1103,7 +1151,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
       {/* ================================================================= */}
       {editingCourse && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
               <div>
                 <h3 className="font-black text-lg text-[#2D041A]">Edit Course: {editingCourse.title}</h3>
@@ -1216,6 +1264,92 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 )}
               </div>
 
+              {/* Course Image Option */}
+              <div className="space-y-2 p-3 bg-gray-50/80 rounded-2xl border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-[#590231] uppercase tracking-wide flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-[#8A064D]" />
+                    <span>Course Image</span>
+                  </label>
+                  {editImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setEditImageUrl('')}
+                      className="text-[10px] text-rose-600 hover:underline font-bold cursor-pointer"
+                    >
+                      Clear Image
+                    </button>
+                  )}
+                </div>
+
+                {/* Thumbnail Preview + URL Input + File Upload */}
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-200 border border-gray-300 shrink-0 relative">
+                    <img
+                      src={editImageUrl || (editingCourse ? getCourseImage(editingCourse) : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80')}
+                      alt="Course Preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80';
+                      }}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <input
+                      type="url"
+                      placeholder="Paste image URL (https://...)"
+                      value={editImageUrl}
+                      onChange={(e) => setEditImageUrl(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D]"
+                    />
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-[11px] font-bold text-gray-700 cursor-pointer transition shadow-2xs">
+                      <Upload className="w-3 h-3 text-[#8A064D]" />
+                      <span>Upload from Device</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 2 * 1024 * 1024) {
+                              alert('Image file size should be less than 2MB');
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              if (reader.result) setEditImageUrl(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Quick Cultural Presets */}
+                <div>
+                  <span className="text-[10px] font-bold text-gray-500 block mb-1">Quick Select Cultural Presets:</span>
+                  <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-1">
+                    {SUGGESTED_COURSE_IMAGES.map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setEditImageUrl(preset.url)}
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-medium transition cursor-pointer border ${
+                          editImageUrl === preset.url
+                            ? 'bg-[#8A064D] text-white border-[#8A064D]'
+                            : 'bg-white hover:bg-[#FFF2F8] text-gray-600 border-gray-200'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
@@ -1299,7 +1433,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
       {/* ================================================================= */}
       {isAddOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
               <div>
                 <h3 className="font-black text-lg text-[#2D041A]">Add New Academy Course</h3>
@@ -1401,6 +1535,92 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* Course Image Option */}
+              <div className="space-y-2 p-3 bg-gray-50/80 rounded-2xl border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-[#590231] uppercase tracking-wide flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-[#8A064D]" />
+                    <span>Course Image</span>
+                  </label>
+                  {newImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setNewImageUrl('')}
+                      className="text-[10px] text-rose-600 hover:underline font-bold cursor-pointer"
+                    >
+                      Clear Image
+                    </button>
+                  )}
+                </div>
+
+                {/* Thumbnail Preview + URL Input + File Upload */}
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-200 border border-gray-300 shrink-0 relative">
+                    <img
+                      src={newImageUrl || (newCategory && CATEGORY_DEFAULT_IMAGES[newCategory]) || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80'}
+                      alt="Course Preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80';
+                      }}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <input
+                      type="url"
+                      placeholder="Paste image URL (https://...)"
+                      value={newImageUrl}
+                      onChange={(e) => setNewImageUrl(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D]"
+                    />
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-[11px] font-bold text-gray-700 cursor-pointer transition shadow-2xs">
+                      <Upload className="w-3 h-3 text-[#8A064D]" />
+                      <span>Upload from Device</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 2 * 1024 * 1024) {
+                              alert('Image file size should be less than 2MB');
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              if (reader.result) setNewImageUrl(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Quick Cultural Presets */}
+                <div>
+                  <span className="text-[10px] font-bold text-gray-500 block mb-1">Quick Select Cultural Presets:</span>
+                  <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-1">
+                    {SUGGESTED_COURSE_IMAGES.map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setNewImageUrl(preset.url)}
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-medium transition cursor-pointer border ${
+                          newImageUrl === preset.url
+                            ? 'bg-[#8A064D] text-white border-[#8A064D]'
+                            : 'bg-white hover:bg-[#FFF2F8] text-gray-600 border-gray-200'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

@@ -129,18 +129,12 @@ class _StudentAttendanceHistoryScreenState extends State<StudentAttendanceHistor
   Widget _statusIcon(String status) {
     IconData icon;
     Color color;
-    switch (status) {
-      case 'present':
-        icon = Icons.check_circle;
-        color = LaasyaColors.success;
-        break;
-      case 'late':
-        icon = Icons.access_time;
-        color = LaasyaColors.warning;
-        break;
-      default:
-        icon = Icons.cancel;
-        color = LaasyaColors.error;
+    if (status != 'absent') {
+      icon = Icons.check_circle;
+      color = LaasyaColors.success;
+    } else {
+      icon = Icons.cancel;
+      color = LaasyaColors.error;
     }
     return Container(
       padding: const EdgeInsets.all(8),
@@ -155,24 +149,19 @@ class _StudentAttendanceHistoryScreenState extends State<StudentAttendanceHistor
   Widget _statusBadge(String status) {
     Color bg;
     Color fg;
-    switch (status) {
-      case 'present':
-        bg = LaasyaColors.success.withOpacity(0.12);
-        fg = LaasyaColors.success;
-        break;
-      case 'late':
-        bg = LaasyaColors.warning.withOpacity(0.12);
-        fg = LaasyaColors.warning;
-        break;
-      default:
-        bg = LaasyaColors.error.withOpacity(0.12);
-        fg = LaasyaColors.error;
+    final isPresent = status != 'absent';
+    if (isPresent) {
+      bg = LaasyaColors.success.withOpacity(0.12);
+      fg = LaasyaColors.success;
+    } else {
+      bg = LaasyaColors.error.withOpacity(0.12);
+      fg = LaasyaColors.error;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
       child: Text(
-        status.toUpperCase(),
+        isPresent ? 'PRESENT' : 'ABSENT',
         style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg),
       ),
     );

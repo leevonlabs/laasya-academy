@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: true, type, ...result });
       }
       case 'salaries': {
-        const result = await getSalariesReport({ payrollMonth, trainerId, status });
+        const result = await getSalariesReport({ payrollMonth, trainerId, status, startDate, endDate });
         return NextResponse.json({ success: true, type, ...result });
       }
       case 'income_expenses': {

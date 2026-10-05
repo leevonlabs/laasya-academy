@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
 import '../auth/portal_landing_screen.dart';
+import 'student_video_library_screen.dart';
 
 class StudentProfileTab extends StatefulWidget {
   const StudentProfileTab({super.key});
@@ -140,9 +141,7 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
     final gender = _profile?['gender'] ?? 'Female';
     final address = _profile?['address'] ?? 'No. 204, Gachibowli, Hyderabad';
     final course = _profile?['course'] ?? 'Bharathanatyam';
-    final category = _profile?['course_category'] ?? 'Classical Dance';
     final batch = _profile?['batch'] ?? 'Bharathanatyam - Batch A (Beginners)';
-    final room = _profile?['room_or_hall'] ?? 'Natya Mandapam (Room 101)';
     final avatarUrl = _profile?['avatar_url'] as String?;
 
     // Fee attributes
@@ -465,16 +464,99 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
             const SizedBox(height: 16),
 
             // =================================================================
-            // 4. ACADEMIC & ENROLLMENT PARTICULARS
+            // 4. EVENT VIDEO LIBRARY (GOOGLE DRIVE LINKS)
             // =================================================================
-            _sectionCard(
-              title: 'Academic Enrollment',
-              children: [
-                _infoRow(Icons.auto_stories_outlined, 'Discipline & Course', course),
-                _infoRow(Icons.category_outlined, 'Course Category', category),
-                _infoRow(Icons.groups_outlined, 'Enrolled Batch', batch),
-                _infoRow(Icons.meeting_room_outlined, 'Assigned Studio Hall', room),
-              ],
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF590231), Color(0xFF8A064D)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.6), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: LaasyaColors.primaryDark.withOpacity(0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.5)),
+                            ),
+                            child: const Icon(Icons.video_library_rounded, color: LaasyaColors.accentGold, size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Event Video Library',
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDEF7EC),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'DRIVE VAULT',
+                          style: TextStyle(color: Color(0xFF03543F), fontSize: 9.5, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Access official Google Drive event shoot folders, stage video recordings, and photography for your enrolled course ($course).',
+                    style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: LaasyaColors.accentGold,
+                        foregroundColor: const Color(0xFF4A0025),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => StudentVideoLibraryScreen(
+                              studentCourse: course,
+                              studentBatch: batch,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.folder_shared_rounded, size: 18),
+                      label: const Text(
+                        'Open Video Library & Drive Links',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
 
             const SizedBox(height: 14),

@@ -332,7 +332,7 @@ class _TrainerSessionScreenState extends State<TrainerSessionScreen> {
                                 ),
                               ),
 
-                              // Three Segmented Toggle Buttons: P / L / A
+                              // Two Segmented Toggle Buttons: P / A
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -344,16 +344,7 @@ class _TrainerSessionScreenState extends State<TrainerSessionScreen> {
                                     borderColor: const Color(0xFF31C48D),
                                     onTap: () => setState(() => _attendanceMap[studentId] = 'present'),
                                   ),
-                                  const SizedBox(width: 6),
-                                  _statusBtn(
-                                    label: 'L',
-                                    isSelected: currentStatus == 'late',
-                                    bgColor: const Color(0xFFFEF08A),
-                                    textColor: const Color(0xFF854D0E),
-                                    borderColor: const Color(0xFFFACC15),
-                                    onTap: () => setState(() => _attendanceMap[studentId] = 'late'),
-                                  ),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: 8),
                                   _statusBtn(
                                     label: 'A',
                                     isSelected: currentStatus == 'absent',

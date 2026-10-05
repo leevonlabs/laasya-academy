@@ -382,34 +382,40 @@ export default function TrainersListClient({
       )}
 
       {/* Top Header Card */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-7 rounded-3xl border border-[#F0D5E4] shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#F0D5E4]/80 shadow-xs">
         <div>
-          <h1 className="text-3xl font-extrabold text-[#2D041A] flex items-center gap-2.5">
-            <span>Faculty & Revered Gurus</span>
-            <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-3 py-1 rounded-full font-bold">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-[#FCE7F3] text-[#8A064D]">
+              Academy Mentors
+            </span>
+            <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-full font-bold tabular-nums">
               {trainers.length} Faculty Masters
             </span>
+          </div>
+          <h1 className="text-2xl font-black text-[#2D041A] tracking-tight flex items-center gap-2.5">
+            <Users className="w-7 h-7 text-[#8A064D]" />
+            <span>Faculty & Revered Gurus</span>
           </h1>
-          <p className="text-sm text-gray-600 mt-1 font-medium">
+          <p className="text-xs text-[#6E3955] mt-1 font-medium max-w-2xl">
             Manage classical dance gurus, vocal masters, instrumental mentors, monthly salaries, and batch timetables.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+            <Search className="w-4 h-4 text-[#8A064D]/60 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search by guru name, title, course, contact..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2.5 bg-gray-50 border border-[#F0D5E4] rounded-xl text-sm w-80 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white font-medium"
+              className="pl-10 pr-4 py-2.5 bg-[#FFF9FB] border border-[#F0D5E4] rounded-2xl text-xs font-semibold text-[#2D041A] placeholder:text-[#8A064D]/40 w-72 sm:w-80 focus:outline-none focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] focus:bg-white transition"
             />
           </div>
 
           <button
             onClick={() => setIsAddOpen(true)}
-            className="bg-[#8A064D] hover:bg-[#70043E] text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md transition flex items-center gap-2 cursor-pointer"
+            className="bg-[#8A064D] hover:bg-[#70043E] active:scale-98 text-white px-5 py-2.5 rounded-2xl text-xs font-black tracking-wide shadow-sm hover:shadow-md transition flex items-center gap-2 cursor-pointer border border-[#F9E33A]/40 shrink-0"
           >
             <Plus className="w-4 h-4 text-[#F9E33A]" />
             <span>Add New Guru</span>
@@ -421,35 +427,50 @@ export default function TrainersListClient({
       <div className="flex items-center gap-2.5">
         <button
           onClick={() => setStatusFilter('all')}
-          className={`px-4.5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition cursor-pointer ${
+          className={`px-5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-2 ${
             statusFilter === 'all'
-              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/50'
-              : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
+              ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
+              : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
           }`}
         >
-          All Gurus ({trainers.length})
+          <span>All Gurus</span>
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
+            statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-[#FFF2F8] text-[#8A064D]'
+          }`}>
+            {trainers.length}
+          </span>
         </button>
         <button
           onClick={() => setStatusFilter('active')}
-          className={`px-4.5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-2 ${
+          className={`px-5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-2 ${
             statusFilter === 'active'
-              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/50'
-              : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
+              ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
+              : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
           }`}
         >
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-          <span>Active ({activeCount})</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>Active</span>
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
+            statusFilter === 'active' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-800'
+          }`}>
+            {activeCount}
+          </span>
         </button>
         <button
           onClick={() => setStatusFilter('inactive')}
-          className={`px-4.5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-2 ${
+          className={`px-5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-2 ${
             statusFilter === 'inactive'
-              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/50'
-              : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
+              ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
+              : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
           }`}
         >
-          <span className="w-2.5 h-2.5 rounded-full bg-zinc-400"></span>
-          <span>Inactive / On Leave ({inactiveCount})</span>
+          <span className="w-2 h-2 rounded-full bg-zinc-400"></span>
+          <span>Inactive / Leave</span>
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
+            statusFilter === 'inactive' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {inactiveCount}
+          </span>
         </button>
       </div>
 
@@ -463,32 +484,32 @@ export default function TrainersListClient({
           return (
             <div
               key={t.id}
-              className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-sm hover:shadow-md transition flex flex-col justify-between"
+              className="bg-white rounded-3xl p-5 border border-[#F0D5E4]/90 shadow-xs hover:shadow-md hover:border-[#8A064D]/40 transition flex flex-col justify-between group"
             >
               <div>
                 {/* 1. TOP OF EACH GRID: Status Active/Inactive & Salary Payment Status Pending/Paid */}
-                <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-gray-100">
+                <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-[#F0D5E4]/60">
                   {/* Status: Active or Inactive */}
                   <div className="flex items-center gap-1.5">
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
                       t.is_active !== false 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
                         : 'bg-zinc-100 text-zinc-600 border-zinc-200'
                     }`}>
-                      <span className={`w-2 h-2 rounded-full ${t.is_active !== false ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`}></span>
-                      {t.is_active !== false ? 'Active' : 'Inactive'}
+                      <span className={`w-2 h-2 rounded-full ${t.is_active !== false ? 'bg-emerald-500' : 'bg-zinc-400'}`}></span>
+                      <span>{t.is_active !== false ? 'Active Guru' : 'Inactive'}</span>
                     </span>
                   </div>
 
                   {/* Below Status / Header right: Salary Payment Status Pending or Paid with Red and Green */}
                   <div>
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold border ${
                       isSalaryPaid
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                        : 'bg-rose-50 text-rose-700 border-rose-300'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-rose-50 text-rose-800 border-rose-300'
                     }`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${isSalaryPaid ? 'bg-emerald-600' : 'bg-rose-600'}`}></span>
-                      Salary: {isSalaryPaid ? 'Paid' : 'Pending'}
+                      <span>Salary: {isSalaryPaid ? 'Paid' : 'Pending'}</span>
                     </span>
                   </div>
                 </div>
@@ -508,38 +529,38 @@ export default function TrainersListClient({
                   )}
                   <div className="flex-1 min-w-0">
                     {/* 2. GURU FULL NAME (Primary heading) */}
-                    <h3 className="font-bold text-xl text-[#2D041A] leading-tight truncate">
+                    <h3 className="font-bold text-lg text-[#2D041A] leading-tight group-hover:text-[#8A064D] transition truncate">
                       {t.full_name}
                     </h3>
 
                     {/* 3. DISPLAY TITLE AND CONTACT BELOW IT */}
-                    <p className="text-sm font-bold text-[#8A064D] truncate mt-0.5">
+                    <p className="text-xs font-bold text-[#8A064D] truncate mt-0.5">
                       {t.display_title || 'Revered Guru & Mentor'}
                     </p>
                     {t.phone ? (
-                      <p className="text-sm text-gray-700 flex items-center gap-1.5 font-medium mt-1 truncate">
-                        <Phone className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <p className="text-xs text-[#6E3955] flex items-center gap-1.5 font-medium mt-1 truncate tabular-nums">
+                        <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                         <span>{t.phone}</span>
                       </p>
                     ) : (
-                      <p className="text-sm text-gray-400 italic mt-1">No contact phone</p>
+                      <p className="text-xs text-gray-400 italic mt-1">No contact phone</p>
                     )}
                   </div>
                 </div>
 
                 {/* 4. ASSIGNED COURSES */}
                 <div className="mb-4">
-                  <span className="text-xs text-gray-500 uppercase font-bold tracking-wider block mb-2">
+                  <span className="text-[10px] text-[#6E3955] uppercase font-black tracking-wider block mb-2">
                     Assigned Courses ({t.specializations?.length || 0})
                   </span>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {t.specializations && t.specializations.length > 0 ? (
                       t.specializations.map((spec, i) => (
                         <span
                           key={i}
-                          className="text-xs font-semibold bg-[#FFF8FA] text-[#8A064D] border border-rose-100 px-3 py-1 rounded-xl flex items-center gap-1.5 shadow-2xs"
+                          className="text-xs font-semibold bg-[#FFF9FB] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-xl flex items-center gap-1.5 shadow-2xs"
                         >
-                          <BookOpen className="w-3.5 h-3.5 text-[#8A064D]/70" />
+                          <BookOpen className="w-3 h-3 text-[#8A064D]/70" />
                           <span>{spec}</span>
                         </span>
                       ))
@@ -551,34 +572,34 @@ export default function TrainersListClient({
               </div>
 
               {/* 5. ACTION BUTTONS: DETAILS, EDIT, AND VIEW TIMETABLE */}
-              <div className="pt-3.5 border-t border-gray-100 grid grid-cols-3 gap-2.5">
+              <div className="pt-3.5 border-t border-[#F0D5E4]/50 grid grid-cols-3 gap-2">
                 {/* Details Button */}
                 <button
                   onClick={() => setViewingGuru(t)}
-                  className="py-2.5 px-2 rounded-xl bg-[#2D041A] hover:bg-[#1A020F] text-white text-sm font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                  className="py-2.5 px-2 rounded-xl bg-[#2D041A] hover:bg-[#48082B] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 border border-[#48082B]"
                   title="View complete Guru profile and batch details"
                 >
-                  <Eye className="w-4 h-4 text-[#F9E33A]" />
+                  <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
                   <span>Details</span>
                 </button>
 
                 {/* Edit Button */}
                 <button
                   onClick={() => openEditModal(t)}
-                  className="py-2.5 px-2 rounded-xl bg-[#1E3A8A] hover:bg-[#172554] text-white text-sm font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                  className="py-2.5 px-2 rounded-xl bg-[#FFF5F9] hover:bg-[#FCE7F3] text-[#8A064D] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 border border-[#E8BFD5]"
                   title="Edit Guru profile and salary"
                 >
-                  <Edit3 className="w-4 h-4 text-blue-200" />
+                  <Edit3 className="w-3.5 h-3.5 text-[#8A064D]" />
                   <span>Edit</span>
                 </button>
 
                 {/* View Timetable Button */}
                 <button
                   onClick={() => setTimetableGuru(t)}
-                  className="py-2.5 px-2 rounded-xl bg-[#8A064D] hover:bg-[#70043E] text-white text-sm font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                  className="py-2.5 px-2 rounded-xl bg-[#8A064D] hover:bg-[#70043E] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95 border border-[#8A064D]"
                   title="View assigned classes timetable"
                 >
-                  <Calendar className="w-4 h-4 text-[#F9E33A]" />
+                  <Calendar className="w-3.5 h-3.5 text-[#F9E33A]" />
                   <span className="truncate">Timetable</span>
                 </button>
               </div>
@@ -831,9 +852,9 @@ export default function TrainersListClient({
                     setViewingGuru(null);
                     openEditModal(g);
                   }}
-                  className="px-4 py-2.5 rounded-xl bg-[#1E3A8A] hover:bg-[#172554] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-[#8A064D] hover:bg-[#70043E] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm border border-[#8A064D] cursor-pointer"
                 >
-                  <Edit3 className="w-3.5 h-3.5 text-blue-200" />
+                  <Edit3 className="w-3.5 h-3.5 text-[#F9E33A]" />
                   <span>Edit Details</span>
                 </button>
               </div>

@@ -5,16 +5,35 @@
   --foreground: #220314;
   --laasya-primary: #8A064D;
   --laasya-primary-dark: #590231;
+  --laasya-primary-hover: #73023E;
   --laasya-gold: #F9E33A;
   --laasya-gold-dark: #D4AF37;
   --laasya-cream: #FFFDF7;
+  --laasya-border: #F0D5E4;
+  --laasya-border-subtle: #F6E7EF;
+  --laasya-muted-plum: #6E3955;
+}
+
+/* Impeccable Browser Surfaces Theming */
+::selection {
+  background-color: #8A064D;
+  color: #FFFDF7;
+}
+
+* {
+  caret-color: #8A064D;
+  scrollbar-width: thin;
+  scrollbar-color: #D9A0C3 #FDF2F7;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* Custom scrollbars with brand plum tint */
@@ -31,4 +50,22 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #8A064D;
+}
+
+/* Tabular figures for aligned currencies, dates, rolls, metrics */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle transitions for buttons and cards */
+.interactive-card {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+.interactive-card:hover {
+  transform: translateY(-1.5px);
+}
+
+/* Clean accessible focus ring */
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: none;
 }

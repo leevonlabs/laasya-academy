@@ -266,9 +266,8 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
     const total = records.length;
     const present = records.filter(r => r.status === 'present').length;
     const absent = records.filter(r => r.status === 'absent').length;
-    const late = records.filter(r => r.status === 'late').length;
-    const rate = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
-    return { total, present, absent, late, rate };
+    const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+    return { total, present, absent, rate };
   };
 
   const batchStats = useMemo(() => getStats(filteredBatchRecords), [filteredBatchRecords]);
@@ -483,8 +482,8 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
 
                         {/* Fee & Duration */}
                         <div className="mt-3.5 flex items-center justify-between text-xs text-gray-600">
-                          <span>Monthly Fee: <strong className="text-[#8A064D] text-sm">₹{Number(crs.monthly_fee).toLocaleString('en-IN')}</strong></span>
-                          <span>{crs.duration_months} Months</span>
+                          <span>Monthly Fee: <strong className="text-[#8A064D] text-sm tabular-nums font-black">₹{Number(crs.monthly_fee).toLocaleString('en-IN')}</strong></span>
+                          <span className="tabular-nums font-semibold">{crs.duration_months} Months</span>
                         </div>
                       </div>
 
@@ -728,7 +727,6 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
                           <option value="All">All Statuses</option>
                           <option value="present">Present Only</option>
                           <option value="absent">Absent Only</option>
-                          <option value="late">Late Only</option>
                         </select>
                       </div>
 
@@ -750,35 +748,29 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
                   </div>
 
                   {/* Summary Details for this Batch */}
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Audited Records</span>
-                      <span className="text-xl font-bold text-[#2D041A] mt-1 block">{batchStats.total}</span>
-                      <span className="text-[10px] text-gray-500">In selected date range</span>
+                      <span className="text-xs font-bold text-[#6E3955] uppercase tracking-wider block">Audited Records</span>
+                      <span className="text-2xl font-black text-[#2D041A] mt-1 block tabular-nums">{batchStats.total}</span>
+                      <span className="text-[11px] text-[#8C5E77]">In selected date range</span>
                     </div>
 
-                    <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
-                      <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">Present</span>
-                      <span className="text-xl font-bold text-emerald-700 mt-1 block">{batchStats.present}</span>
-                      <span className="text-[10px] text-gray-500">Marked present</span>
+                    <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-xs">
+                      <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block">Present</span>
+                      <span className="text-2xl font-black text-emerald-700 mt-1 block tabular-nums">{batchStats.present}</span>
+                      <span className="text-[11px] text-emerald-600">Marked present</span>
                     </div>
 
-                    <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
-                      <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block">Absent</span>
-                      <span className="text-xl font-bold text-rose-700 mt-1 block">{batchStats.absent}</span>
-                      <span className="text-[10px] text-gray-500">Unexcused / absent</span>
+                    <div className="bg-white p-4 rounded-2xl border border-red-200 shadow-xs">
+                      <span className="text-xs font-bold text-red-800 uppercase tracking-wider block">Absent</span>
+                      <span className="text-2xl font-black text-red-700 mt-1 block tabular-nums">{batchStats.absent}</span>
+                      <span className="text-[11px] text-red-600">Unexcused / absent</span>
                     </div>
 
-                    <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
-                      <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">Late Arrivals</span>
-                      <span className="text-xl font-bold text-amber-700 mt-1 block">{batchStats.late}</span>
-                      <span className="text-[10px] text-gray-500">Delayed check-in</span>
-                    </div>
-
-                    <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-rose-100 shadow-xs">
-                      <span className="text-[10px] font-bold text-[#8A064D] uppercase tracking-wider block">Batch Rate</span>
-                      <span className="text-xl font-bold text-[#8A064D] mt-1 block">{batchStats.rate}%</span>
-                      <span className="text-[10px] text-[#8A064D]/80">Effective attendance</span>
+                    <div className="bg-gradient-to-br from-white to-[#FFF9FB] p-4 rounded-2xl border border-[#F9E33A] shadow-xs">
+                      <span className="text-xs font-bold text-[#8A064D] uppercase tracking-wider block">Batch Rate</span>
+                      <span className="text-2xl font-black text-[#590231] mt-1 block tabular-nums">{batchStats.rate}%</span>
+                      <span className="text-[11px] text-emerald-700 font-bold">Effective attendance</span>
                     </div>
                   </div>
 
@@ -838,22 +830,15 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
                                   {r.session_date}
                                 </td>
                                 <td className="py-3.5 px-4">
-                                  {r.status === 'present' && (
+                                  {r.status !== 'absent' ? (
                                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
                                       <CheckCircle2 className="w-3.5 h-3.5" />
                                       <span>Present</span>
                                     </span>
-                                  )}
-                                  {r.status === 'absent' && (
+                                  ) : (
                                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
                                       <XCircle className="w-3.5 h-3.5" />
                                       <span>Absent</span>
-                                    </span>
-                                  )}
-                                  {r.status === 'late' && (
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
-                                      <Clock className="w-3.5 h-3.5" />
-                                      <span>Late</span>
                                     </span>
                                   )}
                                 </td>
@@ -952,7 +937,6 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
                   <option value="All">All Statuses</option>
                   <option value="present">Present Only</option>
                   <option value="absent">Absent Only</option>
-                  <option value="late">Late Only</option>
                 </select>
               </div>
 
@@ -992,37 +976,31 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
           </div>
 
           {/* Complete Academy Summary Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Logs Audited</span>
-              <span className="text-xl font-bold text-[#2D041A] mt-1 block">{completeStats.total}</span>
-              <span className="text-[10px] text-gray-500">
+              <span className="text-xs font-bold text-[#6E3955] uppercase tracking-wider block">Total Logs Audited</span>
+              <span className="text-2xl font-black text-[#2D041A] mt-1 block tabular-nums">{completeStats.total}</span>
+              <span className="text-[11px] text-[#8C5E77]">
                 {completePreset === 'Today' ? "Today's logs" : 'Across filtered dates'}
               </span>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
-              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">Present</span>
-              <span className="text-xl font-bold text-emerald-700 mt-1 block">{completeStats.present}</span>
-              <span className="text-[10px] text-gray-500">Students attended</span>
+            <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-xs">
+              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block">Present</span>
+              <span className="text-2xl font-black text-emerald-700 mt-1 block tabular-nums">{completeStats.present}</span>
+              <span className="text-[11px] text-emerald-600">Students attended</span>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
-              <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block">Absent</span>
-              <span className="text-xl font-bold text-rose-700 mt-1 block">{completeStats.absent}</span>
-              <span className="text-[10px] text-gray-500">Absent count</span>
+            <div className="bg-white p-4 rounded-2xl border border-red-200 shadow-xs">
+              <span className="text-xs font-bold text-red-800 uppercase tracking-wider block">Absent</span>
+              <span className="text-2xl font-black text-red-700 mt-1 block tabular-nums">{completeStats.absent}</span>
+              <span className="text-[11px] text-red-600">Absent count</span>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
-              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">Late Arrivals</span>
-              <span className="text-xl font-bold text-amber-700 mt-1 block">{completeStats.late}</span>
-              <span className="text-[10px] text-gray-500">Delayed arrivals</span>
-            </div>
-
-            <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-rose-100 shadow-xs">
-              <span className="text-[10px] font-bold text-[#8A064D] uppercase tracking-wider block">Overall Rate</span>
-              <span className="text-xl font-bold text-[#8A064D] mt-1 block">{completeStats.rate}%</span>
-              <span className="text-[10px] text-[#8A064D]/80">Academy average</span>
+            <div className="bg-gradient-to-br from-white to-[#FFF9FB] p-4 rounded-2xl border border-[#F9E33A] shadow-xs">
+              <span className="text-xs font-bold text-[#8A064D] uppercase tracking-wider block">Overall Rate</span>
+              <span className="text-2xl font-black text-[#590231] mt-1 block tabular-nums">{completeStats.rate}%</span>
+              <span className="text-[11px] text-emerald-700 font-bold">Academy average</span>
             </div>
           </div>
 
@@ -1088,22 +1066,15 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
                           {r.session_date}
                         </td>
                         <td className="py-4 px-5">
-                          {r.status === 'present' && (
+                          {r.status !== 'absent' ? (
                             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-2xs">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               <span>Present</span>
                             </span>
-                          )}
-                          {r.status === 'absent' && (
+                          ) : (
                             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full shadow-2xs">
                               <XCircle className="w-3.5 h-3.5" />
                               <span>Absent</span>
-                            </span>
-                          )}
-                          {r.status === 'late' && (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full shadow-2xs">
-                              <Clock className="w-3.5 h-3.5" />
-                              <span>Late</span>
                             </span>
                           )}
                         </td>

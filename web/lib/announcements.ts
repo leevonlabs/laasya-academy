@@ -14,6 +14,7 @@ export interface Announcement {
   expiry_date?: string | null;
   status: 'Draft' | 'Scheduled' | 'Published' | 'Expired';
   delivery_status: string; // 'System verified (Delivered)' | 'Queued' | 'Draft (Not sent)'
+  image_url?: string | null;
   is_deleted: boolean;
   deleted_at?: string | null;
   created_by: string;
@@ -71,6 +72,7 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
         a.expiry_date::text as expiry_date, 
         a.status, 
         a.delivery_status, 
+        a.image_url,
         a.is_deleted, 
         a.deleted_at::text as deleted_at, 
         a.created_by, 
@@ -147,6 +149,7 @@ export async function createAnnouncement(data: {
   publish_date: string;
   expiry_date?: string | null;
   status?: string;
+  image_url?: string | null;
   created_by?: string;
 }): Promise<Announcement> {
   if (!data.title || data.title.trim() === '') {
@@ -181,8 +184,9 @@ export async function createAnnouncement(data: {
       expiry_date,
       status,
       delivery_status,
+      image_url,
       created_by
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     RETURNING 
       id, 
       title, 
@@ -197,6 +201,7 @@ export async function createAnnouncement(data: {
       expiry_date::text as expiry_date, 
       status, 
       delivery_status, 
+      image_url,
       is_deleted, 
       deleted_at::text as deleted_at, 
       created_by, 
@@ -215,6 +220,7 @@ export async function createAnnouncement(data: {
     data.expiry_date || null,
     status,
     deliveryStatus,
+    data.image_url || null,
     data.created_by || 'Academy Director'
   ]);
 
@@ -238,6 +244,7 @@ export async function updateAnnouncement(
     publish_date: string;
     expiry_date?: string | null;
     status?: string;
+    image_url?: string | null;
   }
 ): Promise<Announcement> {
   if (!data.title || data.title.trim() === '') {
@@ -269,6 +276,7 @@ export async function updateAnnouncement(
       expiry_date = $11,
       status = $12,
       delivery_status = $13,
+      image_url = $14,
       updated_at = NOW()
     WHERE id = $1
     RETURNING 
@@ -285,6 +293,7 @@ export async function updateAnnouncement(
       expiry_date::text as expiry_date, 
       status, 
       delivery_status, 
+      image_url,
       is_deleted, 
       deleted_at::text as deleted_at, 
       created_by, 
@@ -303,7 +312,8 @@ export async function updateAnnouncement(
     data.publish_date,
     data.expiry_date || null,
     status,
-    deliveryStatus
+    deliveryStatus,
+    data.image_url !== undefined ? data.image_url : null
   ]);
 
   return updated;
@@ -331,6 +341,7 @@ export async function duplicateAnnouncement(id: string): Promise<Announcement> {
     publish_date: todayStr,
     expiry_date: original.expiry_date,
     status: 'Draft',
+    image_url: original.image_url,
     created_by: original.created_by
   });
 

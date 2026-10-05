@@ -96,49 +96,49 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-bold text-gray-800 mb-2">
+              <label className="block text-sm font-bold text-[#2D041A] mb-2">
                 Director Email Address
               </label>
               <div className="relative">
-                <Mail className="w-5 h-5 text-[#8A064D] absolute left-3.5 top-3.5" />
+                <Mail className="w-5 h-5 text-[#8A064D] absolute left-3.5 top-3.5 pointer-events-none" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="director@laasyaacademy.com"
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50/90 border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:border-[#8A064D] focus:bg-white transition"
+                  className="w-full pl-11 pr-4 py-3 bg-[#FFF9FB] border border-[#F0D5E4] rounded-xl text-base text-[#2D041A] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:border-[#8A064D] focus:bg-white transition"
                 />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-bold text-gray-800">
+                <label className="block text-sm font-bold text-[#2D041A]">
                   Password
                 </label>
                 <button
                   type="button"
                   onClick={fillCredentials}
-                  className="text-xs text-[#8A064D] hover:underline font-bold cursor-pointer"
+                  className="text-xs text-[#8A064D] hover:text-[#590231] hover:underline font-bold cursor-pointer transition"
                 >
                   Reset to default
                 </button>
               </div>
               <div className="relative">
-                <Lock className="w-5 h-5 text-[#8A064D] absolute left-3.5 top-3.5" />
+                <Lock className="w-5 h-5 text-[#8A064D] absolute left-3.5 top-3.5 pointer-events-none" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full pl-11 pr-11 py-3 bg-gray-50/90 border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:border-[#8A064D] focus:bg-white transition"
+                  className="w-full pl-11 pr-11 py-3 bg-[#FFF9FB] border border-[#F0D5E4] rounded-xl text-base text-[#2D041A] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:border-[#8A064D] focus:bg-white transition"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-3.5 text-gray-400 hover:text-[#8A064D] cursor-pointer"
+                  className="absolute right-3.5 top-3.5 text-gray-400 hover:text-[#8A064D] cursor-pointer transition"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -146,23 +146,23 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-sm text-gray-600 pt-1">
+            <div className="flex items-center justify-between text-sm text-[#6E3955] pt-1">
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#8A064D] focus:ring-[#8A064D] cursor-pointer"
+                  className="w-4 h-4 rounded text-[#8A064D] accent-[#8A064D] focus:ring-[#8A064D] cursor-pointer"
                 />
-                <span className="font-medium text-gray-700">Remember me</span>
+                <span className="font-semibold text-gray-700">Remember me</span>
               </label>
-              <span className="text-xs font-semibold text-gray-500">Owner Session Protected</span>
+              <span className="text-xs font-semibold text-[#8C5E77]">Owner Session Protected</span>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-3 bg-[#8A064D] hover:bg-[#72043F] text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-[#8A064D]/25 border border-[#F9E33A]/40 transition flex items-center justify-center gap-2.5 text-base disabled:opacity-50 cursor-pointer"
+              className="w-full mt-3 bg-[#8A064D] hover:bg-[#72043F] active:scale-[0.99] text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-[#8A064D]/25 border border-[#F9E33A]/40 transition flex items-center justify-center gap-2.5 text-base disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -176,21 +176,21 @@ export default function LoginPage() {
           </form>
 
           {/* Quick Demo Helper */}
-          <div className="mt-7 pt-6 border-t border-gray-100">
+          <div className="mt-7 pt-6 border-t border-[#F0D5E4]/60">
             <button
               type="button"
               onClick={fillCredentials}
-              className="w-full bg-[#FFF9FB] hover:bg-[#FDF2F7] border-2 border-[#F0D5E4] rounded-2xl p-4 text-center transition cursor-pointer text-left flex items-center justify-between shadow-xs"
+              className="w-full bg-[#FFF9FB] hover:bg-[#FDF2F7] border border-[#F0D5E4] rounded-2xl p-4 text-center transition cursor-pointer text-left flex items-center justify-between shadow-2xs hover:border-[#8A064D]/30"
             >
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#8A064D]/10 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-[#8A064D]/10 border border-[#F0D5E4] flex items-center justify-center shrink-0">
                   <ShieldCheck className="w-5 h-5 text-[#8A064D]" />
                 </div>
                 <div>
                   <p className="text-sm text-[#590231] font-bold">
                     1-Click Auto-Fill Director Credentials
                   </p>
-                  <p className="text-xs text-gray-600 font-medium mt-0.5">
+                  <p className="text-xs text-[#6E3955] font-semibold mt-0.5 tabular-nums">
                     director@laasyaacademy.com • Laasya@Owner2026
                   </p>
                 </div>

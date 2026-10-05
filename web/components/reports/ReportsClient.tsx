@@ -36,6 +36,19 @@ import {
   IncomeExpensesReportRow 
 } from '@/lib/reports';
 import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
+import StudentSearchSelect, { StudentOption } from '@/components/common/StudentSearchSelect';
+import TrainerSearchSelect, { TrainerOption } from '@/components/common/TrainerSearchSelect';
+
+function getCurrentMonthRange() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+  return {
+    start: `${year}-${month}-01`,
+    end: `${year}-${month}-${String(lastDay).padStart(2, '0')}`,
+  };
+}
 
 interface Props {
   courses: Course[];
@@ -47,15 +60,16 @@ interface Props {
 export default function ReportsClient({ courses, batches, students, trainers }: Props) {
   const [activeType, setActiveType] = useState<ReportType>('attendance');
 
+  const currentMonthRange = useMemo(() => getCurrentMonthRange(), []);
+
   // Shared / Dynamic Filters
   const [selectedCourseId, setSelectedCourseId] = useState('all');
   const [selectedBatchId, setSelectedBatchId] = useState('all');
   const [selectedStudentId, setSelectedStudentId] = useState('all');
   const [selectedTrainerId, setSelectedTrainerId] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedPayrollMonth, setSelectedPayrollMonth] = useState('all');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(currentMonthRange.start);
+  const [endDate, setEndDate] = useState(currentMonthRange.end);
 
   // Report Data State
   const [attendanceData, setAttendanceData] = useState<{
@@ -82,9 +96,10 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     generatedAt: string;
   } | null>(null);
 
-  // Loading & Error States
+  // Loading, Error & Refresh States
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Available batches based on selected course
   const availableBatches = useMemo(() => {
@@ -92,49 +107,70 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     return batches.filter(b => b.course_id === selectedCourseId);
   }, [selectedCourseId, batches]);
 
-  // Fetch Report Data from API
-  const fetchReport = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
+  // Fetch Report Data safely with isMounted guard and AbortController
+  useEffect(() => {
+    let isMounted = true;
+    const abortController = new AbortController();
 
-    try {
-      const params = new URLSearchParams();
-      params.set('type', activeType);
+    async function fetchReportSafe() {
+      setIsLoading(true);
+      setErrorMessage(null);
 
-      if (selectedCourseId !== 'all') params.set('courseId', selectedCourseId);
-      if (selectedBatchId !== 'all') params.set('batchId', selectedBatchId);
-      if (selectedStudentId !== 'all') params.set('studentId', selectedStudentId);
-      if (selectedTrainerId !== 'all') params.set('trainerId', selectedTrainerId);
-      if (selectedStatus !== 'all') params.set('status', selectedStatus);
-      if (selectedPayrollMonth !== 'all') params.set('payrollMonth', selectedPayrollMonth);
-      if (startDate) params.set('startDate', startDate);
-      if (endDate) params.set('endDate', endDate);
+      try {
+        const params = new URLSearchParams();
+        params.set('type', activeType);
 
-      const res = await fetch(`/api/reports?${params.toString()}`);
-      if (!res.ok) {
-        throw new Error(`Server returned HTTP ${res.status}`);
+        if (selectedCourseId !== 'all') params.set('courseId', selectedCourseId);
+        if (selectedBatchId !== 'all') params.set('batchId', selectedBatchId);
+        if (selectedStudentId !== 'all') params.set('studentId', selectedStudentId);
+        if (selectedTrainerId !== 'all') params.set('trainerId', selectedTrainerId);
+        if (selectedStatus !== 'all') params.set('status', selectedStatus);
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+
+        const res = await fetch(`/api/reports?${params.toString()}`, {
+          signal: abortController.signal
+        });
+
+        if (!res.ok) {
+          throw new Error(`Server returned HTTP ${res.status}`);
+        }
+        const json = await res.json();
+
+        if (!json.success) {
+          throw new Error(json.error || 'Failed to generate report');
+        }
+
+        if (isMounted) {
+          if (activeType === 'attendance') {
+            setAttendanceData({ summary: json.summary, records: json.records, generatedAt: json.generatedAt });
+          } else if (activeType === 'fees') {
+            setFeesData({ summary: json.summary, records: json.records, generatedAt: json.generatedAt });
+          } else if (activeType === 'salaries') {
+            setSalariesData({ summary: json.summary, records: json.records, generatedAt: json.generatedAt });
+          } else if (activeType === 'income_expenses') {
+            setIncomeExpensesData({ summary: json.summary, records: json.records, generatedAt: json.generatedAt });
+          }
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+        if (isMounted) {
+          console.error('Error fetching report:', err);
+          setErrorMessage(err.message || 'Unable to retrieve report records. Please verify connectivity and retry.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-      const json = await res.json();
-
-      if (!json.success) {
-        throw new Error(json.error || 'Failed to generate report');
-      }
-
-      if (activeType === 'attendance') {
-        setAttendanceData({ summary: json.summary, records: json.records, generatedAt: json.generatedAt });
-      } else if (activeType === 'fees') {
-        setFeesData({ summary: json.summary, records: json.records, generatedAt: json.generatedAt });
-      } else if (activeType === 'salaries') {
-        setSalariesData({ summary: json.summary, records: json.records, generatedAt: json.generatedAt });
-      } else if (activeType === 'income_expenses') {
-        setIncomeExpensesData({ summary: json.summary, records: json.records, generatedAt: json.generatedAt });
-      }
-    } catch (err: any) {
-      console.error('Error fetching report:', err);
-      setErrorMessage(err.message || 'Unable to retrieve report records. Please verify connectivity and retry.');
-    } finally {
-      setIsLoading(false);
     }
+
+    fetchReportSafe();
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
   }, [
     activeType,
     selectedCourseId,
@@ -142,15 +178,28 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     selectedStudentId,
     selectedTrainerId,
     selectedStatus,
-    selectedPayrollMonth,
     startDate,
-    endDate
+    endDate,
+    refreshKey
   ]);
 
-  // Refetch when filters or report type changes
-  useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
+  // Searchable Student & Trainer options
+  const studentOptions: StudentOption[] = useMemo(() => {
+    return students.map(s => ({
+      id: s.id,
+      full_name: s.full_name,
+      roll_number: s.roll_number
+    })).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }, [students]);
+
+  const trainerOptions: TrainerOption[] = useMemo(() => {
+    return trainers.map(t => ({
+      id: t.id,
+      full_name: t.full_name,
+      display_title: t.display_title || 'Guru',
+      specialization: Array.isArray(t.specializations) ? t.specializations.join(', ') : undefined
+    })).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }, [trainers]);
 
   // Reset batch when course changes
   const handleCourseChange = (courseId: string) => {
@@ -165,9 +214,8 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     setSelectedStudentId('all');
     setSelectedTrainerId('all');
     setSelectedStatus('all');
-    setSelectedPayrollMonth('all');
-    setStartDate('');
-    setEndDate('');
+    setStartDate(currentMonthRange.start);
+    setEndDate(currentMonthRange.end);
   };
 
   const hasActiveFilters = Boolean(
@@ -176,9 +224,8 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     selectedStudentId !== 'all' ||
     selectedTrainerId !== 'all' ||
     selectedStatus !== 'all' ||
-    selectedPayrollMonth !== 'all' ||
-    startDate ||
-    endDate
+    (startDate && startDate !== currentMonthRange.start) ||
+    (endDate && endDate !== currentMonthRange.end)
   );
 
   // Current Generated At Timestamp
@@ -345,11 +392,9 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
       if (activeType === 'attendance' && attendanceData) {
         doc.text(`• Total Tracked Sessions: ${attendanceData.summary.totalSessions}`, 14, y);
         doc.text(`• Present: ${attendanceData.summary.presentCount}`, 80, y);
-        doc.text(`• Attendance Rate: ${attendanceData.summary.attendancePercentage}%`, 140, y);
+        doc.text(`• Absent: ${attendanceData.summary.absentCount}`, 140, y);
         y += 5;
-        doc.text(`• Absent: ${attendanceData.summary.absentCount}`, 14, y);
-        doc.text(`• Late: ${attendanceData.summary.lateCount}`, 80, y);
-        doc.text(`• Not-marked: ${attendanceData.summary.notMarkedCount}`, 140, y);
+        doc.text(`• Attendance Rate: ${attendanceData.summary.attendancePercentage}%`, 14, y);
       } else if (activeType === 'fees' && feesData) {
         doc.text(`• Total Collected: Rs. ${feesData.summary.totalCollected.toLocaleString('en-IN')}`, 14, y);
         doc.text(`• Outstanding: Rs. ${feesData.summary.totalOutstanding.toLocaleString('en-IN')}`, 80, y);
@@ -637,9 +682,9 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
         </div>
 
         {/* Dynamic Filter Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           
-          {/* Attendance Report Filters: Course, Batch, Student, Date Range */}
+          {/* Attendance Report Filters: Course, Batch, Student (Searchable) */}
           {activeType === 'attendance' && (
             <>
               {/* Course */}
@@ -672,39 +717,21 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                 </select>
               </div>
 
-              {/* Student */}
+              {/* Student (Searchable) */}
               <div>
                 <label className="text-xs font-black text-gray-600 uppercase block mb-1">Student</label>
-                <select
-                  value={selectedStudentId}
-                  onChange={(e) => setSelectedStudentId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800"
-                >
-                  <option value="all">All Students</option>
-                  {students.map(s => (
-                    <option key={s.id} value={s.id}>{s.full_name} ({s.roll_number})</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Date Filter in 4th col */}
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Session Date Range</label>
-                <DateRangeQuickFilter
-                  startDate={startDate}
-                  endDate={endDate}
-                  align="right"
-                  onApply={({ startDate: s, endDate: e }) => {
-                    setStartDate(s);
-                    setEndDate(e);
-                  }}
-                  placeholder="Select Date Range"
+                <StudentSearchSelect
+                  students={studentOptions}
+                  value={selectedStudentId === 'all' ? '' : selectedStudentId}
+                  onChange={(id) => setSelectedStudentId(id || 'all')}
+                  placeholder="All Students (Search)"
+                  className="w-full"
                 />
               </div>
             </>
           )}
 
-          {/* Fees Report Filters: Course, Batch, Status, Date Range */}
+          {/* Fees Report Filters: Course, Batch, Status */}
           {activeType === 'fees' && (
             <>
               <div>
@@ -749,53 +776,21 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <option value="overdue">Overdue</option>
                 </select>
               </div>
-
-              {/* Date Filter in 4th col */}
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Due / Payment Date Range</label>
-                <DateRangeQuickFilter
-                  startDate={startDate}
-                  endDate={endDate}
-                  align="right"
-                  onApply={({ startDate: s, endDate: e }) => {
-                    setStartDate(s);
-                    setEndDate(e);
-                  }}
-                  placeholder="Select Date Range"
-                />
-              </div>
             </>
           )}
 
-          {/* Salaries Report Filters: Payroll Month, Trainer, Status */}
+          {/* Salaries Report Filters: Trainer (Searchable), Status */}
           {activeType === 'salaries' && (
             <>
               <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Payroll Month</label>
-                <select
-                  value={selectedPayrollMonth}
-                  onChange={(e) => setSelectedPayrollMonth(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800"
-                >
-                  <option value="all">All Payroll Months</option>
-                  <option value="2026-10">October 2026</option>
-                  <option value="2026-09">September 2026</option>
-                  <option value="2026-08">August 2026</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Trainer (Guru)</label>
-                <select
-                  value={selectedTrainerId}
-                  onChange={(e) => setSelectedTrainerId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800"
-                >
-                  <option value="all">All Trainers</option>
-                  {trainers.map(t => (
-                    <option key={t.id} value={t.id}>{t.full_name}</option>
-                  ))}
-                </select>
+                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Trainer / Guru (Searchable)</label>
+                <TrainerSearchSelect
+                  trainers={trainerOptions}
+                  value={selectedTrainerId === 'all' ? '' : selectedTrainerId}
+                  onChange={(id) => setSelectedTrainerId(id || 'all')}
+                  placeholder="All Gurus / Faculty"
+                  className="w-full"
+                />
               </div>
 
               <div>
@@ -811,11 +806,11 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                 </select>
               </div>
 
-              <div className="flex items-center justify-end pt-4">
+              <div className="flex items-end pb-1">
                 {hasActiveFilters && (
                   <button
                     onClick={clearFilters}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-[#8A064D] text-xs font-bold"
+                    className="flex items-center gap-1 px-4 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-[#8A064D] text-xs font-bold cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                     <span>Clear filters</span>
@@ -825,38 +820,22 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
             </>
           )}
 
-          {/* Income vs Expenses Report Filters: Date Range */}
+          {/* Income vs Expenses Report Filters */}
           {activeType === 'income_expenses' && (
-            <>
-              <div className="md:col-span-2">
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Accounting Period Range</label>
-                <DateRangeQuickFilter
-                  startDate={startDate}
-                  endDate={endDate}
-                  align="left"
-                  onApply={({ startDate: s, endDate: e }) => {
-                    setStartDate(s);
-                    setEndDate(e);
-                  }}
-                  placeholder="Select Accounting Date Range"
-                />
-              </div>
-
-              <div className="md:col-span-2 flex items-center justify-end pt-4 gap-2">
-                <span className="text-xs font-semibold text-gray-500">
-                  Note: General expenses dynamically match records from the Expenses ledger.
-                </span>
-                {hasActiveFilters && (
-                  <button
-                    onClick={clearFilters}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-[#8A064D] text-xs font-bold"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    <span>Clear</span>
-                  </button>
-                )}
-              </div>
-            </>
+            <div className="sm:col-span-3 flex flex-wrap items-center justify-between gap-3 bg-[#FFF9FB] p-3.5 rounded-2xl border border-[#F0D5E4]/60">
+              <span className="text-xs font-semibold text-gray-600">
+                Auditing combined fee collections, faculty salaries, and operational expenses matching the selected date range.
+              </span>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-[#8A064D] text-xs font-bold cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Clear filters</span>
+                </button>
+              )}
+            </div>
           )}
 
         </div>
@@ -889,7 +868,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
             {errorMessage}
           </p>
           <button
-            onClick={() => fetchReport()}
+            onClick={() => setRefreshKey(k => k + 1)}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#8A064D] text-white text-xs font-black shadow-md hover:bg-[#590231] transition"
           >
             <RefreshCw className="w-4 h-4" />
@@ -933,46 +912,38 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
           {activeType === 'attendance' && attendanceData && (
             <>
               {/* Summary Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 
                 <div className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-xs">
-                  <div className="text-xs font-black text-gray-500 uppercase">Sessions Audited</div>
-                  <div className="text-3xl font-black text-[#590231] mt-2">
+                  <div className="text-xs font-black text-[#6E3955] uppercase tracking-wide">Sessions Audited</div>
+                  <div className="text-3xl font-black text-[#590231] mt-2 tabular-nums">
                     {attendanceData.summary.totalSessions}
                   </div>
-                  <div className="text-[11px] font-semibold text-gray-400 mt-1">Class sessions</div>
+                  <div className="text-[11px] font-semibold text-[#8C5E77] mt-1">Class sessions</div>
                 </div>
 
                 <div className="bg-white rounded-3xl p-5 border border-emerald-200 shadow-xs">
-                  <div className="text-xs font-black text-emerald-800 uppercase">Present</div>
-                  <div className="text-3xl font-black text-emerald-700 mt-2">
+                  <div className="text-xs font-black text-emerald-800 uppercase tracking-wide">Present</div>
+                  <div className="text-3xl font-black text-emerald-700 mt-2 tabular-nums">
                     {attendanceData.summary.presentCount}
                   </div>
                   <div className="text-[11px] font-semibold text-emerald-600 mt-1">Full attendance</div>
                 </div>
 
-                <div className="bg-white rounded-3xl p-5 border border-purple-200 shadow-xs">
-                  <div className="text-xs font-black text-purple-800 uppercase">Late</div>
-                  <div className="text-3xl font-black text-purple-700 mt-2">
-                    {attendanceData.summary.lateCount}
-                  </div>
-                  <div className="text-[11px] font-semibold text-purple-600 mt-1">Admitted with delay</div>
-                </div>
-
                 <div className="bg-white rounded-3xl p-5 border border-red-200 shadow-xs">
-                  <div className="text-xs font-black text-red-800 uppercase">Absent</div>
-                  <div className="text-3xl font-black text-red-700 mt-2">
+                  <div className="text-xs font-black text-red-800 uppercase tracking-wide">Absent</div>
+                  <div className="text-3xl font-black text-red-700 mt-2 tabular-nums">
                     {attendanceData.summary.absentCount}
                   </div>
                   <div className="text-[11px] font-semibold text-red-600 mt-1">Unexcused / Leave</div>
                 </div>
 
-                <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-5 border border-[#F9E33A] shadow-xs">
+                <div className="bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-5 border border-[#F9E33A] shadow-xs">
                   <div className="text-xs font-black text-[#854D0E] uppercase flex items-center justify-between">
                     <span>Attendance Rate</span>
                     <Percent className="w-4 h-4 text-[#854D0E]" />
                   </div>
-                  <div className="text-3xl font-black text-[#590231] mt-2">
+                  <div className="text-3xl font-black text-[#590231] mt-2 tabular-nums">
                     {attendanceData.summary.attendancePercentage}%
                   </div>
                   <div className="text-[11px] font-semibold text-emerald-700 mt-1 font-bold">
@@ -988,13 +959,13 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <span className="text-xs font-black text-[#590231] uppercase tracking-wider">
                     Attendance Composition Breakdown
                   </span>
-                  <span className="text-xs font-bold text-gray-500">
+                  <span className="text-xs font-bold text-[#6E3955] tabular-nums">
                     {attendanceData.summary.totalSessions} Total Tracked Entries
                   </span>
                 </div>
                 
                 {/* Visual Stacked Progress Bar */}
-                <div className="h-6 w-full rounded-xl bg-gray-100 overflow-hidden flex shadow-inner">
+                <div className="h-6 w-full rounded-xl bg-[#FFF2F8] border border-[#F0D5E4]/60 overflow-hidden flex shadow-inner">
                   {attendanceData.summary.totalSessions > 0 && (
                     <>
                       <div 
@@ -1003,19 +974,9 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                         title={`Present: ${attendanceData.summary.presentCount}`}
                       />
                       <div 
-                        style={{ width: `${(attendanceData.summary.lateCount / attendanceData.summary.totalSessions) * 100}%` }}
-                        className="bg-purple-600 h-full transition-all"
-                        title={`Late: ${attendanceData.summary.lateCount}`}
-                      />
-                      <div 
                         style={{ width: `${(attendanceData.summary.absentCount / attendanceData.summary.totalSessions) * 100}%` }}
                         className="bg-red-600 h-full transition-all"
                         title={`Absent: ${attendanceData.summary.absentCount}`}
-                      />
-                      <div 
-                        style={{ width: `${(attendanceData.summary.notMarkedCount / attendanceData.summary.totalSessions) * 100}%` }}
-                        className="bg-gray-300 h-full transition-all"
-                        title={`Not Marked: ${attendanceData.summary.notMarkedCount}`}
                       />
                     </>
                   )}
@@ -1025,14 +986,8 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <span className="flex items-center gap-1.5 text-emerald-800">
                     <span className="w-3 h-3 rounded-full bg-emerald-600 inline-block" /> Present ({attendanceData.summary.presentCount})
                   </span>
-                  <span className="flex items-center gap-1.5 text-purple-800">
-                    <span className="w-3 h-3 rounded-full bg-purple-600 inline-block" /> Late ({attendanceData.summary.lateCount})
-                  </span>
                   <span className="flex items-center gap-1.5 text-red-800">
                     <span className="w-3 h-3 rounded-full bg-red-600 inline-block" /> Absent ({attendanceData.summary.absentCount})
-                  </span>
-                  <span className="flex items-center gap-1.5 text-gray-600">
-                    <span className="w-3 h-3 rounded-full bg-gray-400 inline-block" /> Not Marked ({attendanceData.summary.notMarkedCount})
                   </span>
                 </div>
               </div>
@@ -1043,7 +998,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <h3 className="font-black text-sm text-[#590231] uppercase tracking-wider">
                     Detailed Attendance Audit Records
                   </h3>
-                  <span className="text-xs font-semibold text-gray-500">
+                  <span className="text-xs font-semibold text-[#6E3955] tabular-nums">
                     {attendanceData.records.length} records matching criteria
                   </span>
                 </div>
@@ -1064,13 +1019,13 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                     <tbody className="divide-y divide-[#F0D5E4]/60">
                       {attendanceData.records.map((r, i) => (
                         <tr key={i} className="hover:bg-[#FFF9FB] transition">
-                          <td className="py-3.5 px-5 font-bold text-gray-700 whitespace-nowrap">
+                          <td className="py-3.5 px-5 font-bold text-gray-700 whitespace-nowrap tabular-nums">
                             {r.session_date ? new Date(r.session_date).toLocaleDateString('en-GB') : '—'}
                           </td>
                           <td className="py-3.5 px-5 font-bold text-gray-900">
                             {r.student_name}
                           </td>
-                          <td className="py-3.5 px-5 font-semibold text-gray-500">
+                          <td className="py-3.5 px-5 font-semibold text-[#6E3955] tabular-nums">
                             {r.roll_number}
                           </td>
                           <td className="py-3.5 px-5 font-semibold text-gray-800">
@@ -1081,10 +1036,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                           </td>
                           <td className="py-3.5 px-5 text-center">
                             <span className={`px-2.5 py-1 rounded-xl text-xs font-black ${
-                              r.status === 'present' ? 'bg-emerald-100 text-emerald-800' :
-                              r.status === 'late' ? 'bg-purple-100 text-purple-800' :
-                              r.status === 'absent' ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-600'
+                              r.status === 'present' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                             }`}>
                               {r.status.toUpperCase()}
                             </span>
@@ -1110,43 +1062,43 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 
                 <div className="bg-white rounded-3xl p-5 border border-emerald-200 shadow-xs">
-                  <div className="text-xs font-black text-emerald-800 uppercase">Collected</div>
-                  <div className="text-2xl md:text-3xl font-black text-emerald-700 mt-2">
+                  <div className="text-xs font-black text-emerald-800 uppercase tracking-wide">Collected</div>
+                  <div className="text-2xl md:text-3xl font-black text-emerald-700 mt-2 tabular-nums">
                     ₹{feesData.summary.totalCollected.toLocaleString('en-IN')}
                   </div>
                   <div className="text-[11px] font-semibold text-emerald-600 mt-1">Paid in range</div>
                 </div>
 
                 <div className="bg-white rounded-3xl p-5 border border-amber-200 shadow-xs">
-                  <div className="text-xs font-black text-amber-800 uppercase">Outstanding</div>
-                  <div className="text-2xl md:text-3xl font-black text-amber-700 mt-2">
+                  <div className="text-xs font-black text-amber-800 uppercase tracking-wide">Outstanding</div>
+                  <div className="text-2xl md:text-3xl font-black text-amber-700 mt-2 tabular-nums">
                     ₹{feesData.summary.totalOutstanding.toLocaleString('en-IN')}
                   </div>
                   <div className="text-[11px] font-semibold text-amber-600 mt-1">Pending clearance</div>
                 </div>
 
                 <div className="bg-white rounded-3xl p-5 border border-red-200 shadow-xs">
-                  <div className="text-xs font-black text-red-800 uppercase">Overdue</div>
-                  <div className="text-2xl md:text-3xl font-black text-red-700 mt-2">
+                  <div className="text-xs font-black text-red-800 uppercase tracking-wide">Overdue</div>
+                  <div className="text-2xl md:text-3xl font-black text-red-700 mt-2 tabular-nums">
                     ₹{feesData.summary.totalOverdue.toLocaleString('en-IN')}
                   </div>
                   <div className="text-[11px] font-semibold text-red-600 mt-1">Past due date</div>
                 </div>
 
                 <div className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-xs">
-                  <div className="text-xs font-black text-[#8A064D] uppercase">Discounts</div>
-                  <div className="text-2xl md:text-3xl font-black text-[#590231] mt-2">
+                  <div className="text-xs font-black text-[#8A064D] uppercase tracking-wide">Discounts</div>
+                  <div className="text-2xl md:text-3xl font-black text-[#590231] mt-2 tabular-nums">
                     ₹{feesData.summary.totalDiscounts.toLocaleString('en-IN')}
                   </div>
-                  <div className="text-[11px] font-semibold text-gray-500 mt-1">Scholarships/offers</div>
+                  <div className="text-[11px] font-semibold text-[#8C5E77] mt-1">Scholarships/offers</div>
                 </div>
 
-                <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-xs">
-                  <div className="text-xs font-black text-gray-700 uppercase">Refunds</div>
-                  <div className="text-2xl md:text-3xl font-black text-gray-800 mt-2">
+                <div className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-xs">
+                  <div className="text-xs font-black text-[#6E3955] uppercase tracking-wide">Refunds</div>
+                  <div className="text-2xl md:text-3xl font-black text-gray-800 mt-2 tabular-nums">
                     ₹{feesData.summary.totalRefunds.toLocaleString('en-IN')}
                   </div>
-                  <div className="text-[11px] font-semibold text-gray-400 mt-1">Returned amounts</div>
+                  <div className="text-[11px] font-semibold text-[#8C5E77] mt-1">Returned amounts</div>
                 </div>
 
               </div>
@@ -1162,10 +1114,10 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                     <div key={idx} className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] flex items-center justify-between">
                       <div>
                         <div className="text-xs font-black text-[#8A064D] uppercase">{pm.method}</div>
-                        <div className="text-sm font-semibold text-gray-500">{pm.count} transactions</div>
+                        <div className="text-sm font-semibold text-[#6E3955] tabular-nums">{pm.count} transactions</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-black text-[#590231]">₹{Number(pm.total).toLocaleString('en-IN')}</div>
+                        <div className="text-lg font-black text-[#590231] tabular-nums">₹{Number(pm.total).toLocaleString('en-IN')}</div>
                       </div>
                     </div>
                   ))}
@@ -1178,7 +1130,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <h3 className="font-black text-sm text-[#590231] uppercase tracking-wider">
                     Tuition Fee Invoices & Audit Records
                   </h3>
-                  <span className="text-xs font-semibold text-gray-500">
+                  <span className="text-xs font-semibold text-[#6E3955] tabular-nums">
                     {feesData.records.length} records matching filters
                   </span>
                 </div>
@@ -1201,7 +1153,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                     <tbody className="divide-y divide-[#F0D5E4]/60">
                       {feesData.records.map((r, i) => (
                         <tr key={i} className="hover:bg-[#FFF9FB] transition">
-                          <td className="py-3.5 px-5 font-bold text-gray-900 whitespace-nowrap">
+                          <td className="py-3.5 px-5 font-bold text-gray-900 whitespace-nowrap tabular-nums">
                             {r.invoice_number}
                           </td>
                           <td className="py-3.5 px-5 font-bold text-gray-900">
@@ -1210,19 +1162,24 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                           <td className="py-3.5 px-5 font-semibold text-gray-700">
                             {r.course_title}
                           </td>
-                          <td className="py-3.5 px-5 font-semibold text-gray-500">
+                          <td className="py-3.5 px-5 font-semibold text-[#6E3955]">
                             {r.fee_period}
                           </td>
-                          <td className="py-3.5 px-5 font-semibold text-gray-600 whitespace-nowrap">
+                          <td className="py-3.5 px-5 font-semibold text-gray-600 whitespace-nowrap tabular-nums">
                             {r.due_date ? new Date(r.due_date).toLocaleDateString('en-GB') : '—'}
                           </td>
-                          <td className="py-3.5 px-5 text-right font-semibold text-gray-700">
+                          <td className="py-3.5 px-5 text-right font-semibold text-gray-700 tabular-nums">
                             ₹{Number(r.total_amount).toLocaleString('en-IN')}
                           </td>
-                          <td className="py-3.5 px-5 text-right font-black text-emerald-700">
-                            ₹{Number(r.paid_amount).toLocaleString('en-IN')}
+                          <td className="py-3.5 px-5 text-right font-black text-emerald-700 tabular-nums">
+                            <div>₹{Number(r.paid_amount).toLocaleString('en-IN')}</div>
+                            {Number(r.discount_amount) > 0 && (
+                              <div className="text-[10px] font-semibold text-rose-600 mt-0.5 tabular-nums">
+                                Disc: -₹{Number(r.discount_amount).toLocaleString('en-IN')}
+                              </div>
+                            )}
                           </td>
-                          <td className="py-3.5 px-5 text-right font-black text-amber-700">
+                          <td className="py-3.5 px-5 text-right font-black text-amber-700 tabular-nums">
                             ₹{Number(r.balance_amount).toLocaleString('en-IN')}
                           </td>
                           <td className="py-3.5 px-5 text-center">
@@ -1253,40 +1210,40 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 
                 <div className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-xs">
-                  <div className="text-xs font-black text-gray-500 uppercase">Total Payable</div>
-                  <div className="text-2xl md:text-3xl font-black text-[#590231] mt-2">
+                  <div className="text-xs font-black text-[#6E3955] uppercase tracking-wide">Total Payable</div>
+                  <div className="text-2xl md:text-3xl font-black text-[#590231] mt-2 tabular-nums">
                     ₹{salariesData.summary.totalPayable.toLocaleString('en-IN')}
                   </div>
-                  <div className="text-[11px] font-semibold text-gray-400 mt-1">Full payroll bill</div>
+                  <div className="text-[11px] font-semibold text-[#8C5E77] mt-1">Full payroll bill</div>
                 </div>
 
                 <div className="bg-white rounded-3xl p-5 border border-emerald-200 shadow-xs">
-                  <div className="text-xs font-black text-emerald-800 uppercase">Total Paid</div>
-                  <div className="text-2xl md:text-3xl font-black text-emerald-700 mt-2">
+                  <div className="text-xs font-black text-emerald-800 uppercase tracking-wide">Total Paid</div>
+                  <div className="text-2xl md:text-3xl font-black text-emerald-700 mt-2 tabular-nums">
                     ₹{salariesData.summary.totalPaid.toLocaleString('en-IN')}
                   </div>
                   <div className="text-[11px] font-semibold text-emerald-600 mt-1">Disbursed successfully</div>
                 </div>
 
                 <div className="bg-white rounded-3xl p-5 border border-amber-200 shadow-xs">
-                  <div className="text-xs font-black text-amber-800 uppercase">Pending</div>
-                  <div className="text-2xl md:text-3xl font-black text-amber-700 mt-2">
+                  <div className="text-xs font-black text-amber-800 uppercase tracking-wide">Pending</div>
+                  <div className="text-2xl md:text-3xl font-black text-amber-700 mt-2 tabular-nums">
                     ₹{salariesData.summary.totalPending.toLocaleString('en-IN')}
                   </div>
                   <div className="text-[11px] font-semibold text-amber-600 mt-1">Awaiting release</div>
                 </div>
 
                 <div className="bg-white rounded-3xl p-5 border border-[#FEF9C3] shadow-xs">
-                  <div className="text-xs font-black text-[#854D0E] uppercase">Bonuses</div>
-                  <div className="text-2xl md:text-3xl font-black text-[#854D0E] mt-2">
+                  <div className="text-xs font-black text-[#854D0E] uppercase tracking-wide">Bonuses</div>
+                  <div className="text-2xl md:text-3xl font-black text-[#854D0E] mt-2 tabular-nums">
                     ₹{salariesData.summary.totalBonuses.toLocaleString('en-IN')}
                   </div>
-                  <div className="text-[11px] font-semibold text-gray-500 mt-1">Performance rewards</div>
+                  <div className="text-[11px] font-semibold text-[#8C5E77] mt-1">Performance rewards</div>
                 </div>
 
                 <div className="bg-white rounded-3xl p-5 border border-red-200 shadow-xs">
-                  <div className="text-xs font-black text-red-800 uppercase">Deductions</div>
-                  <div className="text-2xl md:text-3xl font-black text-red-700 mt-2">
+                  <div className="text-xs font-black text-red-800 uppercase tracking-wide">Deductions</div>
+                  <div className="text-2xl md:text-3xl font-black text-red-700 mt-2 tabular-nums">
                     ₹{salariesData.summary.totalDeductions.toLocaleString('en-IN')}
                   </div>
                   <div className="text-[11px] font-semibold text-red-600 mt-1">Advances & leaves</div>
@@ -1300,7 +1257,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <h3 className="font-black text-sm text-[#590231] uppercase tracking-wider">
                     Guru Payroll & Salary Audit
                   </h3>
-                  <span className="text-xs font-semibold text-gray-500">
+                  <span className="text-xs font-semibold text-[#6E3955] tabular-nums">
                     {salariesData.records.length} gurus on record
                   </span>
                 </div>
@@ -1329,22 +1286,22 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                           <td className="py-3.5 px-5 font-semibold text-gray-600">
                             {r.display_title}
                           </td>
-                          <td className="py-3.5 px-5 font-bold text-[#8A064D]">
+                          <td className="py-3.5 px-5 font-bold text-[#8A064D] tabular-nums">
                             {r.payroll_month}
                           </td>
-                          <td className="py-3.5 px-5 text-center font-bold text-gray-700">
+                          <td className="py-3.5 px-5 text-center font-bold text-gray-700 tabular-nums">
                             {r.classes_conducted}
                           </td>
-                          <td className="py-3.5 px-5 text-right font-semibold text-gray-700">
+                          <td className="py-3.5 px-5 text-right font-semibold text-gray-700 tabular-nums">
                             ₹{Number(r.base_salary).toLocaleString('en-IN')}
                           </td>
-                          <td className="py-3.5 px-5 text-right font-semibold text-[#854D0E]">
+                          <td className="py-3.5 px-5 text-right font-semibold text-[#854D0E] tabular-nums">
                             +₹{Number(r.bonus_amount).toLocaleString('en-IN')}
                           </td>
-                          <td className="py-3.5 px-5 text-right font-semibold text-red-600">
+                          <td className="py-3.5 px-5 text-right font-semibold text-red-600 tabular-nums">
                             -₹{(Number(r.deduction_amount) + Number(r.advance_deducted)).toLocaleString('en-IN')}
                           </td>
-                          <td className="py-3.5 px-5 text-right font-black text-base text-[#590231]">
+                          <td className="py-3.5 px-5 text-right font-black text-base text-[#590231] tabular-nums">
                             ₹{Number(r.net_salary).toLocaleString('en-IN')}
                           </td>
                           <td className="py-3.5 px-5 text-center">
@@ -1376,7 +1333,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                     <span>Fee Revenue</span>
                     <TrendingUp className="w-4 h-4 text-emerald-600" />
                   </div>
-                  <div className="text-3xl font-black text-emerald-700 mt-2">
+                  <div className="text-3xl font-black text-emerald-700 mt-2 tabular-nums">
                     ₹{incomeExpensesData.summary.totalIncome.toLocaleString('en-IN')}
                   </div>
                   <div className="text-[11px] font-semibold text-emerald-600 mt-1">Total tuition collections</div>
@@ -1387,10 +1344,10 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                     <span>Guru Salaries</span>
                     <Banknote className="w-4 h-4 text-[#8A064D]" />
                   </div>
-                  <div className="text-3xl font-black text-[#8A064D] mt-2">
+                  <div className="text-3xl font-black text-[#8A064D] mt-2 tabular-nums">
                     ₹{incomeExpensesData.summary.totalSalaries.toLocaleString('en-IN')}
                   </div>
-                  <div className="text-[11px] font-semibold text-gray-500 mt-1">Paid trainer disbursements</div>
+                  <div className="text-[11px] font-semibold text-[#8C5E77] mt-1">Paid trainer disbursements</div>
                 </div>
 
                 <div className="bg-white rounded-3xl p-5 border border-amber-200 shadow-xs">
@@ -1398,7 +1355,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                     <span>Academy Expenses</span>
                     <Receipt className="w-4 h-4 text-amber-600" />
                   </div>
-                  <div className="text-3xl font-black text-amber-800 mt-2">
+                  <div className="text-3xl font-black text-amber-800 mt-2 tabular-nums">
                     ₹{incomeExpensesData.summary.totalOtherExpenses.toLocaleString('en-IN')}
                   </div>
                   <div className="text-[11px] font-bold text-amber-700 mt-1">From Expenses Page ledger</div>
@@ -1411,12 +1368,12 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                       {incomeExpensesData.summary.status}
                     </span>
                   </div>
-                  <div className={`text-3xl font-black mt-2 ${
+                  <div className={`text-3xl font-black mt-2 tabular-nums ${
                     incomeExpensesData.summary.netOperatingAmount >= 0 ? 'text-emerald-700' : 'text-red-600'
                   }`}>
                     ₹{incomeExpensesData.summary.netOperatingAmount.toLocaleString('en-IN')}
                   </div>
-                  <div className="text-[11px] font-semibold text-gray-500 mt-1">
+                  <div className="text-[11px] font-semibold text-[#8C5E77] mt-1">
                     Income - (Salaries + Expenses)
                   </div>
                 </div>
@@ -1429,7 +1386,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider">
                     Revenue vs Outflow Proportions
                   </h4>
-                  <span className="text-xs font-bold text-gray-500">
+                  <span className="text-xs font-bold text-[#6E3955] tabular-nums">
                     Total Outflow: ₹{incomeExpensesData.summary.totalExpenses.toLocaleString('en-IN')}
                   </span>
                 </div>
@@ -1439,7 +1396,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <div>
                     <div className="flex justify-between text-xs font-bold mb-1">
                       <span className="text-emerald-700">Gross Income (Fee Collections)</span>
-                      <span>₹{incomeExpensesData.summary.totalIncome.toLocaleString('en-IN')}</span>
+                      <span className="tabular-nums font-black text-gray-900">₹{incomeExpensesData.summary.totalIncome.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="h-4 w-full rounded-xl bg-gray-100 overflow-hidden">
                       <div className="bg-emerald-600 h-full rounded-xl" style={{ width: '100%' }} />
@@ -1449,7 +1406,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <div>
                     <div className="flex justify-between text-xs font-bold mb-1">
                       <span className="text-rose-700">Guru Payroll Outflow</span>
-                      <span>₹{incomeExpensesData.summary.totalSalaries.toLocaleString('en-IN')}</span>
+                      <span className="tabular-nums font-black text-gray-900">₹{incomeExpensesData.summary.totalSalaries.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="h-4 w-full rounded-xl bg-gray-100 overflow-hidden">
                       <div 
@@ -1462,7 +1419,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <div>
                     <div className="flex justify-between text-xs font-bold mb-1">
                       <span className="text-amber-700">General Academy Spending (Expenses Page)</span>
-                      <span>₹{incomeExpensesData.summary.totalOtherExpenses.toLocaleString('en-IN')}</span>
+                      <span className="tabular-nums font-black text-gray-900">₹{incomeExpensesData.summary.totalOtherExpenses.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="h-4 w-full rounded-xl bg-gray-100 overflow-hidden">
                       <div 
@@ -1480,7 +1437,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <h3 className="font-black text-sm text-[#590231] uppercase tracking-wider">
                     Detailed Financial Ledger & Transaction Flow
                   </h3>
-                  <span className="text-xs font-semibold text-gray-500">
+                  <span className="text-xs font-semibold text-[#6E3955] tabular-nums">
                     {incomeExpensesData.records.length} items recorded
                   </span>
                 </div>
@@ -1500,7 +1457,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                     <tbody className="divide-y divide-[#F0D5E4]/60">
                       {incomeExpensesData.records.map((r, i) => (
                         <tr key={i} className="hover:bg-[#FFF9FB] transition">
-                          <td className="py-3.5 px-5 font-bold text-gray-700 whitespace-nowrap">
+                          <td className="py-3.5 px-5 font-bold text-gray-700 whitespace-nowrap tabular-nums">
                             {r.date ? new Date(r.date).toLocaleDateString('en-GB') : '—'}
                           </td>
                           <td className="py-3.5 px-5">
@@ -1521,7 +1478,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                           <td className="py-3.5 px-5 text-xs text-gray-500">
                             {r.payment_method}
                           </td>
-                          <td className={`py-3.5 px-5 text-right font-black ${
+                          <td className={`py-3.5 px-5 text-right font-black tabular-nums ${
                             r.type === 'Income' ? 'text-emerald-700' : 'text-[#8A064D]'
                           }`}>
                             {r.type === 'Income' ? '+' : '-'}₹{Number(r.amount).toLocaleString('en-IN')}

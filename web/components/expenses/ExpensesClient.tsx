@@ -439,7 +439,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         
         {/* Total This Period / Current Month */}
-        <div className="bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-6 border border-[#F0D5E4] shadow-xs relative overflow-hidden">
+        <div className="bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-6 border border-[#F0D5E4]/80 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-28 h-28 bg-[#FFF2F8] rounded-bl-full -z-0 opacity-70" />
           <div className="flex items-center justify-between mb-3 relative z-10">
             <span className="text-xs font-black text-[#8A064D] uppercase tracking-wider">
@@ -451,10 +451,10 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
               <DollarSign className="w-5 h-5" />
             </div>
           </div>
-          <div className="text-3xl md:text-4xl font-black text-[#590231] tracking-tight relative z-10">
+          <div className="text-3xl md:text-4xl font-black text-[#590231] tracking-tight relative z-10 tabular-nums">
             ₹{dynamicSummary.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </div>
-          <p className="text-xs font-semibold text-gray-500 mt-2 relative z-10">
+          <p className="text-xs font-semibold text-[#6E3955] mt-2 relative z-10">
             {startDate === defaultStartDate && endDate === defaultEndDate 
               ? 'Current month total expenditure summary' 
               : `Aggregated spending from ${startDate || 'start'} to ${endDate || 'present'}`}
@@ -462,7 +462,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
         </div>
 
         {/* Count of Expenses / Current Month */}
-        <div className="bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-6 border border-[#F0D5E4] shadow-xs relative overflow-hidden">
+        <div className="bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-6 border border-[#F0D5E4]/80 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-28 h-28 bg-[#FFF2F8] rounded-bl-full -z-0 opacity-70" />
           <div className="flex items-center justify-between mb-3 relative z-10">
             <span className="text-xs font-black text-[#8A064D] uppercase tracking-wider">
@@ -474,10 +474,10 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
               <FileCheck className="w-5 h-5" />
             </div>
           </div>
-          <div className="text-3xl md:text-4xl font-black text-[#590231] tracking-tight relative z-10">
+          <div className="text-3xl md:text-4xl font-black text-[#590231] tracking-tight relative z-10 tabular-nums">
             {dynamicSummary.expenseCount}
           </div>
-          <p className="text-xs font-semibold text-gray-500 mt-2 relative z-10">
+          <p className="text-xs font-semibold text-[#6E3955] mt-2 relative z-10">
             {dynamicSummary.expenseCount === 1 
               ? '1 expense record logged' 
               : `${dynamicSummary.expenseCount} expense records logged`}
@@ -678,7 +678,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                       <tr key={exp.id} className="hover:bg-[#FFF9FB] transition">
                         
                         {/* Date */}
-                        <td className="py-4 px-5 font-bold text-gray-700 whitespace-nowrap">
+                        <td className="py-4 px-5 font-bold text-gray-700 whitespace-nowrap tabular-nums">
                           {dateFormatted}
                         </td>
 
@@ -709,7 +709,7 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                         </td>
 
                         {/* Amount */}
-                        <td className="py-4 px-5 text-right font-black text-base text-[#590231] whitespace-nowrap">
+                        <td className="py-4 px-5 text-right font-black text-base text-[#590231] whitespace-nowrap tabular-nums">
                           ₹{Number(exp.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
 
@@ -742,29 +742,29 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                             {/* View Details Button (Primary Action) */}
                             <button
                               onClick={() => openDetailsModal(exp)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF2F8] hover:bg-[#8A064D] text-[#8A064D] hover:text-white border border-[#F0D5E4] hover:border-[#8A064D] text-xs font-bold transition shadow-2xs cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2D041A] hover:bg-[#48082B] text-white border border-[#48082B] text-xs font-bold transition shadow-2xs cursor-pointer"
                               title="View Full Expense Details & Audit History"
                             >
-                              <Eye className="w-3.5 h-3.5" />
+                              <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
                               <span>View Details</span>
                             </button>
 
                             {/* Edit Button */}
                             <button
                               onClick={() => openEditModal(exp)}
-                              className="p-1.5 rounded-xl text-gray-600 hover:text-[#8A064D] hover:bg-[#FFF2F8] border border-transparent hover:border-[#F0D5E4] transition cursor-pointer"
+                              className="p-1.5 rounded-xl bg-[#FFF5F9] border border-[#E8BFD5] hover:bg-[#FCE7F3] text-[#8A064D] transition cursor-pointer shadow-2xs"
                               title="Edit Expense"
                             >
-                              <Edit3 className="w-4 h-4" />
+                              <Edit3 className="w-3.5 h-3.5" />
                             </button>
 
                             {/* Delete Button */}
                             <button
                               onClick={() => setDeletingExpense(exp)}
-                              className="p-1.5 rounded-xl text-gray-600 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition cursor-pointer"
+                              className="p-1.5 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition cursor-pointer shadow-2xs"
                               title="Remove Expense"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
 
                           </div>

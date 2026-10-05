@@ -106,8 +106,6 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
               _detailRow(Icons.room_rounded, 'Hall / Location', course['room']!),
               _detailRow(Icons.calendar_today_rounded, 'Start Date & Duration', '${course['start_date']} (${course['duration']})'),
               _detailRow(Icons.payments_rounded, 'Course Fee', course['fee']!),
-              _detailRow(Icons.auto_stories_rounded, 'Syllabus Focus', course['syllabus_covered']!),
-              _detailRow(Icons.checkroom_rounded, 'Academy Dress Code', course['dress_code']!),
 
               const SizedBox(height: 24),
               SizedBox(

@@ -1056,8 +1056,8 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
               {/* Capacity Progress Bar & Action Buttons */}
               <div className="mt-6 pt-4.5 border-t border-gray-100">
                 <div className="flex justify-between items-center text-sm mb-2">
-                  <span className="text-gray-600 font-semibold">Batch Enrollment</span>
-                  <span className="font-extrabold text-[#8A064D]">
+                  <span className="text-[#6E3955] font-semibold">Batch Enrollment</span>
+                  <span className="font-extrabold text-[#8A064D] tabular-nums">
                     {b.enrolled_count || 0} / {b.max_capacity} Seats ({fillPercentage}%)
                   </span>
                 </div>
@@ -1075,9 +1075,9 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 <div className="flex items-center justify-between pt-1">
                   <button
                     onClick={() => setViewingBatch(b)}
-                    className="px-4 py-2 rounded-xl bg-gray-50 hover:bg-[#8A064D] text-gray-800 hover:text-white border border-gray-200 hover:border-[#8A064D] text-sm font-bold transition cursor-pointer flex items-center gap-2 shadow-2xs"
+                    className="px-4 py-2 rounded-xl bg-[#2D041A] hover:bg-[#48082B] text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-2xs border border-[#48082B]"
                   >
-                    <Eye className="w-4 h-4" />
+                    <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
                     <span>View Details</span>
                   </button>
 
@@ -1085,16 +1085,16 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                     <button
                       onClick={() => openEditModal(b)}
                       title="Edit Batch"
-                      className="p-2.5 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] hover:bg-[#8A064D] hover:text-white text-[#8A064D] transition cursor-pointer shadow-2xs"
+                      className="p-2 rounded-xl bg-[#FFF5F9] border border-[#E8BFD5] hover:bg-[#FCE7F3] text-[#8A064D] transition cursor-pointer shadow-2xs"
                     >
-                      <Edit3 className="w-4 h-4" />
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setDeletingBatch(b)}
                       title="Delete Batch"
-                      className="p-2.5 rounded-xl bg-gray-50 border border-gray-200 hover:bg-rose-600 hover:text-white text-gray-400 hover:border-rose-600 transition cursor-pointer shadow-2xs"
+                      className="p-2 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition cursor-pointer shadow-2xs"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>

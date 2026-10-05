@@ -11,8 +11,6 @@ export interface AttendanceReportSummary {
   totalSessions: number;
   presentCount: number;
   absentCount: number;
-  lateCount: number;
-  notMarkedCount: number;
   attendancePercentage: number;
 }
 
@@ -22,7 +20,7 @@ export interface AttendanceReportRow {
   batch_name: string;
   student_name: string;
   roll_number: string;
-  status: 'present' | 'absent' | 'late' | 'not-marked';
+  status: 'present' | 'absent';
   check_in_time?: string | null;
   remarks?: string | null;
 }
@@ -148,43 +146,40 @@ export async function getAttendanceReport(filters: {
 
     if (filters.startDate) {
       params.push(filters.startDate);
-      sql += ` AND cs.session_date >= $${params.length}`;
+      sql += ` AND cs.session_date::date >= $${params.length}::date`;
     }
 
     if (filters.endDate) {
       params.push(filters.endDate);
-      sql += ` AND cs.session_date <= $${params.length}`;
+      sql += ` AND cs.session_date::date <= $${params.length}::date`;
     }
 
     sql += ` ORDER BY cs.session_date DESC, student_name ASC LIMIT 500;`;
 
     const rawRows = await query<AttendanceReportRow>(sql, params);
 
-    // If query has no records or attendance table was empty for range, get what exists
     let presentCount = 0;
     let absentCount = 0;
-    let lateCount = 0;
-    let notMarkedCount = 0;
 
     for (const r of rawRows) {
-      const st = (r.status || 'not-marked').toLowerCase();
-      if (st === 'present') presentCount++;
-      else if (st === 'absent') absentCount++;
-      else if (st === 'late') lateCount++;
-      else notMarkedCount++;
+      const st = (r.status || 'absent').toLowerCase();
+      if (st === 'present' || st === 'late') {
+        presentCount++;
+        r.status = 'present';
+      } else {
+        absentCount++;
+        r.status = 'absent';
+      }
     }
 
     const totalSessions = rawRows.length;
-    const attended = presentCount + lateCount;
-    const percentage = totalSessions > 0 ? Math.round((attended / totalSessions) * 100) : 0;
+    const percentage = totalSessions > 0 ? Math.round((presentCount / totalSessions) * 100) : 0;
 
     return {
       summary: {
         totalSessions,
         presentCount,
         absentCount,
-        lateCount,
-        notMarkedCount,
         attendancePercentage: percentage
       },
       records: rawRows,
@@ -197,8 +192,6 @@ export async function getAttendanceReport(filters: {
         totalSessions: 0,
         presentCount: 0,
         absentCount: 0,
-        lateCount: 0,
-        notMarkedCount: 0,
         attendancePercentage: 0
       },
       records: [],
@@ -273,12 +266,12 @@ export async function getFeesReport(filters: {
 
     if (filters.startDate) {
       params.push(filters.startDate);
-      sql += ` AND i.due_date >= $${params.length}`;
+      sql += ` AND i.due_date::date >= $${params.length}::date`;
     }
 
     if (filters.endDate) {
       params.push(filters.endDate);
-      sql += ` AND i.due_date <= $${params.length}`;
+      sql += ` AND i.due_date::date <= $${params.length}::date`;
     }
 
     sql += ` ORDER BY i.due_date DESC, i.created_at DESC;`;
@@ -354,6 +347,8 @@ export async function getSalariesReport(filters: {
   payrollMonth?: string;
   trainerId?: string;
   status?: string;
+  startDate?: string;
+  endDate?: string;
 }): Promise<{
   summary: SalariesReportSummary;
   records: SalariesReportRow[];
@@ -394,6 +389,22 @@ export async function getSalariesReport(filters: {
     if (filters.status && filters.status !== 'all') {
       params.push(filters.status);
       sql += ` AND r.status = $${params.length}`;
+    }
+
+    if (filters.startDate) {
+      params.push(filters.startDate);
+      sql += ` AND (
+        (r.payment_date IS NOT NULL AND r.payment_date::date >= $${params.length}::date) 
+        OR (TO_DATE(r.payroll_month, 'Month YYYY') >= DATE_TRUNC('month', $${params.length}::date))
+      )`;
+    }
+
+    if (filters.endDate) {
+      params.push(filters.endDate);
+      sql += ` AND (
+        (r.payment_date IS NOT NULL AND r.payment_date::date <= $${params.length}::date) 
+        OR (TO_DATE(r.payroll_month, 'Month YYYY') <= DATE_TRUNC('month', $${params.length}::date))
+      )`;
     }
 
     sql += ` ORDER BY r.payroll_month DESC, p.full_name ASC;`;
@@ -478,11 +489,17 @@ export async function getIncomeVsExpensesReport(filters: {
     const feeParams: any[] = [];
     if (filters.startDate) {
       feeParams.push(filters.startDate);
-      feeSql += ` AND (pay.payment_date >= $${feeParams.length} OR i.due_date >= $${feeParams.length})`;
+      feeSql += ` AND (
+        (pay.payment_date IS NOT NULL AND pay.payment_date::date >= $${feeParams.length}::date) 
+        OR (i.due_date::date >= $${feeParams.length}::date)
+      )`;
     }
     if (filters.endDate) {
       feeParams.push(filters.endDate);
-      feeSql += ` AND (pay.payment_date <= $${feeParams.length} OR i.due_date <= $${feeParams.length})`;
+      feeSql += ` AND (
+        (pay.payment_date IS NOT NULL AND pay.payment_date::date <= $${feeParams.length}::date) 
+        OR (i.due_date::date <= $${feeParams.length}::date)
+      )`;
     }
 
     const incomeRows = await query<IncomeExpensesReportRow>(feeSql, feeParams);
@@ -505,11 +522,17 @@ export async function getIncomeVsExpensesReport(filters: {
     const salParams: any[] = [];
     if (filters.startDate) {
       salParams.push(filters.startDate);
-      salSql += ` AND (r.payment_date >= $${salParams.length} OR CONCAT(r.payroll_month, '-01') >= $${salParams.length})`;
+      salSql += ` AND (
+        (r.payment_date IS NOT NULL AND r.payment_date::date >= $${salParams.length}::date) 
+        OR (TO_DATE(r.payroll_month, 'Month YYYY') >= DATE_TRUNC('month', $${salParams.length}::date))
+      )`;
     }
     if (filters.endDate) {
       salParams.push(filters.endDate);
-      salSql += ` AND (r.payment_date <= $${salParams.length} OR CONCAT(r.payroll_month, '-28') <= $${salParams.length})`;
+      salSql += ` AND (
+        (r.payment_date IS NOT NULL AND r.payment_date::date <= $${salParams.length}::date) 
+        OR (TO_DATE(r.payroll_month, 'Month YYYY') <= DATE_TRUNC('month', $${salParams.length}::date))
+      )`;
     }
 
     const salaryRows = await query<IncomeExpensesReportRow>(salSql, salParams);

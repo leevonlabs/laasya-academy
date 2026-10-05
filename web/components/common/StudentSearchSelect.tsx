@@ -60,10 +60,11 @@ export default function StudentSearchSelect({
   );
 
   return (
-    <div className={`relative inline-block ${className}`} ref={containerRef}>
+    <div className={`relative inline-block ${className}`} ref={containerRef} suppressHydrationWarning>
       {/* Trigger Button */}
       <button
         type="button"
+        suppressHydrationWarning
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full px-3.5 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-semibold flex items-center justify-between text-left transition focus:outline-none focus:ring-2 focus:ring-[#8A064D] ${
           isOpen ? 'ring-2 ring-[#8A064D]/20 border-[#8A064D] bg-white' : ''

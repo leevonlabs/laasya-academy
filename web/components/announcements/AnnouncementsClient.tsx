@@ -23,7 +23,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  Info
+  Info,
+  Image as ImageIcon,
+  Upload
 } from 'lucide-react';
 import { Announcement } from '@/lib/announcements';
 import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
@@ -66,6 +68,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
   const [formData, setFormData] = useState({
     title: '',
     message: '',
+    image_url: '',
     audience: 'All students' as 'All students' | 'Selected course or batch' | 'Trainers' | 'Chosen recipients',
     target_course_id: '',
     target_course_title: '',
@@ -79,6 +82,47 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Auto-resize uploaded image to fit 2.5:1 mobile banner
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const targetWidth = 800;
+        const targetHeight = 320;
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const srcRatio = img.width / img.height;
+          const targetRatio = targetWidth / targetHeight;
+          let sw, sh, sx, sy;
+          if (srcRatio > targetRatio) {
+            sh = img.height;
+            sw = img.height * targetRatio;
+            sx = (img.width - sw) / 2;
+            sy = 0;
+          } else {
+            sw = img.width;
+            sh = img.width / targetRatio;
+            sx = 0;
+            sy = (img.height - sh) / 2;
+          }
+          ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+          const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          setFormData(prev => ({ ...prev, image_url: resizedDataUrl }));
+          showToast('Image automatically adjusted & scaled to suit app banner size!');
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Preview tab inside create/edit modal
   const [activeFormTab, setActiveFormTab] = useState<'edit' | 'preview'>('edit');
@@ -155,6 +199,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
     setFormData({
       title: '',
       message: '',
+      image_url: '',
       audience: 'All students',
       target_course_id: '',
       target_course_title: '',
@@ -176,6 +221,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
     setFormData({
       title: ann.title,
       message: ann.message,
+      image_url: ann.image_url || '',
       audience: ann.audience as any,
       target_course_id: ann.target_course_id || '',
       target_course_title: ann.target_course_title || '',
@@ -653,7 +699,19 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
 
                 </div>
 
-                {/* Announcement Content */}
+                {/* Announcement Content & Image */}
+                {ann.image_url && (
+                  <div className="w-full aspect-[2.6/1] max-h-48 rounded-2xl overflow-hidden border border-[#F0D5E4] relative group bg-black/5 shadow-2xs">
+                    <img
+                      src={ann.image_url}
+                      alt={ann.title}
+                      className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                    />
+                    <div className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-black/60 text-white text-[10px] font-bold backdrop-blur-xs">
+                      App Banner Showcase
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <h3 className="text-lg md:text-xl font-black text-[#590231]">
                     {ann.title}
@@ -692,17 +750,17 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                     {/* Preview Button */}
                     <button
                       onClick={() => setPreviewAnnouncement(ann)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white border border-[#F0D5E4] hover:bg-[#FFF2F8] text-gray-700 hover:text-[#8A064D] text-xs font-bold transition"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2D041A] hover:bg-[#48082B] text-white border border-[#48082B] text-xs font-bold transition shadow-2xs cursor-pointer"
                       title="Preview how users see it"
                     >
-                      <Eye className="w-3.5 h-3.5" />
+                      <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
                       <span>Preview</span>
                     </button>
 
                     {/* Duplicate Button */}
                     <button
                       onClick={() => handleDuplicate(ann)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white border border-[#F0D5E4] hover:bg-[#FFF2F8] text-gray-700 hover:text-blue-700 text-xs font-bold transition"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF5F9] border border-[#E8BFD5] hover:bg-[#FCE7F3] text-[#8A064D] text-xs font-bold transition shadow-2xs cursor-pointer"
                       title="Duplicate as new draft"
                     >
                       <Copy className="w-3.5 h-3.5" />
@@ -713,7 +771,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                     {ann.status === 'Published' && (
                       <button
                         onClick={() => handleUnpublish(ann)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white border border-[#F0D5E4] hover:bg-amber-50 text-gray-700 hover:text-amber-800 text-xs font-bold transition"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-900 text-xs font-bold transition shadow-2xs cursor-pointer"
                         title="Unpublish and return to Draft"
                       >
                         <Archive className="w-3.5 h-3.5" />
@@ -724,19 +782,19 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                     {/* Edit Button */}
                     <button
                       onClick={() => openEditModal(ann)}
-                      className="p-1.5 rounded-xl bg-white border border-[#F0D5E4] hover:bg-[#FFF2F8] text-gray-700 hover:text-[#8A064D] transition"
+                      className="p-1.5 rounded-xl bg-[#FFF5F9] border border-[#E8BFD5] hover:bg-[#FCE7F3] text-[#8A064D] transition shadow-2xs cursor-pointer"
                       title="Edit Announcement"
                     >
-                      <Edit3 className="w-4 h-4" />
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
 
                     {/* Delete Button */}
                     <button
                       onClick={() => setDeletingAnnouncement(ann)}
-                      className="p-1.5 rounded-xl bg-white border border-[#F0D5E4] hover:bg-red-50 text-gray-700 hover:text-red-600 transition"
+                      className="p-1.5 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 transition shadow-2xs cursor-pointer"
                       title="Delete Announcement"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
 
                   </div>
@@ -840,6 +898,97 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                   />
                   {formErrors.message && (
                     <p className="text-xs font-bold text-red-600 mt-1">{formErrors.message}</p>
+                  )}
+                </div>
+
+                {/* Banner Advertisement Image */}
+                <div className="space-y-2 p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-[#590231] uppercase tracking-wider flex items-center gap-1.5">
+                      <ImageIcon className="w-4 h-4 text-[#8A064D]" />
+                      <span>Banner Advertisement Image (App & Web Showcase)</span>
+                    </label>
+                    {formData.image_url && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, image_url: '' }))}
+                        className="text-[11px] font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Remove Image
+                      </button>
+                    )}
+                  </div>
+                  
+                  <p className="text-[11px] text-gray-500">
+                    Attached image will automatically be adjusted to suit the moving advertisement banner aspect ratio (2.5:1) in the mobile app.
+                  </p>
+
+                  {/* Upload button & URL input */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <label className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-[#8A064D]/50 bg-white hover:bg-[#FFF2F8] text-[#8A064D] text-xs font-bold cursor-pointer transition">
+                      <Upload className="w-4 h-4" />
+                      <span>Upload & Auto-Fit Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                      />
+                    </label>
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Or paste image URL (https://...)"
+                        value={formData.image_url}
+                        onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
+                        className="w-full px-3 py-2.5 rounded-xl bg-white border border-[#F0D5E4] text-xs font-medium text-gray-800 focus:outline-none focus:border-[#8A064D]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quick Academy Presets */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Quick Presets:</span>
+                    {[
+                      { label: 'Classical Dance', url: 'https://images.unsplash.com/photo-1547153760-18fc86324498?w=800&auto=format&fit=crop&q=80' },
+                      { label: 'Carnatic Music', url: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=80' },
+                      { label: 'Grand Festival', url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80' },
+                      { label: 'Arts & Craft', url: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&auto=format&fit=crop&q=80' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, image_url: preset.url }))}
+                        className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white border border-[#F0D5E4] hover:border-[#8A064D] hover:text-[#8A064D] text-gray-600 transition cursor-pointer"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Live Banner Preview adjusted for mobile app */}
+                  {formData.image_url && (
+                    <div className="pt-2">
+                      <div className="text-[10px] font-bold text-[#8A064D] uppercase mb-1">
+                        Mobile App Banner Preview (Aspect Ratio 2.5:1)
+                      </div>
+                      <div className="relative w-full aspect-[2.5/1] rounded-2xl overflow-hidden border-2 border-[#8A064D]/30 shadow-sm bg-black/10">
+                        <img
+                          src={formData.image_url}
+                          alt="Banner Preview"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent flex flex-col justify-end p-3 text-white">
+                          <span className="text-[10px] font-black uppercase text-[#F9E33A] tracking-wider mb-0.5">
+                            {formData.type_tag}
+                          </span>
+                          <h4 className="text-sm font-bold text-white line-clamp-1 drop-shadow-sm">
+                            {formData.title || 'Announcement Headline'}
+                          </h4>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -1030,6 +1179,15 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                     </span>
                   </div>
 
+                  {formData.image_url && (
+                    <div className="w-full aspect-[2.5/1] rounded-2xl overflow-hidden border border-[#F0D5E4] shadow-xs">
+                      <img
+                        src={formData.image_url}
+                        alt="Preview Banner"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
                   <div>
                     <h3 className="text-lg font-black text-[#590231]">
                       {formData.title || '(Untitled Announcement Title)'}
@@ -1101,6 +1259,16 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                 Target: {previewAnnouncement.audience}
                 {previewAnnouncement.target_course_title && ` • ${previewAnnouncement.target_course_title}`}
               </div>
+
+              {previewAnnouncement.image_url && (
+                <div className="w-full aspect-[2.5/1] rounded-2xl overflow-hidden border border-[#F0D5E4] shadow-xs">
+                  <img
+                    src={previewAnnouncement.image_url}
+                    alt={previewAnnouncement.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
 
               <h3 className="text-xl font-black text-[#590231]">
                 {previewAnnouncement.title}

@@ -569,21 +569,21 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       {/* ===================================================================== */}
       {/* 1. HEADER & TOP CONTROLS */}
       {/* ===================================================================== */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#F0D5E4]/80 shadow-xs">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1.5">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-[#FCE7F3] text-[#8A064D]">
               Student Directory
             </span>
-            <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-full font-bold">
+            <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-full font-bold tabular-nums">
               {students.length} Total Learners
             </span>
           </div>
-          <h1 className="text-2xl font-black text-[#2D041A] tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-black text-[#2D041A] tracking-tight flex items-center gap-2.5">
             <GraduationCap className="w-7 h-7 text-[#8A064D]" />
-            Student Management
+            <span>Student Management</span>
           </h1>
-          <p className="text-xs text-gray-500 mt-1 max-w-2xl">
+          <p className="text-xs text-[#6E3955] mt-1 max-w-2xl font-medium">
             Track student admissions, status, course fees, due amounts, and parent details.
           </p>
         </div>
@@ -591,41 +591,41 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         <div className="flex flex-wrap items-center gap-3">
           
           {/* Search Box */}
-          <div className="relative min-w-[240px]">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <div className="relative min-w-[260px]">
+            <Search className="w-4 h-4 text-[#8A064D]/60 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search student, ID, phone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+              className="w-full pl-10 pr-4 py-2.5 bg-[#FFF9FB] border border-[#F0D5E4] rounded-2xl text-xs font-semibold text-[#2D041A] placeholder:text-[#8A064D]/40 focus:outline-none focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] focus:bg-white transition"
             />
           </div>
 
           {/* View Mode Toggle: Grid vs Row */}
-          <div className="flex items-center bg-gray-100 p-1 rounded-2xl border border-gray-200">
+          <div className="flex items-center bg-[#FFF2F8] p-1 rounded-2xl border border-[#F0D5E4]">
             <button
               onClick={() => setViewMode('grid')}
-              className={`px-3.5 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'grid'
                   ? 'bg-[#8A064D] text-white shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-[#6E3955] hover:text-[#2D041A]'
               }`}
               title="Grid View (Default)"
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutGrid className="w-3.5 h-3.5" />
               <span>Grid</span>
             </button>
             <button
               onClick={() => setViewMode('row')}
-              className={`px-3.5 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'row'
                   ? 'bg-[#8A064D] text-white shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-[#6E3955] hover:text-[#2D041A]'
               }`}
               title="Row / Table View"
             >
-              <List className="w-4 h-4" />
+              <List className="w-3.5 h-3.5" />
               <span>Row</span>
             </button>
           </div>
@@ -633,7 +633,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
           {/* Register New Student Button */}
           <button
             onClick={handleOpenRegister}
-            className="bg-[#8A064D] hover:bg-[#70043E] text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2 cursor-pointer"
+            className="bg-[#8A064D] hover:bg-[#70043E] active:scale-98 text-white px-5 py-2.5 rounded-2xl text-xs font-black tracking-wide shadow-sm hover:shadow-md transition flex items-center gap-2 cursor-pointer border border-[#F9E33A]/40"
           >
             <Plus className="w-4 h-4 text-[#F9E33A]" />
             <span>Register Student</span>
@@ -648,16 +648,16 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       <div className="flex items-center gap-2.5">
         <button
           onClick={() => setStatusFilter('active')}
-          className={`px-5 py-2.5 rounded-2xl text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
+          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
             statusFilter === 'active'
-              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/40'
-              : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
+              ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
+              : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
           }`}
         >
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
           <span>Active Students</span>
-          <span className={`text-xs px-2.5 py-0.5 rounded-full ${
-            statusFilter === 'active' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
+            statusFilter === 'active' ? 'bg-white/20 text-white' : 'bg-[#FFF2F8] text-[#8A064D]'
           }`}>
             {activeCount}
           </span>
@@ -665,15 +665,15 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
         <button
           onClick={() => setStatusFilter('inactive')}
-          className={`px-5 py-2.5 rounded-2xl text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
+          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
             statusFilter === 'inactive'
-              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/40'
-              : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
+              ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
+              : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
           }`}
         >
-          <span className="w-2.5 h-2.5 rounded-full bg-gray-400" />
+          <span className="w-2 h-2 rounded-full bg-gray-400" />
           <span>Inactive Students</span>
-          <span className={`text-xs px-2.5 py-0.5 rounded-full ${
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
             statusFilter === 'inactive' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
           }`}>
             {inactiveCount}
@@ -682,14 +682,14 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
         <button
           onClick={() => setStatusFilter('all')}
-          className={`px-5 py-2.5 rounded-2xl text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
+          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
             statusFilter === 'all'
-              ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#F9E33A]/40'
-              : 'bg-white text-gray-700 border border-[#F0D5E4] hover:bg-gray-50'
+              ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
+              : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
           }`}
         >
           <span>All Students</span>
-          <span className={`text-xs px-2.5 py-0.5 rounded-full ${
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
             statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
           }`}>
             {students.length}
@@ -703,10 +703,10 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       {viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredStudents.length === 0 ? (
-            <div className="col-span-full py-16 text-center text-gray-400 bg-white rounded-3xl border border-[#F0D5E4]">
-              <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="font-bold text-gray-600">No {statusFilter !== 'all' ? statusFilter : ''} students found.</p>
-              <p className="text-xs text-gray-400 mt-1">Try switching filters or clearing your search.</p>
+            <div className="col-span-full py-16 text-center text-[#6E3955] bg-white rounded-3xl border border-[#F0D5E4]">
+              <AlertTriangle className="w-8 h-8 text-[#8A064D]/30 mx-auto mb-2" />
+              <p className="font-bold text-[#2D041A]">No {statusFilter !== 'all' ? statusFilter : ''} students found.</p>
+              <p className="text-xs text-[#6E3955] mt-1 font-medium">Try switching filters or clearing your search.</p>
             </div>
           ) : (
             filteredStudents.map((s) => {
@@ -716,17 +716,17 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               return (
                 <div
                   key={s.id}
-                  className="bg-white rounded-3xl border border-[#F0D5E4] p-5 shadow-xs hover:shadow-md hover:border-[#8A064D]/50 transition flex flex-col justify-between group"
+                  className="bg-white rounded-3xl border border-[#F0D5E4]/90 p-5 shadow-xs hover:shadow-md hover:border-[#8A064D]/40 transition flex flex-col justify-between group"
                 >
                   <div>
                     {/* Top Bar: Status Badge & Student ID */}
                     <div className="flex items-center justify-between mb-3.5">
-                      <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-3 py-1 rounded-xl shadow-2xs">
+                      <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100/80 px-3 py-1 rounded-xl shadow-2xs tabular-nums">
                         {s.roll_number}
                       </span>
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
                         s.status === 'active'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                           : 'bg-gray-100 text-gray-600 border border-gray-200'
                       }`}>
                         <span className={`w-2 h-2 rounded-full ${s.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
@@ -754,44 +754,44 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                         </h3>
 
                         {/* Contact Number below Name */}
-                        <div className="text-sm text-gray-600 flex items-center gap-1.5 mt-1 truncate">
+                        <div className="text-sm text-[#6E3955] flex items-center gap-1.5 mt-1 truncate tabular-nums">
                           <Phone className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span className="font-medium text-gray-800">{s.phone}</span>
+                          <span className="font-medium text-[#2D041A]">{s.phone}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Fee Details Box: Total Monthly Fee, Due Amount with Color, Due Date */}
-                    <div className="mt-4 p-4 bg-gray-50/90 rounded-2xl border border-gray-100 space-y-3">
+                    <div className="mt-4 p-4 bg-[#FFF9FB]/70 rounded-2xl border border-[#F0D5E4]/60 space-y-3">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 font-semibold">Total Monthly Fee:</span>
-                        <span className="font-extrabold text-[#2D041A] text-base">
+                        <span className="text-[#6E3955] font-semibold text-xs uppercase tracking-wide">Total Monthly Fee:</span>
+                        <span className="font-extrabold text-[#2D041A] text-base tabular-nums">
                           ₹{monthlyFee.toLocaleString('en-IN')}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 font-semibold">Due Amount:</span>
-                        <span className={`px-3 py-1 rounded-xl text-xs font-extrabold flex items-center gap-1.5 ${dueInfo.badgeClass}`}>
+                        <span className="text-[#6E3955] font-semibold text-xs uppercase tracking-wide">Due Amount:</span>
+                        <span className={`px-3 py-1 rounded-xl text-xs font-extrabold flex items-center gap-1.5 tabular-nums ${dueInfo.badgeClass}`}>
                           <span className={`w-2 h-2 rounded-full ${dueInfo.dotClass}`} />
                           <span>{dueInfo.text}</span>
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 font-semibold">Due Date:</span>
-                        <span className="font-mono font-bold text-gray-800 bg-white px-2.5 py-1 rounded-xl border border-gray-200 text-xs shadow-2xs">
+                        <span className="text-[#6E3955] font-semibold text-xs uppercase tracking-wide">Due Date:</span>
+                        <span className="font-mono font-bold text-[#2D041A] bg-white px-2.5 py-1 rounded-xl border border-[#F0D5E4] text-xs shadow-2xs tabular-nums">
                           {formatDueDateDisplay(s.due_date)}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Action Buttons Below: Details, Edit, Delete with dark, high-contrast, premium colors */}
-                  <div className="mt-5 pt-3.5 border-t border-gray-100 flex items-center gap-2.5">
+                  {/* Action Buttons Below: Details, Edit, Delete with refined, cohesive styling */}
+                  <div className="mt-5 pt-3.5 border-t border-[#F0D5E4]/50 flex items-center gap-2.5">
                     <button
                       onClick={() => setDetailStudent(s)}
-                      className="flex-1 py-2.5 px-3 rounded-xl bg-[#2D041A] hover:bg-[#48082B] active:scale-95 text-white text-sm font-bold transition flex items-center justify-center gap-1.5 shadow-xs border border-[#48082B] cursor-pointer"
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-[#2D041A] hover:bg-[#48082B] active:scale-95 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs border border-[#48082B] cursor-pointer"
                       title="View Complete Student Details"
                     >
                       <Eye className="w-4 h-4 text-[#F9E33A]" />
@@ -800,19 +800,19 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
                     <button
                       onClick={() => handleOpenEdit(s)}
-                      className="flex-1 py-2.5 px-3 rounded-xl bg-[#1E3A8A] hover:bg-[#1D4ED8] active:scale-95 text-white text-sm font-bold transition flex items-center justify-center gap-1.5 shadow-xs border border-[#1E3A8A] cursor-pointer"
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-[#FFF5F9] hover:bg-[#FCE7F3] active:scale-95 text-[#8A064D] hover:text-[#70043E] text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs border border-[#E8BFD5] cursor-pointer"
                       title="Edit Student Information"
                     >
-                      <Edit3 className="w-4 h-4 text-sky-200" />
+                      <Edit3 className="w-4 h-4 text-[#8A064D]" />
                       <span>Edit</span>
                     </button>
 
                     <button
                       onClick={() => setDeletingStudent(s)}
-                      className="py-2.5 px-3.5 rounded-xl bg-[#881337] hover:bg-[#9F1239] active:scale-95 text-white text-sm font-bold transition flex items-center justify-center gap-1 shadow-xs border border-[#881337] cursor-pointer"
+                      className="py-2.5 px-3.5 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 hover:text-rose-800 text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs border border-rose-200 cursor-pointer"
                       title="Delete Student"
                     >
-                      <Trash2 className="w-4 h-4 text-rose-200" />
+                      <Trash2 className="w-4 h-4 text-rose-600" />
                       <span>Delete</span>
                     </button>
                   </div>
@@ -827,7 +827,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       {/* 4. ROW-WISE (TABLE) VIEW */}
       {/* ===================================================================== */}
       {viewMode === 'row' && (
-        <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
+        <div className="bg-white rounded-3xl border border-[#F0D5E4]/90 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
@@ -840,10 +840,10 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   <th className="py-4 px-5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 text-sm">
+              <tbody className="divide-y divide-[#F0D5E4]/40 text-sm">
                 {filteredStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-gray-400">
+                    <td colSpan={6} className="py-12 text-center text-[#6E3955]">
                       No students found matching your criteria.
                     </td>
                   </tr>
@@ -856,12 +856,12 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                       <tr key={s.id} className="hover:bg-[#FFFDFC] transition">
                         <td className="py-4 px-5">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg text-xs">
+                            <span className="font-mono font-bold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg text-xs tabular-nums">
                               {s.roll_number}
                             </span>
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
                               s.status === 'active' 
-                                ? 'bg-emerald-50 text-emerald-700' 
+                                ? 'bg-emerald-50 text-emerald-800' 
                                 : 'bg-gray-100 text-gray-600'
                             }`}>
                               <span className={`w-2 h-2 rounded-full ${s.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
@@ -884,8 +884,8 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                               </div>
                             )}
                             <div>
-                              <div className="font-bold text-gray-900 text-sm">{s.full_name}</div>
-                              <div className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
+                              <div className="font-bold text-[#2D041A] text-sm">{s.full_name}</div>
+                              <div className="text-xs text-[#6E3955] flex items-center gap-1.5 mt-0.5 tabular-nums">
                                 <Phone className="w-3.5 h-3.5 text-emerald-600" />
                                 <span>{s.phone}</span>
                               </div>
@@ -893,18 +893,18 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                           </div>
                         </td>
 
-                        <td className="py-4 px-5 text-right font-extrabold text-gray-900 text-sm">
+                        <td className="py-4 px-5 text-right font-extrabold text-[#2D041A] text-sm tabular-nums">
                           ₹{monthlyFee.toLocaleString('en-IN')}
                         </td>
 
                         <td className="py-4 px-5 text-center">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-extrabold ${dueInfo.badgeClass}`}>
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-extrabold tabular-nums ${dueInfo.badgeClass}`}>
                             <span className={`w-2 h-2 rounded-full ${dueInfo.dotClass}`} />
                             <span>{dueInfo.text}</span>
                           </span>
                         </td>
 
-                        <td className="py-4 px-5 text-center font-mono font-bold text-gray-800 text-xs">
+                        <td className="py-4 px-5 text-center font-mono font-bold text-[#2D041A] text-xs tabular-nums">
                           {formatDueDateDisplay(s.due_date)}
                         </td>
 
@@ -912,7 +912,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => setDetailStudent(s)}
-                              className="px-3.5 py-2 rounded-xl bg-[#2D041A] hover:bg-[#48082B] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs border border-[#48082B] cursor-pointer"
+                              className="px-3.5 py-2 rounded-xl bg-[#2D041A] hover:bg-[#48082B] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-2xs border border-[#48082B] cursor-pointer"
                               title="View Details"
                             >
                               <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
@@ -921,19 +921,19 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
                             <button
                               onClick={() => handleOpenEdit(s)}
-                              className="px-3.5 py-2 rounded-xl bg-[#1E3A8A] hover:bg-[#1D4ED8] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs border border-[#1E3A8A] cursor-pointer"
+                              className="px-3.5 py-2 rounded-xl bg-[#FFF5F9] hover:bg-[#FCE7F3] active:scale-95 text-[#8A064D] text-xs font-bold transition flex items-center gap-1.5 shadow-2xs border border-[#E8BFD5] cursor-pointer"
                               title="Edit Details"
                             >
-                              <Edit3 className="w-3.5 h-3.5 text-sky-200" />
+                              <Edit3 className="w-3.5 h-3.5 text-[#8A064D]" />
                               <span>Edit</span>
                             </button>
 
                             <button
                               onClick={() => setDeletingStudent(s)}
-                              className="p-2 rounded-xl bg-[#881337] hover:bg-[#9F1239] active:scale-95 text-white transition flex items-center shadow-xs border border-[#881337] cursor-pointer"
+                              className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 transition flex items-center shadow-2xs border border-rose-200 cursor-pointer"
                               title="Delete Student"
                             >
-                              <Trash2 className="w-4 h-4 text-rose-200" />
+                              <Trash2 className="w-4 h-4 text-rose-600" />
                             </button>
                           </div>
                         </td>
@@ -1152,7 +1152,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               </div>
 
               {/* Modal Actions */}
-              <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-between pt-4 border-t border-[#F0D5E4]/60">
                 <button
                   type="button"
                   onClick={() => {
@@ -1160,9 +1160,9 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                     setDetailStudent(null);
                     setDeletingStudent(s);
                   }}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#881337] hover:bg-[#9F1239] active:scale-95 text-white shadow-xs border border-[#881337] transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 shadow-2xs border border-rose-200 transition flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-200" />
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                   <span>Delete Student</span>
                 </button>
 
@@ -1170,7 +1170,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   <button
                     type="button"
                     onClick={() => setDetailStudent(null)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition cursor-pointer"
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-[#521D38] bg-gray-100 hover:bg-gray-200 transition cursor-pointer"
                   >
                     Close
                   </button>
@@ -1181,9 +1181,9 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                       setDetailStudent(null);
                       handleOpenEdit(s);
                     }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-[#1E3A8A] hover:bg-[#1D4ED8] active:scale-95 text-white shadow-md border border-[#1E3A8A] transition flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] active:scale-95 text-white shadow-sm border border-[#8A064D] transition flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Edit3 className="w-3.5 h-3.5 text-sky-200" />
+                    <Edit3 className="w-3.5 h-3.5 text-[#F9E33A]" />
                     <span>Edit Details</span>
                   </button>
                 </div>

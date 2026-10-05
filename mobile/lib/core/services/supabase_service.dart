@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/supabase_constants.dart';
 
@@ -21,31 +23,39 @@ class SupabaseService {
       'title': 'Navaratri Cultural Mahotsav 2026',
       'message': 'Annual grand cultural showcase rehearsals commence this Saturday at Natya Mandapam. All Bharathanatyam and Vocal students must attend.',
       'type': 'announcement',
+      'type_tag': 'Festival Special',
+      'image_url': 'https://images.unsplash.com/photo-1547153760-18fc86324498?w=800&auto=format&fit=crop&q=80',
       'date': 'Today, 09:30 AM',
       'is_read': false,
     },
     {
       'id': 'notif-2',
-      'title': 'Class Timing Update - Batch A',
-      'message': 'Tomorrow\'s Bharathanatyam evening session will start at 17:15 instead of 17:00 due to temple hall blessing ceremony.',
-      'type': 'schedule_change',
+      'title': 'Grand Annual Arangetram Showcase',
+      'message': 'Celebration of senior disciples graduating with traditional classical arangetram performances at the Academy Main Hall.',
+      'type': 'announcement',
+      'type_tag': 'Academy Showcase',
+      'image_url': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80',
       'date': 'Yesterday',
       'is_read': false,
     },
     {
       'id': 'notif-3',
-      'title': 'Academy Holiday Notice: Gandhi Jayanthi',
-      'message': 'The Academy will remain closed on Friday, 2nd October in observance of Gandhi Jayanthi. Compensatory classes will be scheduled next week.',
-      'type': 'holiday',
+      'title': 'Carnatic Sangeetha Sambhrama 2026',
+      'message': 'Special vocal jugalbandi and guest lec-dem by revered maestros on Melakarta Ragas. Open to all students & families.',
+      'type': 'announcement',
+      'type_tag': 'Music Concert',
+      'image_url': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=80',
       'date': '2 days ago',
       'is_read': true,
     },
     {
       'id': 'notif-4',
-      'title': 'Class Reminder: Today 05:00 PM',
-      'message': 'You have an upcoming Bharathanatyam class scheduled with Guru Smt. Radhika Sharma at Natya Mandapam.',
-      'type': 'reminder',
-      'date': 'Today, 08:00 AM',
+      'title': 'Chitra Kala & Canvas Art Exhibition',
+      'message': 'Annual fine arts showcase displaying traditional Tanjore paintings, water colours, and student craft masterpieces.',
+      'type': 'announcement',
+      'type_tag': 'Art & Craft',
+      'image_url': 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&auto=format&fit=crop&q=80',
+      'date': '3 days ago',
       'is_read': false,
     },
   ];
@@ -651,6 +661,9 @@ class SupabaseService {
         'status': 'Active',
         'fee': '₹2,500 / month',
         'attendance_rate': 92,
+        'month_attendance': '92% (11/12 classes)',
+        'month_attended': 11,
+        'month_total': 12,
         'syllabus_covered': 'Adavu Steps 1-8, Alarippu rhythm bols',
         'dress_code': 'Practice Saree or Salwar with Dupatta firmly pinned',
       },
@@ -669,6 +682,9 @@ class SupabaseService {
         'status': 'Active',
         'fee': '₹2,000 / month',
         'attendance_rate': 85,
+        'month_attendance': '85% (9/11 classes)',
+        'month_attended': 9,
+        'month_total': 11,
         'syllabus_covered': 'Sarali Varisai, Janta Varisai, Mayamalavagowla Raga',
         'dress_code': 'Traditional modest attire with notebook & shruti box',
       }
@@ -676,7 +692,6 @@ class SupabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getStudentSchedule() async {
-    final today = DateTime.now().toIso8601String().split('T').first;
     return [
       {
         'id': 'sch-1',
@@ -688,9 +703,10 @@ class SupabaseService {
         'time': '17:00 - 18:30',
         'room': 'Natya Mandapam (Room 101)',
         'day': 'Today',
-        'date': today,
+        'date': '05-October-2026',
         'status': 'Scheduled',
         'is_today': true,
+        'is_tomorrow': false,
       },
       {
         'id': 'sch-2',
@@ -701,39 +717,27 @@ class SupabaseService {
         'trainer': 'Vidwan Sri K. Venkatesh',
         'time': '07:30 - 08:45',
         'room': 'Sangeetha Shala (Room 202)',
-        'day': 'Tomorrow (Thursday)',
-        'date': '2026-10-01',
+        'day': 'Tomorrow',
+        'date': '06-October-2026',
         'status': 'Scheduled',
         'is_today': false,
+        'is_tomorrow': true,
       },
       {
         'id': 'sch-3',
-        'course': 'Bharathanatyam',
+        'course': 'Bharathanatyam Rehearsal',
         'category': 'Classical Dance',
         'batch': 'Batch A (Beginners)',
         'batch_id': 'batch-201',
         'trainer': 'Guru Smt. Radhika Sharma',
-        'time': '17:00 - 18:30',
+        'time': '18:30 - 19:30',
         'room': 'Natya Mandapam (Room 101)',
-        'day': 'Friday',
-        'date': '2026-10-02',
-        'status': 'Holiday (Gandhi Jayanthi)',
-        'is_today': false,
-      },
-      {
-        'id': 'sch-4',
-        'course': 'Carnatic Vocal Music',
-        'category': 'Vocal & Music',
-        'batch': 'Morning Ragas',
-        'batch_id': 'batch-203',
-        'trainer': 'Vidwan Sri K. Venkatesh',
-        'time': '07:30 - 08:45',
-        'room': 'Sangeetha Shala (Room 202)',
-        'day': 'Saturday',
-        'date': '2026-10-03',
+        'day': 'Tomorrow',
+        'date': '06-October-2026',
         'status': 'Scheduled',
         'is_today': false,
-      }
+        'is_tomorrow': true,
+      },
     ];
   }
 
@@ -746,32 +750,46 @@ class SupabaseService {
       {
         'id': 'att-1',
         'status': 'present',
-        'check_in_method': 'student_code',
-        'course_title': 'Bharathanatyam',
-        'batch_name': 'Batch A (Beginners)',
-        'trainer_name': 'Guru Smt. Radhika Sharma',
-        'date': '29 Sep 2026',
-        'time': '17:02',
-      },
-      {
-        'id': 'att-2',
-        'status': 'present',
-        'check_in_method': 'student_code',
-        'course_title': 'Carnatic Vocal Music',
-        'batch_name': 'Morning Ragas',
-        'trainer_name': 'Vidwan Sri K. Venkatesh',
-        'date': '27 Sep 2026',
-        'time': '07:34',
-      },
-      {
-        'id': 'att-3',
-        'status': 'late',
         'check_in_method': 'trainer_manual',
         'course_title': 'Bharathanatyam',
         'batch_name': 'Batch A (Beginners)',
         'trainer_name': 'Guru Smt. Radhika Sharma',
-        'date': '25 Sep 2026',
-        'time': '17:20',
+        'date': '05 Oct 2026',
+        'date_iso': '2026-10-05',
+        'time': '17:02',
+      },
+      {
+        'id': 'att-1b',
+        'status': 'absent',
+        'check_in_method': 'system',
+        'course_title': 'Bharathanatyam',
+        'batch_name': 'Batch A (Beginners)',
+        'trainer_name': 'Guru Smt. Radhika Sharma',
+        'date': '04 Oct 2026',
+        'date_iso': '2026-10-04',
+        'time': '--',
+      },
+      {
+        'id': 'att-2',
+        'status': 'present',
+        'check_in_method': 'trainer_manual',
+        'course_title': 'Carnatic Vocal Music',
+        'batch_name': 'Morning Ragas',
+        'trainer_name': 'Vidwan Sri K. Venkatesh',
+        'date': '03 Oct 2026',
+        'date_iso': '2026-10-03',
+        'time': '07:34',
+      },
+      {
+        'id': 'att-3',
+        'status': 'present',
+        'check_in_method': 'trainer_manual',
+        'course_title': 'Bharathanatyam',
+        'batch_name': 'Batch A (Beginners)',
+        'trainer_name': 'Guru Smt. Radhika Sharma',
+        'date': '01 Oct 2026',
+        'date_iso': '2026-10-01',
+        'time': '17:05',
       },
       {
         'id': 'att-4',
@@ -780,18 +798,53 @@ class SupabaseService {
         'course_title': 'Carnatic Vocal Music',
         'batch_name': 'Morning Ragas',
         'trainer_name': 'Vidwan Sri K. Venkatesh',
-        'date': '22 Sep 2026',
+        'date': '29 Sep 2026',
+        'date_iso': '2026-09-29',
         'time': '--',
       },
       {
         'id': 'att-5',
         'status': 'present',
-        'check_in_method': 'student_code',
+        'check_in_method': 'trainer_manual',
         'course_title': 'Bharathanatyam',
         'batch_name': 'Batch A (Beginners)',
         'trainer_name': 'Guru Smt. Radhika Sharma',
-        'date': '20 Sep 2026',
-        'time': '17:05',
+        'date': '26 Sep 2026',
+        'date_iso': '2026-09-26',
+        'time': '17:01',
+      },
+      {
+        'id': 'att-6',
+        'status': 'present',
+        'check_in_method': 'trainer_manual',
+        'course_title': 'Carnatic Vocal Music',
+        'batch_name': 'Morning Ragas',
+        'trainer_name': 'Vidwan Sri K. Venkatesh',
+        'date': '24 Sep 2026',
+        'date_iso': '2026-09-24',
+        'time': '07:32',
+      },
+      {
+        'id': 'att-7',
+        'status': 'absent',
+        'check_in_method': 'system',
+        'course_title': 'Bharathanatyam',
+        'batch_name': 'Batch A (Beginners)',
+        'trainer_name': 'Guru Smt. Radhika Sharma',
+        'date': '22 Sep 2026',
+        'date_iso': '2026-09-22',
+        'time': '--',
+      },
+      {
+        'id': 'att-8',
+        'status': 'present',
+        'check_in_method': 'trainer_manual',
+        'course_title': 'Carnatic Vocal Music',
+        'batch_name': 'Morning Ragas',
+        'trainer_name': 'Vidwan Sri K. Venkatesh',
+        'date': '19 Sep 2026',
+        'date_iso': '2026-09-19',
+        'time': '07:30',
       },
     ];
   }
@@ -841,5 +894,383 @@ class SupabaseService {
         break;
       }
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // EVENT VIDEO LIBRARY & DRIVE FOLDERS
+  // ---------------------------------------------------------------------------
+  List<Map<String, dynamic>> _cachedEventFolders = [];
+
+  Future<List<Map<String, dynamic>>> getStudentEventFolders({String? courseTitle, String? batchName}) async {
+    // 1. Live fetch from local / web backend API (http://localhost:3000/api/video-library)
+    try {
+      final uri = Uri.parse('http://localhost:3000/api/video-library');
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['success'] == true && decoded['items'] is List) {
+          final liveItems = List<Map<String, dynamic>>.from(decoded['items']);
+          if (liveItems.isNotEmpty) {
+            _cachedEventFolders = liveItems;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Live API fetch error for video library: $e');
+    }
+
+    // 2. Supabase Cloud fallback if initialized
+    if (_cachedEventFolders.isEmpty && _isInitialized && _client != null) {
+      try {
+        final res = await _client!
+            .from('video_library')
+            .select()
+            .eq('category', 'event_folder')
+            .order('created_at', ascending: false);
+        if (res.isNotEmpty) {
+          _cachedEventFolders = List<Map<String, dynamic>>.from(res);
+        }
+      } catch (e) {
+        debugPrint('Supabase fetch error for video library: $e');
+      }
+    }
+
+    // 3. Fallback cache with demo items including kalki uploaded for Bharathanatyam
+    if (_cachedEventFolders.isEmpty) {
+      _cachedEventFolders = [
+        {
+          'id': 'evt-kalki',
+          'title': 'kalki',
+          'event_name': 'kalki',
+          'event_date': '2026-10-05',
+          'created_at': '2026-10-05T15:00:00Z',
+          'category': 'event_folder',
+          'target_course_title': 'Bharathanatyam',
+          'target_batch_name': 'All Batches',
+          'drive_url': 'https://drive.google.com/drive/folders/1kZbRN-inNyTmJD_HblU7BunbwySyY796?usp=sharing',
+          'description': 'Official shoot drive folder uploaded for Bharathanatyam disciples.',
+          'access_level': 'Course',
+          'created_by': 'Academy Owner',
+        },
+        {
+          'id': 'evt-1',
+          'title': 'Navaratri Cultural Mahotsav 2026 - Classical Showcase',
+          'event_name': 'Navaratri Cultural Mahotsav 2026',
+          'event_date': '2026-10-01',
+          'created_at': '2026-10-02T10:30:00Z',
+          'category': 'event_folder',
+          'target_course_title': 'Bharathanatyam',
+          'target_batch_name': 'All Batches',
+          'drive_url': 'https://drive.google.com/drive/folders/1laasya_navaratri_2026_showcase?usp=sharing',
+          'description': 'Complete multi-cam HD stage recording and individual solo footages of the grand Navaratri festival dance drama held at Natya Mandapam.',
+          'access_level': 'Course',
+          'created_by': 'Academy Owner',
+        },
+        {
+          'id': 'evt-2',
+          'title': 'Annual Day 2026 - Full Photo & Video Media Archive',
+          'event_name': 'Annual Academy Showcase 2026',
+          'event_date': '2026-09-14',
+          'created_at': '2026-09-15T12:00:00Z',
+          'category': 'event_folder',
+          'target_course_title': 'All 18 Courses',
+          'target_batch_name': 'All Batches',
+          'drive_url': 'https://drive.google.com/drive/folders/1laasya_annual_day_2026_media_vault?usp=sharing',
+          'description': 'High-resolution photo gallery and backstage video recordings from the 2026 Annual Cultural Showcase for all academy disciples.',
+          'access_level': 'All Students',
+          'created_by': 'Academy Owner',
+        },
+        {
+          'id': 'evt-3',
+          'title': 'Natya Mandapam Stage Performance Footage (Multi-Angle 4K)',
+          'event_name': 'Natya Mandapam Stage Performance',
+          'event_date': '2026-08-29',
+          'created_at': '2026-08-30T14:15:00Z',
+          'category': 'event_folder',
+          'target_course_title': 'Bharathanatyam',
+          'target_batch_name': 'Batch A (Beginners)',
+          'drive_url': 'https://drive.google.com/drive/folders/1laasya_natya_mandapam_4k_footage?usp=sharing',
+          'description': 'Raw and edited performance clips sorted by batch and raga for all participating disciples and parents.',
+          'access_level': 'Batch',
+          'created_by': 'Academy Owner',
+        },
+        {
+          'id': 'evt-4',
+          'title': 'Carnatic Sangeetha Sambhrama 2026 - Vocal Concert Vault',
+          'event_name': 'Carnatic Sangeetha Sambhrama 2026',
+          'event_date': '2026-09-27',
+          'created_at': '2026-09-28T09:45:00Z',
+          'category': 'event_folder',
+          'target_course_title': 'Carnatic Vocal Music',
+          'target_batch_name': 'Morning Ragas',
+          'drive_url': 'https://drive.google.com/drive/folders/1laasya_carnatic_vocal_sambhrama?usp=sharing',
+          'description': 'Traditional Carnatic vocal concert performance and masterclass lecture demonstration on Melakarta ragas.',
+          'access_level': 'Course',
+          'created_by': 'Academy Owner',
+        },
+      ];
+    }
+
+    return List<Map<String, dynamic>>.from(_cachedEventFolders);
+  }
+
+  // ---------------------------------------------------------------------------
+  // STUDENT FEE PAYMENTS & INVOICES
+  // ---------------------------------------------------------------------------
+  List<Map<String, dynamic>> _cachedPayments = [];
+
+  Future<List<Map<String, dynamic>>> getStudentPayments({String? studentId, String? rollNumber}) async {
+    // 1. Live fetch from local / web backend API
+    try {
+      final uri = Uri.parse('http://localhost:3000/api/finance/student-payments');
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['success'] == true && decoded['payments'] is List) {
+          final livePayments = List<Map<String, dynamic>>.from(decoded['payments']);
+          if (livePayments.isNotEmpty) {
+            _cachedPayments = livePayments;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Live API fetch error for student payments: $e');
+    }
+
+    if (_cachedPayments.isEmpty) {
+      _cachedPayments = [
+        {
+          'id': 'pay-2026-10-01',
+          'invoice_number': 'LCA-INV-2026-10-006',
+          'receipt_number': 'LCA-REC-2026-10-006',
+          'fee_period': 'October 2026',
+          'course_title': 'Bharathanatyam',
+          'batch_name': 'Batch A (Beginners)',
+          'amount_paid': 2000,
+          'gross_amount': 2000,
+          'discount_amount': 0,
+          'balance_due': 0,
+          'payment_date': '02 Oct 2026',
+          'payment_date_iso': '2026-10-02',
+          'payment_method': 'UPI',
+          'transaction_reference': 'UPI/627581920391/HDFC',
+          'status': 'Paid',
+          'receipt_issued_by': 'Sri Ramesh Rao (Director)',
+          'student_name': 'Aditi Sundaram',
+          'roll_number': 'LCA-6',
+          'parent_name': 'Sri Sundaram V.',
+          'remarks': 'Tuition fee for October 2026 received via UPI QR',
+        },
+        {
+          'id': 'pay-2026-09-01',
+          'invoice_number': 'LCA-INV-2026-09-006',
+          'receipt_number': 'LCA-REC-2026-09-006',
+          'fee_period': 'September 2026',
+          'course_title': 'Bharathanatyam',
+          'batch_name': 'Batch A (Beginners)',
+          'amount_paid': 2000,
+          'gross_amount': 2000,
+          'discount_amount': 0,
+          'balance_due': 0,
+          'payment_date': '04 Sep 2026',
+          'payment_date_iso': '2026-09-04',
+          'payment_method': 'UPI',
+          'transaction_reference': 'UPI/592837190281/ICICI',
+          'status': 'Paid',
+          'receipt_issued_by': 'Sri Ramesh Rao (Director)',
+          'student_name': 'Aditi Sundaram',
+          'roll_number': 'LCA-6',
+          'parent_name': 'Sri Sundaram V.',
+          'remarks': 'Tuition fee for September 2026 received via UPI',
+        },
+        {
+          'id': 'pay-2026-08-01',
+          'invoice_number': 'LCA-INV-2026-08-006',
+          'receipt_number': 'LCA-REC-2026-08-006',
+          'fee_period': 'August 2026',
+          'course_title': 'Bharathanatyam',
+          'batch_name': 'Batch A (Beginners)',
+          'amount_paid': 2000,
+          'gross_amount': 2000,
+          'discount_amount': 0,
+          'balance_due': 0,
+          'payment_date': '02 Aug 2026',
+          'payment_date_iso': '2026-08-02',
+          'payment_method': 'UPI',
+          'transaction_reference': 'UPI/549102847291/SBI',
+          'status': 'Paid',
+          'receipt_issued_by': 'Sri Ramesh Rao (Director)',
+          'student_name': 'Aditi Sundaram',
+          'roll_number': 'LCA-6',
+          'parent_name': 'Sri Sundaram V.',
+          'remarks': 'Tuition fee for August 2026 received via UPI',
+        },
+        {
+          'id': 'pay-2026-07-01',
+          'invoice_number': 'LCA-INV-2026-07-006',
+          'receipt_number': 'LCA-REC-2026-07-006',
+          'fee_period': 'July 2026',
+          'course_title': 'Bharathanatyam',
+          'batch_name': 'Batch A (Beginners)',
+          'amount_paid': 2000,
+          'gross_amount': 2000,
+          'discount_amount': 0,
+          'balance_due': 0,
+          'payment_date': '05 Jul 2026',
+          'payment_date_iso': '2026-07-05',
+          'payment_method': 'Bank Transfer',
+          'transaction_reference': 'NEFT/AXIS/291827401',
+          'status': 'Paid',
+          'receipt_issued_by': 'Sri Ramesh Rao (Director)',
+          'student_name': 'Aditi Sundaram',
+          'roll_number': 'LCA-6',
+          'parent_name': 'Sri Sundaram V.',
+          'remarks': 'Tuition fee for July 2026 received via NEFT',
+        },
+        {
+          'id': 'pay-2026-06-REG',
+          'invoice_number': 'LCA-INV-2026-06-REG',
+          'receipt_number': 'LCA-REC-2026-06-REG',
+          'fee_period': 'Academic Year 2026-27 Admission',
+          'course_title': 'Bharathanatyam',
+          'batch_name': 'Batch A (Beginners)',
+          'amount_paid': 1500,
+          'gross_amount': 1500,
+          'discount_amount': 0,
+          'balance_due': 0,
+          'payment_date': '15 Jun 2026',
+          'payment_date_iso': '2026-06-15',
+          'payment_method': 'UPI',
+          'transaction_reference': 'UPI/492817293810/HDFC',
+          'status': 'Paid',
+          'receipt_issued_by': 'Sri Ramesh Rao (Director)',
+          'student_name': 'Aditi Sundaram',
+          'roll_number': 'LCA-6',
+          'parent_name': 'Sri Sundaram V.',
+          'remarks': 'Annual Academy Enrollment, ID Card & Practice Ghungroo kit',
+        },
+      ];
+    }
+
+    return List<Map<String, dynamic>>.from(_cachedPayments);
+  }
+
+  // ---------------------------------------------------------------------------
+  // TRAINER / GURU SALARY PAYOUTS & VOUCHERS
+  // ---------------------------------------------------------------------------
+  List<Map<String, dynamic>> _cachedSalaries = [];
+
+  Future<List<Map<String, dynamic>>> getTrainerSalaryPayouts({String? trainerId}) async {
+    // 1. Live fetch from local / web backend API
+    try {
+      final uri = Uri.parse('http://localhost:3000/api/finance/trainer-salaries');
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['success'] == true && decoded['salaries'] is List) {
+          final liveSalaries = List<Map<String, dynamic>>.from(decoded['salaries']);
+          if (liveSalaries.isNotEmpty) {
+            _cachedSalaries = liveSalaries;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Live API fetch error for trainer salaries: $e');
+    }
+
+    if (_cachedSalaries.isEmpty) {
+      _cachedSalaries = [
+        {
+          'id': 'sal-2026-10-01',
+          'voucher_number': 'LCA-SAL-2026-10-004',
+          'receipt_number': 'LCA-VOUCHER-2026-10-004',
+          'payroll_month': 'October 2026',
+          'trainer_name': 'Smt. Anusha Sumesh',
+          'display_title': 'Founder & Head Guru',
+          'specialization': 'Bharatanatyam Classical Dance',
+          'base_salary': 45000,
+          'classes_assigned': 24,
+          'classes_conducted': 24,
+          'bonus_amount': 3000,
+          'bonus_reason': 'Festive Performance Choreography Honorarium',
+          'deduction_amount': 0,
+          'net_salary': 48000,
+          'status': 'paid',
+          'payment_date': '02 Oct 2026',
+          'payment_method': 'Bank Transfer (IMPS)',
+          'transaction_reference': 'IMPS/629104829104/HDFC',
+          'disbursed_by': 'Sri Ramesh Rao (Academy Director)',
+          'remarks': 'Monthly honorarium & Navaratri performance choreography advance',
+        },
+        {
+          'id': 'sal-2026-09-01',
+          'voucher_number': 'LCA-SAL-2026-09-004',
+          'receipt_number': 'LCA-VOUCHER-2026-09-004',
+          'payroll_month': 'September 2026',
+          'trainer_name': 'Smt. Anusha Sumesh',
+          'display_title': 'Founder & Head Guru',
+          'specialization': 'Bharatanatyam Classical Dance',
+          'base_salary': 45000,
+          'classes_assigned': 24,
+          'classes_conducted': 24,
+          'bonus_amount': 0,
+          'bonus_reason': null,
+          'deduction_amount': 0,
+          'net_salary': 45000,
+          'status': 'paid',
+          'payment_date': '02 Sep 2026',
+          'payment_method': 'Bank Transfer (NEFT)',
+          'transaction_reference': 'NEFT/591820491820/HDFC',
+          'disbursed_by': 'Sri Ramesh Rao (Academy Director)',
+          'remarks': 'Monthly faculty honorarium for September 2026',
+        },
+        {
+          'id': 'sal-2026-08-01',
+          'voucher_number': 'LCA-SAL-2026-08-004',
+          'receipt_number': 'LCA-VOUCHER-2026-08-004',
+          'payroll_month': 'August 2026',
+          'trainer_name': 'Smt. Anusha Sumesh',
+          'display_title': 'Founder & Head Guru',
+          'specialization': 'Bharatanatyam Classical Dance',
+          'base_salary': 45000,
+          'classes_assigned': 24,
+          'classes_conducted': 24,
+          'bonus_amount': 0,
+          'bonus_reason': null,
+          'deduction_amount': 0,
+          'net_salary': 45000,
+          'status': 'paid',
+          'payment_date': '02 Aug 2026',
+          'payment_method': 'Bank Transfer (NEFT)',
+          'transaction_reference': 'NEFT/540192847192/HDFC',
+          'disbursed_by': 'Sri Ramesh Rao (Academy Director)',
+          'remarks': 'Monthly faculty honorarium for August 2026',
+        },
+        {
+          'id': 'sal-2026-07-01',
+          'voucher_number': 'LCA-SAL-2026-07-004',
+          'receipt_number': 'LCA-VOUCHER-2026-07-004',
+          'payroll_month': 'July 2026',
+          'trainer_name': 'Smt. Anusha Sumesh',
+          'display_title': 'Founder & Head Guru',
+          'specialization': 'Bharatanatyam Classical Dance',
+          'base_salary': 45000,
+          'classes_assigned': 24,
+          'classes_conducted': 24,
+          'bonus_amount': 0,
+          'bonus_reason': null,
+          'deduction_amount': 0,
+          'net_salary': 45000,
+          'status': 'paid',
+          'payment_date': '03 Jul 2026',
+          'payment_method': 'Bank Transfer (NEFT)',
+          'transaction_reference': 'NEFT/489102938192/HDFC',
+          'disbursed_by': 'Sri Ramesh Rao (Academy Director)',
+          'remarks': 'Monthly faculty honorarium for July 2026',
+        },
+      ];
+    }
+
+    return List<Map<String, dynamic>>.from(_cachedSalaries);
   }
 }

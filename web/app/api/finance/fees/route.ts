@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       const result = await collectStudentFee({
         student_id: body.student_id,
         amount_paid: Number(body.amount_paid),
+        discount_amount: body.discount_amount !== undefined ? Number(body.discount_amount) : 0,
         payment_method: body.payment_method || 'upi',
         transaction_reference: body.transaction_reference,
         fee_period: body.fee_period,

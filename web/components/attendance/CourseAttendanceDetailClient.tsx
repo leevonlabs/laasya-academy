@@ -48,7 +48,7 @@ export default function CourseAttendanceDetailClient({ course, initialRecords }:
   const [records] = useState<AttendanceRecord[]>(initialRecords);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<string>('All');
-  const [statusFilter, setStatusFilter] = useState<'All' | 'present' | 'absent' | 'late'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'present' | 'absent'>('All');
 
   // ---------------------------------------------------------------------------
   // Date Range Popover State (Matching Reference Image 1)
@@ -156,9 +156,8 @@ export default function CourseAttendanceDetailClient({ course, initialRecords }:
     const total = filteredRecords.length;
     const present = filteredRecords.filter((r) => r.status === 'present').length;
     const absent = filteredRecords.filter((r) => r.status === 'absent').length;
-    const late = filteredRecords.filter((r) => r.status === 'late').length;
-    const rate = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
-    return { total, present, absent, late, rate };
+    const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+    return { total, present, absent, rate };
   }, [filteredRecords]);
 
   // CSV Export handler
@@ -287,40 +286,34 @@ export default function CourseAttendanceDetailClient({ course, initialRecords }:
         </div>
 
         {/* KPI Mini Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-6 pt-6 border-t border-gray-100">
-          <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-rose-100 text-center">
-            <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Enrolled</span>
-            <p className="text-xl font-bold text-[#590231] mt-0.5">{enrolledStudents.length}</p>
-            <span className="text-[10px] text-gray-500">Active Students</span>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-6 pt-6 border-t border-gray-100">
+          <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-[#F0D5E4] text-center">
+            <span className="text-[10px] font-bold uppercase text-[#6E3955] tracking-wider">Enrolled</span>
+            <p className="text-xl font-black text-[#590231] mt-0.5 tabular-nums">{enrolledStudents.length}</p>
+            <span className="text-[10px] text-[#8C5E77]">Active Students</span>
           </div>
 
-          <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-rose-100 text-center">
-            <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Total Records</span>
-            <p className="text-xl font-bold text-gray-800 mt-0.5">{stats.total}</p>
-            <span className="text-[10px] text-gray-500">In Selected Range</span>
+          <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-[#F0D5E4] text-center">
+            <span className="text-[10px] font-bold uppercase text-[#6E3955] tracking-wider">Total Records</span>
+            <p className="text-xl font-black text-gray-800 mt-0.5 tabular-nums">{stats.total}</p>
+            <span className="text-[10px] text-[#8C5E77]">In Selected Range</span>
           </div>
 
-          <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-100 text-center">
-            <span className="text-[10px] font-bold uppercase text-emerald-700 tracking-wider">Present</span>
-            <p className="text-xl font-bold text-emerald-700 mt-0.5">{stats.present}</p>
+          <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-200 text-center">
+            <span className="text-[10px] font-bold uppercase text-emerald-800 tracking-wider">Present</span>
+            <p className="text-xl font-black text-emerald-700 mt-0.5 tabular-nums">{stats.present}</p>
             <span className="text-[10px] text-emerald-600">On Time Sessions</span>
           </div>
 
-          <div className="bg-amber-50/70 p-3.5 rounded-2xl border border-amber-100 text-center">
-            <span className="text-[10px] font-bold uppercase text-amber-700 tracking-wider">Late</span>
-            <p className="text-xl font-bold text-amber-700 mt-0.5">{stats.late}</p>
-            <span className="text-[10px] text-amber-600">Delayed Check-ins</span>
-          </div>
-
-          <div className="bg-rose-50/70 p-3.5 rounded-2xl border border-rose-100 text-center">
-            <span className="text-[10px] font-bold uppercase text-rose-700 tracking-wider">Absent</span>
-            <p className="text-xl font-bold text-rose-700 mt-0.5">{stats.absent}</p>
+          <div className="bg-rose-50/70 p-3.5 rounded-2xl border border-rose-200 text-center">
+            <span className="text-[10px] font-bold uppercase text-rose-800 tracking-wider">Absent</span>
+            <p className="text-xl font-black text-rose-700 mt-0.5 tabular-nums">{stats.absent}</p>
             <span className="text-[10px] text-rose-600">Missed Sessions</span>
           </div>
 
           <div className="bg-gradient-to-br from-[#FFF5F8] to-[#FFF0F4] p-3.5 rounded-2xl border border-[#EBB128] text-center">
             <span className="text-[10px] font-bold uppercase text-[#8A064D] tracking-wider">Attendance %</span>
-            <p className="text-xl font-extrabold text-[#8A064D] mt-0.5">{stats.rate}%</p>
+            <p className="text-xl font-black text-[#8A064D] mt-0.5 tabular-nums">{stats.rate}%</p>
             <span className="text-[10px] text-[#250216] font-semibold">Verified Rate</span>
           </div>
         </div>
@@ -523,7 +516,6 @@ export default function CourseAttendanceDetailClient({ course, initialRecords }:
               { key: 'All', label: `All (${stats.total})` },
               { key: 'present', label: `Present (${stats.present})` },
               { key: 'absent', label: `Absent (${stats.absent})` },
-              { key: 'late', label: `Late (${stats.late})` },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -608,22 +600,15 @@ export default function CourseAttendanceDetailClient({ course, initialRecords }:
 
                       {/* Status */}
                       <td className="py-3.5 px-6 text-center whitespace-nowrap">
-                        {r.status === 'present' && (
+                        {r.status !== 'absent' ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             Present
                           </span>
-                        )}
-                        {r.status === 'absent' && (
+                        ) : (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
                             <XCircle className="w-3.5 h-3.5" />
                             Absent
-                          </span>
-                        )}
-                        {r.status === 'late' && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            <Clock className="w-3.5 h-3.5" />
-                            Late
                           </span>
                         )}
                       </td>

@@ -132,7 +132,6 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
     final timings = '${_selectedSession?['start_time']} - ${_selectedSession?['end_time']}';
 
     final presentCount = _attendanceMap.values.where((v) => v == 'present').length;
-    final lateCount = _attendanceMap.values.where((v) => v == 'late').length;
     final absentCount = _attendanceMap.values.where((v) => v == 'absent').length;
 
     return Scaffold(
@@ -285,8 +284,6 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
               children: [
                 _counterBadge('Present', '$presentCount', const Color(0xFFDEF7EC), const Color(0xFF03543F)),
                 const SizedBox(width: 8),
-                _counterBadge('Late', '$lateCount', const Color(0xFFFEF08A), const Color(0xFF854D0E)),
-                const SizedBox(width: 8),
                 _counterBadge('Absent', '$absentCount', const Color(0xFFFDE8E8), const Color(0xFF991B1B)),
                 const Spacer(),
                 TextButton.icon(
@@ -303,7 +300,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
             const SizedBox(height: 14),
 
             // =================================================================
-            // 4. STUDENT ROLL-CALL LIST (DIRECT PRESENT / LATE / ABSENT TOGGLE)
+            // 4. STUDENT ROLL-CALL LIST (DIRECT PRESENT / ABSENT TOGGLE)
             // =================================================================
             const Text(
               'Enrolled Student Roll-Call',
@@ -324,7 +321,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                   border: Border.all(
                     color: status == 'present'
                         ? const Color(0xFFDEF7EC)
-                        : (status == 'late' ? const Color(0xFFFEF08A) : const Color(0xFFFDE8E8)),
+                        : const Color(0xFFFDE8E8),
                     width: 1.5,
                   ),
                   boxShadow: [
@@ -363,7 +360,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                       ),
                     ),
 
-                    // Three Segmented Toggle Buttons: P / L / A
+                    // Two Segmented Toggle Buttons: P / A
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -376,17 +373,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                           borderColor: const Color(0xFF31C48D),
                           onTap: () => setState(() => _attendanceMap[sId] = 'present'),
                         ),
-                        const SizedBox(width: 6),
-                        _statusToggleButton(
-                          label: 'L',
-                          fullLabel: 'Late',
-                          isSelected: status == 'late',
-                          selectedColor: const Color(0xFFFEF08A),
-                          selectedTextColor: const Color(0xFF854D0E),
-                          borderColor: const Color(0xFFFACC15),
-                          onTap: () => setState(() => _attendanceMap[sId] = 'late'),
-                        ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
                         _statusToggleButton(
                           label: 'A',
                           fullLabel: 'Absent',

@@ -7,7 +7,8 @@ export async function GET(req: Request) {
   const date = searchParams.get('date') || undefined;
   const startDate = searchParams.get('startDate') || undefined;
   const endDate = searchParams.get('endDate') || undefined;
-  const sessions = await getSessions(date, startDate, endDate);
+  const room = searchParams.get('room') || undefined;
+  const sessions = await getSessions(date, startDate, endDate, room);
   return NextResponse.json(sessions);
 }
 

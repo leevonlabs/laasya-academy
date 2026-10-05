@@ -4,7 +4,7 @@ import 'trainer_dashboard_tab.dart';
 import 'trainer_classes_tab.dart';
 import 'trainer_students_tab.dart';
 import 'trainer_attendance_tab.dart';
-import 'trainer_profile_tab.dart';
+import 'trainer_settings_tab.dart';
 import 'trainer_notifications_screen.dart';
 
 class TrainerMainScaffold extends StatefulWidget {
@@ -28,7 +28,7 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
       const TrainerClassesTab(),
       const TrainerStudentsTab(),
       const TrainerAttendanceTab(),
-      const TrainerProfileTab(),
+      const TrainerSettingsTab(),
     ];
 
     final titles = [
@@ -36,7 +36,7 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
       'My Classes & Schedule',
       'Student Management',
       'Attendance Management',
-      'Guru Profile & Settings',
+      'Settings',
     ];
 
     return Scaffold(
@@ -127,9 +127,9 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
               label: 'Attendance',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline_rounded),
-              activeIcon: Icon(Icons.person_rounded),
-              label: 'Profile',
+              icon: Icon(Icons.settings_outlined),
+              activeIcon: Icon(Icons.settings_rounded),
+              label: 'Settings',
             ),
           ],
         ),

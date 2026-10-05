@@ -117,7 +117,8 @@ export default function StudentFeesClient({
   // A. Collect Modal (From Collections tab)
   const [collectingStudent, setCollectingStudent] = useState<Student | null>(null);
   const [collectAmount, setCollectAmount] = useState<string>('');
-  const [collectMethod, setCollectMethod] = useState<'upi' | 'cash' | 'bank_transfer' | 'card' | 'cheque'>('upi');
+  const [collectDiscount, setCollectDiscount] = useState<string>('0');
+  const [collectMethod, setCollectMethod] = useState<'upi' | 'cash' | 'bank_transfer' | 'card' | 'cheque' | 'other'>('upi');
   const [collectRef, setCollectRef] = useState('');
   const [collectFeePeriod, setCollectFeePeriod] = useState('September 2026');
   const [collectRemarks, setCollectRemarks] = useState('');
@@ -422,11 +423,28 @@ export default function StudentFeesClient({
     setCollectingStudent(row.student);
     const defAmount = row.balanceDue > 0 ? row.balanceDue.toString() : row.totalMonthlyFee.toString();
     setCollectAmount(defAmount);
+    setCollectDiscount('0');
     setCollectMethod('upi');
     setCollectRef('');
     setCollectFeePeriod(`${MONTHS[collectionsMonth].full} ${collectionsYear}`);
-    setCollectRemarks(`Tuition fee collection for ${row.studentName} (${MONTHS[collectionsMonth].full} ${collectionsYear})`);
+    setCollectRemarks('');
   };
+
+  const handleDiscountChange = (val: string) => {
+    setCollectDiscount(val);
+    const discNum = Math.max(0, Number(val) || 0);
+    const base = Number(collectingStudent?.total_monthly_fee || 0);
+    if (base > 0 && discNum <= base) {
+      setCollectAmount((base - discNum).toString());
+    }
+  };
+
+  const collectDiscountPercent = useMemo(() => {
+    const discNum = Number(collectDiscount || 0);
+    const base = Number(collectingStudent?.total_monthly_fee || 0) || (Number(collectAmount || 0) + discNum);
+    if (base <= 0 || discNum <= 0) return 0;
+    return Math.min(100, Math.round(((discNum / base) * 100) * 10) / 10);
+  }, [collectDiscount, collectingStudent, collectAmount]);
 
   // Submit Collect Fee
   const handleSubmitCollect = async (e: React.FormEvent) => {
@@ -447,6 +465,7 @@ export default function StudentFeesClient({
           action: 'collect',
           student_id: collectingStudent.id,
           amount_paid: amount,
+          discount_amount: Number(collectDiscount || 0),
           payment_method: collectMethod,
           transaction_reference: collectRef || undefined,
           fee_period: collectFeePeriod,
@@ -752,58 +771,57 @@ For queries, contact: +91 8151 998 899`;
           {/* Collections Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs">
-              <div className="flex items-center justify-between text-gray-500 mb-2">
+            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4]/80 shadow-xs">
+              <div className="flex items-center justify-between text-[#6E3955] mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Total Active Learners</span>
                 <Users className="w-5 h-5 text-[#8A064D]" />
               </div>
-              <div className="text-3xl font-extrabold text-[#2D041A]">
+              <div className="text-3xl font-black text-[#2D041A] tabular-nums">
                 {collectionsSummary.totalStudents}
               </div>
-              <span className="text-xs text-gray-500 font-medium mt-1.5 block">
+              <span className="text-xs text-[#6E3955] font-medium mt-1.5 block tabular-nums">
                 {collectionsSummary.settledCount} Fully Paid • {collectionsSummary.pendingCount} Pending
               </span>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs">
-              <div className="flex items-center justify-between text-gray-500 mb-2">
+            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4]/80 shadow-xs">
+              <div className="flex items-center justify-between text-[#6E3955] mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Expected Monthly Fee</span>
-                <IndianRupee className="w-5 h-5 text-blue-600" />
+                <IndianRupee className="w-5 h-5 text-[#8A064D]" />
               </div>
-              <div className="text-3xl font-extrabold text-[#2D041A]">
+              <div className="text-3xl font-black text-[#2D041A] tabular-nums">
                 ₹{collectionsSummary.totalMonthlyExpected.toLocaleString('en-IN')}
               </div>
-              <span className="text-xs text-gray-500 font-medium mt-1.5 block">
+              <span className="text-xs text-[#6E3955] font-medium mt-1.5 block">
                 Total sum of joined course fees
               </span>
             </div>
 
             <div className="bg-white p-5 rounded-3xl border border-emerald-100 shadow-xs bg-emerald-50/20">
-              <div className="flex items-center justify-between text-emerald-700 mb-2">
+              <div className="flex items-center justify-between text-emerald-800 mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Total Fee Collected</span>
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               </div>
-              <div className="text-3xl font-extrabold text-emerald-800">
+              <div className="text-3xl font-black text-emerald-800 tabular-nums">
                 ₹{collectionsSummary.totalPaid.toLocaleString('en-IN')}
               </div>
-              <span className="text-xs text-emerald-700 font-semibold mt-1.5 block">
+              <span className="text-xs text-emerald-700 font-semibold mt-1.5 block tabular-nums">
                 {collectionsSummary.collectionRate}% of monthly target collected
               </span>
             </div>
 
             <div className="bg-white p-5 rounded-3xl border border-rose-100 shadow-xs bg-rose-50/20">
-              <div className="flex items-center justify-between text-rose-700 mb-2">
+              <div className="flex items-center justify-between text-rose-800 mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Balance Due Outstanding</span>
                 <AlertCircle className="w-5 h-5 text-rose-600" />
               </div>
-              <div className="text-3xl font-extrabold text-rose-700">
+              <div className="text-3xl font-black text-rose-700 tabular-nums">
                 ₹{collectionsSummary.totalDue.toLocaleString('en-IN')}
               </div>
-              <span className="text-xs text-rose-600 font-semibold mt-1.5 block">
+              <span className="text-xs text-rose-600 font-semibold mt-1.5 block tabular-nums">
                 Due by {collectionsMonthDueDate}
               </span>
             </div>
-
           </div>
 
           {/* Collections Search Bar & Top Filter Tabs */}
@@ -1001,25 +1019,25 @@ For queries, contact: +91 8151 998 899`;
           {/* Payments Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs">
-              <div className="flex items-center justify-between text-gray-500 mb-2">
+            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4]/80 shadow-xs">
+              <div className="flex items-center justify-between text-[#6E3955] mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Total Payments Received</span>
                 <Receipt className="w-5 h-5 text-[#8A064D]" />
               </div>
-              <div className="text-3xl font-extrabold text-[#2D041A]">
+              <div className="text-3xl font-black text-[#2D041A] tabular-nums">
                 {paymentsSummary.totalPaymentsCount}
               </div>
-              <span className="text-xs text-gray-500 font-medium mt-1.5 block">
+              <span className="text-xs text-[#6E3955] font-medium mt-1.5 block tabular-nums">
                 {paymentsSummary.paidCount} Full Settled • {paymentsSummary.partialCount} Partial
               </span>
             </div>
 
             <div className="bg-white p-5 rounded-3xl border border-emerald-100 shadow-xs bg-emerald-50/20">
-              <div className="flex items-center justify-between text-emerald-700 mb-2">
+              <div className="flex items-center justify-between text-emerald-800 mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Total Amount Received</span>
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               </div>
-              <div className="text-3xl font-extrabold text-emerald-800">
+              <div className="text-3xl font-black text-emerald-800 tabular-nums">
                 ₹{paymentsSummary.totalPaid.toLocaleString('en-IN')}
               </div>
               <span className="text-xs text-emerald-700 font-semibold mt-1.5 block">
@@ -1027,25 +1045,25 @@ For queries, contact: +91 8151 998 899`;
               </span>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs">
-              <div className="flex items-center justify-between text-gray-500 mb-2">
+            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4]/80 shadow-xs">
+              <div className="flex items-center justify-between text-[#6E3955] mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Paying Students</span>
-                <Users className="w-5 h-5 text-blue-600" />
+                <Users className="w-5 h-5 text-[#8A064D]" />
               </div>
-              <div className="text-3xl font-extrabold text-[#2D041A]">
+              <div className="text-3xl font-black text-[#2D041A] tabular-nums">
                 {new Set(filteredInvoices.map(i => i.student_id)).size}
               </div>
-              <span className="text-xs text-gray-500 font-medium mt-1.5 block">
+              <span className="text-xs text-[#6E3955] font-medium mt-1.5 block">
                 Active student learners with paid fees
               </span>
             </div>
 
             <div className="bg-white p-5 rounded-3xl border border-amber-100 shadow-xs bg-amber-50/20">
-              <div className="flex items-center justify-between text-amber-700 mb-2">
+              <div className="flex items-center justify-between text-amber-800 mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Remaining Invoice Due</span>
                 <AlertCircle className="w-5 h-5 text-amber-600" />
               </div>
-              <div className="text-3xl font-extrabold text-amber-700">
+              <div className="text-3xl font-black text-amber-700 tabular-nums">
                 ₹{paymentsSummary.totalDue.toLocaleString('en-IN')}
               </div>
               <span className="text-xs text-amber-600 font-semibold mt-1.5 block">
@@ -1290,7 +1308,12 @@ For queries, contact: +91 8151 998 899`;
 
                           {/* 3. Amount Paid */}
                           <td className="py-4 px-5 text-right font-extrabold text-emerald-700 text-sm">
-                            ₹{Number(inv.paid_amount).toLocaleString('en-IN')}
+                            <div>₹{Number(inv.paid_amount).toLocaleString('en-IN')}</div>
+                            {Number(inv.discount_amount) > 0 && (
+                              <div className="text-[10px] font-semibold text-rose-600 mt-0.5">
+                                Disc: -₹{Number(inv.discount_amount).toLocaleString('en-IN')}
+                              </div>
+                            )}
                           </td>
 
                           {/* 4. Due (Balance Amount) */}
@@ -1333,10 +1356,10 @@ For queries, contact: +91 8151 998 899`;
                               {/* Edit Button */}
                               <button
                                 onClick={() => handleOpenEditInvoice(inv)}
-                                className="px-3 py-1.5 rounded-xl bg-[#1E3A8A] hover:bg-[#1D4ED8] active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs border border-[#1E3A8A] cursor-pointer"
+                                className="px-3 py-1.5 rounded-xl bg-[#FFF5F9] hover:bg-[#FCE7F3] active:scale-95 text-[#8A064D] text-xs font-bold transition flex items-center gap-1.5 shadow-2xs border border-[#E8BFD5] cursor-pointer"
                                 title="Edit Invoice Details"
                               >
-                                <Edit3 className="w-3.5 h-3.5 text-sky-200" />
+                                <Edit3 className="w-3.5 h-3.5 text-[#8A064D]" />
                                 <span>Edit</span>
                               </button>
 
@@ -1434,27 +1457,53 @@ For queries, contact: +91 8151 998 899`;
                 </div>
               </div>
 
-              {/* Payment Method */}
+              {/* Discount Option Below Collection Amount */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-gray-700">
+                    Discount (INR ₹)
+                  </label>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                    collectDiscountPercent > 0 
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300' 
+                      : 'text-gray-400 bg-gray-100'
+                  }`}>
+                    {collectDiscountPercent}% Discount
+                  </span>
+                </div>
+                <div className="relative flex items-center">
+                  <IndianRupee className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="number"
+                    min={0}
+                    value={collectDiscount}
+                    onChange={(e) => handleDiscountChange(e.target.value)}
+                    placeholder="0"
+                    className="w-full pl-9 pr-24 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#2D041A] focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-[#8A064D] pointer-events-none">
+                    {collectDiscountPercent > 0 ? `(${collectDiscountPercent}% off)` : '0%'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Method Dropdown */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1.5">
                   Payment Method <span className="text-rose-500">*</span>
                 </label>
-                <div className="grid grid-cols-3 gap-2 text-xs font-bold">
-                  {(['upi', 'cash', 'bank_transfer', 'card', 'cheque'] as const).map((method) => (
-                    <button
-                      type="button"
-                      key={method}
-                      onClick={() => setCollectMethod(method)}
-                      className={`py-2 px-2.5 rounded-xl border text-center uppercase tracking-wider text-[11px] transition cursor-pointer ${
-                        collectMethod === method
-                          ? 'bg-[#8A064D] text-white border-[#8A064D] shadow-xs'
-                          : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {method.replace('_', ' ')}
-                    </button>
-                  ))}
-                </div>
+                <select
+                  value={collectMethod}
+                  onChange={(e) => setCollectMethod(e.target.value as any)}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#2D041A] focus:ring-2 focus:ring-[#8A064D] cursor-pointer"
+                >
+                  <option value="upi">UPI / QR Code (Default)</option>
+                  <option value="cash">Cash</option>
+                  <option value="bank_transfer">Bank Transfer / NEFT / IMPS</option>
+                  <option value="card">Credit / Debit Card</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="other">Other</option>
+                </select>
               </div>
 
               {/* Fee Period & Transaction Ref */}
@@ -1489,7 +1538,7 @@ For queries, contact: +91 8151 998 899`;
                   type="text"
                   value={collectRemarks}
                   onChange={(e) => setCollectRemarks(e.target.value)}
-                  placeholder="Optional payment notes"
+                  placeholder="Enter payment remarks (optional)"
                   className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                 />
               </div>

@@ -229,10 +229,11 @@ export default function DateRangeQuickFilter({
   ];
 
   return (
-    <div className={`relative inline-block ${className}`} ref={containerRef}>
+    <div className={`relative inline-block ${className}`} ref={containerRef} suppressHydrationWarning>
       {/* Trigger Button */}
       <button
         type="button"
+        suppressHydrationWarning
         onClick={() => setIsOpen(!isOpen)}
         className={`px-4 py-2.5 bg-white hover:bg-gray-50 border border-[#F0D5E4] rounded-2xl text-xs font-bold text-gray-800 transition flex items-center gap-2 shadow-xs focus:outline-none focus:ring-2 focus:ring-[#8A064D] ${
           isOpen ? 'ring-2 ring-[#8A064D]/20 border-[#8A064D]' : ''
@@ -327,47 +328,54 @@ export default function DateRangeQuickFilter({
 
           </div>
 
-          {/* BOTTOM SECTION: DATE RANGE DISPLAY & APPLY BUTTON (Per User Instruction) */}
-          <div className="mt-4 pt-3.5 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#FFF9FB] p-3 rounded-2xl">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-gray-500 font-semibold">Range:</span>
-              <input
-                type="date"
-                value={tempStart}
-                onChange={(e) => {
-                  setTempStart(e.target.value);
-                  setActivePreset('Custom');
-                }}
-                className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800"
-              />
-              <span className="text-gray-400 font-bold">to</span>
-              <input
-                type="date"
-                value={tempEnd}
-                onChange={(e) => {
-                  setTempEnd(e.target.value);
-                  setActivePreset('Custom');
-                }}
-                className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800"
-              />
+          {/* BOTTOM SECTION: CLEAN DATE RANGE DISPLAY & REFINED APPLY BUTTON */}
+          <div className="mt-4 pt-3.5 border-t border-[#F0D5E4] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#FFF9FB] p-3 rounded-2xl border border-[#F0D5E4]/80">
+            <div className="flex items-center gap-2 text-xs flex-wrap">
+              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-[#F0D5E4] shadow-2xs">
+                <span className="text-[10px] font-black text-gray-400 uppercase">From:</span>
+                <input
+                  type="date"
+                  value={tempStart}
+                  onChange={(e) => {
+                    setTempStart(e.target.value);
+                    setActivePreset('Custom');
+                  }}
+                  className="bg-transparent text-xs font-bold text-gray-800 focus:outline-none cursor-pointer"
+                />
+              </div>
+
+              <span className="text-gray-400 font-bold text-xs hidden sm:inline">➔</span>
+
+              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-[#F0D5E4] shadow-2xs">
+                <span className="text-[10px] font-black text-gray-400 uppercase">To:</span>
+                <input
+                  type="date"
+                  value={tempEnd}
+                  onChange={(e) => {
+                    setTempEnd(e.target.value);
+                    setActivePreset('Custom');
+                  }}
+                  className="bg-transparent text-xs font-bold text-gray-800 focus:outline-none cursor-pointer"
+                />
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 self-end sm:self-auto">
+            <div className="flex items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="px-3 py-1.5 rounded-xl text-xs font-medium text-gray-500 hover:bg-gray-100 transition cursor-pointer"
+                className="px-3.5 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition cursor-pointer"
               >
                 Cancel
               </button>
 
-              {/* Apply Button */}
               <button
                 type="button"
                 onClick={handleApply}
-                className="px-5 py-1.5 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition cursor-pointer"
+                className="px-5 py-2.5 rounded-xl text-xs font-black tracking-wide bg-[#590231] hover:bg-[#8A064D] text-white shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
               >
-                Apply Range
+                <Check className="w-3.5 h-3.5 text-[#F9E33A] stroke-[3]" />
+                <span>Apply Range</span>
               </button>
             </div>
           </div>

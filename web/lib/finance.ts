@@ -12,7 +12,7 @@ export interface FeePayment {
   receipt_number: string;
   amount_paid: number;
   payment_date: string;
-  payment_method: 'upi' | 'cash' | 'bank_transfer' | 'card' | 'cheque';
+  payment_method: 'upi' | 'cash' | 'bank_transfer' | 'card' | 'cheque' | 'other';
   transaction_reference?: string;
   receipt_issued_by: string;
   remarks?: string;
@@ -250,7 +250,7 @@ export async function getStudentFeeInvoices(): Promise<StudentFeeInvoice[]> {
 export async function recordStudentFeePayment(data: {
   invoice_id: string;
   amount_paid: number;
-  payment_method: 'upi' | 'cash' | 'bank_transfer' | 'card' | 'cheque';
+  payment_method: 'upi' | 'cash' | 'bank_transfer' | 'card' | 'cheque' | 'other';
   transaction_reference?: string;
   remarks?: string;
   receipt_issued_by?: string;
@@ -397,12 +397,15 @@ export async function updateStudentFeeInvoice(id: string, data: {
 export async function collectStudentFee(data: {
   student_id: string;
   amount_paid: number;
-  payment_method: 'upi' | 'cash' | 'bank_transfer' | 'card' | 'cheque';
+  discount_amount?: number;
+  payment_method: 'upi' | 'cash' | 'bank_transfer' | 'card' | 'cheque' | 'other';
   transaction_reference?: string;
   fee_period?: string;
   remarks?: string;
   receipt_issued_by?: string;
 }) {
+  const discountAmt = Math.max(0, Number(data.discount_amount || 0));
+
   // Check if student has pending or partial invoices
   const unpaidInvoice = await queryOne<StudentFeeInvoice>(`
     SELECT * FROM public.student_fee_invoices 
@@ -412,6 +415,15 @@ export async function collectStudentFee(data: {
   `, [data.student_id]);
 
   if (unpaidInvoice) {
+    if (discountAmt > 0 || data.discount_amount !== undefined) {
+      await query(`
+        UPDATE public.student_fee_invoices
+        SET discount_amount = $2,
+            updated_at = now()
+        WHERE id = $1;
+      `, [unpaidInvoice.id, discountAmt]);
+    }
+
     // Record payment against existing unpaid invoice
     return recordStudentFeePayment({
       invoice_id: unpaidInvoice.id,
@@ -438,14 +450,16 @@ export async function collectStudentFee(data: {
   const period = data.fee_period || `${monthName} ${now.getFullYear()}`;
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
+  const totalBillable = data.amount_paid + discountAmt;
+
   const newInvoice = await createStudentFeeInvoice({
     student_id: data.student_id,
     course_id: enroll?.course_id,
     batch_id: enroll?.batch_id,
     fee_period: period,
     due_date: lastDay,
-    total_amount: data.amount_paid,
-    discount_amount: 0,
+    total_amount: totalBillable > 0 ? totalBillable : Number(enroll?.monthly_fee || data.amount_paid),
+    discount_amount: discountAmt,
     notes: data.remarks || 'Collected at academy desk'
   });
 

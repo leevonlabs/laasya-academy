@@ -1,0 +1,116 @@
+import { NextResponse } from 'next/server';
+
+export async function GET(req: Request) {
+  const salaries = [
+    {
+      id: 'sal-2026-10-01',
+      voucher_number: 'LCA-SAL-2026-10-004',
+      receipt_number: 'LCA-VOUCHER-2026-10-004',
+      payroll_month: 'October 2026',
+      trainer_name: 'Smt. Anusha Sumesh',
+      display_title: 'Founder & Head Guru',
+      specialization: 'Bharatanatyam Classical Dance',
+      base_salary: 45000,
+      classes_assigned: 24,
+      classes_conducted: 24,
+      bonus_amount: 3000,
+      bonus_reason: 'Festive Performance Choreography Honorarium',
+      deduction_amount: 0,
+      net_salary: 48000,
+      status: 'paid',
+      payment_date: '02 Oct 2026',
+      payment_method: 'Bank Transfer (IMPS)',
+      transaction_reference: 'IMPS/629104829104/HDFC',
+      disbursed_by: 'Sri Ramesh Rao (Academy Director)',
+      remarks: 'Monthly honorarium & Navaratri performance choreography advance',
+    },
+    {
+      id: 'sal-2026-09-01',
+      voucher_number: 'LCA-SAL-2026-09-004',
+      receipt_number: 'LCA-VOUCHER-2026-09-004',
+      payroll_month: 'September 2026',
+      trainer_name: 'Smt. Anusha Sumesh',
+      display_title: 'Founder & Head Guru',
+      specialization: 'Bharatanatyam Classical Dance',
+      base_salary: 45000,
+      classes_assigned: 24,
+      classes_conducted: 24,
+      bonus_amount: 0,
+      bonus_reason: null,
+      deduction_amount: 0,
+      net_salary: 45000,
+      status: 'paid',
+      payment_date: '02 Sep 2026',
+      payment_method: 'Bank Transfer (NEFT)',
+      transaction_reference: 'NEFT/591820491820/HDFC',
+      disbursed_by: 'Sri Ramesh Rao (Academy Director)',
+      remarks: 'Monthly faculty honorarium for September 2026',
+    },
+    {
+      id: 'sal-2026-08-01',
+      voucher_number: 'LCA-SAL-2026-08-004',
+      receipt_number: 'LCA-VOUCHER-2026-08-004',
+      payroll_month: 'August 2026',
+      trainer_name: 'Smt. Anusha Sumesh',
+      display_title: 'Founder & Head Guru',
+      specialization: 'Bharatanatyam Classical Dance',
+      base_salary: 45000,
+      classes_assigned: 24,
+      classes_conducted: 24,
+      bonus_amount: 0,
+      bonus_reason: null,
+      deduction_amount: 0,
+      net_salary: 45000,
+      status: 'paid',
+      payment_date: '02 Aug 2026',
+      payment_method: 'Bank Transfer (NEFT)',
+      transaction_reference: 'NEFT/540192847192/HDFC',
+      disbursed_by: 'Sri Ramesh Rao (Academy Director)',
+      remarks: 'Monthly faculty honorarium for August 2026',
+    },
+    {
+      id: 'sal-2026-07-01',
+      voucher_number: 'LCA-SAL-2026-07-004',
+      receipt_number: 'LCA-VOUCHER-2026-07-004',
+      payroll_month: 'July 2026',
+      trainer_name: 'Smt. Anusha Sumesh',
+      display_title: 'Founder & Head Guru',
+      specialization: 'Bharatanatyam Classical Dance',
+      base_salary: 45000,
+      classes_assigned: 24,
+      classes_conducted: 24,
+      bonus_amount: 0,
+      bonus_reason: null,
+      deduction_amount: 0,
+      net_salary: 45000,
+      status: 'paid',
+      payment_date: '03 Jul 2026',
+      payment_method: 'Bank Transfer (NEFT)',
+      transaction_reference: 'NEFT/489102938192/HDFC',
+      disbursed_by: 'Sri Ramesh Rao (Academy Director)',
+      remarks: 'Monthly faculty honorarium for July 2026',
+    },
+  ];
+
+  return NextResponse.json(
+    { success: true, salaries },
+    {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    }
+  );
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}

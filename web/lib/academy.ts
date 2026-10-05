@@ -10,6 +10,7 @@ export interface Course {
   monthly_fee: number;
   is_active: boolean;
   batch_count?: number;
+  image_url?: string;
 }
 
 export interface Room {
@@ -121,6 +122,7 @@ export interface ClassSession {
   session_date: string;
   start_time: string;
   end_time: string;
+  room_or_hall?: string;
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   check_in_code: string;
   session_topic_notes: string;
@@ -137,7 +139,7 @@ export interface AttendanceRecord {
   student_id: string;
   student_name: string;
   roll_number: string;
-  status: 'present' | 'absent' | 'late' | 'excused';
+  status: 'present' | 'absent';
   check_in_time: string | null;
   check_in_method: string;
   remarks: string | null;
@@ -227,7 +229,7 @@ export async function getCourses(category?: string): Promise<Course[]> {
   let sql = `
     SELECT 
       c.id, c.title, c.code, COALESCE(c.category, '') as category, c.description, 
-      c.duration_months, c.monthly_fee, c.is_active,
+      c.duration_months, c.monthly_fee, c.is_active, c.image_url,
       COUNT(b.id)::int as batch_count
     FROM public.courses c
     LEFT JOIN public.batches b ON b.course_id = c.id
@@ -252,12 +254,13 @@ export async function createCourse(data: {
   description: string;
   duration_months: number;
   monthly_fee: number;
+  image_url?: string;
 }) {
   return queryOne<Course>(`
-    INSERT INTO public.courses (title, code, category, description, duration_months, monthly_fee, is_active)
-    VALUES ($1, $2, $3, $4, $5, $6, true)
+    INSERT INTO public.courses (title, code, category, description, duration_months, monthly_fee, is_active, image_url)
+    VALUES ($1, $2, $3, $4, $5, $6, true, $7)
     RETURNING *;
-  `, [data.title, data.code, data.category || '', data.description, data.duration_months, data.monthly_fee]);
+  `, [data.title, data.code, data.category || '', data.description, data.duration_months, data.monthly_fee, data.image_url || null]);
 }
 
 export async function updateCourse(id: string, data: {
@@ -268,6 +271,7 @@ export async function updateCourse(id: string, data: {
   duration_months?: number;
   description?: string;
   is_active?: boolean;
+  image_url?: string;
 }) {
   return queryOne<Course>(`
     UPDATE public.courses
@@ -278,6 +282,7 @@ export async function updateCourse(id: string, data: {
         description = COALESCE($6, description),
         duration_months = COALESCE($7, duration_months),
         is_active = COALESCE($8, is_active),
+        image_url = CASE WHEN $9::text IS NOT NULL THEN $9 ELSE image_url END,
         updated_at = now()
     WHERE id = $1
     RETURNING *;
@@ -289,7 +294,8 @@ export async function updateCourse(id: string, data: {
     data.monthly_fee,
     data.description, 
     data.duration_months, 
-    data.is_active
+    data.is_active,
+    data.image_url !== undefined ? data.image_url : null
   ]);
 }
 
@@ -1010,10 +1016,11 @@ export async function deleteBatch(id: string) {
 // -------------------------------------------------------------
 // SESSIONS & ATTENDANCE
 // -------------------------------------------------------------
-export async function getSessions(dateFilter?: string, startDate?: string, endDate?: string): Promise<ClassSession[]> {
+export async function getSessions(dateFilter?: string, startDate?: string, endDate?: string, roomFilter?: string): Promise<ClassSession[]> {
   let sql = `
     SELECT 
       s.id, s.batch_id, b.name as batch_name, c.title as course_title,
+      b.room_or_hall,
       p.full_name as trainer_name, TO_CHAR(s.session_date, 'YYYY-MM-DD') as session_date,
       s.start_time, s.end_time,
       s.status, s.check_in_code, s.session_topic_notes,
@@ -1040,8 +1047,14 @@ export async function getSessions(dateFilter?: string, startDate?: string, endDa
     sql += ` AND s.session_date = $1`;
     params.push(today);
   }
+
+  if (roomFilter && roomFilter !== 'All' && roomFilter !== 'all' && roomFilter.trim() !== '') {
+    params.push(roomFilter);
+    sql += ` AND b.room_or_hall = $${params.length}`;
+  }
+
   sql += `
-    GROUP BY s.id, s.batch_id, b.name, c.title, p.full_name
+    GROUP BY s.id, s.batch_id, b.name, c.title, b.room_or_hall, p.full_name
     ORDER BY s.session_date ASC, s.start_time ASC;
   `;
   return query<ClassSession>(sql, params);
@@ -1100,7 +1113,7 @@ export interface AttendanceAuditRecord {
   student_id: string;
   student_name: string;
   roll_number: string;
-  status: 'present' | 'absent' | 'late' | 'excused';
+  status: 'present' | 'absent';
   check_in_time?: string | null;
   check_in_method?: string | null;
   remarks?: string | null;
