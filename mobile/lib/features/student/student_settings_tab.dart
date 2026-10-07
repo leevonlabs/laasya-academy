@@ -4,6 +4,7 @@ import '../../core/services/supabase_service.dart';
 import '../auth/portal_landing_screen.dart';
 import 'student_profile_details_screen.dart';
 import 'student_video_library_screen.dart';
+import 'student_messages_screen.dart';
 import 'student_payments_screen.dart';
 
 class StudentSettingsTab extends StatefulWidget {
@@ -326,7 +327,26 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
                   ),
                   const Divider(height: 1, indent: 64),
 
-                  // 3. Payments Option (Includes all payments done with invoice download)
+                  // 3. Messages Option (Official Broadcast Channel)
+                  _settingsTile(
+                    icon: Icons.chat_bubble_rounded,
+                    iconBg: const Color(0xFFDEF7EC),
+                    iconColor: const Color(0xFF075E54),
+                    title: 'Messages',
+                    subtitle: 'Official academy notices, circulars & announcements',
+                    badgeText: 'NOTICE BOARD',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const StudentMessagesScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, indent: 64),
+
+                  // 4. Payments Option (Includes all payments done with invoice download)
                   _settingsTile(
                     icon: Icons.receipt_long_rounded,
                     iconBg: const Color(0xFFDEF7EC),

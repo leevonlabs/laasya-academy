@@ -15,6 +15,8 @@ export interface Announcement {
   status: 'Draft' | 'Scheduled' | 'Published' | 'Expired';
   delivery_status: string; // 'System verified (Delivered)' | 'Queued' | 'Draft (Not sent)'
   image_url?: string | null;
+  announcement_type?: 'banner' | 'message' | 'notification' | string;
+  action_links?: Array<{ title: string; url: string }> | null;
   is_deleted: boolean;
   deleted_at?: string | null;
   created_by: string;
@@ -29,6 +31,7 @@ export interface AnnouncementFilters {
   search?: string;
   startDate?: string;
   endDate?: string;
+  announcementType?: string;
 }
 
 // Helper to calculate runtime status according to date logic
@@ -73,6 +76,8 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
         a.status, 
         a.delivery_status, 
         a.image_url,
+        a.announcement_type,
+        a.action_links,
         a.is_deleted, 
         a.deleted_at::text as deleted_at, 
         a.created_by, 
@@ -84,6 +89,19 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
       WHERE a.is_deleted = false
     `;
     const params: any[] = [];
+
+    if (filters?.announcementType && filters.announcementType !== 'all') {
+      if (filters.announcementType === 'banner') {
+        sql += ` AND (a.announcement_type = 'banner')`;
+      } else if (filters.announcementType === 'message') {
+        // Enforce 30-day lifespan: Messages older than 30 days are automatically deleted/omitted
+        sql += ` AND (a.announcement_type = 'message' OR a.announcement_type = 'notification' OR a.announcement_type IS NULL OR a.announcement_type != 'banner')`;
+        sql += ` AND (a.publish_date >= CURRENT_DATE - INTERVAL '30 days' OR a.created_at >= CURRENT_TIMESTAMP - INTERVAL '30 days')`;
+      } else {
+        params.push(filters.announcementType);
+        sql += ` AND a.announcement_type = $${params.length}`;
+      }
+    }
 
     if (filters?.audience && filters.audience !== 'all') {
       params.push(filters.audience);
@@ -115,13 +133,26 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
     const rows = await query<Announcement>(sql, params);
 
     // Compute live status badge & filter by status if requested
-    const processed = rows.map(r => {
-      const computedStatus = calculateStatus(r);
-      return {
-        ...r,
-        status: computedStatus
-      };
-    });
+    const thirtyDaysAgoTime = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    const processed = rows
+      .map(r => {
+        const computedStatus = calculateStatus(r);
+        return {
+          ...r,
+          status: computedStatus
+        };
+      })
+      .filter(r => {
+        // Enforce 30-day message lifespan: Messages older than 30 days are automatically cleared
+        const isMsg = r.announcement_type === 'message' || r.announcement_type === 'notification' || (r.announcement_type !== 'banner' && !r.image_url);
+        if (isMsg) {
+          const pubTime = new Date(r.publish_date).getTime();
+          if (pubTime < thirtyDaysAgoTime) {
+            return false;
+          }
+        }
+        return true;
+      });
 
     if (filters?.status && filters.status !== 'all') {
       return processed.filter(r => r.status.toLowerCase() === filters.status?.toLowerCase());
@@ -150,6 +181,8 @@ export async function createAnnouncement(data: {
   expiry_date?: string | null;
   status?: string;
   image_url?: string | null;
+  announcement_type?: string;
+  action_links?: Array<{ title: string; url: string }> | null;
   created_by?: string;
 }): Promise<Announcement> {
   if (!data.title || data.title.trim() === '') {
@@ -170,6 +203,16 @@ export async function createAnnouncement(data: {
       ? 'Queued for Scheduled Dispatch' 
       : 'System verified (Delivered)';
 
+  const annType = data.announcement_type || (data.image_url ? 'banner' : 'message');
+
+  // Enforce 30-day lifespan for message broadcasts
+  let expiryDate = data.expiry_date || null;
+  if (!expiryDate && annType === 'message') {
+    const pub = new Date(data.publish_date);
+    pub.setDate(pub.getDate() + 30);
+    expiryDate = pub.toISOString().split('T')[0];
+  }
+
   const [row] = await query<Announcement>(`
     INSERT INTO public.announcements (
       title,
@@ -185,8 +228,10 @@ export async function createAnnouncement(data: {
       status,
       delivery_status,
       image_url,
-      created_by
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      announcement_type,
+      created_by,
+      action_links
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb)
     RETURNING 
       id, 
       title, 
@@ -202,6 +247,8 @@ export async function createAnnouncement(data: {
       status, 
       delivery_status, 
       image_url,
+      announcement_type,
+      action_links,
       is_deleted, 
       deleted_at::text as deleted_at, 
       created_by, 
@@ -217,11 +264,13 @@ export async function createAnnouncement(data: {
     data.target_batch_name || null,
     data.type_tag,
     data.publish_date,
-    data.expiry_date || null,
+    expiryDate,
     status,
     deliveryStatus,
     data.image_url || null,
-    data.created_by || 'Academy Director'
+    annType,
+    data.created_by || 'Academy Director',
+    JSON.stringify(data.action_links || [])
   ]);
 
   return row;
@@ -245,6 +294,8 @@ export async function updateAnnouncement(
     expiry_date?: string | null;
     status?: string;
     image_url?: string | null;
+    announcement_type?: string;
+    action_links?: Array<{ title: string; url: string }> | null;
   }
 ): Promise<Announcement> {
   if (!data.title || data.title.trim() === '') {
@@ -277,6 +328,8 @@ export async function updateAnnouncement(
       status = $12,
       delivery_status = $13,
       image_url = $14,
+      announcement_type = COALESCE($15, announcement_type),
+      action_links = CASE WHEN $16::text IS NOT NULL THEN $16::jsonb ELSE action_links END,
       updated_at = NOW()
     WHERE id = $1
     RETURNING 
@@ -294,6 +347,8 @@ export async function updateAnnouncement(
       status, 
       delivery_status, 
       image_url,
+      announcement_type,
+      action_links,
       is_deleted, 
       deleted_at::text as deleted_at, 
       created_by, 
@@ -313,7 +368,9 @@ export async function updateAnnouncement(
     data.expiry_date || null,
     status,
     deliveryStatus,
-    data.image_url !== undefined ? data.image_url : null
+    data.image_url !== undefined ? data.image_url : null,
+    data.announcement_type || null,
+    data.action_links !== undefined ? JSON.stringify(data.action_links || []) : null
   ]);
 
   return updated;

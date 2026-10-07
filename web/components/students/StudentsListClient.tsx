@@ -26,7 +26,9 @@ import {
   Check,
   AlertCircle,
   IndianRupee,
-  AlertTriangle
+  AlertTriangle,
+  ZoomIn,
+  Maximize2
 } from 'lucide-react';
 
 interface Props {
@@ -48,6 +50,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   // Modals state
   // 1. Details Modal
   const [detailStudent, setDetailStudent] = useState<Student | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; title: string } | null>(null);
 
   // 2. Edit Modal
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -948,75 +951,133 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       )}
 
       {/* ===================================================================== */}
-      {/* 5. DETAILS MODAL (ALL STUDENT DETAILS IN ONE PLACE) */}
+      {/* 5. DETAILS MODAL (BIG IMAGE & PERFECT INFORMATION ALIGNMENT) */}
       {/* ===================================================================== */}
       {detailStudent && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-[#F0D5E4] max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-7 shadow-2xl border border-[#F0D5E4] max-h-[90vh] overflow-y-auto my-8">
             
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-5">
-              <div className="flex items-center gap-3.5">
-                {detailStudent.avatar_url ? (
-                  <img
-                    src={detailStudent.avatar_url}
-                    alt={detailStudent.full_name}
-                    className="w-14 h-14 rounded-2xl object-cover border-2 border-[#F9E33A] shadow-xs shrink-0"
-                  />
-                ) : (
-                  <div className="w-14 h-14 rounded-2xl bg-[#590231] text-[#F9E33A] font-black text-base flex items-center justify-center border border-rose-200/50 shadow-xs shrink-0">
-                    {detailStudent.full_name.slice(0, 2).toUpperCase()}
-                  </div>
-                )}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-0.5 rounded-lg">
-                      {detailStudent.roll_number}
-                    </span>
-                    <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${
-                      detailStudent.status === 'active' ? 'text-emerald-700' : 'text-gray-500'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${detailStudent.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                      <span className="capitalize">{detailStudent.status || 'Active'}</span>
-                    </span>
-                  </div>
-                  <h3 className="font-black text-lg text-[#2D041A] leading-tight mt-1">
-                    {detailStudent.full_name}
-                  </h3>
-                </div>
-              </div>
-
+            {/* Modal Header & Hero Section */}
+            <div className="flex flex-col sm:flex-row items-start gap-5 pb-6 border-b border-gray-100 mb-5 relative">
+              {/* Close Button Top Right */}
               <button
                 onClick={() => setDetailStudent(null)}
-                className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-[#8A064D] hover:text-[#590231] border border-rose-200 flex items-center justify-center transition shadow-2xs cursor-pointer"
+                className="absolute top-0 right-0 w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-[#8A064D] hover:text-[#590231] border border-rose-200 flex items-center justify-center transition shadow-2xs cursor-pointer z-10"
+                title="Close"
               >
                 <X className="w-4 h-4 stroke-[2.5]" />
               </button>
+
+              {/* BIG STUDENT PORTRAIT WITH CLICK TO ENLARGE LIGHTBOX */}
+              <div className="shrink-0 mx-auto sm:mx-0">
+                {detailStudent.avatar_url ? (
+                  <div
+                    onClick={() => setLightboxImage({ src: detailStudent.avatar_url!, title: detailStudent.full_name })}
+                    className="relative w-36 h-44 sm:w-44 sm:h-52 rounded-2xl overflow-hidden border-2 border-[#F0D5E4] bg-neutral-900 shadow-md group cursor-pointer"
+                    title="Click to view full image"
+                  >
+                    <img
+                      src={detailStudent.avatar_url}
+                      alt={detailStudent.full_name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    {/* Hover Overlay with Zoom Icon */}
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 p-3 text-center">
+                      <div className="p-2 rounded-full bg-white/20 backdrop-blur-xs">
+                        <ZoomIn className="w-6 h-6 text-[#F9E33A]" />
+                      </div>
+                      <span className="text-[11px] font-bold text-white bg-black/60 px-2.5 py-1 rounded-full border border-white/20">
+                        Click to view full image
+                      </span>
+                    </div>
+
+                    {/* Subtle Corner Maximize Indicator */}
+                    <div className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-black/70 text-white group-hover:opacity-0 transition-opacity">
+                      <Maximize2 className="w-3.5 h-3.5 text-[#F9E33A]" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-36 h-44 sm:w-44 sm:h-52 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#590231] text-[#F9E33A] font-bold text-3xl flex flex-col items-center justify-center shadow-md border-2 border-[#F9E33A]/40 gap-2">
+                    <span>{detailStudent.full_name.slice(0, 2).toUpperCase()}</span>
+                    <span className="text-[10px] text-white/70 uppercase tracking-widest font-sans font-normal">No Photo</span>
+                  </div>
+                )}
+              </div>
+
+              {/* STUDENT HEADER INFO */}
+              <div className="flex-1 min-w-0 pr-8 space-y-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-200 px-3 py-1 rounded-lg shadow-2xs">
+                    {detailStudent.roll_number}
+                  </span>
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold border ${
+                    detailStudent.status === 'active' 
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                      : 'bg-zinc-100 text-zinc-700 border-zinc-200'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${detailStudent.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+                    <span className="capitalize">{detailStudent.status === 'active' ? 'Active Disciple' : 'Inactive'}</span>
+                  </span>
+                </div>
+
+                <h3 className="font-serif font-black text-2xl sm:text-3xl text-[#2D041A] leading-tight">
+                  {detailStudent.full_name}
+                </h3>
+
+                {/* Quick Contact & Batch summary */}
+                <div className="space-y-1.5 text-xs text-gray-700 pt-1">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    {detailStudent.phone && (
+                      <a
+                        href={`tel:${detailStudent.phone}`}
+                        className="flex items-center gap-1.5 font-bold text-[#8A064D] hover:underline"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>{detailStudent.phone}</span>
+                      </a>
+                    )}
+                    {detailStudent.email && (
+                      <a
+                        href={`mailto:${detailStudent.email}`}
+                        className="flex items-center gap-1.5 font-medium text-gray-600 hover:text-[#8A064D] truncate max-w-[240px]"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="truncate">{detailStudent.email}</span>
+                      </a>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-gray-500 flex items-center gap-1.5">
+                    <Calendar className="w-3 h-3 text-[#8A064D]" />
+                    <span>Enrolled: <strong>{formatDdMonthName(detailStudent.enrollment_date)}</strong></span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4">
               
-              {/* Section 1: Financial & Fee Summary */}
+              {/* SECTION 1: FINANCIAL & FEE SUMMARY */}
               <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-rose-100">
-                <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider mb-2.5">
-                  Fee & Due Overview
+                <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <IndianRupee className="w-3.5 h-3.5 text-[#8A064D]" />
+                  <span>Fee &amp; Due Overview</span>
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div className="bg-white p-3 rounded-xl border border-rose-100">
+                  <div className="bg-white p-3 rounded-xl border border-rose-100 shadow-2xs">
                     <span className="text-[10px] text-gray-500 uppercase font-black block">Total Monthly Fee</span>
                     <span className="text-base font-extrabold text-[#2D041A] mt-0.5 block">
                       ₹{(detailStudent.total_monthly_fee || 0).toLocaleString('en-IN')}
                     </span>
                   </div>
 
-                  <div className="bg-white p-3 rounded-xl border border-rose-100">
+                  <div className="bg-white p-3 rounded-xl border border-rose-100 shadow-2xs">
                     <span className="text-[10px] text-gray-500 uppercase font-black block">Advance Paid</span>
                     <span className="text-base font-extrabold text-emerald-700 mt-0.5 block">
                       ₹{Number(detailStudent.advance_paid || 0).toLocaleString('en-IN')}
                     </span>
                   </div>
 
-                  <div className="bg-white p-3 rounded-xl border border-rose-100">
+                  <div className="bg-white p-3 rounded-xl border border-rose-100 shadow-2xs">
                     <span className="text-[10px] text-gray-500 uppercase font-black block">Due Amount</span>
                     <span className={`text-base font-extrabold mt-0.5 block ${
                       (detailStudent.due_amount ?? 0) <= 0 
@@ -1031,7 +1092,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                     </span>
                   </div>
 
-                  <div className="bg-white p-3 rounded-xl border border-rose-100">
+                  <div className="bg-white p-3 rounded-xl border border-rose-100 shadow-2xs">
                     <span className="text-[10px] text-gray-500 uppercase font-black block">Due Date</span>
                     <span className="text-base font-mono font-extrabold text-gray-800 mt-0.5 block">
                       {formatDueDateDisplay(detailStudent.due_date)}
@@ -1040,43 +1101,44 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 </div>
               </div>
 
-              {/* Section 2: Contact & Personal Details */}
-              <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100">
-                <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider mb-2.5">
-                  Student Contact & Personal Info
+              {/* SECTION 2: STUDENT CONTACT & PERSONAL DETAILS */}
+              <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-200">
+                <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-[#8A064D]" />
+                  <span>Student Contact &amp; Personal Info</span>
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
-                  <div>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
                     <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Contact Phone</span>
                     <span className="font-bold text-gray-900 flex items-center gap-1.5 mt-0.5">
                       <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>{detailStudent.phone}</span>
+                      <span>{detailStudent.phone || '—'}</span>
                     </span>
                   </div>
 
-                  <div>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
                     <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Email Address</span>
                     <span className="font-bold text-gray-900 flex items-center gap-1.5 mt-0.5 truncate">
-                      <Mail className="w-3.5 h-3.5 text-[#8A064D]" />
-                      <span>{detailStudent.email}</span>
+                      <Mail className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
+                      <span className="truncate">{detailStudent.email || '—'}</span>
                     </span>
                   </div>
 
-                  <div>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
                     <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Age (Years)</span>
                     <span className="font-bold text-gray-900 mt-0.5 block">
                       {detailStudent.age ? `${detailStudent.age} Years` : '—'}
                     </span>
                   </div>
 
-                  <div>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
                     <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Gender</span>
                     <span className="font-bold text-gray-900 capitalize mt-0.5 block">
                       {detailStudent.gender || '—'}
                     </span>
                   </div>
 
-                  <div>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
                     <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Joining Date</span>
                     <span className="font-bold text-gray-900 flex items-center gap-1.5 mt-0.5">
                       <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
@@ -1084,56 +1146,62 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                     </span>
                   </div>
 
-                  <div>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
                     <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Residential Address</span>
                     <span className="font-bold text-gray-800 flex items-start gap-1.5 mt-0.5">
                       <MapPin className="w-3.5 h-3.5 text-[#8A064D] shrink-0 mt-0.5" />
-                      <span>{detailStudent.address || 'Kannamangala, Bangalore'}</span>
+                      <span className="truncate">{detailStudent.address || 'Kannamangala, Bangalore'}</span>
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Section 3: Parent / Guardian Info */}
-              <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100">
-                <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider mb-2.5">
-                  Parent / Guardian Details
+              {/* SECTION 3: PARENT / GUARDIAN DETAILS */}
+              <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-200">
+                <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#8A064D]" />
+                  <span>Parent / Guardian Details</span>
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div>
-                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Guardian Name:</span>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Guardian Name</span>
                     <span className="font-bold text-gray-900 mt-0.5 block">{detailStudent.parent_name || '—'}</span>
                   </div>
-                  <div>
-                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Relation:</span>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Relation</span>
                     <span className="font-bold text-gray-900 mt-0.5 block">{detailStudent.parent_relation || 'Parent'}</span>
                   </div>
-                  <div>
-                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Guardian Contact:</span>
-                    <span className="font-bold text-gray-900 mt-0.5 block">{detailStudent.parent_contact || detailStudent.phone}</span>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Guardian Contact</span>
+                    <span className="font-bold text-gray-900 mt-0.5 flex items-center gap-1.5">
+                      <Phone className="w-3 h-3 text-emerald-600" />
+                      <span>{detailStudent.parent_contact || detailStudent.phone}</span>
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Section 4: Enrolled Courses & Batches */}
-              <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100">
+              {/* SECTION 4: ENROLLED COURSES & BATCHES */}
+              <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-200">
                 <div className="flex items-center justify-between mb-2.5">
-                  <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider">
-                    Enrolled Courses & Batches ({detailStudent.enrolled_batches?.length || 0})
+                  <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-[#8A064D]" />
+                    <span>Enrolled Courses &amp; Batches ({detailStudent.enrolled_batches?.length || 0})</span>
                   </h4>
                 </div>
 
                 <div className="space-y-2">
                   {(detailStudent.enrolled_batches && detailStudent.enrolled_batches.length > 0) ? (
                     detailStudent.enrolled_batches.map((eb, idx) => (
-                      <div key={idx} className="bg-white p-3 rounded-xl border border-gray-200 flex items-center justify-between text-xs">
+                      <div key={idx} className="bg-white p-3 rounded-xl border border-gray-200 flex items-center justify-between text-xs shadow-2xs">
                         <div>
                           <div className="font-bold text-gray-900">{eb.course_title}</div>
                           <div className="text-[11px] text-gray-500 mt-0.5">
                             Batch: <strong className="text-gray-800">{eb.batch_name}</strong> • Guru: {eb.trainer_name}
                           </div>
-                          <div className="text-[10px] text-gray-400 mt-0.5">
-                            Timings: {eb.start_time?.substring(0, 5)} - {eb.end_time?.substring(0, 5)} ({eb.days_of_week?.join(', ')})
+                          <div className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-gray-400" />
+                            <span>Timings: {eb.start_time?.substring(0, 5)} - {eb.end_time?.substring(0, 5)} ({eb.days_of_week?.join(', ')})</span>
                           </div>
                         </div>
 
@@ -1160,7 +1228,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                     setDetailStudent(null);
                     setDeletingStudent(s);
                   }}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 shadow-2xs border border-rose-200 transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 shadow-2xs border border-rose-200 transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                   <span>Delete Student</span>
@@ -1170,7 +1238,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   <button
                     type="button"
                     onClick={() => setDetailStudent(null)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-[#521D38] bg-gray-100 hover:bg-gray-200 transition cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl text-xs font-medium text-[#521D38] bg-gray-100 hover:bg-gray-200 transition cursor-pointer"
                   >
                     Close
                   </button>
@@ -1181,7 +1249,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                       setDetailStudent(null);
                       handleOpenEdit(s);
                     }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] active:scale-95 text-white shadow-sm border border-[#8A064D] transition flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] active:scale-95 text-white shadow-sm border border-[#8A064D] transition flex items-center gap-1.5 cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5 text-[#F9E33A]" />
                     <span>Edit Details</span>
@@ -1800,6 +1868,50 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* ===================================================================== */}
+      {/* FULLSCREEN IMAGE LIGHTBOX VIEWER */}
+      {/* ===================================================================== */}
+      {lightboxImage && (
+        <div 
+          className="fixed inset-0 bg-black/90 backdrop-blur-md z-80 flex flex-col items-center justify-center p-4 sm:p-6 animate-in fade-in duration-150"
+          onClick={() => setLightboxImage(null)}
+        >
+          {/* Top Bar with title and close button */}
+          <div 
+            className="w-full max-w-4xl flex items-center justify-between pb-3 text-white mb-2"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-serif font-bold text-lg text-[#F9E33A]">{lightboxImage.title}</span>
+              <span className="text-xs text-gray-400 font-medium">(Student Portrait)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLightboxImage(null)}
+              className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer flex items-center gap-1.5 text-xs font-bold border border-white/20"
+            >
+              <X className="w-4 h-4" />
+              <span>Close</span>
+            </button>
+          </div>
+
+          {/* Full Image Container */}
+          <div 
+            className="relative max-w-4xl max-h-[85vh] rounded-2xl overflow-hidden border border-white/20 shadow-2xl bg-black flex items-center justify-center"
+            onClick={e => e.stopPropagation()}
+          >
+            <img
+              src={lightboxImage.src}
+              alt={lightboxImage.title}
+              className="max-h-[85vh] max-w-full object-contain"
+            />
+          </div>
+
+          <p className="text-xs text-white/50 mt-3 font-medium">
+            Click anywhere outside or press Close to dismiss
+          </p>
         </div>
       )}
 

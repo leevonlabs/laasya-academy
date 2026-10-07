@@ -52,6 +52,7 @@ class _TrainerProfileDetailsScreenState extends State<TrainerProfileDetailsScree
     final name = _profile?['full_name'] ?? 'Smt. Anusha Sumesh';
     final email = _profile?['email'] ?? 'anusha@laasyaacademy.com';
     final phone = _profile?['phone'] ?? '+91 98765 00004';
+    final alternatePhone = _profile?['alternate_phone'] as String?;
     final specialization = _profile?['specialization'] ?? 'Bharatanatyam Classical Dance';
     final designation = _profile?['designation'] ?? 'Founder & Head Guru (Guruvayoor Arangetram)';
     final age = _profile?['age'] ?? 36;
@@ -239,6 +240,8 @@ class _TrainerProfileDetailsScreenState extends State<TrainerProfileDetailsScree
               title: 'Faculty Contact & Assignment Details',
               children: [
                 _infoRow(Icons.phone_outlined, 'Official Mobile Phone', phone),
+                if (alternatePhone != null && alternatePhone.trim().isNotEmpty)
+                  _infoRow(Icons.phone_iphone_rounded, 'Alternate Contact Phone', alternatePhone),
                 _infoRow(Icons.email_outlined, 'Academy Email', email),
                 _infoRow(Icons.meeting_room_outlined, 'Assigned Rehearsal Room', room),
                 _infoRow(Icons.cake_outlined, 'Age & Gender', '$age Years • $gender'),

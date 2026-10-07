@@ -99,7 +99,6 @@ class _TrainerSessionScreenState extends State<TrainerSessionScreen> {
     final timings = '${widget.session['start_time']} - ${widget.session['end_time']}';
 
     final presentCount = _attendanceMap.values.where((v) => v == 'present').length;
-    final lateCount = _attendanceMap.values.where((v) => v == 'late').length;
     final absentCount = _attendanceMap.values.where((v) => v == 'absent').length;
 
     return Scaffold(
@@ -214,8 +213,6 @@ class _TrainerSessionScreenState extends State<TrainerSessionScreen> {
                     children: [
                       _statPill('Present', '$presentCount', const Color(0xFFDEF7EC), const Color(0xFF03543F)),
                       const SizedBox(width: 8),
-                      _statPill('Late', '$lateCount', const Color(0xFFFEF08A), const Color(0xFF854D0E)),
-                      const SizedBox(width: 8),
                       _statPill('Absent', '$absentCount', const Color(0xFFFDE8E8), const Color(0xFF991B1B)),
                       const Spacer(),
                       TextButton.icon(
@@ -283,7 +280,7 @@ class _TrainerSessionScreenState extends State<TrainerSessionScreen> {
                             border: Border.all(
                               color: currentStatus == 'present'
                                   ? const Color(0xFFDEF7EC)
-                                  : (currentStatus == 'late' ? const Color(0xFFFEF08A) : const Color(0xFFFDE8E8)),
+                                  : const Color(0xFFFDE8E8),
                               width: 1.5,
                             ),
                             boxShadow: [

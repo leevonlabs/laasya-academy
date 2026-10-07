@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Trainer, Course, Batch } from '@/lib/academy';
-import PhotoUploadInput from '@/components/common/PhotoUploadInput';
+import GuruPhotoUploadInput from '@/components/common/GuruPhotoUploadInput';
 import { 
   Users, 
   Plus, 
@@ -25,7 +25,9 @@ import {
   IndianRupee,
   ShieldCheck,
   DoorOpen,
-  CheckCircle2
+  CheckCircle2,
+  ZoomIn,
+  Maximize2
 } from 'lucide-react';
 
 interface Props {
@@ -56,6 +58,7 @@ export default function TrainersListClient({
   const [addBio, setAddBio] = useState('');
   const [addEmail, setAddEmail] = useState('');
   const [addPhone, setAddPhone] = useState('');
+  const [addAlternatePhone, setAddAlternatePhone] = useState('');
   const [addMonthlySalary, setAddMonthlySalary] = useState<number>(25000);
   const [addIsActive, setAddIsActive] = useState<boolean>(true);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
@@ -71,6 +74,7 @@ export default function TrainersListClient({
   const [editSelectedCourses, setEditSelectedCourses] = useState<string[]>([]);
   const [editBio, setEditBio] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editAlternatePhone, setEditAlternatePhone] = useState('');
   const [editMonthlySalary, setEditMonthlySalary] = useState<number>(25000);
   const [editIsActive, setEditIsActive] = useState(true);
   const [isEditCourseDropdownOpen, setIsEditCourseDropdownOpen] = useState(false);
@@ -79,6 +83,7 @@ export default function TrainersListClient({
   // Details Modal State
   const [viewingGuru, setViewingGuru] = useState<Trainer | null>(null);
   const [deletingGuru, setDeletingGuru] = useState<Trainer | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; title: string } | null>(null);
 
   // Timetable Modal State
   const [timetableGuru, setTimetableGuru] = useState<Trainer | null>(null);
@@ -156,6 +161,25 @@ export default function TrainersListClient({
     );
   };
 
+  // Open Add Modal with Clean Blank State
+  const openAddModal = () => {
+    setAddFullName('');
+    setAddAge('');
+    setAddGender('female');
+    setAddDisplayTitle('');
+    setAddAvatarUrl(null);
+    setAddSelectedCourses([]);
+    setAddBio('');
+    setAddEmail('');
+    setAddPhone('');
+    setAddAlternatePhone('');
+    setAddMonthlySalary(25000);
+    setAddIsActive(true);
+    setIsCourseDropdownOpen(false);
+    setCourseSearch('');
+    setIsAddOpen(true);
+  };
+
   // Open Edit Modal
   const openEditModal = (guru: Trainer) => {
     setEditingGuru(guru);
@@ -167,6 +191,7 @@ export default function TrainersListClient({
     setEditSelectedCourses(guru.specializations || []);
     setEditBio(guru.bio || '');
     setEditPhone(guru.phone || '');
+    setEditAlternatePhone(guru.alternate_phone || '');
     setEditMonthlySalary(Number(guru.monthly_salary) || 25000);
     setEditIsActive(guru.is_active !== false);
     setIsEditCourseDropdownOpen(false);
@@ -175,7 +200,18 @@ export default function TrainersListClient({
   // Handle Add Guru Form Submission
   const handleAddGuru = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addFullName.trim()) return;
+    if (!addFullName.trim()) {
+      alert('Please enter Guru Full Name.');
+      return;
+    }
+    if (!addAge || Number(addAge) <= 0) {
+      alert('Age is required. Please specify a valid age in years.');
+      return;
+    }
+    if (!addGender) {
+      alert('Gender is required. Please select a gender.');
+      return;
+    }
     if (addSelectedCourses.length === 0) {
       alert('Please select at least one course / discipline for this Guru.');
       return;
@@ -188,13 +224,14 @@ export default function TrainersListClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: addFullName.trim(),
-          age: addAge ? Number(addAge) : undefined,
+          age: Number(addAge),
           gender: addGender,
-          display_title: addDisplayTitle.trim() || 'Revered Guru & Mentor',
+          display_title: addDisplayTitle.trim() || undefined,
           specializations: addSelectedCourses,
-          bio: addBio.trim(),
+          bio: addBio.trim() || undefined,
           email: addEmail.trim() || undefined,
           phone: addPhone.trim() || undefined,
+          alternate_phone: addAlternatePhone.trim() || undefined,
           avatar_url: addAvatarUrl || undefined,
           monthly_salary: Number(addMonthlySalary) || 25000,
           is_active: addIsActive
@@ -206,7 +243,7 @@ export default function TrainersListClient({
         const newGuru: Trainer = {
           ...added,
           full_name: addFullName.trim(),
-          age: addAge ? Number(addAge) : undefined,
+          age: Number(addAge),
           gender: addGender,
           display_title: addDisplayTitle.trim() || 'Revered Guru & Mentor',
           specializations: addSelectedCourses,
@@ -214,6 +251,7 @@ export default function TrainersListClient({
           avatar_url: addAvatarUrl || undefined,
           email: addEmail.trim() || `${addFullName.toLowerCase().replace(/[^a-z0-9]/g, '')}@laasyaacademy.com`,
           phone: addPhone.trim() || '+91 8151 998 899',
+          alternate_phone: addAlternatePhone.trim() || undefined,
           monthly_salary: Number(addMonthlySalary) || 25000,
           salary_payment_status: 'pending',
           is_active: addIsActive,
@@ -222,17 +260,6 @@ export default function TrainersListClient({
         };
         setTrainers(prev => [...prev, newGuru]);
         setIsAddOpen(false);
-        setAddFullName('');
-        setAddAge('');
-        setAddGender('female');
-        setAddDisplayTitle('');
-        setAddAvatarUrl(null);
-        setAddSelectedCourses([]);
-        setAddBio('');
-        setAddEmail('');
-        setAddPhone('');
-        setAddMonthlySalary(25000);
-        setAddIsActive(true);
         showNotification(`Guru ${addFullName.trim()} successfully registered to academy faculty!`);
       } else {
         const err = await res.json();
@@ -250,7 +277,18 @@ export default function TrainersListClient({
   const handleUpdateGuru = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingGuru) return;
-    if (!editFullName.trim()) return;
+    if (!editFullName.trim()) {
+      alert('Please enter Guru Full Name.');
+      return;
+    }
+    if (!editAge || Number(editAge) <= 0) {
+      alert('Age is required. Please specify a valid age in years.');
+      return;
+    }
+    if (!editGender) {
+      alert('Gender is required. Please select a gender.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -260,12 +298,13 @@ export default function TrainersListClient({
         body: JSON.stringify({
           id: editingGuru.id,
           full_name: editFullName.trim(),
-          age: editAge ? Number(editAge) : undefined,
+          age: Number(editAge),
           gender: editGender,
           display_title: editDisplayTitle.trim(),
           specializations: editSelectedCourses,
-          bio: editBio.trim(),
+          bio: editBio.trim() || undefined,
           phone: editPhone.trim(),
+          alternate_phone: editAlternatePhone.trim() || undefined,
           avatar_url: editAvatarUrl !== undefined ? editAvatarUrl : null,
           is_active: editIsActive,
           monthly_salary: Number(editMonthlySalary) || 25000
@@ -278,12 +317,13 @@ export default function TrainersListClient({
             return {
               ...t,
               full_name: editFullName.trim(),
-              age: editAge ? Number(editAge) : undefined,
+              age: Number(editAge),
               gender: editGender,
               display_title: editDisplayTitle.trim(),
               specializations: editSelectedCourses,
               bio: editBio.trim(),
               phone: editPhone.trim(),
+              alternate_phone: editAlternatePhone.trim() || undefined,
               avatar_url: editAvatarUrl || undefined,
               is_active: editIsActive,
               monthly_salary: Number(editMonthlySalary) || 25000
@@ -296,12 +336,13 @@ export default function TrainersListClient({
           setViewingGuru(prev => prev ? ({
             ...prev,
             full_name: editFullName.trim(),
-            age: editAge ? Number(editAge) : undefined,
+            age: Number(editAge),
             gender: editGender,
             display_title: editDisplayTitle.trim(),
             specializations: editSelectedCourses,
             bio: editBio.trim(),
             phone: editPhone.trim(),
+            alternate_phone: editAlternatePhone.trim() || undefined,
             avatar_url: editAvatarUrl || undefined,
             is_active: editIsActive,
             monthly_salary: Number(editMonthlySalary) || 25000
@@ -414,7 +455,7 @@ export default function TrainersListClient({
           </div>
 
           <button
-            onClick={() => setIsAddOpen(true)}
+            onClick={openAddModal}
             className="bg-[#8A064D] hover:bg-[#70043E] active:scale-98 text-white px-5 py-2.5 rounded-2xl text-xs font-black tracking-wide shadow-sm hover:shadow-md transition flex items-center gap-2 cursor-pointer border border-[#F9E33A]/40 shrink-0"
           >
             <Plus className="w-4 h-4 text-[#F9E33A]" />
@@ -475,133 +516,193 @@ export default function TrainersListClient({
       </div>
 
       {/* =================================================================== */}
-      {/* GURUS CARDS GRID */}
+      {/* GURUS CARDS GRID (ENLARGED GRID & HERO CARDS) */}
       {/* =================================================================== */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-8">
         {filteredTrainers.map((t) => {
           const isSalaryPaid = t.salary_payment_status === 'paid';
 
           return (
             <div
               key={t.id}
-              className="bg-white rounded-3xl p-5 border border-[#F0D5E4]/90 shadow-xs hover:shadow-md hover:border-[#8A064D]/40 transition flex flex-col justify-between group"
+              className="bg-white rounded-3xl overflow-hidden border-2 border-[#F0D5E4] shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
             >
               <div>
-                {/* 1. TOP OF EACH GRID: Status Active/Inactive & Salary Payment Status Pending/Paid */}
-                <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-[#F0D5E4]/60">
-                  {/* Status: Active or Inactive */}
-                  <div className="flex items-center gap-1.5">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                      t.is_active !== false 
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                        : 'bg-zinc-100 text-zinc-600 border-zinc-200'
-                    }`}>
-                      <span className={`w-2 h-2 rounded-full ${t.is_active !== false ? 'bg-emerald-500' : 'bg-zinc-400'}`}></span>
-                      <span>{t.is_active !== false ? 'Active Guru' : 'Inactive'}</span>
-                    </span>
-                  </div>
-
-                  {/* Below Status / Header right: Salary Payment Status Pending or Paid with Red and Green */}
-                  <div>
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold border ${
-                      isSalaryPaid
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                        : 'bg-rose-50 text-rose-800 border-rose-300'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${isSalaryPaid ? 'bg-emerald-600' : 'bg-rose-600'}`}></span>
-                      <span>Salary: {isSalaryPaid ? 'Paid' : 'Pending'}</span>
-                    </span>
-                  </div>
-                </div>
-
-                {/* Guru Info with Profile Photo */}
-                <div className="flex items-start gap-4 mb-4">
+                {/* 1. BIG HERO IMAGE CONTAINER WITH FLOATING BADGES & BOTTOM OVERLAY */}
+                <div className="relative w-full h-80 sm:h-96 bg-gradient-to-br from-[#3D0322] via-[#590231] to-[#1A010F] overflow-hidden">
                   {t.avatar_url ? (
                     <img
                       src={t.avatar_url}
                       alt={t.full_name}
-                      className="w-16 h-16 rounded-2xl object-cover border-2 border-[#F9E33A] shadow-xs shrink-0"
+                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                     />
                   ) : (
-                    <div className="w-16 h-16 rounded-2xl bg-[#590231] text-[#F9E33A] font-black text-lg flex items-center justify-center shrink-0 border border-rose-200/50 shadow-2xs">
-                      {t.full_name.slice(0, 2).toUpperCase()}
+                    <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-br from-[#590231] via-[#3A0320] to-[#1F0111]">
+                      <div className="w-24 h-24 rounded-3xl bg-[#F9E33A]/20 border-2 border-[#F9E33A] flex items-center justify-center shadow-inner">
+                        <span className="font-serif text-3xl font-black text-[#F9E33A] tracking-wider">
+                          {t.full_name.slice(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <span className="text-white/70 text-xs font-bold mt-3 tracking-widest uppercase">
+                        Classical Faculty Master
+                      </span>
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    {/* 2. GURU FULL NAME (Primary heading) */}
-                    <h3 className="font-bold text-lg text-[#2D041A] leading-tight group-hover:text-[#8A064D] transition truncate">
+
+                  {/* FLOATING STATUS PILLS AT TOP CORNERS */}
+                  <div className="absolute top-3.5 left-3.5 z-20">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-extrabold backdrop-blur-md shadow-md border ${
+                      t.is_active !== false 
+                        ? 'bg-emerald-950/75 text-emerald-300 border-emerald-500/40' 
+                        : 'bg-zinc-900/75 text-zinc-300 border-zinc-600/40'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${t.is_active !== false ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-400'}`}></span>
+                      <span>{t.is_active !== false ? 'Active Guru' : 'Inactive'}</span>
+                    </span>
+                  </div>
+
+                  <div className="absolute top-3.5 right-3.5 z-20">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black backdrop-blur-md shadow-md border ${
+                      isSalaryPaid
+                        ? 'bg-emerald-950/75 text-emerald-300 border-emerald-500/40'
+                        : 'bg-rose-950/75 text-rose-300 border-rose-500/40'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${isSalaryPaid ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
+                      <span>Salary: {isSalaryPaid ? 'Paid' : 'Pending'}</span>
+                    </span>
+                  </div>
+
+                  {/* INSIDE THE IMAGE: FULL NAME & DISPLAY NAME AS DISTINCT MARK AT BOTTOM */}
+                  <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black via-black/80 to-transparent pt-28 pb-4 px-5 flex flex-col justify-end">
+                    <h3 className="font-serif font-black text-2xl sm:text-3xl text-white tracking-tight drop-shadow-md leading-tight line-clamp-2">
                       {t.full_name}
                     </h3>
 
-                    {/* 3. DISPLAY TITLE AND CONTACT BELOW IT */}
-                    <p className="text-xs font-bold text-[#8A064D] truncate mt-0.5">
-                      {t.display_title || 'Revered Guru & Mentor'}
-                    </p>
-                    {t.phone ? (
-                      <p className="text-xs text-[#6E3955] flex items-center gap-1.5 font-medium mt-1 truncate tabular-nums">
-                        <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span>{t.phone}</span>
-                      </p>
-                    ) : (
-                      <p className="text-xs text-gray-400 italic mt-1">No contact phone</p>
-                    )}
+                    {/* Display name as a distinct mark inside the image */}
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F9E33A] text-[#2D041A] font-black text-xs uppercase tracking-wider shadow-lg border border-[#F9E33A]">
+                        <Sparkles className="w-3 h-3 text-[#2D041A] fill-[#2D041A]" />
+                        <span>{t.display_title || 'Guru & Mentor'}</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* 4. ASSIGNED COURSES */}
-                <div className="mb-4">
-                  <span className="text-[10px] text-[#6E3955] uppercase font-black tracking-wider block mb-2">
-                    Assigned Courses ({t.specializations?.length || 0})
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {t.specializations && t.specializations.length > 0 ? (
-                      t.specializations.map((spec, i) => (
-                        <span
-                          key={i}
-                          className="text-xs font-semibold bg-[#FFF9FB] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-xl flex items-center gap-1.5 shadow-2xs"
-                        >
-                          <BookOpen className="w-3 h-3 text-[#8A064D]/70" />
-                          <span>{spec}</span>
+                {/* 2. CARD CONTENT BELOW IMAGE */}
+                <div className="p-5 space-y-4">
+                  {/* HIGHLIGHTED CONTACT CARD */}
+                  <div className="bg-gradient-to-br from-[#FFF9FB] to-[#FFF0F6] border-2 border-[#F0D5E4] rounded-2xl p-4 shadow-xs space-y-2.5">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#F0D5E4]/60">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#8A064D] flex items-center gap-1.5">
+                        <Phone className="w-3 h-3 text-[#8A064D]" />
+                        <span>Contact & Personal Details</span>
+                      </span>
+                      {/* Age & Gender Tag */}
+                      {(t.age || t.gender) && (
+                        <span className="text-[11px] font-bold text-[#6E3955] bg-white px-2 py-0.5 rounded-full border border-[#F0D5E4]">
+                          {t.age ? `${t.age} yrs` : ''}{t.age && t.gender ? ' • ' : ''}{t.gender ? t.gender.toUpperCase() : ''}
                         </span>
-                      ))
-                    ) : (
-                      <span className="text-xs text-gray-400 italic">No courses tagged</span>
+                      )}
+                    </div>
+
+                    {/* Primary Phone */}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-gray-500">Primary Phone:</span>
+                      {t.phone ? (
+                        <a
+                          href={`tel:${t.phone}`}
+                          className="font-bold text-[#2D041A] hover:text-[#8A064D] flex items-center gap-1 tabular-nums transition"
+                        >
+                          <span>{t.phone}</span>
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 italic">Not set</span>
+                      )}
+                    </div>
+
+                    {/* Alternate Phone */}
+                    {t.alternate_phone && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-gray-500">Alternate Phone:</span>
+                        <a
+                          href={`tel:${t.alternate_phone}`}
+                          className="font-bold text-[#8A064D] hover:underline flex items-center gap-1 tabular-nums"
+                        >
+                          <span>{t.alternate_phone}</span>
+                        </a>
+                      </div>
                     )}
+
+                    {/* Email */}
+                    {t.email && (
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-[#F0D5E4]/40">
+                        <span className="font-semibold text-gray-500">Official Email:</span>
+                        <span className="font-medium text-gray-700 truncate max-w-[200px]" title={t.email}>
+                          {t.email}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. ASSIGNED COURSES BELOW CONTACT */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-black uppercase tracking-wider text-[#590231] flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-[#8A064D]" />
+                        <span>Assigned Courses ({t.specializations?.length || 0})</span>
+                      </span>
+                      <span className="text-[11px] font-bold text-gray-500">
+                        {t.batches_assigned || getGuruBatches(t).length} Batches
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 min-h-[32px]">
+                      {t.specializations && t.specializations.length > 0 ? (
+                        t.specializations.map((spec, i) => (
+                          <span
+                            key={i}
+                            className="text-xs font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-200/80 px-2.5 py-1 rounded-xl flex items-center gap-1.5 shadow-2xs"
+                          >
+                            <span>{spec}</span>
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">No courses assigned yet</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* 5. ACTION BUTTONS: DETAILS, EDIT, AND VIEW TIMETABLE */}
-              <div className="pt-3.5 border-t border-[#F0D5E4]/50 grid grid-cols-3 gap-2">
-                {/* Details Button */}
-                <button
-                  onClick={() => setViewingGuru(t)}
-                  className="py-2.5 px-2 rounded-xl bg-[#2D041A] hover:bg-[#48082B] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 border border-[#48082B]"
-                  title="View complete Guru profile and batch details"
-                >
-                  <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
-                  <span>Details</span>
-                </button>
+              {/* 4. ACTION BUTTONS: DETAILS, EDIT, TIMETABLE BELOW IT */}
+              <div className="p-5 pt-0">
+                <div className="pt-3.5 border-t border-[#F0D5E4]/80 grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => setViewingGuru(t)}
+                    className="py-2.5 px-3 rounded-xl bg-[#2D041A] hover:bg-[#48082B] text-white text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm hover:shadow active:scale-95 border border-[#48082B]"
+                    title="View complete Guru profile and batch details"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
+                    <span>Details</span>
+                  </button>
 
-                {/* Edit Button */}
-                <button
-                  onClick={() => openEditModal(t)}
-                  className="py-2.5 px-2 rounded-xl bg-[#FFF5F9] hover:bg-[#FCE7F3] text-[#8A064D] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 border border-[#E8BFD5]"
-                  title="Edit Guru profile and salary"
-                >
-                  <Edit3 className="w-3.5 h-3.5 text-[#8A064D]" />
-                  <span>Edit</span>
-                </button>
+                  <button
+                    onClick={() => openEditModal(t)}
+                    className="py-2.5 px-3 rounded-xl bg-[#FFF5F9] hover:bg-[#FCE7F3] text-[#8A064D] text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95 border border-[#E8BFD5]"
+                    title="Edit Guru profile and salary"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-[#8A064D]" />
+                    <span>Edit</span>
+                  </button>
 
-                {/* View Timetable Button */}
-                <button
-                  onClick={() => setTimetableGuru(t)}
-                  className="py-2.5 px-2 rounded-xl bg-[#8A064D] hover:bg-[#70043E] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95 border border-[#8A064D]"
-                  title="View assigned classes timetable"
-                >
-                  <Calendar className="w-3.5 h-3.5 text-[#F9E33A]" />
-                  <span className="truncate">Timetable</span>
-                </button>
+                  <button
+                    onClick={() => setTimetableGuru(t)}
+                    className="py-2.5 px-3 rounded-xl bg-[#8A064D] hover:bg-[#70043E] text-white text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95 border border-[#8A064D]"
+                    title="View assigned classes timetable"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-[#F9E33A]" />
+                    <span className="truncate">Timetable</span>
+                  </button>
+                </div>
               </div>
 
             </div>
@@ -620,144 +721,209 @@ export default function TrainersListClient({
       )}
 
       {/* =================================================================== */}
-      {/* 1. DETAILS POPUP SUB-PAGE (MODAL) */}
+      {/* 1. DETAILS POPUP SUB-PAGE (MODAL) WITH BIG IMAGE & PERFECT ALIGNMENT */}
       {/* =================================================================== */}
       {viewingGuru && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 my-8 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-7 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 my-8 max-h-[90vh] overflow-y-auto">
             
-            {/* Modal Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-gray-100 mb-4">
-              <div className="flex items-center gap-3.5">
-                {viewingGuru.avatar_url ? (
-                  <img
-                    src={viewingGuru.avatar_url}
-                    alt={viewingGuru.full_name}
-                    className="w-14 h-14 rounded-2xl object-cover border-2 border-[#F9E33A] shadow-md shrink-0"
-                  />
-                ) : (
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#590231] text-[#F9E33A] font-bold text-base flex items-center justify-center shadow-md shrink-0 border border-rose-200/50">
-                    {viewingGuru.full_name.slice(0, 2).toUpperCase()}
-                  </div>
-                )}
-                <div>
-                  <h3 className="font-bold text-lg text-[#2D041A] leading-tight">
-                    {viewingGuru.full_name}
-                  </h3>
-                  <p className="text-xs text-[#8A064D] font-semibold mt-0.5">
-                    {viewingGuru.display_title || 'Revered Guru & Mentor'}
-                  </p>
-                </div>
-              </div>
-
+            {/* Modal Header & Hero Card */}
+            <div className="flex flex-col sm:flex-row items-start gap-5 pb-6 border-b border-gray-100 mb-5 relative">
+              {/* Close Button Top Right */}
               <button
                 onClick={() => setViewingGuru(null)}
-                className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-[#8A064D] hover:text-[#590231] border border-rose-200 flex items-center justify-center transition shadow-2xs cursor-pointer"
+                className="absolute top-0 right-0 w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-[#8A064D] hover:text-[#590231] border border-rose-200 flex items-center justify-center transition shadow-2xs cursor-pointer z-10"
+                title="Close"
               >
                 <X className="w-4 h-4 stroke-[2.5]" />
               </button>
+
+              {/* BIG PORTRAIT IMAGE WITH CLICK TO ENLARGE LIGHTBOX */}
+              <div className="shrink-0 mx-auto sm:mx-0">
+                {viewingGuru.avatar_url ? (
+                  <div
+                    onClick={() => setLightboxImage({ src: viewingGuru.avatar_url!, title: viewingGuru.full_name })}
+                    className="relative w-44 h-56 sm:w-52 sm:h-64 rounded-2xl overflow-hidden border-2 border-[#F0D5E4] bg-neutral-900 shadow-md group cursor-pointer"
+                    title="Click to view full image"
+                  >
+                    <img
+                      src={viewingGuru.avatar_url}
+                      alt={viewingGuru.full_name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    {/* Hover Overlay with Zoom Icon */}
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 p-3 text-center">
+                      <div className="p-2 rounded-full bg-white/20 backdrop-blur-xs">
+                        <ZoomIn className="w-6 h-6 text-[#F9E33A]" />
+                      </div>
+                      <span className="text-[11px] font-bold text-white bg-black/60 px-2.5 py-1 rounded-full border border-white/20">
+                        Click to view full image
+                      </span>
+                    </div>
+
+                    {/* Subtle Corner Badge Indicator */}
+                    <div className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-black/70 text-white group-hover:opacity-0 transition-opacity">
+                      <Maximize2 className="w-3.5 h-3.5 text-[#F9E33A]" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-44 h-56 sm:w-52 sm:h-64 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#590231] text-[#F9E33A] font-bold text-3xl flex flex-col items-center justify-center shadow-md border-2 border-[#F9E33A]/40 gap-2">
+                    <span>{viewingGuru.full_name.slice(0, 2).toUpperCase()}</span>
+                    <span className="text-[10px] text-white/70 uppercase tracking-widest font-sans font-normal">No Photo</span>
+                  </div>
+                )}
+              </div>
+
+              {/* GURU PRIMARY DETAILS & STATUS OVERVIEW */}
+              <div className="flex-1 min-w-0 pr-8 space-y-3">
+                <div>
+                  <h3 className="font-serif font-black text-2xl sm:text-3xl text-[#2D041A] leading-tight">
+                    {viewingGuru.full_name}
+                  </h3>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F9E33A] text-[#2D041A] font-black text-xs uppercase tracking-wider shadow-xs border border-[#F9E33A]">
+                      <Sparkles className="w-3 h-3 text-[#2D041A] fill-[#2D041A]" />
+                      <span>{viewingGuru.display_title || 'Revered Guru & Mentor'}</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Status Bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                  {/* Teaching Status */}
+                  <div className="bg-[#FFF9FB] border border-[#F0D5E4] p-2.5 rounded-xl">
+                    <span className="text-[9.5px] font-black text-[#590231] uppercase tracking-wider block mb-1">
+                      Faculty Status
+                    </span>
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                      viewingGuru.is_active !== false 
+                        ? 'bg-emerald-100 text-emerald-800' 
+                        : 'bg-zinc-200 text-zinc-700'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${viewingGuru.is_active !== false ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`}></span>
+                      <span>{viewingGuru.is_active !== false ? 'Active Guru' : 'Inactive'}</span>
+                    </span>
+                  </div>
+
+                  {/* Salary Status */}
+                  <div className="bg-[#FFF9FB] border border-[#F0D5E4] p-2.5 rounded-xl">
+                    <span className="text-[9.5px] font-black text-[#590231] uppercase tracking-wider block mb-1">
+                      Salary Status
+                    </span>
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                      viewingGuru.salary_payment_status === 'paid'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-rose-100 text-rose-800'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${viewingGuru.salary_payment_status === 'paid' ? 'bg-emerald-600' : 'bg-rose-600'}`}></span>
+                      <span>{viewingGuru.salary_payment_status === 'paid' ? 'Paid' : 'Pending'}</span>
+                    </span>
+                  </div>
+
+                  {/* Monthly Base Salary */}
+                  <div className="bg-[#FFF2F8] border border-[#F0D5E4] p-2.5 rounded-xl col-span-2 sm:col-span-1">
+                    <span className="text-[9.5px] font-black text-[#8A064D] uppercase tracking-wider block mb-1">
+                      Monthly Salary
+                    </span>
+                    <span className="text-sm font-extrabold text-[#2D041A]">
+                      ₹{Number(viewingGuru.monthly_salary || 25000).toLocaleString('en-IN')}
+                      <span className="text-[10px] font-normal text-gray-500 ml-1">/mo</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Contact Snippet */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-gray-700 pt-1">
+                  {viewingGuru.phone && (
+                    <a
+                      href={`tel:${viewingGuru.phone}`}
+                      className="flex items-center gap-1.5 font-bold text-[#8A064D] hover:underline"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-[#8A064D]" />
+                      <span>{viewingGuru.phone}</span>
+                    </a>
+                  )}
+                  {viewingGuru.email && (
+                    <div className="flex items-center gap-1.5 font-medium text-gray-600 truncate max-w-[240px]">
+                      <Mail className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="truncate">{viewingGuru.email}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Quick Metrics Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-              {/* Teaching Status */}
-              <div className="bg-gray-50 border border-gray-200 p-3 rounded-2xl">
-                <span className="text-[10px] font-black text-[#590231] uppercase tracking-wider block mb-1">
-                  Faculty Status
-                </span>
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                  viewingGuru.is_active !== false 
-                    ? 'bg-emerald-100 text-emerald-800' 
-                    : 'bg-zinc-200 text-zinc-700'
-                }`}>
-                  <span className={`w-2 h-2 rounded-full ${viewingGuru.is_active !== false ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`}></span>
-                  {viewingGuru.is_active !== false ? 'Active Teaching' : 'On Sabbatical / Leave'}
-                </span>
-              </div>
-
-              {/* Salary Payment Status */}
-              <div className="bg-gray-50 border border-gray-200 p-3 rounded-2xl">
-                <span className="text-[10px] font-black text-[#590231] uppercase tracking-wider block mb-1">
-                  Salary Payment Status
-                </span>
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                  viewingGuru.salary_payment_status === 'paid'
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-rose-100 text-rose-800'
-                }`}>
-                  <span className={`w-2 h-2 rounded-full ${viewingGuru.salary_payment_status === 'paid' ? 'bg-emerald-600' : 'bg-rose-600'}`}></span>
-                  {viewingGuru.salary_payment_status === 'paid' ? 'Paid' : 'Pending Payment'}
-                </span>
-              </div>
-
-              {/* Monthly Salary */}
-              <div className="bg-[#FFF2F8] border border-[#F0D5E4] p-3 rounded-2xl">
-                <span className="text-[10px] font-black text-[#8A064D] uppercase tracking-wider block mb-1">
-                  Monthly Base Salary
-                </span>
-                <span className="text-base font-extrabold text-[#2D041A] flex items-center">
-                  ₹{Number(viewingGuru.monthly_salary || 25000).toLocaleString('en-IN')}
-                  <span className="text-[10px] font-normal text-gray-500 ml-1">/ month</span>
-                </span>
-              </div>
-            </div>
-
-            {/* Profile Content */}
+            {/* PERFECTLY ALIGNED DETAILS SECTIONS */}
             <div className="space-y-4">
-              {/* Contact Information & Personal Details */}
-              <div className="bg-white p-3.5 rounded-2xl border border-gray-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div>
-                  <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Contact Phone</span>
-                  <span className="text-gray-900 font-bold flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-[#8A064D]" />
-                    {viewingGuru.phone || '+91 8151 998 899'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Official Email</span>
-                  <span className="text-gray-900 font-bold flex items-center gap-1.5 truncate">
-                    <Mail className="w-3.5 h-3.5 text-[#8A064D]" />
-                    {viewingGuru.email || `${viewingGuru.full_name.toLowerCase().replace(/[^a-z0-9]/g, '')}@laasyaacademy.com`}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Age</span>
-                  <span className="text-gray-900 font-bold flex items-center gap-1.5">
-                    {viewingGuru.age ? `${viewingGuru.age} Years` : '—'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Gender</span>
-                  <span className="text-gray-900 font-bold capitalize flex items-center gap-1.5">
-                    {viewingGuru.gender || '—'}
-                  </span>
+              {/* SECTION 1: CONTACT & PERSONAL INFORMATION */}
+              <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-200">
+                <h4 className="text-xs font-black text-[#590231] uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5 text-[#8A064D]" />
+                  <span>Personal &amp; Contact Details</span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5 text-xs">
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                    <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Primary Phone</span>
+                    <span className="text-gray-900 font-bold flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-[#8A064D]" />
+                      {viewingGuru.phone || '—'}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                    <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Alternate Phone</span>
+                    <span className="text-gray-900 font-bold flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                      {viewingGuru.alternate_phone || '—'}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200 col-span-2 sm:col-span-1">
+                    <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Official Email</span>
+                    <span className="text-gray-900 font-bold flex items-center gap-1.5 truncate">
+                      <Mail className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
+                      <span className="truncate">{viewingGuru.email || `${viewingGuru.full_name.toLowerCase().replace(/[^a-z0-9]/g, '')}@laasyaacademy.com`}</span>
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                    <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Age</span>
+                    <span className="text-gray-900 font-bold flex items-center gap-1.5">
+                      {viewingGuru.age ? `${viewingGuru.age} Years` : '—'}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                    <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Gender</span>
+                    <span className="text-gray-900 font-bold capitalize flex items-center gap-1.5">
+                      {viewingGuru.gender || '—'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Bio & Artistic Lineage */}
+              {/* SECTION 2: BIO & ARTISTIC LINEAGE */}
               <div>
                 <span className="text-xs font-black text-[#590231] uppercase tracking-wide block mb-1.5">
-                  Bio & Artistic Lineage
+                  Bio &amp; Artistic Lineage
                 </span>
-                <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 text-xs text-gray-800 font-semibold leading-relaxed">
+                <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-[#F0D5E4] text-xs text-gray-800 font-semibold leading-relaxed">
                   {viewingGuru.bio || 'Revered faculty member dedicated to classical arts instruction, student mentoring, and performance coaching.'}
                 </div>
               </div>
 
-              {/* Assigned Disciplines */}
+              {/* SECTION 3: ASSIGNED DISCIPLINES */}
               <div>
-                <span className="text-xs font-black text-[#590231] uppercase tracking-wide block mb-1.5">
-                  Assigned Courses & Disciplines ({viewingGuru.specializations?.length || 0})
-                </span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-black text-[#590231] uppercase tracking-wide">
+                    Assigned Courses &amp; Disciplines ({viewingGuru.specializations?.length || 0})
+                  </span>
+                </div>
                 <div className="flex flex-wrap gap-1.5 p-3 bg-white border border-[#F0D5E4] rounded-2xl">
                   {viewingGuru.specializations && viewingGuru.specializations.length > 0 ? (
                     viewingGuru.specializations.map((spec, i) => (
                       <span
                         key={i}
-                        className="text-xs font-semibold bg-[#FFF2F8] text-[#8A064D] border border-rose-200 px-3 py-1 rounded-xl flex items-center gap-1.5"
+                        className="text-xs font-semibold bg-[#FFF2F8] text-[#8A064D] border border-rose-200 px-3 py-1 rounded-xl flex items-center gap-1.5 shadow-2xs"
                       >
-                        <BookOpen className="w-3 h-3" />
-                        {spec}
+                        <BookOpen className="w-3.5 h-3.5 text-[#8A064D]" />
+                        <span>{spec}</span>
                       </span>
                     ))
                   ) : (
@@ -766,14 +932,14 @@ export default function TrainersListClient({
                 </div>
               </div>
 
-              {/* Batch Details Section */}
+              {/* SECTION 4: BATCH DETAILS */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-[#2D041A] flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-[#8A064D]" />
                     <span>Assigned Batch Details</span>
                   </span>
-                  <span className="text-[10px] font-bold bg-[#8A064D] text-white px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold bg-[#8A064D] text-white px-2.5 py-0.5 rounded-full">
                     {getGuruBatches(viewingGuru).length} Batches
                   </span>
                 </div>
@@ -796,7 +962,7 @@ export default function TrainersListClient({
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-[#2D041A]">{b.name}</span>
-                              <span className="text-[10px] bg-[#FFF2F8] text-[#8A064D] font-semibold px-2 py-0.2 rounded-md border border-rose-100">
+                              <span className="text-[10px] bg-[#FFF2F8] text-[#8A064D] font-semibold px-2 py-0.5 rounded-md border border-rose-100">
                                 {b.course_title}
                               </span>
                             </div>
@@ -934,12 +1100,14 @@ export default function TrainersListClient({
             <form onSubmit={handleAddGuru} className="space-y-4">
               
               {/* Profile Photo Upload */}
-              <PhotoUploadInput
+              <GuruPhotoUploadInput
                 value={addAvatarUrl}
                 onChange={setAddAvatarUrl}
-                label="Guru Profile Photo"
+                label="Guru Portrait Photo"
                 initials={addFullName ? addFullName.slice(0, 2).toUpperCase() : 'GU'}
-                maxSizeMB={1}
+                guruName={addFullName}
+                displayTitle={addDisplayTitle || 'Revered Guru & Mentor'}
+                maxSizeMB={4}
               />
 
               {/* Field 1: Full Name */}
@@ -950,24 +1118,25 @@ export default function TrainersListClient({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Guru Smt. Kalyani Devi or Vidwan Sri Ramesh"
+                  placeholder="Enter Guru's full name"
                   value={addFullName}
                   onChange={(e) => setAddFullName(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
               </div>
 
-              {/* Age & Gender Fields */}
+              {/* Age & Gender Fields (Both Required) */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Age (Years)
+                    Age (Years) <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="number"
-                    min={10}
+                    required
+                    min={15}
                     max={100}
-                    placeholder="e.g. 35"
+                    placeholder="Enter age (e.g. 35)"
                     value={addAge}
                     onChange={(e) => setAddAge(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
@@ -975,9 +1144,10 @@ export default function TrainersListClient({
                 </div>
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Gender
+                    Gender <span className="text-rose-500">*</span>
                   </label>
                   <select
+                    required
                     value={addGender}
                     onChange={(e) => setAddGender(e.target.value as any)}
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white cursor-pointer"
@@ -1094,7 +1264,7 @@ export default function TrainersListClient({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Senior Guru & Choreographer, Sangeetha Acharya, Director"
+                  placeholder="Enter designation (e.g. Senior Faculty / Guru)"
                   value={addDisplayTitle}
                   onChange={(e) => setAddDisplayTitle(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
@@ -1137,30 +1307,39 @@ export default function TrainersListClient({
                 </div>
               </div>
 
-              {/* Field 5: Bio */}
+              {/* Field 5: Bio (Optional) */}
               <div>
                 <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                  Bio & Artistic Lineage <span className="text-rose-500">*</span>
+                  Bio & Artistic Lineage <span className="text-gray-400 font-normal lowercase">(optional)</span>
                 </label>
                 <textarea
                   rows={3}
-                  required
-                  placeholder="Qualifications, guru lineage, temple performances, Trinity / RSL certifications, years of experience..."
+                  placeholder="Qualifications, guru lineage, performance background, experience..."
                   value={addBio}
                   onChange={(e) => setAddBio(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
               </div>
 
-              {/* Optional Contact fields */}
-              <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100">
+              {/* Contact Fields with Alternate Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-gray-100">
                 <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Contact Phone</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Primary Phone</label>
                   <input
-                    type="text"
-                    placeholder="+91 8151 998 899"
+                    type="tel"
+                    placeholder="+91 98765 43210"
                     value={addPhone}
                     onChange={(e) => setAddPhone(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Alternate Phone</label>
+                  <input
+                    type="tel"
+                    placeholder="+91 98765 01234"
+                    value={addAlternatePhone}
+                    onChange={(e) => setAddAlternatePhone(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                   />
                 </div>
@@ -1168,7 +1347,7 @@ export default function TrainersListClient({
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Email (Optional)</label>
                   <input
                     type="email"
-                    placeholder="name@laasyaacademy.com"
+                    placeholder="guru@laasyaacademy.com"
                     value={addEmail}
                     onChange={(e) => setAddEmail(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
@@ -1228,12 +1407,14 @@ export default function TrainersListClient({
             <form onSubmit={handleUpdateGuru} className="space-y-4">
               
               {/* Profile Photo Upload */}
-              <PhotoUploadInput
+              <GuruPhotoUploadInput
                 value={editAvatarUrl}
                 onChange={setEditAvatarUrl}
-                label="Guru Profile Photo"
+                label="Guru Portrait Photo"
                 initials={editFullName ? editFullName.slice(0, 2).toUpperCase() : 'GU'}
-                maxSizeMB={1}
+                guruName={editFullName}
+                displayTitle={editDisplayTitle || 'Revered Guru & Mentor'}
+                maxSizeMB={4}
               />
 
               {/* Field 1: Full Name */}
@@ -1250,17 +1431,18 @@ export default function TrainersListClient({
                 />
               </div>
 
-              {/* Age & Gender Fields */}
+              {/* Age & Gender Fields (Both Required) */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Age (Years)
+                    Age (Years) <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="number"
-                    min={10}
+                    required
+                    min={15}
                     max={100}
-                    placeholder="e.g. 35"
+                    placeholder="Enter age (e.g. 35)"
                     value={editAge}
                     onChange={(e) => setEditAge(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
@@ -1268,9 +1450,10 @@ export default function TrainersListClient({
                 </div>
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Gender
+                    Gender <span className="text-rose-500">*</span>
                   </label>
                   <select
+                    required
                     value={editGender}
                     onChange={(e) => setEditGender(e.target.value as any)}
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white cursor-pointer"
@@ -1429,29 +1612,42 @@ export default function TrainersListClient({
                 </div>
               </div>
 
-              {/* Field 5: Bio */}
+              {/* Field 5: Bio (Optional) */}
               <div>
                 <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                  Bio / Profile Summary <span className="text-rose-500">*</span>
+                  Bio / Profile Summary <span className="text-gray-400 font-normal lowercase">(optional)</span>
                 </label>
                 <textarea
                   rows={3}
-                  required
+                  placeholder="Qualifications, guru lineage, performance background, experience..."
                   value={editBio}
                   onChange={(e) => setEditBio(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
                 />
               </div>
 
-              {/* Contact Phone */}
-              <div className="pt-1 border-t border-gray-100">
-                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Contact Phone</label>
-                <input
-                  type="text"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
-                />
+              {/* Contact Phones */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-gray-100">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Primary Phone</label>
+                  <input
+                    type="tel"
+                    placeholder="+91 98765 43210"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Alternate Phone</label>
+                  <input
+                    type="tel"
+                    placeholder="+91 98765 01234"
+                    value={editAlternatePhone}
+                    onChange={(e) => setEditAlternatePhone(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
               </div>
 
               {/* Action Buttons */}
@@ -1608,6 +1804,51 @@ export default function TrainersListClient({
             </div>
 
           </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* FULLSCREEN IMAGE LIGHTBOX VIEWER */}
+      {/* =================================================================== */}
+      {lightboxImage && (
+        <div 
+          className="fixed inset-0 bg-black/90 backdrop-blur-md z-80 flex flex-col items-center justify-center p-4 sm:p-6 animate-in fade-in duration-150"
+          onClick={() => setLightboxImage(null)}
+        >
+          {/* Top Bar with title and close button */}
+          <div 
+            className="w-full max-w-4xl flex items-center justify-between pb-3 text-white mb-2"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-serif font-bold text-lg text-[#F9E33A]">{lightboxImage.title}</span>
+              <span className="text-xs text-gray-400 font-medium">(Full Resolution Portrait)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLightboxImage(null)}
+              className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer flex items-center gap-1.5 text-xs font-bold border border-white/20"
+            >
+              <X className="w-4 h-4" />
+              <span>Close</span>
+            </button>
+          </div>
+
+          {/* Full Image Container */}
+          <div 
+            className="relative max-w-4xl max-h-[85vh] rounded-2xl overflow-hidden border border-white/20 shadow-2xl bg-black flex items-center justify-center"
+            onClick={e => e.stopPropagation()}
+          >
+            <img
+              src={lightboxImage.src}
+              alt={lightboxImage.title}
+              className="max-h-[85vh] max-w-full object-contain"
+            />
+          </div>
+
+          <p className="text-xs text-white/50 mt-3 font-medium">
+            Click anywhere outside or press Close to dismiss
+          </p>
         </div>
       )}
 

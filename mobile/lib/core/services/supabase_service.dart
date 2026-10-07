@@ -17,46 +17,136 @@ class SupabaseService {
   // Local demo session cache for resilient testing
   Map<String, dynamic>? _cachedProfile;
   final List<Map<String, dynamic>> _mockAttendance = [];
-  final List<Map<String, dynamic>> _mockNotifications = [
+  final List<Map<String, dynamic>> _mockBannerAnnouncements = [
     {
-      'id': 'notif-1',
-      'title': 'Navaratri Cultural Mahotsav 2026',
-      'message': 'Annual grand cultural showcase rehearsals commence this Saturday at Natya Mandapam. All Bharathanatyam and Vocal students must attend.',
+      'id': 'banner-1',
+      'title': 'Bharatanatyam for Little Dancers',
+      'message': 'Special Batch for Ages 3–6 Years. A small & focused batch designed especially for little ones to learn Bharatanatyam with personal attention, care & confidence. Only 5 children per batch, only 5 seats available! Contact: 81 5199 8899 | 81 5188 9988.',
       'type': 'announcement',
-      'type_tag': 'Festival Special',
-      'image_url': 'https://images.unsplash.com/photo-1547153760-18fc86324498?w=800&auto=format&fit=crop&q=80',
+      'announcement_type': 'banner',
+      'type_tag': 'Special Batch (Ages 3-6)',
+      'image_url': 'assets/images/banner_bharatanatyam_kids.jpg',
       'date': 'Today, 09:30 AM',
       'is_read': false,
+      'action_links': [
+        {'title': 'Call Academy Admissions', 'url': 'tel:+918151998899'},
+        {'title': 'Course Syllabus & Info', 'url': 'https://laasyaacademy.com/bharatanatyam-junior'},
+      ],
     },
     {
-      'id': 'notif-2',
-      'title': 'Grand Annual Arangetram Showcase',
-      'message': 'Celebration of senior disciples graduating with traditional classical arangetram performances at the Academy Main Hall.',
+      'id': 'banner-2',
+      'title': 'Welcome to the World of Cinema',
+      'message': '2-Day Acting Workshop on Expressions with Nikhil Nicolas (Actor, Director, Writer & Acting Coach for leading actors in Kerala). State Award Winner. Registrations Open! Call: 81 5188 9988 | 81 5199 8899.',
       'type': 'announcement',
-      'type_tag': 'Academy Showcase',
-      'image_url': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80',
+      'announcement_type': 'banner',
+      'type_tag': 'Acting Workshop',
+      'image_url': 'assets/images/banner_cinema_acting_workshop.jpg',
       'date': 'Yesterday',
       'is_read': false,
+      'action_links': [
+        {'title': 'Register for Acting Workshop', 'url': 'https://laasyaacademy.com/workshops/acting'},
+        {'title': 'Call Workshop Coordinator', 'url': 'tel:+918151889988'},
+      ],
     },
     {
-      'id': 'notif-3',
-      'title': 'Carnatic Sangeetha Sambhrama 2026',
-      'message': 'Special vocal jugalbandi and guest lec-dem by revered maestros on Melakarta Ragas. Open to all students & families.',
+      'id': 'banner-3',
+      'title': 'We Are Hiring: Bharatanatyam Teacher',
+      'message': 'Passionate educators to inspire the next generation. Qualified & experienced Bharatanatyam dancers preferred. Join the Laasya family - Let\'s keep the art alive together! Call: 81 5199 8899 | 81 5188 9988.',
       'type': 'announcement',
-      'type_tag': 'Music Concert',
-      'image_url': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=80',
+      'announcement_type': 'banner',
+      'type_tag': 'Faculty Hiring',
+      'image_url': 'assets/images/banner_hiring_bharatanatyam.jpg',
       'date': '2 days ago',
       'is_read': true,
+      'action_links': [
+        {'title': 'Apply via Faculty Portal', 'url': 'https://laasyaacademy.com/careers'},
+        {'title': 'Call Faculty Recruitment', 'url': 'tel:+918151998899'},
+      ],
     },
     {
-      'id': 'notif-4',
-      'title': 'Chitra Kala & Canvas Art Exhibition',
-      'message': 'Annual fine arts showcase displaying traditional Tanjore paintings, water colours, and student craft masterpieces.',
+      'id': 'banner-4',
+      'title': 'Zumba Fitness Classes',
+      'message': 'Dance • Fitness • Fun • Transformation. Morning Batches | Evening Batches. Burn calories, lose weight, improve stamina, stay active & healthy. Professional & experienced instructor. Enroll Now! Call: 81 5199 8899.',
       'type': 'announcement',
-      'type_tag': 'Art & Craft',
-      'image_url': 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=800&auto=format&fit=crop&q=80',
+      'announcement_type': 'banner',
+      'type_tag': 'Fitness & Zumba',
+      'image_url': 'assets/images/banner_zumba_fitness.png',
       'date': '3 days ago',
       'is_read': false,
+      'action_links': [
+        {'title': 'Enroll for Zumba Trial Class', 'url': 'https://laasyaacademy.com/zumba-trial'},
+        {'title': 'Contact Fitness Desk', 'url': 'tel:+918151998899'},
+      ],
+    },
+  ];
+
+  final List<Map<String, dynamic>> _mockMessageAnnouncements = [
+    {
+      'id': 'msg-1',
+      'title': 'Navaratri & Vijayadashami Special Holiday Schedule',
+      'message': 'Dear Disciples & Respected Parents,\n\nPlease note that regular classes will remain suspended from Oct 11 to Oct 13 in observance of Vijayadashami & Saraswathi Pooja.\n\n✨ Special Maha Pooja & Vidhyarambham will be celebrated on Saturday, Oct 12 at 09:00 AM at Natya Mandapam (Room 101). All disciples, parents, and art lovers are cordially invited to seek the blessings of the Gurus.\n\nPranaams,\nAcademy Administration',
+      'type': 'message',
+      'announcement_type': 'message',
+      'type_tag': 'Holiday',
+      'image_url': 'assets/images/cultural_banner.png',
+      'sender_name': 'Sri Ramesh Rao (Academy Director)',
+      'audience': 'All students',
+      'date': 'Today',
+      'time': '10:15 AM',
+      'is_delivered': true,
+      'is_read': false,
+      'action_links': [
+        {'title': 'Saraswathi Pooja Program Schedule', 'url': 'https://laasyaacademy.com/pooja-schedule'},
+        {'title': 'Natya Mandapam Location Map', 'url': 'https://maps.google.com/?q=Laasya+Academy'},
+      ],
+    },
+    {
+      'id': 'msg-2',
+      'title': 'Monthly Tuition Fee Due Reminder - October 2026',
+      'message': 'Dear Students & Parents,\n\nThis is a gentle reminder that monthly tuition fee dues for the month of October 2026 are payable on or before 10th October 2026.\n\nKindly clear any outstanding balances via online UPI/Netbanking or directly at the academy reception counter. You can view payment breakdown and download official digital invoices directly under Portal Settings > Payments.\n\nRegards,\nFinance & Accounts Desk',
+      'type': 'message',
+      'announcement_type': 'message',
+      'type_tag': 'Fee reminder',
+      'sender_name': 'Accounts Office',
+      'audience': 'All students',
+      'date': 'Yesterday',
+      'time': '03:45 PM',
+      'is_delivered': true,
+      'is_read': true,
+      'action_links': [
+        {'title': 'Direct UPI Payment Link', 'url': 'https://laasyaacademy.com/pay-fee'},
+      ],
+    },
+    {
+      'id': 'msg-3',
+      'title': 'Weekend Batch Timing Alignment for Stage Rehearsals',
+      'message': 'Attention Bharathanatyam (Batch A & Batch B) Students:\n\nStarting this Saturday, morning batch timings will begin 30 minutes earlier at 08:30 AM to accommodate stage lighting & blocking rehearsals for our upcoming Annual Cultural Samarpanam 2026.\n\nDisciples are advised to arrive 10 minutes in advance wearing standard academy dance attire and ghungroos.\n\nGuru Smt. Anusha Sumesh\nHead of Classical Dance',
+      'type': 'message',
+      'announcement_type': 'message',
+      'type_tag': 'Schedule change',
+      'sender_name': 'Guru Smt. Anusha Sumesh',
+      'audience': 'Bharathanatyam',
+      'date': '04 Oct 2026',
+      'time': '11:20 AM',
+      'is_delivered': true,
+      'is_read': true,
+      'action_links': [
+        {'title': 'Samarpanam 2026 Stage Itinerary', 'url': 'https://laasyaacademy.com/events/samarpanam'},
+      ],
+    },
+    {
+      'id': 'msg-4',
+      'title': 'Annual Samarpanam Costume & Measurement Trials',
+      'message': 'Official Circular:\n\nThe master tailor will be visiting the academy campus on Sunday, 12th October from 11:00 AM to 04:00 PM for custom silk costume measurements for all participating dancers.\n\nPlease check your slot with the academy reception desk to avoid waiting.\n\nLaasya Cultural Academy',
+      'type': 'message',
+      'announcement_type': 'message',
+      'type_tag': 'General',
+      'sender_name': 'Academy Administration',
+      'audience': 'All students',
+      'date': '02 Oct 2026',
+      'time': '05:00 PM',
+      'is_delivered': true,
+      'is_read': true,
     },
   ];
 
@@ -209,6 +299,8 @@ class SupabaseService {
         'advance_paid': 2000,
         'due_amount': 0,
         'due_status': 'green',
+        'due_date': '10th Oct 2026',
+        'next_due_date': '10th Nov 2026',
       };
       return _cachedProfile;
     } else if (identifier.contains('10022') || identifier.contains('sneha')) {
@@ -233,6 +325,8 @@ class SupabaseService {
         'advance_paid': 0,
         'due_amount': 2000,
         'due_status': 'red',
+        'due_date': '10th Oct 2026',
+        'next_due_date': '10th Nov 2026',
       };
       return _cachedProfile;
     } else if (identifier.contains('aryan') || identifier.contains('lca-14') || identifier.contains('9845000014')) {
@@ -257,6 +351,8 @@ class SupabaseService {
         'advance_paid': 1800,
         'due_amount': 0,
         'due_status': 'green',
+        'due_date': '10th Oct 2026',
+        'next_due_date': '10th Nov 2026',
       };
       return _cachedProfile;
     } else if (identifier.contains('10023') || identifier.contains('meera')) {
@@ -281,6 +377,8 @@ class SupabaseService {
         'advance_paid': 1000,
         'due_amount': 1000,
         'due_status': 'yellow',
+        'due_date': '10th Oct 2026',
+        'next_due_date': '10th Nov 2026',
       };
       return _cachedProfile;
     } else {
@@ -306,6 +404,8 @@ class SupabaseService {
         'advance_paid': 1000,
         'due_amount': 1000,
         'due_status': 'yellow',
+        'due_date': '10th Oct 2026',
+        'next_due_date': '10th Nov 2026',
       };
       return _cachedProfile;
     }
@@ -881,14 +981,102 @@ class SupabaseService {
   }
 
   // ---------------------------------------------------------------------------
-  // NOTIFICATIONS
+  // ANNOUNCEMENTS & NOTIFICATIONS
   // ---------------------------------------------------------------------------
+  String _normalizeImageUrl(dynamic rawUrl) {
+    if (rawUrl == null) return '';
+    final url = rawUrl.toString().trim();
+    if (url.isEmpty) return '';
+
+    // Check if filename matches local bundled high-res assets
+    final fileName = url.split('/').last.split('?').first;
+    const bundledMap = {
+      'banner_bharatanatyam_kids.jpg': 'assets/images/banner_bharatanatyam_kids.jpg',
+      'banner_cinema_acting_workshop.jpg': 'assets/images/banner_cinema_acting_workshop.jpg',
+      'banner_hiring_bharatanatyam.jpg': 'assets/images/banner_hiring_bharatanatyam.jpg',
+      'banner_zumba_fitness.png': 'assets/images/banner_zumba_fitness.png',
+      'cultural_banner.png': 'assets/images/cultural_banner.png',
+      'crest_logo.png': 'assets/images/crest_logo.png',
+      'crest_logo.jpg': 'assets/images/crest_logo.jpg',
+      'app_logo.png': 'assets/images/app_logo.png',
+      'header_logo.png': 'assets/images/header_logo.png',
+      'logo_banner.png': 'assets/images/logo_banner.png',
+    };
+
+    if (bundledMap.containsKey(fileName)) {
+      return bundledMap[fileName]!;
+    }
+
+    if (url.startsWith('/')) {
+      return 'http://localhost:3000$url';
+    }
+
+    return url;
+  }
+
+  Future<List<Map<String, dynamic>>> getBannerAnnouncements() async {
+    try {
+      final uri = Uri.parse('http://localhost:3000/api/announcements?announcementType=banner');
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['success'] == true && decoded['announcements'] is List) {
+          final live = List<Map<String, dynamic>>.from(decoded['announcements']);
+          if (live.isNotEmpty) {
+            for (var item in live) {
+              item['image_url'] = _normalizeImageUrl(item['image_url']);
+            }
+            return live;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Live API fetch error for banner announcements: $e');
+    }
+    return List<Map<String, dynamic>>.from(_mockBannerAnnouncements);
+  }
+
+  Future<List<Map<String, dynamic>>> getMessageAnnouncements() async {
+    try {
+      final uri = Uri.parse('http://localhost:3000/api/announcements?announcementType=message');
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['success'] == true && decoded['announcements'] is List) {
+          final live = List<Map<String, dynamic>>.from(decoded['announcements']);
+          if (live.isNotEmpty) {
+            final now = DateTime.now();
+            final valid = <Map<String, dynamic>>[];
+            for (var item in live) {
+              // Enforce 30-day message lifespan
+              final dateStr = item['publish_date'] ?? item['created_at'];
+              if (dateStr != null) {
+                try {
+                  final dt = DateTime.parse(dateStr.toString().split('T')[0]);
+                  if (now.difference(dt).inDays > 30) {
+                    continue; // Skip message older than 30 days
+                  }
+                } catch (_) {}
+              }
+              item['image_url'] = _normalizeImageUrl(item['image_url']);
+              valid.add(item);
+            }
+            if (valid.isNotEmpty) return valid;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Live API fetch error for message announcements: $e');
+    }
+    return List<Map<String, dynamic>>.from(_mockMessageAnnouncements);
+  }
+
   Future<List<Map<String, dynamic>>> getNotifications() async {
-    return _mockNotifications;
+    return getBannerAnnouncements();
   }
 
   Future<void> markNotificationAsRead(String notifId) async {
-    for (var n in _mockNotifications) {
+    for (var n in _mockMessageAnnouncements) {
       if (n['id'] == notifId) {
         n['is_read'] = true;
         break;

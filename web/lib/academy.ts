@@ -40,6 +40,7 @@ export interface Trainer {
   full_name: string;
   email: string;
   phone: string;
+  alternate_phone?: string;
   avatar_url?: string;
   age?: number;
   gender?: 'male' | 'female' | 'trans';
@@ -149,31 +150,32 @@ export interface AttendanceRecord {
 // METRICS
 // -------------------------------------------------------------
 export async function getDashboardMetrics() {
-  const [coursesCount] = await query<{ count: string }>('SELECT COUNT(*) as count FROM public.courses WHERE is_active = true');
-  const [trainersCount] = await query<{ count: string }>('SELECT COUNT(*) as count FROM public.trainers WHERE is_active = true');
-  const [studentsCount] = await query<{ count: string }>('SELECT COUNT(*) as count FROM public.students WHERE status = \'active\'');
-  const [batchesCount] = await query<{ count: string }>('SELECT COUNT(*) as count FROM public.batches WHERE is_active = true');
-  
   const today = new Date().toISOString().split('T')[0];
-  const [todaySessions] = await query<{ count: string }>(
-    'SELECT COUNT(*) as count FROM public.class_sessions WHERE session_date = $1',
-    [today]
-  );
+  const rows = await query<{
+    totalCourses: number;
+    totalTrainers: number;
+    totalStudents: number;
+    activeBatches: number;
+    todaySessionsCount: number;
+    presentTodayCount: number;
+  }>(`
+    SELECT 
+      (SELECT COUNT(*)::int FROM public.courses WHERE is_active = true) as "totalCourses",
+      (SELECT COUNT(*)::int FROM public.trainers WHERE is_active = true) as "totalTrainers",
+      (SELECT COUNT(*)::int FROM public.students WHERE status = 'active') as "totalStudents",
+      (SELECT COUNT(*)::int FROM public.batches WHERE is_active = true) as "activeBatches",
+      (SELECT COUNT(*)::int FROM public.class_sessions WHERE session_date = $1) as "todaySessionsCount",
+      (SELECT COUNT(*)::int FROM public.attendance a JOIN public.class_sessions s ON s.id = a.session_id WHERE s.session_date = $1 AND a.status = 'present') as "presentTodayCount"
+  `, [today]);
 
-  const [presentToday] = await query<{ count: string }>(
-    `SELECT COUNT(*) as count FROM public.attendance a 
-     JOIN public.class_sessions s ON s.id = a.session_id 
-     WHERE s.session_date = $1 AND a.status = 'present'`,
-    [today]
-  );
-
+  const row = rows[0];
   return {
-    totalCourses: parseInt(coursesCount?.count || '0', 10),
-    totalTrainers: parseInt(trainersCount?.count || '0', 10),
-    totalStudents: parseInt(studentsCount?.count || '0', 10),
-    activeBatches: parseInt(batchesCount?.count || '0', 10),
-    todaySessionsCount: parseInt(todaySessions?.count || '0', 10),
-    presentTodayCount: parseInt(presentToday?.count || '0', 10)
+    totalCourses: Number(row?.totalCourses || 0),
+    totalTrainers: Number(row?.totalTrainers || 0),
+    totalStudents: Number(row?.totalStudents || 0),
+    activeBatches: Number(row?.activeBatches || 0),
+    todaySessionsCount: Number(row?.todaySessionsCount || 0),
+    presentTodayCount: Number(row?.presentTodayCount || 0)
   };
 }
 
@@ -316,6 +318,7 @@ export async function getTrainers(): Promise<Trainer[]> {
   const sql = `
     SELECT 
       t.id, t.profile_id, p.full_name, p.email, p.phone,
+      COALESCE(t.alternate_phone, p.alternate_phone) as alternate_phone,
       COALESCE(t.avatar_url, p.avatar_url) as avatar_url,
       COALESCE(t.age, p.age)::int as age,
       COALESCE(t.gender, p.gender) as gender,
@@ -348,7 +351,7 @@ export async function getTrainers(): Promise<Trainer[]> {
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batches b ON b.trainer_id = t.id
     LEFT JOIN public.courses c ON c.id = b.course_id
-    GROUP BY t.id, t.profile_id, p.full_name, p.email, p.phone, t.avatar_url, p.avatar_url, t.age, p.age, t.gender, p.gender, t.specializations, t.display_title, t.bio, t.is_active, t.joined_date, t.monthly_salary
+    GROUP BY t.id, t.profile_id, p.full_name, p.email, p.phone, t.alternate_phone, p.alternate_phone, t.avatar_url, p.avatar_url, t.age, p.age, t.gender, p.gender, t.specializations, t.display_title, t.bio, t.is_active, t.joined_date, t.monthly_salary
     ORDER BY p.full_name;
   `;
   return query<Trainer>(sql);
@@ -358,12 +361,13 @@ export async function createTrainer(data: {
   full_name: string;
   email?: string;
   phone?: string;
+  alternate_phone?: string;
   avatar_url?: string;
   age?: number;
   gender?: string;
   specializations: string[];
   display_title?: string;
-  bio: string;
+  bio?: string;
   monthly_salary?: number;
   is_active?: boolean;
 }) {
@@ -371,11 +375,13 @@ export async function createTrainer(data: {
     ? data.email.toLowerCase().trim()
     : `${data.full_name.toLowerCase().replace(/[^a-z0-9]/g, '') || 'guru'}@laasyaacademy.com`;
   const cleanPhone = data.phone?.trim() || '+91 8151 998 899';
+  const cleanAlternatePhone = data.alternate_phone?.trim() || null;
   const displayTitle = data.display_title?.trim() || 'Revered Guru & Mentor';
   const monthlySalary = Number(data.monthly_salary) || 25000;
   const isActive = data.is_active !== undefined ? data.is_active : true;
   const age = data.age ? Number(data.age) : null;
   const gender = data.gender ? data.gender.toLowerCase() : null;
+  const bio = data.bio?.trim() || '';
 
   // Create in auth.users first
   const [authUser] = await query<{ id: string }>(`
@@ -394,28 +400,30 @@ export async function createTrainer(data: {
 
   // Insert profile
   await query(`
-    INSERT INTO public.profiles (id, full_name, email, phone, role, avatar_url, age, gender)
-    VALUES ($1, $2, $3, $4, 'trainer', $5, $6, $7)
+    INSERT INTO public.profiles (id, full_name, email, phone, alternate_phone, role, avatar_url, age, gender)
+    VALUES ($1, $2, $3, $4, $5, 'trainer', $6, $7, $8)
     ON CONFLICT (id) DO UPDATE SET 
       full_name = EXCLUDED.full_name, 
       phone = EXCLUDED.phone, 
+      alternate_phone = COALESCE(EXCLUDED.alternate_phone, profiles.alternate_phone),
       avatar_url = COALESCE(EXCLUDED.avatar_url, profiles.avatar_url),
       age = COALESCE(EXCLUDED.age, profiles.age),
       gender = COALESCE(EXCLUDED.gender, profiles.gender);
-  `, [uid, data.full_name, cleanEmail, cleanPhone, data.avatar_url || null, age, gender]);
+  `, [uid, data.full_name, cleanEmail, cleanPhone, cleanAlternatePhone, data.avatar_url || null, age, gender]);
 
   // Insert trainer
   return queryOne<Trainer>(`
-    INSERT INTO public.trainers (profile_id, specializations, display_title, bio, is_active, monthly_salary, avatar_url, age, gender)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    INSERT INTO public.trainers (profile_id, specializations, display_title, bio, is_active, monthly_salary, avatar_url, age, gender, alternate_phone)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING *;
-  `, [uid, data.specializations, displayTitle, data.bio, isActive, monthlySalary, data.avatar_url || null, age, gender]);
+  `, [uid, data.specializations, displayTitle, bio, isActive, monthlySalary, data.avatar_url || null, age, gender, cleanAlternatePhone]);
 }
 
 export async function updateTrainer(id: string, data: {
   full_name?: string;
   display_title?: string;
   phone?: string;
+  alternate_phone?: string;
   avatar_url?: string;
   age?: number;
   gender?: string;
@@ -432,20 +440,23 @@ export async function updateTrainer(id: string, data: {
 
   const age = data.age !== undefined ? (data.age ? Number(data.age) : null) : undefined;
   const gender = data.gender !== undefined ? (data.gender ? data.gender.toLowerCase() : null) : undefined;
+  const alternatePhone = data.alternate_phone !== undefined ? (data.alternate_phone?.trim() || null) : undefined;
 
   await query(`
     UPDATE public.profiles
     SET full_name = COALESCE($2, full_name),
         phone = COALESCE($3, phone),
-        avatar_url = COALESCE($4, avatar_url),
-        age = COALESCE($5, age),
-        gender = COALESCE($6, gender),
+        alternate_phone = COALESCE($4, alternate_phone),
+        avatar_url = COALESCE($5, avatar_url),
+        age = COALESCE($6, age),
+        gender = COALESCE($7, gender),
         updated_at = now()
     WHERE id = $1
   `, [
     trainer.profile_id, 
     data.full_name, 
     data.phone, 
+    alternatePhone,
     data.avatar_url !== undefined ? data.avatar_url : null,
     age !== undefined ? age : null,
     gender !== undefined ? gender : null
@@ -461,6 +472,7 @@ export async function updateTrainer(id: string, data: {
         avatar_url = COALESCE($7, avatar_url),
         age = COALESCE($8, age),
         gender = COALESCE($9, gender),
+        alternate_phone = COALESCE($10, alternate_phone),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
@@ -468,12 +480,13 @@ export async function updateTrainer(id: string, data: {
     id, 
     data.display_title, 
     data.specializations, 
-    data.bio, 
+    data.bio !== undefined ? data.bio : null, 
     data.is_active, 
     data.monthly_salary, 
     data.avatar_url !== undefined ? data.avatar_url : null,
     age !== undefined ? age : null,
-    gender !== undefined ? gender : null
+    gender !== undefined ? gender : null,
+    alternatePhone
   ]);
 }
 
@@ -542,48 +555,64 @@ export async function getStudents(): Promise<Student[]> {
       CASE WHEN s.roll_number ~ '^LCA-[0-9]+$' THEN CAST(SUBSTRING(s.roll_number FROM 5) AS INT) ELSE 999999 END ASC,
       p.full_name ASC;
   `;
-  const students = await query<Student>(sql);
-
-  // Fetch all active batch enrollments with batch & course & trainer info
-  const enrollments = await query<{
-    student_id: string;
-    batch_id: string;
-    batch_name: string;
-    course_id: string;
-    course_title: string;
-    course_category: string;
-    monthly_fee: number;
-    trainer_id: string;
-    trainer_name: string;
-    days_of_week: string[];
-    start_time: string;
-    end_time: string;
-    room_or_hall: string;
-    enrollment_status: string;
-  }>(`
-    SELECT 
-      be.student_id,
-      b.id as batch_id,
-      b.name as batch_name,
-      c.id as course_id,
-      c.title as course_title,
-      c.category as course_category,
-      c.monthly_fee,
-      t.id as trainer_id,
-      tp.full_name as trainer_name,
-      b.days_of_week,
-      b.start_time,
-      b.end_time,
-      b.room_or_hall,
-      be.status as enrollment_status
-    FROM public.batch_enrollments be
-    JOIN public.batches b ON b.id = be.batch_id
-    JOIN public.courses c ON c.id = b.course_id
-    JOIN public.trainers t ON t.id = b.trainer_id
-    JOIN public.profiles tp ON tp.id = t.profile_id
-    WHERE be.status = 'active'
-    ORDER BY b.start_time;
-  `);
+  // Fetch students, batch enrollments, and fee invoice summaries concurrently
+  const [students, enrollments, invoiceSummaries] = await Promise.all([
+    query<Student>(sql),
+    query<{
+      student_id: string;
+      batch_id: string;
+      batch_name: string;
+      course_id: string;
+      course_title: string;
+      course_category: string;
+      monthly_fee: number;
+      trainer_id: string;
+      trainer_name: string;
+      days_of_week: string[];
+      start_time: string;
+      end_time: string;
+      room_or_hall: string;
+      enrollment_status: string;
+    }>(`
+      SELECT 
+        be.student_id,
+        b.id as batch_id,
+        b.name as batch_name,
+        c.id as course_id,
+        c.title as course_title,
+        c.category as course_category,
+        c.monthly_fee,
+        t.id as trainer_id,
+        tp.full_name as trainer_name,
+        b.days_of_week,
+        b.start_time,
+        b.end_time,
+        b.room_or_hall,
+        be.status as enrollment_status
+      FROM public.batch_enrollments be
+      JOIN public.batches b ON b.id = be.batch_id
+      JOIN public.courses c ON c.id = b.course_id
+      JOIN public.trainers t ON t.id = b.trainer_id
+      JOIN public.profiles tp ON tp.id = t.profile_id
+      WHERE be.status = 'active'
+      ORDER BY b.start_time;
+    `),
+    query<{
+      student_id: string;
+      invoice_balance: string;
+      has_overdue: number;
+      earliest_due_date: string;
+    }>(`
+      SELECT 
+        student_id, 
+        SUM(balance_amount)::text as invoice_balance,
+        MAX(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END)::int as has_overdue,
+        MIN(due_date)::text as earliest_due_date
+      FROM public.student_fee_invoices
+      WHERE status IN ('unpaid', 'partial', 'overdue')
+      GROUP BY student_id;
+    `)
+  ]);
 
   const enrollMap = new Map<string, StudentEnrolledBatch[]>();
   for (const row of enrollments) {
@@ -607,22 +636,6 @@ export async function getStudents(): Promise<Student[]> {
     });
   }
 
-  // Fetch fee invoices summary per student
-  const invoiceSummaries = await query<{
-    student_id: string;
-    invoice_balance: string;
-    has_overdue: number;
-    earliest_due_date: string;
-  }>(`
-    SELECT 
-      student_id, 
-      SUM(balance_amount)::text as invoice_balance,
-      MAX(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END)::int as has_overdue,
-      MIN(due_date)::text as earliest_due_date
-    FROM public.student_fee_invoices
-    WHERE status IN ('unpaid', 'partial', 'overdue')
-    GROUP BY student_id;
-  `);
   const invoiceMap = new Map<string, { balance: number; hasOverdue: boolean; earliestDueDate: string }>();
   for (const inv of invoiceSummaries) {
     invoiceMap.set(inv.student_id, {

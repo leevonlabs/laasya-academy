@@ -26,11 +26,13 @@ import {
 export const revalidate = 0; // Fresh dynamic data
 
 export default async function OverviewPage() {
-  const metrics = await getDashboardMetrics();
-  const finance = await getFinancialSummary();
-  const todaySessions = await getSessions();
-  const allCourses = await getCourses();
-  const allBatches = await getBatches();
+  const [metrics, finance, todaySessions, allCourses, allBatches] = await Promise.all([
+    getDashboardMetrics(),
+    getFinancialSummary(),
+    getSessions(),
+    getCourses(),
+    getBatches()
+  ]);
 
   // Categories count
   const categories = [

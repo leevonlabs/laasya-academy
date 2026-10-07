@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
-import 'student_payments_screen.dart';
+import 'student_messages_screen.dart';
 import 'student_video_library_screen.dart';
 
 class StudentDashboardTab extends StatefulWidget {
@@ -50,14 +52,18 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
     setState(() => _isLoading = true);
     final prof = await SupabaseService().getCurrentUserProfile();
     final crs = await SupabaseService().getStudentEnrolledCourses();
-    final notifs = await SupabaseService().getNotifications();
+    final bannerAds = await SupabaseService().getBannerAnnouncements();
     final sch = await SupabaseService().getStudentSchedule();
 
     if (mounted) {
       setState(() {
         _profile = prof;
         _courses = crs;
-        _announcements = notifs.where((n) => n['type'] == 'announcement').toList();
+        _announcements = bannerAds.where((n) {
+          final isBanner = n['announcement_type'] == 'banner' || 
+                           (n['image_url'] != null && n['image_url'].toString().isNotEmpty && n['announcement_type'] != 'message');
+          return isBanner;
+        }).toList();
         _schedule = sch;
         _isLoading = false;
       });
@@ -91,12 +97,124 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
     return 'Good Evening';
   }
 
+  Widget _buildAnnouncementImage(String? imageUrl, {BoxFit fit = BoxFit.cover}) {
+    if (imageUrl == null || imageUrl.trim().isEmpty) {
+      return _bannerFallback(fit);
+    }
+
+    final cleanUrl = imageUrl.trim();
+
+    // 1. Match local high-res bundled assets by filename
+    final fileName = cleanUrl.split('/').last.split('?').first;
+    const bundledMap = {
+      'banner_bharatanatyam_kids.jpg': 'assets/images/banner_bharatanatyam_kids.jpg',
+      'banner_cinema_acting_workshop.jpg': 'assets/images/banner_cinema_acting_workshop.jpg',
+      'banner_hiring_bharatanatyam.jpg': 'assets/images/banner_hiring_bharatanatyam.jpg',
+      'banner_zumba_fitness.png': 'assets/images/banner_zumba_fitness.png',
+      'cultural_banner.png': 'assets/images/cultural_banner.png',
+      'crest_logo.png': 'assets/images/crest_logo.png',
+      'crest_logo.jpg': 'assets/images/crest_logo.jpg',
+      'app_logo.png': 'assets/images/app_logo.png',
+      'header_logo.png': 'assets/images/header_logo.png',
+      'logo_banner.png': 'assets/images/logo_banner.png',
+    };
+
+    if (bundledMap.containsKey(fileName)) {
+      return Image.asset(
+        bundledMap[fileName]!,
+        fit: fit,
+        errorBuilder: (_, __, ___) => _bannerFallback(fit),
+      );
+    }
+
+    // 2. Direct assets path
+    if (cleanUrl.startsWith('assets/')) {
+      return Image.asset(
+        cleanUrl,
+        fit: fit,
+        errorBuilder: (_, __, ___) => _bannerFallback(fit),
+      );
+    }
+
+    // 3. Base64 data URL
+    if (cleanUrl.startsWith('data:image')) {
+      try {
+        final commaIdx = cleanUrl.indexOf(',');
+        final base64Str = commaIdx != -1 ? cleanUrl.substring(commaIdx + 1) : cleanUrl;
+        return Image.memory(
+          base64Decode(base64Str),
+          fit: fit,
+          errorBuilder: (_, __, ___) => _bannerFallback(fit),
+        );
+      } catch (_) {
+        return _bannerFallback(fit);
+      }
+    }
+
+    // 4. Remote or relative URL
+    String fullUrl = cleanUrl;
+    if (fullUrl.startsWith('/')) {
+      fullUrl = 'http://localhost:3000$fullUrl';
+    }
+
+    return Image.network(
+      fullUrl,
+      fit: fit,
+      errorBuilder: (_, __, ___) => _bannerFallback(fit),
+    );
+  }
+
+  Widget _bannerFallback([BoxFit fit = BoxFit.cover]) {
+    return Image.asset(
+      'assets/images/banner_bharatanatyam_kids.jpg',
+      fit: fit,
+      errorBuilder: (_, __, ___) => Container(
+        color: const Color(0xFF590231),
+        child: const Icon(Icons.campaign_rounded, color: Colors.white, size: 36),
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _parseActionLinks(dynamic rawLinks) {
+    if (rawLinks == null) return [];
+    if (rawLinks is List) {
+      return rawLinks.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+    }
+    if (rawLinks is String && rawLinks.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawLinks);
+        if (decoded is List) {
+          return decoded.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+        }
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  Future<void> _launchActionUrl(String url) async {
+    final clean = url.trim();
+    if (clean.isEmpty) return;
+    try {
+      final uri = Uri.parse(clean.startsWith('http') || clean.startsWith('tel:') || clean.startsWith('mailto:') ? clean : 'https://$clean');
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('Could not launch $url: $e');
+    }
+  }
+
   void _showAnnouncementDetail(Map<String, dynamic> ann) {
+    final actionLinks = _parseActionLinks(ann['action_links']);
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.88,
+        ),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.only(
@@ -104,85 +222,189 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
             topRight: Radius.circular(26),
           ),
         ),
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (ann['image_url'] != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: AspectRatio(
-                  aspectRatio: 2.2 / 1,
-                  child: Image.network(
-                    ann['image_url'],
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: LaasyaColors.primary.withOpacity(0.1),
-                      child: const Icon(Icons.campaign_rounded, color: LaasyaColors.primary, size: 36),
-                    ),
+        padding: const EdgeInsets.fromLTRB(22, 16, 22, 22),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF3E8EE),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                ann['type_tag'] ?? 'Academy Notice',
-                style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              ann['title'] ?? 'Notice',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              ann['message'] ?? '',
-              style: const TextStyle(fontSize: 13.5, color: Colors.black87, height: 1.45),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                const Icon(Icons.calendar_today_rounded, size: 14, color: Colors.grey),
-                const SizedBox(width: 6),
-                Text(
-                  ann['date'] ?? 'Recent',
-                  style: const TextStyle(fontSize: 11.5, color: Colors.grey, fontWeight: FontWeight.w500),
+              const SizedBox(height: 16),
+              if (ann['image_url'] != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    color: const Color(0xFF1E0111),
+                    child: AspectRatio(
+                      aspectRatio: 3 / 4,
+                      child: _buildAnnouncementImage(
+                        ann['image_url'],
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
                 ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3E8EE),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      ann['type_tag'] ?? 'Academy Notice',
+                      style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today_rounded, size: 13, color: Colors.grey),
+                      const SizedBox(width: 5),
+                      Text(
+                        ann['date'] ?? 'Recent',
+                        style: const TextStyle(fontSize: 11.5, color: Colors.grey, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                ann['title'] ?? 'Notice',
+                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                ann['message'] ?? '',
+                style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
+              ),
+
+              // Action Links / Resource Buttons (if specified)
+              if (actionLinks.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                const Divider(height: 1),
+                const SizedBox(height: 14),
+                const Row(
+                  children: [
+                    Icon(Icons.link_rounded, size: 18, color: LaasyaColors.primary),
+                    SizedBox(width: 6),
+                    Text(
+                      'Action Links & Resources',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: LaasyaColors.primary,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ...actionLinks.map((link) {
+                  final linkTitle = link['title']?.toString() ?? 'Open Link';
+                  final linkUrl = link['url']?.toString() ?? '';
+                  final isPhone = linkUrl.startsWith('tel:');
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _launchActionUrl(linkUrl),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF2F8),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFF0D5E4)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: LaasyaColors.primary.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  isPhone ? Icons.phone_in_talk_rounded : Icons.open_in_new_rounded,
+                                  size: 18,
+                                  color: LaasyaColors.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      linkTitle,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: LaasyaColors.primary,
+                                      ),
+                                    ),
+                                    if (linkUrl.isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        linkUrl,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 13,
+                                color: LaasyaColors.primary,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
               ],
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: LaasyaColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: LaasyaColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Close Notice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 ),
-                child: const Text('Close Notice', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -415,15 +637,15 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                 ),
                 const SizedBox(width: 8),
                 _quickActionButton(
-                  icon: Icons.receipt_long_rounded,
-                  label: 'Invoices',
+                  icon: Icons.chat_bubble_rounded,
+                  label: 'Messages',
                   bgColor: const Color(0xFFDEF7EC),
-                  iconColor: const Color(0xFF03543F),
+                  iconColor: const Color(0xFF075E54),
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => StudentPaymentsScreen(studentProfile: _profile),
+                        builder: (_) => const StudentMessagesScreen(),
                       ),
                     );
                   },
@@ -442,7 +664,184 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
             const SizedBox(height: 18),
 
             // =================================================================
-            // 3. MOVING ADVERTISEMENT BANNER WITH IMAGES (BELOW WELCOME BAR)
+            // 3. TUITION FEE & DUES STATUS (ON TOP OF ACADEMY ANNOUNCEMENTS)
+            // =================================================================
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFF0D5E4)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.025),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.currency_rupee_rounded, color: LaasyaColors.primary, size: 19),
+                          SizedBox(width: 6),
+                          Text(
+                            'Tuition Fee & Dues Status',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                        decoration: BoxDecoration(
+                          color: dueBadgeBg,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          dueLabel,
+                          style: TextStyle(color: dueBadgeText, fontSize: 10.5, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF9FB),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFF0D5E4)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Monthly Fee', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 3),
+                              Text('₹$totalFee', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3FAF7),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFC7EBD9)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Paid / Advance', style: TextStyle(fontSize: 10, color: Color(0xFF03543F), fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 3),
+                              Text('₹$advancePaid', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: (dueAmount > 0) ? const Color(0xFFFDF2F2) : const Color(0xFFFFF9FB),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: (dueAmount > 0) ? const Color(0xFFF8B4B4) : const Color(0xFFF0D5E4)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Balance Due', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 3),
+                              Text('₹$dueAmount', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: dueBadgeText)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // DUE DATE PROMINENTLY DISPLAYED WHEN DUE IS PENDING (MANDATED REQUIREMENT)
+                  const SizedBox(height: 12),
+                  if (dueAmount > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDF2F2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFF8B4B4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.event_busy_rounded, size: 16, color: Color(0xFF9B1C1C)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: RichText(
+                              text: TextSpan(
+                                style: const TextStyle(fontSize: 11.5, color: Color(0xFF9B1C1C)),
+                                children: [
+                                  const TextSpan(text: 'Due Date: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  TextSpan(
+                                    text: '${_profile?['due_date'] ?? '10th Oct 2026'} ',
+                                    style: const TextStyle(fontWeight: FontWeight.w900, decoration: TextDecoration.underline),
+                                  ),
+                                  TextSpan(
+                                    text: '• Pending Amount ₹$dueAmount',
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDEF7EC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF31C48D).withOpacity(0.35)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.verified_rounded, size: 16, color: Color(0xFF03543F)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: RichText(
+                              text: TextSpan(
+                                style: const TextStyle(fontSize: 11.5, color: Color(0xFF03543F)),
+                                children: [
+                                  const TextSpan(text: 'No Dues Pending • Next Due Cycle: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  TextSpan(
+                                    text: '${_profile?['next_due_date'] ?? '10th Nov 2026'}',
+                                    style: const TextStyle(fontWeight: FontWeight.w900),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 18),
+
+            // =================================================================
+            // 4. MOVING ADVERTISEMENT BANNER WITH IMAGES
             // =================================================================
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -499,7 +898,7 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
               Column(
                 children: [
                   SizedBox(
-                    height: 168,
+                    height: 400,
                     child: PageView.builder(
                       controller: _bannerController,
                       itemCount: _announcements.length,
@@ -507,13 +906,14 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                       itemBuilder: (context, index) {
                         final ann = _announcements[index];
                         final imageUrl = ann['image_url'] ??
-                            'https://images.unsplash.com/photo-1547153760-18fc86324498?w=800&auto=format&fit=crop&q=80';
+                            'assets/images/banner_bharatanatyam_kids.jpg';
 
                         return GestureDetector(
                           onTap: () => _showAnnouncementDetail(ann),
                           child: Container(
                             margin: const EdgeInsets.symmetric(horizontal: 2),
                             decoration: BoxDecoration(
+                              color: const Color(0xFF1E0111),
                               borderRadius: BorderRadius.circular(18),
                               border: Border.all(color: const Color(0xFFF0D5E4)),
                               boxShadow: [
@@ -529,17 +929,10 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  // Banner Image
-                                  Image.network(
+                                  // Banner Image (Poster Aspect Ratio)
+                                  _buildAnnouncementImage(
                                     imageUrl,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      decoration: const BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [Color(0xFF590231), Color(0xFF8A064D)],
-                                        ),
-                                      ),
-                                    ),
                                   ),
 
                                   // High contrast gradient overlay
@@ -658,155 +1051,6 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                   ),
                 ],
               ),
-
-            const SizedBox(height: 18),
-
-            // =================================================================
-            // 4. TUITION FEE & DUES STATUS BAR (EXECUTIVE REPLACED FROM PROFILE)
-            // =================================================================
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFF0D5E4)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.025),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.currency_rupee_rounded, color: LaasyaColors.primary, size: 19),
-                          SizedBox(width: 6),
-                          Text(
-                            'Tuition Fee & Dues Status',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
-                        decoration: BoxDecoration(
-                          color: dueBadgeBg,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          dueLabel,
-                          style: TextStyle(color: dueBadgeText, fontSize: 10.5, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF9FB),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFF0D5E4)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Monthly Fee', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 3),
-                              Text('₹$totalFee', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF3FAF7),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFC7EBD9)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Paid / Advance', style: TextStyle(fontSize: 10, color: Color(0xFF03543F), fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 3),
-                              Text('₹$advancePaid', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: (dueAmount > 0) ? const Color(0xFFFDF2F2) : const Color(0xFFFFF9FB),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: (dueAmount > 0) ? const Color(0xFFF8B4B4) : const Color(0xFFF0D5E4)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Balance Due', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 3),
-                              Text('₹$dueAmount', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: dueBadgeText)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => StudentPaymentsScreen(studentProfile: _profile),
-                        ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.receipt_long_rounded, size: 14, color: LaasyaColors.primary),
-                              SizedBox(width: 6),
-                              Text(
-                                'View Payment History & Download Invoices',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: LaasyaColors.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Icon(Icons.arrow_forward_ios_rounded, size: 12, color: LaasyaColors.primary),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
             const SizedBox(height: 20),
 

@@ -2,13 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAnnouncements, createAnnouncement } from '@/lib/announcements';
 import { getCurrentUser } from '@/lib/auth';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, DELETE',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user || user.role !== 'owner') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || undefined;
     const audience = searchParams.get('audience') || undefined;
@@ -16,6 +21,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || undefined;
     const startDate = searchParams.get('startDate') || undefined;
     const endDate = searchParams.get('endDate') || undefined;
+    const announcementType = searchParams.get('announcementType') || searchParams.get('type') || undefined;
 
     const announcements = await getAnnouncements({
       status,
@@ -23,16 +29,19 @@ export async function GET(request: NextRequest) {
       typeTag,
       search,
       startDate,
-      endDate
+      endDate,
+      announcementType,
     });
 
     return NextResponse.json({
       success: true,
       announcements
-    });
+    }, { headers: corsHeaders });
   } catch (error: any) {
-    console.error('Error fetching announcements:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500, headers: corsHeaders }
+    );
   }
 }
 
@@ -40,7 +49,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user || user.role !== 'owner') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
     }
 
     const body = await request.json();

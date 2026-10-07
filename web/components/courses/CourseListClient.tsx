@@ -27,8 +27,10 @@ import {
   AlertTriangle,
   Image as ImageIcon,
   Upload,
-  User
+  User,
+  Lock
 } from 'lucide-react';
+import CourseImageUploadInput from '@/components/common/CourseImageUploadInput';
 
 const COURSE_GURUS_MAP: Record<string, string> = {
   'Bharathanatyam': 'Smt. Anusha Sumesh (Founder & Guru)',
@@ -81,20 +83,6 @@ const CATEGORY_DEFAULT_IMAGES: Record<string, string> = {
   'Fine Arts': 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=800&q=80',
   'Mind Sports': 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&w=800&q=80'
 };
-
-const SUGGESTED_COURSE_IMAGES = [
-  { label: 'Classical Dance', url: 'https://images.unsplash.com/photo-1617196034183-421b4917c92d?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Western Dance', url: 'https://images.unsplash.com/photo-1535525153412-5a42439a210d?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Carnatic Vocal', url: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Violin / Strings', url: 'https://images.unsplash.com/photo-1612225330812-01a9c6b355ec?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Keyboard / Piano', url: 'https://images.unsplash.com/photo-1520523839898-50712140e698?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Guitar', url: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Drawing & Art', url: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Craft & Design', url: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Martial Arts', url: 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Yoga & Fitness', url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Chess & Mind', url: 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&w=800&q=80' }
-];
 
 function getCourseImage(course: Course): string {
   if (course.image_url && course.image_url.trim()) {
@@ -1180,16 +1168,20 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Course Code <span className="text-[10px] text-[#8A064D]">(Editable)</span>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5 flex items-center justify-between">
+                    <span>Course Code</span>
+                    <span className="text-[10px] text-gray-500 font-bold flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-gray-400" />
+                      <span>Locked</span>
+                    </span>
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={editCode}
-                    onChange={(e) => setEditCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
-                  />
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-100/90 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-600 select-none">
+                    <Lock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <span className="tracking-wide">{editCode}</span>
+                    <span className="ml-auto text-[9px] uppercase tracking-wider font-extrabold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-md">
+                      Read-Only
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1264,90 +1256,14 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 )}
               </div>
 
-              {/* Course Image Option */}
-              <div className="space-y-2 p-3 bg-gray-50/80 rounded-2xl border border-gray-200">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-black text-[#590231] uppercase tracking-wide flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-[#8A064D]" />
-                    <span>Course Image</span>
-                  </label>
-                  {editImageUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setEditImageUrl('')}
-                      className="text-[10px] text-rose-600 hover:underline font-bold cursor-pointer"
-                    >
-                      Clear Image
-                    </button>
-                  )}
-                </div>
-
-                {/* Thumbnail Preview + URL Input + File Upload */}
-                <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-200 border border-gray-300 shrink-0 relative">
-                    <img
-                      src={editImageUrl || (editingCourse ? getCourseImage(editingCourse) : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80')}
-                      alt="Course Preview"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80';
-                      }}
-                    />
-                  </div>
-                  <div className="flex-1 space-y-1.5">
-                    <input
-                      type="url"
-                      placeholder="Paste image URL (https://...)"
-                      value={editImageUrl}
-                      onChange={(e) => setEditImageUrl(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D]"
-                    />
-                    <label className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-[11px] font-bold text-gray-700 cursor-pointer transition shadow-2xs">
-                      <Upload className="w-3 h-3 text-[#8A064D]" />
-                      <span>Upload from Device</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            if (file.size > 2 * 1024 * 1024) {
-                              alert('Image file size should be less than 2MB');
-                              return;
-                            }
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              if (reader.result) setEditImageUrl(reader.result as string);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* Quick Cultural Presets */}
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 block mb-1">Quick Select Cultural Presets:</span>
-                  <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-1">
-                    {SUGGESTED_COURSE_IMAGES.map((preset) => (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => setEditImageUrl(preset.url)}
-                        className={`text-[10px] px-2 py-0.5 rounded-md font-medium transition cursor-pointer border ${
-                          editImageUrl === preset.url
-                            ? 'bg-[#8A064D] text-white border-[#8A064D]'
-                            : 'bg-white hover:bg-[#FFF2F8] text-gray-600 border-gray-200'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {/* Course Image Upload & Interactive Framing Studio */}
+              <div className="p-3.5 bg-gray-50/80 rounded-2xl border border-gray-200">
+                <CourseImageUploadInput
+                  value={editImageUrl}
+                  onChange={(url) => setEditImageUrl(url || '')}
+                  label="Course Cover Image (Upload Only)"
+                  maxSizeMB={5}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1463,16 +1379,20 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Course Code <span className="text-[10px] text-emerald-600 font-normal">(Auto)</span>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5 flex items-center justify-between">
+                    <span>Course Code</span>
+                    <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-emerald-600" />
+                      <span>Auto-Assigned</span>
+                    </span>
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={newCode}
-                    onChange={(e) => setNewCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-black text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
-                  />
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-100/90 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-600 select-none">
+                    <Lock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <span className="tracking-wide">{newCode}</span>
+                    <span className="ml-auto text-[9px] uppercase tracking-wider font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                      System ID
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1537,90 +1457,14 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 )}
               </div>
 
-              {/* Course Image Option */}
-              <div className="space-y-2 p-3 bg-gray-50/80 rounded-2xl border border-gray-200">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-black text-[#590231] uppercase tracking-wide flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-[#8A064D]" />
-                    <span>Course Image</span>
-                  </label>
-                  {newImageUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setNewImageUrl('')}
-                      className="text-[10px] text-rose-600 hover:underline font-bold cursor-pointer"
-                    >
-                      Clear Image
-                    </button>
-                  )}
-                </div>
-
-                {/* Thumbnail Preview + URL Input + File Upload */}
-                <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-200 border border-gray-300 shrink-0 relative">
-                    <img
-                      src={newImageUrl || (newCategory && CATEGORY_DEFAULT_IMAGES[newCategory]) || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80'}
-                      alt="Course Preview"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80';
-                      }}
-                    />
-                  </div>
-                  <div className="flex-1 space-y-1.5">
-                    <input
-                      type="url"
-                      placeholder="Paste image URL (https://...)"
-                      value={newImageUrl}
-                      onChange={(e) => setNewImageUrl(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D]"
-                    />
-                    <label className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-[11px] font-bold text-gray-700 cursor-pointer transition shadow-2xs">
-                      <Upload className="w-3 h-3 text-[#8A064D]" />
-                      <span>Upload from Device</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            if (file.size > 2 * 1024 * 1024) {
-                              alert('Image file size should be less than 2MB');
-                              return;
-                            }
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              if (reader.result) setNewImageUrl(reader.result as string);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* Quick Cultural Presets */}
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 block mb-1">Quick Select Cultural Presets:</span>
-                  <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-1">
-                    {SUGGESTED_COURSE_IMAGES.map((preset) => (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => setNewImageUrl(preset.url)}
-                        className={`text-[10px] px-2 py-0.5 rounded-md font-medium transition cursor-pointer border ${
-                          newImageUrl === preset.url
-                            ? 'bg-[#8A064D] text-white border-[#8A064D]'
-                            : 'bg-white hover:bg-[#FFF2F8] text-gray-600 border-gray-200'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {/* Course Image Upload & Interactive Framing Studio */}
+              <div className="p-3.5 bg-gray-50/80 rounded-2xl border border-gray-200">
+                <CourseImageUploadInput
+                  value={newImageUrl}
+                  onChange={(url) => setNewImageUrl(url || '')}
+                  label="Course Cover Image (Upload Only)"
+                  maxSizeMB={5}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

@@ -172,6 +172,7 @@ export default function DashboardShell({ user, children }: Props) {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={false}
                 onClick={() => setIsMobileOpen(false)}
                 title={isCollapsed ? item.label : undefined}
                 className={`flex items-center ${isCollapsed ? 'justify-center px-2 py-2.5' : 'px-3.5 py-2.5'} rounded-xl text-[15px] font-bold transition-all duration-150 group relative ${

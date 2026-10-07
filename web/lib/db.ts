@@ -1,21 +1,27 @@
 import { Pool } from 'pg';
 
-let pool: Pool | null = null;
+declare global {
+  var _pgPool: Pool | undefined;
+}
 
 export function getDbPool(): Pool {
-  if (!pool) {
+  if (!globalThis._pgPool) {
     const connectionString = process.env.DATABASE_URL || 'postgresql://postgres.bhpqzrcohjigkkpmcdsy:Satya%4024530@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres';
-    pool = new Pool({
+    globalThis._pgPool = new Pool({
       connectionString,
       ssl: {
         rejectUnauthorized: false
       },
       max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000
+      idleTimeoutMillis: 5000,
+      connectionTimeoutMillis: 5000
+    });
+
+    globalThis._pgPool.on('error', (err) => {
+      console.error('Unexpected idle client error in PostgreSQL pool:', err);
     });
   }
-  return pool;
+  return globalThis._pgPool;
 }
 
 export async function query<T = any>(text: string, params?: any[]): Promise<T[]> {

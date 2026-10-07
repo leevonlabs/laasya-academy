@@ -25,12 +25,40 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
   String _searchQuery = '';
   String _activeTab = 'my_course'; // 'my_course' or 'all'
 
-  // Standard Website Date Range Filter State
-  // Default to This Month (October 2026 - Academic calendar active month)
-  String _activePreset = 'This Month';
-  DateTime? _startDate = DateTime(2026, 10, 1);
-  DateTime? _endDate = DateTime(2026, 10, 31, 23, 59, 59);
-  String _displayMonthYear = 'October 2026';
+  // Multi-Year & Month Filter State (Side-scrolling multi-year selection)
+  Set<int> _selectedYears = {2026};
+  int? _selectedMonth = 10; // Default: October (10), null = All Months
+
+  static const List<int> _availableYears = [
+    2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030
+  ];
+
+  static const List<String> _monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  static const List<String> _shortMonths = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+
+  String get _displayMonthYear {
+    String yearPart;
+    if (_selectedYears.isEmpty || _selectedYears.length == _availableYears.length) {
+      yearPart = 'All Years';
+    } else if (_selectedYears.length == 1) {
+      yearPart = '${_selectedYears.first}';
+    } else {
+      final sorted = _selectedYears.toList()..sort();
+      yearPart = sorted.join(', ');
+    }
+
+    if (_selectedMonth == null) {
+      return 'All Months ($yearPart)';
+    }
+    return '${_monthNames[_selectedMonth! - 1]} ($yearPart)';
+  }
 
   @override
   void initState() {
@@ -92,59 +120,42 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
     return _parseDate(item['event_date']);
   }
 
-  // Standard preset switcher
-  void _applyPreset(String preset) {
-    final now = DateTime(2026, 10, 5); // Reference calendar anchor
-    DateTime? sDate;
-    DateTime? eDate;
-    String monthYear = 'October 2026';
-
-    switch (preset) {
-      case 'This Month':
-        sDate = DateTime(2026, 10, 1);
-        eDate = DateTime(2026, 10, 31, 23, 59, 59);
-        monthYear = 'October 2026';
-        break;
-      case 'Last Month':
-        sDate = DateTime(2026, 9, 1);
-        eDate = DateTime(2026, 9, 30, 23, 59, 59);
-        monthYear = 'September 2026';
-        break;
-      case 'Last 30 Days':
-        sDate = now.subtract(const Duration(days: 30));
-        eDate = now;
-        monthYear = 'Sep - Oct 2026';
-        break;
-      case 'Last 7 Days':
-        sDate = now.subtract(const Duration(days: 7));
-        eDate = now;
-        monthYear = 'Oct 2026 (Last 7 Days)';
-        break;
-      case 'All Time':
-        sDate = null;
-        eDate = null;
-        monthYear = 'All Time Archive';
-        break;
-      default:
-        break;
-    }
-
+  void _stepMonth(int delta) {
     setState(() {
-      _activePreset = preset;
-      _startDate = sDate;
-      _endDate = eDate;
-      _displayMonthYear = monthYear;
+      if (_selectedMonth == null) {
+        _selectedMonth = delta > 0 ? 1 : 12;
+      } else {
+        int m = _selectedMonth! + delta;
+        if (m > 12) {
+          _selectedMonth = 1;
+          if (_selectedYears.isNotEmpty) {
+            final maxYear = _selectedYears.reduce((a, b) => a > b ? a : b);
+            if (maxYear < 2030) _selectedYears = {maxYear + 1};
+          }
+        } else if (m < 1) {
+          _selectedMonth = 12;
+          if (_selectedYears.isNotEmpty) {
+            final minYear = _selectedYears.reduce((a, b) => a < b ? a : b);
+            if (minYear > 2022) _selectedYears = {minYear - 1};
+          }
+        } else {
+          _selectedMonth = m;
+        }
+      }
     });
   }
 
-  // Standard Date Range Filter Sheet matching website & student attendance
-  void _openDateFilterSheet() {
+  // Month & Year Filter Selection Sheet (Side scrolling multi-year selection)
+  void _openMonthYearFilterSheet() {
+    Set<int> tempYears = Set<int>.from(_selectedYears);
+    int? tempMonth = _selectedMonth;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) {
-        return Container(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Container(
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.only(
@@ -172,7 +183,7 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Select Upload Period',
+                    'Select Month & Years',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -186,150 +197,241 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                 ],
               ),
               const Text(
-                'Filter event videos by their publishing/upload date',
+                'Side-scroll to select multiple years and target month',
                 style: TextStyle(fontSize: 12, color: Colors.black54),
               ),
               const SizedBox(height: 16),
               const Divider(height: 1),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
 
-              _presetTile(
-                ctx,
-                label: 'This Month (October 2026)',
-                presetKey: 'This Month',
-                badgeText: 'Default',
+              // Side-Scrolling Multi-Year Selector Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'SELECT YEARS (SIDE-SCROLL)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                      color: Color(0xFF8A064D),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () {
+                      setSheetState(() {
+                        if (tempYears.length == _availableYears.length) {
+                          tempYears = {2026};
+                        } else {
+                          tempYears = Set.from(_availableYears);
+                        }
+                      });
+                    },
+                    child: Text(
+                      tempYears.length == _availableYears.length ? 'Reset to 2026' : 'Select All Years',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF8A064D),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              _presetTile(
-                ctx,
-                label: 'Last Month (September 2026)',
-                presetKey: 'Last Month',
-              ),
-              _presetTile(
-                ctx,
-                label: 'Last 30 Days',
-                presetKey: 'Last 30 Days',
-              ),
-              _presetTile(
-                ctx,
-                label: 'Last 7 Days',
-                presetKey: 'Last 7 Days',
-              ),
-              _presetTile(
-                ctx,
-                label: 'All Time (Full Video Archive)',
-                presetKey: 'All Time',
-              ),
+              const SizedBox(height: 8),
 
-              const SizedBox(height: 10),
-              // Custom Date Range Picker
-              OutlinedButton.icon(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  final picked = await showDateRangePicker(
-                    context: context,
-                    firstDate: DateTime(2025, 1, 1),
-                    lastDate: DateTime(2027, 12, 31),
-                    initialDateRange: _startDate != null && _endDate != null
-                        ? DateTimeRange(start: _startDate!, end: _endDate!)
-                        : DateTimeRange(start: DateTime(2026, 10, 1), end: DateTime(2026, 10, 31)),
-                    builder: (context, child) {
-                      return Theme(
-                        data: Theme.of(context).copyWith(
-                          colorScheme: const ColorScheme.light(
-                            primary: LaasyaColors.primary,
-                            onPrimary: Colors.white,
-                            onSurface: LaasyaColors.textDark,
+              // Horizontal Side-Scrolling Year Chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    // All Years toggle chip
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: InkWell(
+                        onTap: () {
+                          setSheetState(() {
+                            if (tempYears.length == _availableYears.length) {
+                              tempYears = {2026};
+                            } else {
+                              tempYears = Set.from(_availableYears);
+                            }
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: tempYears.length == _availableYears.length
+                                ? LaasyaColors.primary
+                                : const Color(0xFFFFF9FB),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: tempYears.length == _availableYears.length
+                                  ? LaasyaColors.primary
+                                  : const Color(0xFFF0D5E4),
+                            ),
+                          ),
+                          child: Text(
+                            'All Years',
+                            style: TextStyle(
+                              color: tempYears.length == _availableYears.length ? Colors.white : Colors.black87,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12.5,
+                            ),
                           ),
                         ),
-                        child: child!,
+                      ),
+                    ),
+                    ..._availableYears.map((y) {
+                      final isSelected = tempYears.contains(y);
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: InkWell(
+                          onTap: () {
+                            setSheetState(() {
+                              if (isSelected) {
+                                if (tempYears.length > 1) {
+                                  tempYears.remove(y);
+                                }
+                              } else {
+                                tempYears.add(y);
+                              }
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected ? LaasyaColors.primary : const Color(0xFFFFF9FB),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected ? LaasyaColors.primary : const Color(0xFFF0D5E4),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isSelected) ...[
+                                  const Icon(Icons.check, size: 13, color: Colors.white),
+                                  const SizedBox(width: 4),
+                                ],
+                                Text(
+                                  '$y',
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : Colors.black87,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       );
-                    },
-                  );
+                    }),
+                  ],
+                ),
+              ),
 
-                  if (picked != null) {
-                    setState(() {
-                      _activePreset = 'Custom';
-                      _startDate = picked.start;
-                      _endDate = picked.end.add(const Duration(hours: 23, minutes: 59, seconds: 59));
-                      _displayMonthYear = '${picked.start.day}/${picked.start.month}/${picked.start.year} - ${picked.end.day}/${picked.end.month}/${picked.end.year}';
-                    });
-                  }
+              const SizedBox(height: 18),
+
+              // Month Selector Grid (12 months)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'MONTH',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                      color: Color(0xFF8A064D),
+                    ),
+                  ),
+                  if (tempMonth != null)
+                    InkWell(
+                      onTap: () => setSheetState(() => tempMonth = null),
+                      child: const Text(
+                        'Select All Months',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF8A064D),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 2.1,
+                ),
+                itemCount: 12,
+                itemBuilder: (context, idx) {
+                  final m = idx + 1;
+                  final isSelected = tempMonth == m;
+                  return InkWell(
+                    onTap: () {
+                      setSheetState(() => tempMonth = isSelected ? null : m);
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected ? LaasyaColors.primary : const Color(0xFFFFF9FB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isSelected ? LaasyaColors.primary : const Color(0xFFF0D5E4),
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _shortMonths[idx],
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.black87,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                  );
                 },
-                icon: const Icon(Icons.date_range_rounded, size: 18),
-                label: const Text('Custom Date Range...'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: LaasyaColors.primary,
-                  side: const BorderSide(color: Color(0xFFF0D5E4)),
-                  minimumSize: const Size(double.infinity, 44),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+
+              const SizedBox(height: 18),
+
+              // Action Buttons: Apply Filter
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedYears = tempYears;
+                      _selectedMonth = tempMonth;
+                    });
+                    Navigator.pop(ctx);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: LaasyaColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(
+                    'Apply Filter (${tempYears.length == _availableYears.length ? "All Years" : "${tempYears.length} Years Selected"}${tempMonth != null ? " • ${_shortMonths[tempMonth! - 1]}" : " • All Months"})',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
                 ),
               ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _presetTile(
-    BuildContext ctx, {
-    required String label,
-    required String presetKey,
-    String? badgeText,
-  }) {
-    final isSelected = _activePreset == presetKey;
-    return InkWell(
-      onTap: () {
-        Navigator.pop(ctx);
-        _applyPreset(presetKey);
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFFF2F8) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? LaasyaColors.primary : Colors.grey.shade200,
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-              color: isSelected ? LaasyaColors.primary : Colors.grey,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? LaasyaColors.primary : LaasyaColors.textDark,
-                ),
-              ),
-            ),
-            if (badgeText != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDEF7EC),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  badgeText,
-                  style: const TextStyle(
-                    color: Color(0xFF03543F),
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-          ],
         ),
       ),
     );
@@ -389,23 +491,18 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
     return false;
   }
 
-  // Check upload date matches selected date range
+  // Check upload date matches selected month and year
   bool _matchesUploadDate(Map<String, dynamic> item) {
-    if (_startDate == null && _endDate == null) return true;
     final itemDate = _getUploadDate(item);
     if (itemDate == null) return true;
 
-    if (_startDate != null) {
-      final startDay = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
-      final itemDay = DateTime(itemDate.year, itemDate.month, itemDate.day);
-      if (itemDay.isBefore(startDay)) return false;
-    }
+    // Check year match (matches all if empty or contains)
+    final matchesYear = _selectedYears.isEmpty || _selectedYears.contains(itemDate.year);
+    if (!matchesYear) return false;
 
-    if (_endDate != null) {
-      final endDay = DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59);
-      if (itemDate.isAfter(endDay)) return false;
+    if (_selectedMonth != null) {
+      return itemDate.month == _selectedMonth;
     }
-
     return true;
   }
 
@@ -464,7 +561,7 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                     // 1. PROMINENT ACTIVE MONTH & YEAR ON TOP (USER REQUIREMENT)
                     // =========================================================
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
@@ -480,7 +577,7 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.all(9),
                             decoration: BoxDecoration(
                               color: const Color(0xFFFFF2F8),
                               borderRadius: BorderRadius.circular(12),
@@ -489,65 +586,69 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                             child: const Icon(
                               Icons.calendar_month_rounded,
                               color: LaasyaColors.primary,
-                              size: 22,
+                              size: 20,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Text(
-                                      'ACTIVE MONTH & YEAR',
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        letterSpacing: 0.8,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF8A064D),
-                                      ),
+                            child: InkWell(
+                              onTap: _openMonthYearFilterSheet,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'MONTH & YEAR FILTER',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      letterSpacing: 0.8,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF8A064D),
                                     ),
-                                    if (_activePreset == 'This Month') ...[
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFDEF7EC),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: const Text(
-                                          'DEFAULT',
-                                          style: TextStyle(
-                                            fontSize: 8.5,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          _displayMonthYear,
+                                          style: const TextStyle(
+                                            fontSize: 15,
                                             fontWeight: FontWeight.bold,
-                                            color: Color(0xFF03543F),
+                                            color: LaasyaColors.textDark,
                                           ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
+                                      const SizedBox(width: 3),
+                                      const Icon(Icons.arrow_drop_down, color: LaasyaColors.primary, size: 18),
                                     ],
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  _displayMonthYear,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: LaasyaColors.textDark,
                                   ),
-                                ),
-                                const SizedBox(height: 1),
-                                const Text(
-                                  'Videos filtered by upload date',
-                                  style: TextStyle(fontSize: 10.5, color: Colors.grey),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                          // Date Filter Selector Button
+                          // Month Nav Stepper: Previous Month (<)
+                          IconButton(
+                            icon: const Icon(Icons.chevron_left_rounded, size: 24, color: LaasyaColors.primary),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            tooltip: 'Previous Month',
+                            onPressed: () => _stepMonth(-1),
+                          ),
+                          const SizedBox(width: 4),
+                          // Month Nav Stepper: Next Month (>)
+                          IconButton(
+                            icon: const Icon(Icons.chevron_right_rounded, size: 24, color: LaasyaColors.primary),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            tooltip: 'Next Month',
+                            onPressed: () => _stepMonth(1),
+                          ),
+                          const SizedBox(width: 8),
+                          // Month & Year Picker Button
                           InkWell(
-                            onTap: _openDateFilterSheet,
+                            onTap: _openMonthYearFilterSheet,
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -555,25 +656,151 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                                 color: const Color(0xFF590231),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Row(
+                              child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.tune_rounded, color: LaasyaColors.accentGold, size: 14),
-                                  const SizedBox(width: 5),
+                                  Icon(Icons.tune_rounded, color: LaasyaColors.accentGold, size: 13),
+                                  SizedBox(width: 4),
                                   Text(
-                                    _activePreset,
-                                    style: const TextStyle(
+                                    'Filter',
+                                    style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  const SizedBox(width: 2),
-                                  const Icon(Icons.arrow_drop_down, color: Colors.white70, size: 16),
                                 ],
                               ),
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // =========================================================
+                    // 1.1 SIDE-SCROLLING MULTI-YEAR SELECTOR CHIPS (USER REQUIREMENT)
+                    // =========================================================
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: [
+                          // "All Years" Pill
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  if (_selectedYears.isEmpty || _selectedYears.length == _availableYears.length) {
+                                    _selectedYears = {2026};
+                                  } else {
+                                    _selectedYears = Set.from(_availableYears);
+                                  }
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6.5),
+                                decoration: BoxDecoration(
+                                  color: (_selectedYears.isEmpty || _selectedYears.length == _availableYears.length)
+                                      ? LaasyaColors.primary
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: (_selectedYears.isEmpty || _selectedYears.length == _availableYears.length)
+                                        ? LaasyaColors.primary
+                                        : const Color(0xFFF0D5E4),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.02),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.layers_rounded,
+                                      size: 13,
+                                      color: (_selectedYears.isEmpty || _selectedYears.length == _availableYears.length)
+                                          ? Colors.white
+                                          : LaasyaColors.primary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'All Years',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: (_selectedYears.isEmpty || _selectedYears.length == _availableYears.length)
+                                            ? Colors.white
+                                            : Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          ..._availableYears.map((y) {
+                            final isSelected = _selectedYears.contains(y);
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    if (isSelected) {
+                                      if (_selectedYears.length > 1) {
+                                        _selectedYears.remove(y);
+                                      }
+                                    } else {
+                                      _selectedYears.add(y);
+                                    }
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? LaasyaColors.primary : Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isSelected ? LaasyaColors.primary : const Color(0xFFF0D5E4),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.02),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (isSelected) ...[
+                                        const Icon(Icons.check, size: 11, color: Colors.white),
+                                        const SizedBox(width: 3),
+                                      ],
+                                      Text(
+                                        '$y',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSelected ? Colors.white : Colors.black87,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
                         ],
                       ),
                     ),
@@ -726,13 +953,13 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              _activePreset == 'This Month'
-                                  ? 'Only this month\'s videos are displayed by default. Tap "All Time" to explore older event recordings.'
-                                  : 'Try adjusting your date range filter or search keyword.',
+                              _selectedMonth != null
+                                  ? 'No videos found for $_displayMonthYear. Use the month & year filter above to explore other dates.'
+                                  : 'Try adjusting your search keyword or selecting a specific month.',
                               style: const TextStyle(fontSize: 11.5, color: Colors.grey),
                               textAlign: TextAlign.center,
                             ),
-                            if (_activePreset != 'All Time') ...[
+                            if (_selectedMonth != null) ...[
                               const SizedBox(height: 14),
                               ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
@@ -741,9 +968,13 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                                 ),
-                                onPressed: () => _applyPreset('All Time'),
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedMonth = null;
+                                  });
+                                },
                                 icon: const Icon(Icons.history_rounded, size: 15),
-                                label: const Text('View All Time Archive', style: TextStyle(fontSize: 12)),
+                                label: const Text('Show All Months', style: TextStyle(fontSize: 12)),
                               ),
                             ],
                           ],

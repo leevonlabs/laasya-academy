@@ -119,41 +119,45 @@ export interface FinancialSummary {
 // FINANCIAL SUMMARY FOR OWNER DASHBOARD
 // -------------------------------------------------------------
 export async function getFinancialSummary(): Promise<FinancialSummary> {
-  const [feeRow] = await query<{
-    total_collected: string;
-    total_pending: string;
-    total_billed: string;
-    overdue_count: string;
-    partial_count: string;
-    students_count: string;
-  }>(`
-    SELECT 
-      COALESCE(SUM(paid_amount), 0) as total_collected,
-      COALESCE(SUM(balance_amount), 0) as total_pending,
-      COALESCE(SUM(total_amount - discount_amount), 0) as total_billed,
-      COUNT(CASE WHEN status = 'overdue' THEN 1 END) as overdue_count,
-      COUNT(CASE WHEN status = 'partial' THEN 1 END) as partial_count,
-      COUNT(DISTINCT student_id) as students_count
-    FROM public.student_fee_invoices;
-  `);
+  const [feeRows, salaryRows, advancesRows] = await Promise.all([
+    query<{
+      total_collected: string;
+      total_pending: string;
+      total_billed: string;
+      overdue_count: string;
+      partial_count: string;
+      students_count: string;
+    }>(`
+      SELECT 
+        COALESCE(SUM(paid_amount), 0) as total_collected,
+        COALESCE(SUM(balance_amount), 0) as total_pending,
+        COALESCE(SUM(total_amount - discount_amount), 0) as total_billed,
+        COUNT(CASE WHEN status = 'overdue' THEN 1 END) as overdue_count,
+        COUNT(CASE WHEN status = 'partial' THEN 1 END) as partial_count,
+        COUNT(DISTINCT student_id) as students_count
+      FROM public.student_fee_invoices;
+    `),
+    query<{
+      salaries_paid: string;
+      salaries_pending: string;
+      gurus_count: string;
+    }>(`
+      SELECT 
+        COALESCE(SUM(CASE WHEN status = 'paid' THEN net_salary ELSE 0 END), 0) as salaries_paid,
+        COALESCE(SUM(CASE WHEN status != 'paid' THEN net_salary ELSE 0 END), 0) as salaries_pending,
+        COUNT(DISTINCT trainer_id) as gurus_count
+      FROM public.guru_salary_records;
+    `),
+    query<{ active_advances: string }>(`
+      SELECT COALESCE(SUM(remaining_balance), 0) as active_advances
+      FROM public.guru_salary_advances
+      WHERE status != 'settled';
+    `)
+  ]);
 
-  const [salaryRow] = await query<{
-    salaries_paid: string;
-    salaries_pending: string;
-    gurus_count: string;
-  }>(`
-    SELECT 
-      COALESCE(SUM(CASE WHEN status = 'paid' THEN net_salary ELSE 0 END), 0) as salaries_paid,
-      COALESCE(SUM(CASE WHEN status != 'paid' THEN net_salary ELSE 0 END), 0) as salaries_pending,
-      COUNT(DISTINCT trainer_id) as gurus_count
-    FROM public.guru_salary_records;
-  `);
-
-  const [advancesRow] = await query<{ active_advances: string }>(`
-    SELECT COALESCE(SUM(remaining_balance), 0) as active_advances
-    FROM public.guru_salary_advances
-    WHERE status != 'settled';
-  `);
+  const feeRow = feeRows[0];
+  const salaryRow = salaryRows[0];
+  const advancesRow = advancesRows[0];
 
   const collected = Number(feeRow?.total_collected || 0);
   const pending = Number(feeRow?.total_pending || 0);

@@ -125,24 +125,7 @@ class _StudentProfileDetailsScreenState extends State<StudentProfileDetailsScree
                           ),
                         ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDEF7EC),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.verified_rounded, size: 12, color: Color(0xFF03543F)),
-                            SizedBox(width: 4),
-                            Text(
-                              'VERIFIED STUDENT',
-                              style: TextStyle(color: Color(0xFF03543F), fontSize: 9.5, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                      ),
+                      const SizedBox.shrink(),
                     ],
                   ),
                   const SizedBox(height: 18),
@@ -174,9 +157,19 @@ class _StudentProfileDetailsScreenState extends State<StudentProfileDetailsScree
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              name,
-                              style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold),
+                            Row(
+                              children: [
+                                Text(
+                                  name,
+                                  style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(width: 6),
+                                const Icon(
+                                  Icons.verified_rounded,
+                                  color: Color(0xFF31C48D),
+                                  size: 19,
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(

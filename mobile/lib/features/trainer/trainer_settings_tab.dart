@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
 import '../auth/portal_landing_screen.dart';
+import '../student/student_messages_screen.dart';
 import '../student/student_video_library_screen.dart';
 import 'trainer_profile_details_screen.dart';
 import 'trainer_salaries_screen.dart';
@@ -333,6 +334,25 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => TrainerSalariesScreen(trainerProfile: _profile),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, indent: 64),
+
+                  // 4. Academy Messages
+                  _settingsTile(
+                    icon: Icons.chat_bubble_rounded,
+                    iconBg: const Color(0xFFE8F4FD),
+                    iconColor: const Color(0xFF0284C7),
+                    title: 'Academy Messages',
+                    subtitle: 'Official broadcasts, parent circulars & academy notices',
+                    badgeText: 'MESSAGES',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const StudentMessagesScreen(),
                         ),
                       );
                     },

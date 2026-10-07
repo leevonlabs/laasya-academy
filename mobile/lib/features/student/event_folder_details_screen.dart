@@ -113,7 +113,7 @@ class EventFolderDetailsScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'Event Shoot Details',
+          'Event Details',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
@@ -341,14 +341,14 @@ class EventFolderDetailsScreen extends StatelessWidget {
                       Icon(Icons.notes_rounded, size: 18, color: LaasyaColors.primary),
                       SizedBox(width: 8),
                       Text(
-                        'Shoot Description & Instructions',
+                        'Event Description',
                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    desc.isEmpty ? 'No additional notes provided for this event shoot folder.' : desc,
+                    desc.isEmpty ? 'No additional notes provided for this event folder.' : desc,
                     style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.45),
                   ),
                 ],
@@ -358,106 +358,45 @@ class EventFolderDetailsScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // =================================================================
-            // 4. GOOGLE DRIVE ACCESS & REDIRECT ACTIONS
+            // 4. GOOGLE DRIVE ACTIONS (JUST SIMPLE 2 BUTTONS)
             // =================================================================
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFF0D5E4), width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF590231),
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: () => _openDriveUrl(context, driveUrl),
+                icon: const Icon(Icons.open_in_new_rounded, size: 20, color: LaasyaColors.accentGold),
+                label: const Text(
+                  'Open in Google Drive',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.2),
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.link_rounded, size: 20, color: LaasyaColors.primary),
-                      SizedBox(width: 8),
-                      Text(
-                        'Google Drive Media Folder',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Tap below to open directly in Google Drive or copy the link to your clipboard.',
-                    style: TextStyle(fontSize: 11.5, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 12),
+            ),
 
-                  // Drive URL box
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF9FB),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFF0D5E4)),
-                    ),
-                    child: Text(
-                      driveUrl,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        color: Colors.black87,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+            const SizedBox(height: 12),
 
-                  const SizedBox(height: 18),
-
-                  // Primary Button: Open in Google Drive (Redirects directly)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF590231),
-                        foregroundColor: Colors.white,
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: () => _openDriveUrl(context, driveUrl),
-                      icon: const Icon(Icons.open_in_new_rounded, size: 18, color: LaasyaColors.accentGold),
-                      label: const Text(
-                        'Open in Google Drive',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.2),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  // Secondary Button: Copy Drive Link
-                  SizedBox(
-                    width: double.infinity,
-                    height: 46,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: LaasyaColors.primary,
-                        side: const BorderSide(color: Color(0xFFF0D5E4), width: 1.2),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: () => _copyLink(context, driveUrl, title),
-                      icon: const Icon(Icons.copy_rounded, size: 16),
-                      label: const Text(
-                        'Copy Drive Link',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: LaasyaColors.primary,
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFFF0D5E4), width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: () => _copyLink(context, driveUrl, title),
+                icon: const Icon(Icons.copy_rounded, size: 18, color: LaasyaColors.primary),
+                label: const Text(
+                  'Copy Drive Link',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
 
