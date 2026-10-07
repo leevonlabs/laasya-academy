@@ -1015,6 +1015,30 @@ class SupabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getBannerAnnouncements() async {
+    // 1. Direct Supabase query if initialized
+    if (_isInitialized && _client != null) {
+      try {
+        final res = await _client!
+            .from('announcements')
+            .select()
+            .eq('is_deleted', false)
+            .eq('announcement_type', 'banner')
+            .order('created_at', ascending: false);
+        if (res.isNotEmpty) {
+          final live = List<Map<String, dynamic>>.from(res);
+          for (var item in live) {
+            item['image_url'] = _normalizeImageUrl(item['image_url']);
+            item['date'] = item['publish_date'] ?? 'Today';
+            item['is_read'] = false;
+          }
+          return live;
+        }
+      } catch (e) {
+        debugPrint('Supabase direct query banner error: $e');
+      }
+    }
+
+    // 2. HTTP API fallback
     try {
       final uri = Uri.parse('http://localhost:3000/api/announcements?announcementType=banner');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
@@ -1037,6 +1061,42 @@ class SupabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getMessageAnnouncements() async {
+    // 1. Direct Supabase query if initialized
+    if (_isInitialized && _client != null) {
+      try {
+        final res = await _client!
+            .from('announcements')
+            .select()
+            .eq('is_deleted', false)
+            .neq('announcement_type', 'banner')
+            .order('publish_date', ascending: false);
+        if (res.isNotEmpty) {
+          final now = DateTime.now();
+          final valid = <Map<String, dynamic>>[];
+          for (var item in res) {
+            final dateStr = item['publish_date'] ?? item['created_at'];
+            if (dateStr != null) {
+              try {
+                final dt = DateTime.parse(dateStr.toString().split('T')[0]);
+                if (now.difference(dt).inDays > 30) {
+                  continue; // Skip message older than 30 days
+                }
+              } catch (_) {}
+            }
+            final mapItem = Map<String, dynamic>.from(item);
+            mapItem['image_url'] = _normalizeImageUrl(mapItem['image_url']);
+            mapItem['date'] = mapItem['publish_date'] ?? 'Today';
+            mapItem['is_read'] = false;
+            valid.add(mapItem);
+          }
+          if (valid.isNotEmpty) return valid;
+        }
+      } catch (e) {
+        debugPrint('Supabase direct query message error: $e');
+      }
+    }
+
+    // 2. HTTP API fallback
     try {
       final uri = Uri.parse('http://localhost:3000/api/announcements?announcementType=message');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
@@ -1072,7 +1132,25 @@ class SupabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getNotifications() async {
-    return getBannerAnnouncements();
+    final messages = await getMessageAnnouncements();
+    final banners = await getBannerAnnouncements();
+    final notifs = <Map<String, dynamic>>[];
+    for (var m in messages) {
+      final item = Map<String, dynamic>.from(m);
+      item['type'] = (m['type_tag'] ?? 'General').toString().toLowerCase().replaceAll(' ', '_');
+      if (item['type'] == 'fee_reminder') item['type'] = 'reminder';
+      item['date'] = item['date'] ?? item['publish_date'] ?? 'Today';
+      item['is_read'] = item['is_read'] ?? false;
+      notifs.add(item);
+    }
+    for (var b in banners) {
+      final item = Map<String, dynamic>.from(b);
+      item['type'] = 'announcement';
+      item['date'] = item['date'] ?? 'Today';
+      item['is_read'] = item['is_read'] ?? false;
+      notifs.add(item);
+    }
+    return notifs;
   }
 
   Future<void> markNotificationAsRead(String notifId) async {

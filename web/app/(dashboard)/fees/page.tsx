@@ -5,7 +5,7 @@ import { getStudentFeeInvoices, getFinancialSummary } from '@/lib/finance';
 import { getCourses, getBatches, getStudents } from '@/lib/academy';
 import StudentFeesClient from '@/components/finance/StudentFeesClient';
 
-export const revalidate = 0; // Dynamic real-time data
+export const revalidate = 15;
 
 export default async function FeesPage() {
   const user = await getCurrentUser();

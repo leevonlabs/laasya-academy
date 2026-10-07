@@ -38,11 +38,11 @@ export default function GuruPhotoUploadInput({
 
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
 
-  // Frame dimensions matching grid card portrait aspect ratio (280px wide x 340px tall)
-  const FRAME_W = 280;
-  const FRAME_H = 340;
-  const CANVAS_W = 560;
-  const CANVAS_H = 680;
+  // Fixed outlook frame dimensions: exact 4:5 ratio (300px wide x 375px tall)
+  const FRAME_W = 300;
+  const FRAME_H = 375;
+  const CANVAS_W = 600;
+  const CANVAS_H = 750;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -319,10 +319,10 @@ export default function GuruPhotoUploadInput({
               </button>
             </div>
 
-            {/* PREVIEW FRAME MATCHING GRID CARD (280x340 px) */}
+            {/* PREVIEW FRAME MATCHING FIXED 4:5 GRID CARD OUTLOOK */}
             <div className="flex justify-center mb-4">
               <div
-                className="relative w-[280px] h-[340px] rounded-3xl overflow-hidden bg-[#1A010F] border-2 border-[#F0D5E4] shadow-2xl select-none cursor-grab active:cursor-grabbing"
+                className="relative w-[300px] h-[375px] rounded-3xl overflow-hidden bg-[#1A010F] border-2 border-[#F0D5E4] shadow-2xl select-none cursor-grab active:cursor-grabbing"
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}

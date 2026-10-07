@@ -80,6 +80,7 @@ export interface Student {
   phone: string;
   avatar_url?: string;
   age?: number;
+  date_of_birth?: string;
   gender?: 'male' | 'female' | 'trans';
   parent_name: string;
   parent_relation?: string;
@@ -534,6 +535,7 @@ export async function getStudents(): Promise<Student[]> {
       s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone,
       COALESCE(s.avatar_url, p.avatar_url) as avatar_url,
       COALESCE(s.age, p.age)::int as age,
+      TO_CHAR(s.date_of_birth, 'YYYY-MM-DD') as date_of_birth,
       COALESCE(s.gender, p.gender) as gender,
       s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, 
       TO_CHAR(s.enrollment_date, 'YYYY-MM-DD') as enrollment_date,
@@ -550,7 +552,7 @@ export async function getStudents(): Promise<Student[]> {
     JOIN public.profiles p ON p.id = s.profile_id
     LEFT JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
     LEFT JOIN public.attendance a ON a.student_id = s.id
-    GROUP BY s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone, s.avatar_url, p.avatar_url, s.age, p.age, s.gender, p.gender, s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, s.enrollment_date, s.advance_paid
+    GROUP BY s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone, s.avatar_url, p.avatar_url, s.age, p.age, s.date_of_birth, s.gender, p.gender, s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, s.enrollment_date, s.advance_paid
     ORDER BY 
       CASE WHEN s.roll_number ~ '^LCA-[0-9]+$' THEN CAST(SUBSTRING(s.roll_number FROM 5) AS INT) ELSE 999999 END ASC,
       p.full_name ASC;
@@ -694,6 +696,7 @@ export async function createStudent(data: {
   phone: string;
   avatar_url?: string;
   age?: number;
+  date_of_birth?: string;
   gender?: string;
   parent_name: string;
   parent_relation?: string;
@@ -742,7 +745,8 @@ export async function createStudent(data: {
   `, [authEmail, data.full_name, data.phone]);
 
   const uid = authUser.id;
-  const age = data.age ? Number(data.age) : null;
+  const calculatedAge = data.date_of_birth ? Math.max(1, Math.floor((new Date().getTime() - new Date(data.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))) : null;
+  const age = data.age ? Number(data.age) : calculatedAge;
   const gender = data.gender ? data.gender.toLowerCase() : null;
 
   await query(`
@@ -758,13 +762,14 @@ export async function createStudent(data: {
 
   const joiningDate = data.joining_date || new Date().toISOString().split('T')[0];
   const advancePaid = Number(data.advance_paid || 0);
+  const dob = data.date_of_birth?.trim() || null;
 
   const student = await queryOne<Student>(`
     INSERT INTO public.students (
       profile_id, roll_number, parent_name, parent_relation,
-      parent_contact, address, emergency_contact, status, enrollment_date, advance_paid, avatar_url, age, gender
+      parent_contact, address, emergency_contact, status, enrollment_date, advance_paid, avatar_url, age, gender, date_of_birth
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9, $10, $11, $12)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9, $10, $11, $12, $13::date)
     ON CONFLICT (profile_id) DO UPDATE SET
       parent_name = EXCLUDED.parent_name,
       parent_relation = EXCLUDED.parent_relation,
@@ -776,7 +781,8 @@ export async function createStudent(data: {
       advance_paid = EXCLUDED.advance_paid,
       avatar_url = COALESCE(EXCLUDED.avatar_url, students.avatar_url),
       age = COALESCE(EXCLUDED.age, students.age),
-      gender = COALESCE(EXCLUDED.gender, students.gender)
+      gender = COALESCE(EXCLUDED.gender, students.gender),
+      date_of_birth = COALESCE(EXCLUDED.date_of_birth, students.date_of_birth)
     RETURNING *;
   `, [
     uid, 
@@ -790,7 +796,8 @@ export async function createStudent(data: {
     advancePaid,
     data.avatar_url || null,
     age,
-    gender
+    gender,
+    dob
   ]);
 
   if (student && data.batch_ids && data.batch_ids.length > 0) {
@@ -811,6 +818,7 @@ export async function createStudent(data: {
     advance_paid: advancePaid,
     avatar_url: data.avatar_url || null,
     age: age || undefined,
+    date_of_birth: dob || undefined,
     gender: (gender as any) || undefined
   };
 }
@@ -821,6 +829,7 @@ export async function updateStudent(id: string, data: {
   phone?: string;
   avatar_url?: string;
   age?: number;
+  date_of_birth?: string;
   gender?: string;
   parent_name?: string;
   parent_relation?: string;
@@ -837,8 +846,10 @@ export async function updateStudent(id: string, data: {
   );
   if (!current) throw new Error('Student not found');
 
-  const age = data.age !== undefined ? (data.age ? Number(data.age) : null) : undefined;
+  const calculatedAge = data.date_of_birth ? Math.max(1, Math.floor((new Date().getTime() - new Date(data.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))) : undefined;
+  const age = data.age !== undefined ? (data.age ? Number(data.age) : null) : calculatedAge;
   const gender = data.gender !== undefined ? (data.gender ? data.gender.toLowerCase() : null) : undefined;
+  const dob = data.date_of_birth !== undefined ? (data.date_of_birth?.trim() || null) : undefined;
 
   if (data.full_name || data.email || data.phone || data.avatar_url !== undefined || age !== undefined || gender !== undefined) {
     await query(`
@@ -874,6 +885,7 @@ export async function updateStudent(id: string, data: {
         avatar_url = COALESCE($9, avatar_url),
         age = COALESCE($10, age),
         gender = COALESCE($11, gender),
+        date_of_birth = COALESCE($12::date, date_of_birth),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
@@ -882,7 +894,8 @@ export async function updateStudent(id: string, data: {
     data.address, data.status, data.joining_date, data.advance_paid,
     data.avatar_url !== undefined ? data.avatar_url : null,
     age !== undefined ? age : null,
-    gender !== undefined ? gender : null
+    gender !== undefined ? gender : null,
+    dob
   ]);
 
   // Update batch enrollments if batch_ids provided

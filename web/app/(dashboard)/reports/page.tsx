@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { getCourses, getBatches, getStudents, getTrainers } from '@/lib/academy';
 import ReportsClient from '@/components/reports/ReportsClient';
 
-export const revalidate = 0; // Dynamic real-time data
+export const revalidate = 15;
 
 export default async function ReportsPage() {
   const user = await getCurrentUser();

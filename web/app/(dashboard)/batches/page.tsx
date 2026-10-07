@@ -2,7 +2,7 @@ import React from 'react';
 import { getBatches, getCourses, getTrainers, getRooms } from '@/lib/academy';
 import BatchesListClient from '@/components/batches/BatchesListClient';
 
-export const revalidate = 0;
+export const revalidate = 15;
 
 export default async function BatchesPage() {
   const [batches, courses, trainers, rooms] = await Promise.all([

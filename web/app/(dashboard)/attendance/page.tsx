@@ -2,7 +2,7 @@ import React from 'react';
 import { getAttendanceAuditRecords, getCourses, getBatches, getStudents } from '@/lib/academy';
 import AttendanceListClient from '@/components/attendance/AttendanceListClient';
 
-export const revalidate = 0;
+export const revalidate = 15;
 
 export default async function AttendancePage() {
   const [auditRecords, courses, batches, students] = await Promise.all([

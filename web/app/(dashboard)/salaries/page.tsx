@@ -5,7 +5,7 @@ import { getGuruSalaryRecords, getGuruSalaryAdvances, getFinancialSummary } from
 import { getTrainers } from '@/lib/academy';
 import GuruSalariesClient from '@/components/finance/GuruSalariesClient';
 
-export const revalidate = 0; // Dynamic real-time data
+export const revalidate = 15;
 
 export default async function SalariesPage() {
   const user = await getCurrentUser();

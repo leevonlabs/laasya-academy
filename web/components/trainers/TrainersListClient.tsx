@@ -528,8 +528,8 @@ export default function TrainersListClient({
               className="bg-white rounded-3xl overflow-hidden border-2 border-[#F0D5E4] shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
             >
               <div>
-                {/* 1. BIG HERO IMAGE CONTAINER WITH FLOATING BADGES & BOTTOM OVERLAY */}
-                <div className="relative w-full h-80 sm:h-96 bg-gradient-to-br from-[#3D0322] via-[#590231] to-[#1A010F] overflow-hidden">
+                {/* 1. FIXED OUTLOOK FRAME (4:5 RATIO) MATCHING ADJUSTMENT MODAL EXACTLY */}
+                <div className="relative w-full aspect-[4/5] bg-gradient-to-br from-[#3D0322] via-[#590231] to-[#1A010F] overflow-hidden">
                   {t.avatar_url ? (
                     <img
                       src={t.avatar_url}

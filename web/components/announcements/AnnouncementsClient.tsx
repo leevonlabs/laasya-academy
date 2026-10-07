@@ -22,7 +22,8 @@ import {
   ShieldCheck,
   Smartphone,
   Link as LinkIcon,
-  ExternalLink
+  ExternalLink,
+  ArrowLeft
 } from 'lucide-react';
 import { Announcement } from '@/lib/announcements';
 
@@ -50,9 +51,14 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
   const [activeCategory, setActiveCategory] = useState<'banners' | 'messages'>('banners');
   const [formAnnouncementType, setFormAnnouncementType] = useState<'banner' | 'message'>('banner');
 
-  // Filters state (NO DATE RANGE FILTER per requirement)
+  // Subpage: dedicated Scheduled Messages view
+  const [isScheduledViewOpen, setIsScheduledViewOpen] = useState(false);
+
+  // Filters state
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all'); // Used ONLY for banner advertisements
+  const [startDate, setStartDate] = useState('');          // Standard Date Range Filter for messages
+  const [endDate, setEndDate] = useState('');              // Standard Date Range Filter for messages
   const [audienceFilter, setAudienceFilter] = useState('all');
   const [typeTagFilter, setTypeTagFilter] = useState('all');
 
@@ -115,6 +121,11 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
   const bannerCount = useMemo(() => announcements.filter(a => !a.is_deleted && isBanner(a)).length, [announcements]);
   const messageCount = useMemo(() => announcements.filter(a => !a.is_deleted && isMessage(a) && !isExpiredBy30Days(a)).length, [announcements]);
 
+  // Scheduled messages list
+  const scheduledMessages = useMemo(() => {
+    return announcements.filter(a => !a.is_deleted && isMessage(a) && (a.status === 'Scheduled' || (a.publish_date && new Date(a.publish_date).getTime() > Date.now())));
+  }, [announcements]);
+
   // Auto-resize uploaded image
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -167,6 +178,16 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
         if (!isMessage(ann)) return false;
         // Filter out messages older than 30 days
         if (isExpiredBy30Days(ann)) return false;
+
+        // Standard Date Range Filter for Message Broadcasts
+        if (startDate) {
+          const itemDate = (ann.publish_date || ann.created_at || '').substring(0, 10);
+          if (itemDate && itemDate < startDate) return false;
+        }
+        if (endDate) {
+          const itemDate = (ann.publish_date || ann.created_at || '').substring(0, 10);
+          if (itemDate && itemDate > endDate) return false;
+        }
       }
 
       if (searchQuery.trim()) {
@@ -176,8 +197,11 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
         if (!matchTitle && !matchMsg) return false;
       }
 
-      if (statusFilter !== 'all' && ann.status.toLowerCase() !== statusFilter.toLowerCase()) {
-        return false;
+      // Status filter is applied ONLY for banner advertisements
+      if (activeCategory === 'banners') {
+        if (statusFilter !== 'all' && ann.status.toLowerCase() !== statusFilter.toLowerCase()) {
+          return false;
+        }
       }
 
       if (audienceFilter !== 'all' && ann.audience !== audienceFilter) {
@@ -190,11 +214,11 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
 
       return true;
     });
-  }, [announcements, activeCategory, searchQuery, statusFilter, audienceFilter, typeTagFilter]);
+  }, [announcements, activeCategory, searchQuery, statusFilter, startDate, endDate, audienceFilter, typeTagFilter]);
 
   const hasActiveFilters = Boolean(
     searchQuery || 
-    statusFilter !== 'all' || 
+    (activeCategory === 'banners' ? statusFilter !== 'all' : (startDate || endDate)) || 
     audienceFilter !== 'all' || 
     typeTagFilter !== 'all'
   );
@@ -202,8 +226,38 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
   const clearFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
+    setStartDate('');
+    setEndDate('');
     setAudienceFilter('all');
     setTypeTagFilter('all');
+  };
+
+  // Immediate Publish Action for Scheduled Messages
+  const handlePublishNow = async (ann: Announcement) => {
+    setIsSubmitting(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await fetch(`/api/announcements/${ann.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...ann,
+          status: 'Published',
+          publish_date: today
+        })
+      });
+      const json = await res.json();
+      if (json.success && json.announcement) {
+        setAnnouncements(prev => prev.map(item => item.id === ann.id ? json.announcement : item));
+        showToast(`"${ann.title}" published immediately to student mobile logins!`);
+      } else {
+        showToast(json.error || 'Failed to publish announcement', 'error');
+      }
+    } catch {
+      showToast('Network error while publishing announcement', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Open Create Modal - NO PREFILLED INFO, TODAY'S DATE DEFAULT
@@ -522,11 +576,24 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
     <div className="space-y-6 pb-20">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className={`fixed top-6 right-6 z-50 px-5 py-3.5 rounded-2xl shadow-xl text-white font-bold text-sm flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-300 ${
-          toastMessage.type === 'error' ? 'bg-red-600' : 'bg-emerald-600'
+        <div className={`fixed top-6 right-6 z-70 text-white px-5 py-3.5 rounded-2xl shadow-2xl border-2 border-[#F9E33A] flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-200 ${
+          toastMessage.type === 'error' ? 'bg-[#7F1D1D]' : 'bg-[#2D041A]'
         }`}>
-          <CheckCircle2 className="w-5 h-5 shrink-0" />
-          <span>{toastMessage.text}</span>
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#8A064D] to-[#EBB128] flex items-center justify-center shrink-0 shadow-xs">
+            <CheckCircle2 className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <div className="text-[10px] font-black text-[#F9E33A] uppercase tracking-wider">
+              {toastMessage.type === 'error' ? 'Action Failed' : 'Action Successful'}
+            </div>
+            <div className="text-xs font-bold text-white mt-0.5">{toastMessage.text}</div>
+          </div>
+          <button 
+            onClick={() => setToastMessage(null)}
+            className="p-1 hover:bg-white/10 rounded-lg transition ml-3 cursor-pointer text-white/70 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -556,13 +623,26 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
             <span>+ Create Banner Ad</span>
           </button>
         ) : (
-          <button
-            onClick={() => openCreateModal('message')}
-            className="flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-[#075E54] hover:bg-[#128C7E] text-white font-black text-sm shadow-lg hover:shadow-xl transition-all border border-emerald-300 cursor-pointer shrink-0"
-          >
-            <Send className="w-5 h-5 text-emerald-300" />
-            <span>+ Broadcast New Message</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsScheduledViewOpen(true)}
+              className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-sm shadow-xs transition cursor-pointer"
+            >
+              <Clock className="w-4 h-4 text-amber-600" />
+              <span>Scheduled Messages</span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-black bg-amber-500 text-white">
+                {scheduledMessages.length}
+              </span>
+            </button>
+            <button
+              onClick={() => openCreateModal('message')}
+              className="flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-[#075E54] hover:bg-[#128C7E] text-white font-black text-sm shadow-lg hover:shadow-xl transition-all border border-emerald-300 cursor-pointer shrink-0"
+            >
+              <Send className="w-5 h-5 text-emerald-300" />
+              <span>+ Broadcast New Message</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -573,16 +653,19 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
           {/* TAB 1: Banner Advertisements */}
           <button
             type="button"
-            onClick={() => setActiveCategory('banners')}
+            onClick={() => {
+              setActiveCategory('banners');
+              setIsScheduledViewOpen(false);
+            }}
             className={`flex items-center justify-between p-4 rounded-2xl transition text-left cursor-pointer border ${
-              activeCategory === 'banners'
+              activeCategory === 'banners' && !isScheduledViewOpen
                 ? 'bg-gradient-to-r from-[#590231] to-[#8A064D] text-white border-[#F9E33A]/60 shadow-md'
                 : 'bg-[#FFF9FB] hover:bg-[#FFF2F8] text-gray-700 border-[#F0D5E4]'
             }`}
           >
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                activeCategory === 'banners' ? 'bg-white/20 text-[#F9E33A]' : 'bg-[#FFF2F8] text-[#8A064D]'
+                activeCategory === 'banners' && !isScheduledViewOpen ? 'bg-white/20 text-[#F9E33A]' : 'bg-[#FFF2F8] text-[#8A064D]'
               }`}>
                 <ImageIcon className="w-5 h-5" />
               </div>
@@ -590,12 +673,12 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                 <div className="flex items-center gap-2">
                   <span className="font-black text-base">App Banner Advertisements</span>
                   <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                    activeCategory === 'banners' ? 'bg-[#F9E33A] text-[#590231]' : 'bg-[#8A064D]/10 text-[#8A064D]'
+                    activeCategory === 'banners' && !isScheduledViewOpen ? 'bg-[#F9E33A] text-[#590231]' : 'bg-[#8A064D]/10 text-[#8A064D]'
                   }`}>
                     {bannerCount} Posters
                   </span>
                 </div>
-                <p className={`text-xs mt-0.5 ${activeCategory === 'banners' ? 'text-white/80' : 'text-gray-500'}`}>
+                <p className={`text-xs mt-0.5 ${activeCategory === 'banners' && !isScheduledViewOpen ? 'text-white/80' : 'text-gray-500'}`}>
                   Image-based moving banner flyers displayed on Student App Home carousel
                 </p>
               </div>
@@ -605,16 +688,19 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
           {/* TAB 2: Message Broadcasts */}
           <button
             type="button"
-            onClick={() => setActiveCategory('messages')}
+            onClick={() => {
+              setActiveCategory('messages');
+              setIsScheduledViewOpen(false);
+            }}
             className={`flex items-center justify-between p-4 rounded-2xl transition text-left cursor-pointer border ${
-              activeCategory === 'messages'
+              activeCategory === 'messages' && !isScheduledViewOpen
                 ? 'bg-gradient-to-r from-[#075E54] to-[#128C7E] text-white border-emerald-300 shadow-md'
                 : 'bg-[#F0FDF4] hover:bg-emerald-50 text-gray-700 border-emerald-200'
             }`}
           >
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                activeCategory === 'messages' ? 'bg-white/20 text-emerald-300' : 'bg-emerald-100 text-[#075E54]'
+                activeCategory === 'messages' && !isScheduledViewOpen ? 'bg-white/20 text-emerald-300' : 'bg-emerald-100 text-[#075E54]'
               }`}>
                 <MessageSquare className="w-5 h-5" />
               </div>
@@ -622,12 +708,12 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                 <div className="flex items-center gap-2">
                   <span className="font-black text-base">Message Broadcasts</span>
                   <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                    activeCategory === 'messages' ? 'bg-emerald-300 text-[#075E54]' : 'bg-emerald-200 text-[#075E54]'
+                    activeCategory === 'messages' && !isScheduledViewOpen ? 'bg-emerald-300 text-[#075E54]' : 'bg-emerald-200 text-[#075E54]'
                   }`}>
                     {messageCount} Circulars
                   </span>
                 </div>
-                <p className={`text-xs mt-0.5 ${activeCategory === 'messages' ? 'text-white/80' : 'text-gray-500'}`}>
+                <p className={`text-xs mt-0.5 ${activeCategory === 'messages' && !isScheduledViewOpen ? 'text-white/80' : 'text-gray-500'}`}>
                   Official notices & circulars sent to Student App (30-day auto-clear lifespan)
                 </p>
               </div>
@@ -637,12 +723,12 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
         </div>
       </div>
 
-      {/* Search and Filters Section (NO DATE RANGE FILTER) */}
+      {/* Search and Filters Section */}
       <div className="bg-white rounded-3xl p-6 border border-[#F0D5E4] shadow-xs space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className={`grid grid-cols-1 ${activeCategory === 'banners' ? 'md:grid-cols-4' : 'md:grid-cols-5'} gap-4`}>
           
           {/* Search Box */}
-          <div className="relative md:col-span-1">
+          <div className="relative">
             <Search className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -661,20 +747,48 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
             )}
           </div>
 
-          {/* Status Filter */}
-          <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
-            >
-              <option value="all">All Statuses</option>
-              <option value="Published">Published</option>
-              <option value="Scheduled">Scheduled</option>
-              <option value="Draft">Draft</option>
-              <option value="Expired">Expired</option>
-            </select>
-          </div>
+          {/* If BANNERS: show Status Filter. If MESSAGES: Status Filter completely removed, show standard Date Range filter */}
+          {activeCategory === 'banners' ? (
+            <div>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-bold text-gray-800 focus:outline-none focus:border-[#8A064D]"
+              >
+                <option value="all">All Statuses</option>
+                <option value="Published">Published</option>
+                <option value="Scheduled">Scheduled</option>
+                <option value="Draft">Draft</option>
+                <option value="Expired">Expired</option>
+              </select>
+            </div>
+          ) : (
+            <>
+              {/* Standard Date Range Filter: From Date */}
+              <div className="relative">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  title="From Date"
+                  placeholder="From Date"
+                  className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-bold text-gray-800 focus:outline-none focus:border-[#075E54]"
+                />
+              </div>
+
+              {/* Standard Date Range Filter: To Date */}
+              <div className="relative">
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  title="To Date"
+                  placeholder="To Date"
+                  className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-bold text-gray-800 focus:outline-none focus:border-[#075E54]"
+                />
+              </div>
+            </>
+          )}
 
           {/* Audience Filter */}
           <div>
@@ -738,7 +852,197 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
         </div>
       )}
 
-      {/* Main Content Area */}
+      {/* Main Content Area OR Dedicated Scheduled Messages Sub-Page */}
+      {isScheduledViewOpen ? (
+        <div className="space-y-6">
+          {/* Subpage Header Banner */}
+          <div className="bg-white rounded-3xl p-6 border-2 border-amber-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsScheduledViewOpen(false)}
+                className="px-4 py-2.5 rounded-2xl bg-[#F4F4F5] hover:bg-[#E4E4E7] text-gray-800 transition font-bold text-xs flex items-center gap-2 cursor-pointer shadow-2xs border border-gray-200"
+              >
+                <ArrowLeft className="w-4 h-4 text-gray-600" />
+                <span>Back to Message Broadcasts</span>
+              </button>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">
+                    Scheduled Message Broadcasts
+                  </h2>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500 text-white shadow-2xs">
+                    {scheduledMessages.length} Queued
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Official circulars queued for automated future release to student &amp; trainer mobile logins
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                openCreateModal('message');
+                setFormData(prev => ({ ...prev, status: 'Scheduled' }));
+              }}
+              className="px-5 py-3 rounded-2xl bg-[#075E54] hover:bg-[#128C7E] text-white text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-white" />
+              <span>Schedule New Message</span>
+            </button>
+          </div>
+
+          {/* Scheduled Messages List */}
+          {scheduledMessages.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-amber-200 shadow-xs space-y-4">
+              <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center bg-amber-50 text-amber-600 border border-amber-200">
+                <Clock className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-gray-800">
+                  No Messages Currently Scheduled
+                </h3>
+                <p className="text-xs text-gray-500 max-w-md mx-auto mt-1">
+                  You do not have any pending scheduled message broadcasts. Click the button below to draft a circular and queue it for future release.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  openCreateModal('message');
+                  setFormData(prev => ({ ...prev, status: 'Scheduled' }));
+                }}
+                className="px-6 py-3 rounded-2xl bg-[#075E54] hover:bg-[#128C7E] text-white text-sm font-bold shadow-md transition flex items-center gap-2 mx-auto cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-white" />
+                <span>Schedule a Broadcast Now</span>
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {scheduledMessages.map((ann) => {
+                const pubDateStr = ann.publish_date 
+                  ? new Date(ann.publish_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : 'Pending Date';
+
+                return (
+                  <div
+                    key={ann.id}
+                    className="bg-white rounded-3xl border-2 border-amber-200 hover:border-amber-400 shadow-xs hover:shadow-md transition-all overflow-hidden"
+                  >
+                    {/* Scheduled Card Header */}
+                    <div className="bg-gradient-to-r from-amber-600 to-amber-700 px-6 py-3.5 text-white flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-white/20 border border-amber-200 flex items-center justify-center font-black text-xs text-white">
+                          <Clock className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 font-black text-sm">
+                            <span>Scheduled for: {pubDateStr}</span>
+                          </div>
+                          <div className="text-[11px] text-amber-100 flex items-center gap-2">
+                            <span>Target: <strong>{ann.audience}</strong></span>
+                            {ann.target_course_title && <span>• {ann.target_course_title}</span>}
+                            {ann.target_batch_name && <span>({ann.target_batch_name})</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="px-3 py-1 rounded-xl text-xs font-black bg-white text-amber-800 shadow-2xs">
+                          Scheduled Broadcast
+                        </span>
+                        {renderTypeTagBadge(ann.type_tag)}
+                      </div>
+                    </div>
+
+                    {/* Scheduled Card Body */}
+                    <div className="p-6 space-y-4">
+                      <div>
+                        <h3 className="text-lg md:text-xl font-black text-gray-900">
+                          {ann.title}
+                        </h3>
+
+                        {ann.image_url && (
+                          <div className="mt-3 max-w-sm rounded-2xl overflow-hidden border border-amber-200 shadow-xs bg-black/5">
+                            <img
+                              src={ann.image_url}
+                              alt={ann.title}
+                              className="w-full max-h-56 object-cover"
+                            />
+                          </div>
+                        )}
+
+                        <div className="mt-2.5 p-4 rounded-2xl bg-amber-50/50 border border-amber-100 text-sm font-semibold text-gray-800 whitespace-pre-line leading-relaxed">
+                          {ann.message}
+                        </div>
+
+                        {ann.action_links && ann.action_links.length > 0 && (
+                          <div className="mt-2.5 flex flex-wrap gap-2">
+                            {ann.action_links.map((link, idx) => (
+                              <a
+                                key={idx}
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-50 transition shadow-2xs"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span>{link.title}</span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Scheduled Actions Footer */}
+                      <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200">
+                            <Clock className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Queued in Broadcast Outbox</span>
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handlePublishNow(ann)}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition shadow-2xs cursor-pointer"
+                            title="Publish this message immediately"
+                          >
+                            <Send className="w-3.5 h-3.5 text-emerald-200" />
+                            <span>Publish Now</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(ann)}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition cursor-pointer"
+                            title="Reschedule / Edit Message"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Reschedule</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeletingAnnouncement(ann)}
+                            className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
+                            title="Cancel &amp; Delete Schedule"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
       <div>
         {filteredAnnouncements.length === 0 ? (
           <div className="bg-white rounded-3xl p-12 text-center border border-[#F0D5E4] shadow-xs space-y-4">
@@ -1035,6 +1339,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
           </div>
         )}
       </div>
+      )}
 
       {/* ===================================================================== */}
       {/* CREATE & EDIT MODAL (CUSTOMIZED FOR BANNER VS MESSAGE)                 */}

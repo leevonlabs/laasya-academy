@@ -11,6 +11,7 @@ export interface Announcement {
   target_batch_name?: string | null;
   type_tag: 'Holiday' | 'Schedule change' | 'Cancellation' | 'Fee reminder' | 'General';
   publish_date: string;
+  publish_time?: string | null;
   expiry_date?: string | null;
   status: 'Draft' | 'Scheduled' | 'Published' | 'Expired';
   delivery_status: string; // 'System verified (Delivered)' | 'Queued' | 'Draft (Not sent)'

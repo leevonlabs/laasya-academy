@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { getExpenses, getExpenseSummary, getExpenseCategories } from '@/lib/expenses';
 import ExpensesClient from '@/components/expenses/ExpensesClient';
 
-export const revalidate = 0; // Dynamic real-time data
+export const revalidate = 15;
 
 export default async function ExpensesPage() {
   const user = await getCurrentUser();

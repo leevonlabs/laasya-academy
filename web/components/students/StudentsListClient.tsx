@@ -55,6 +55,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   // 2. Edit Modal
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [editFullName, setEditFullName] = useState('');
+  const [editDateOfBirth, setEditDateOfBirth] = useState<string>('');
   const [editAge, setEditAge] = useState<string>('');
   const [editGender, setEditGender] = useState<'male' | 'female' | 'trans'>('female');
   const [editEmail, setEditEmail] = useState('');
@@ -74,6 +75,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   // 3. Register New Student Modal
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState<string>('');
   const [age, setAge] = useState<string>('');
   const [gender, setGender] = useState<'male' | 'female' | 'trans'>('female');
   const [email, setEmail] = useState('');
@@ -189,6 +191,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   const handleOpenEdit = (s: Student) => {
     setEditingStudent(s);
     setEditFullName(s.full_name);
+    setEditDateOfBirth(s.date_of_birth ? s.date_of_birth.substring(0, 10) : '');
     setEditAge(s.age ? String(s.age) : '');
     setEditGender((s.gender as any) || 'female');
     setEditEmail(s.email);
@@ -212,6 +215,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   // Open Register Modal
   const handleOpenRegister = () => {
     setFullName('');
+    setDateOfBirth('');
     setAge('');
     setGender('female');
     setEmail('');
@@ -262,6 +266,20 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     );
   };
 
+  // Helper to auto-calculate chronological age from Date of Birth
+  const calculateAge = (dobString: string) => {
+    if (!dobString) return '';
+    const dob = new Date(dobString);
+    if (isNaN(dob.getTime())) return '';
+    const today = new Date();
+    let calculatedAge = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      calculatedAge--;
+    }
+    return calculatedAge >= 0 ? String(calculatedAge) : '';
+  };
+
   // Register New Student
   const handleRegisterStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -273,6 +291,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: fullName.trim(),
+          date_of_birth: dateOfBirth || undefined,
           age: age ? Number(age) : undefined,
           gender: gender,
           email: email.trim(),
@@ -323,6 +342,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       const fullStudent: Student = {
         ...created,
         full_name: fullName.trim(),
+        date_of_birth: dateOfBirth || undefined,
         age: age ? Number(age) : undefined,
         gender: gender as any,
         email: email.trim(),
@@ -367,6 +387,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         body: JSON.stringify({
           id: editingStudent.id,
           full_name: editFullName.trim(),
+          date_of_birth: editDateOfBirth || null,
           age: editAge ? Number(editAge) : undefined,
           gender: editGender,
           email: editEmail.trim(),
@@ -419,6 +440,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
             ? {
                 ...s,
                 full_name: editFullName.trim(),
+                date_of_birth: editDateOfBirth || undefined,
                 age: editAge ? Number(editAge) : undefined,
                 gender: editGender as any,
                 email: editEmail.trim(),
@@ -446,6 +468,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         setDetailStudent({
           ...detailStudent,
           full_name: editFullName.trim(),
+          date_of_birth: editDateOfBirth || undefined,
           age: editAge ? Number(editAge) : undefined,
           gender: editGender as any,
           email: editEmail.trim(),
@@ -1064,22 +1087,22 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                   <div className="bg-white p-3 rounded-xl border border-rose-100 shadow-2xs">
-                    <span className="text-[10px] text-gray-500 uppercase font-black block">Total Monthly Fee</span>
-                    <span className="text-base font-extrabold text-[#2D041A] mt-0.5 block">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Total Monthly Fee</span>
+                    <span className="text-sm sm:text-base font-extrabold text-[#2D041A] mt-0.5 block">
                       ₹{(detailStudent.total_monthly_fee || 0).toLocaleString('en-IN')}
                     </span>
                   </div>
 
                   <div className="bg-white p-3 rounded-xl border border-rose-100 shadow-2xs">
-                    <span className="text-[10px] text-gray-500 uppercase font-black block">Advance Paid</span>
-                    <span className="text-base font-extrabold text-emerald-700 mt-0.5 block">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Advance Paid</span>
+                    <span className="text-sm sm:text-base font-extrabold text-emerald-700 mt-0.5 block">
                       ₹{Number(detailStudent.advance_paid || 0).toLocaleString('en-IN')}
                     </span>
                   </div>
 
                   <div className="bg-white p-3 rounded-xl border border-rose-100 shadow-2xs">
-                    <span className="text-[10px] text-gray-500 uppercase font-black block">Due Amount</span>
-                    <span className={`text-base font-extrabold mt-0.5 block ${
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Due Amount</span>
+                    <span className={`text-sm sm:text-base font-extrabold mt-0.5 block ${
                       (detailStudent.due_amount ?? 0) <= 0 
                         ? 'text-emerald-700' 
                         : (detailStudent.due_amount ?? 0) > (detailStudent.total_monthly_fee || 0) 
@@ -1093,8 +1116,8 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   </div>
 
                   <div className="bg-white p-3 rounded-xl border border-rose-100 shadow-2xs">
-                    <span className="text-[10px] text-gray-500 uppercase font-black block">Due Date</span>
-                    <span className="text-base font-mono font-extrabold text-gray-800 mt-0.5 block">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Due Date</span>
+                    <span className="text-sm sm:text-base font-mono font-extrabold text-gray-800 mt-0.5 block">
                       {formatDueDateDisplay(detailStudent.due_date)}
                     </span>
                   </div>
@@ -1108,49 +1131,60 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   <span>Student Contact &amp; Personal Info</span>
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
-                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
-                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Contact Phone</span>
-                    <span className="font-bold text-gray-900 flex items-center gap-1.5 mt-0.5">
-                      <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                  {/* Row 1: Contact Phone, Email Address, Date of Birth */}
+                  <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Contact Phone</span>
+                    <span className="text-sm sm:text-base font-extrabold text-gray-900 flex items-center gap-1.5 mt-0.5">
+                      <Phone className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span>{detailStudent.phone || '—'}</span>
                     </span>
                   </div>
 
-                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
-                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Email Address</span>
-                    <span className="font-bold text-gray-900 flex items-center gap-1.5 mt-0.5 truncate">
-                      <Mail className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
+                  <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Email Address</span>
+                    <span className="text-sm sm:text-base font-extrabold text-gray-900 flex items-center gap-1.5 mt-0.5 truncate">
+                      <Mail className="w-4 h-4 text-[#8A064D] shrink-0" />
                       <span className="truncate">{detailStudent.email || '—'}</span>
                     </span>
                   </div>
 
-                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
-                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Age (Years)</span>
-                    <span className="font-bold text-gray-900 mt-0.5 block">
+                  <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Date of Birth</span>
+                    <span className="text-sm sm:text-base font-extrabold text-gray-900 flex items-center gap-1.5 mt-0.5">
+                      <Calendar className="w-4 h-4 text-[#8A064D] shrink-0" />
+                      <span>{detailStudent.date_of_birth ? formatDdMonthName(detailStudent.date_of_birth) : '—'}</span>
+                    </span>
+                  </div>
+
+                  {/* Row 2: Age, Gender, Joining Date */}
+                  <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Age</span>
+                    <span className="text-sm sm:text-base font-extrabold text-gray-900 mt-0.5 block">
                       {detailStudent.age ? `${detailStudent.age} Years` : '—'}
                     </span>
                   </div>
 
-                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
-                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Gender</span>
-                    <span className="font-bold text-gray-900 capitalize mt-0.5 block">
+                  <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Gender</span>
+                    <span className="text-sm sm:text-base font-extrabold text-gray-900 capitalize mt-0.5 block">
                       {detailStudent.gender || '—'}
                     </span>
                   </div>
 
-                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
-                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Joining Date</span>
-                    <span className="font-bold text-gray-900 flex items-center gap-1.5 mt-0.5">
-                      <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
+                  <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Joining Date</span>
+                    <span className="text-sm sm:text-base font-extrabold text-gray-900 flex items-center gap-1.5 mt-0.5">
+                      <Calendar className="w-4 h-4 text-[#8A064D] shrink-0" />
                       <span>{formatDdMonthName(detailStudent.enrollment_date)}</span>
                     </span>
                   </div>
 
-                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
-                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Residential Address</span>
-                    <span className="font-bold text-gray-800 flex items-start gap-1.5 mt-0.5">
-                      <MapPin className="w-3.5 h-3.5 text-[#8A064D] shrink-0 mt-0.5" />
-                      <span className="truncate">{detailStudent.address || 'Kannamangala, Bangalore'}</span>
+                  {/* Row 3: Residential Address - Spans full 3 columns completely without truncation */}
+                  <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs sm:col-span-3">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider mb-1">Residential Address</span>
+                    <span className="text-sm sm:text-base font-extrabold text-gray-900 flex items-start gap-2 break-words whitespace-normal leading-relaxed">
+                      <MapPin className="w-4 h-4 text-[#8A064D] shrink-0 mt-0.5" />
+                      <span>{detailStudent.address || '—'}</span>
                     </span>
                   </div>
                 </div>
@@ -1163,18 +1197,18 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   <span>Parent / Guardian Details</span>
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
-                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Guardian Name</span>
-                    <span className="font-bold text-gray-900 mt-0.5 block">{detailStudent.parent_name || '—'}</span>
+                  <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Guardian Name</span>
+                    <span className="text-sm sm:text-base font-extrabold text-gray-900 mt-0.5 block">{detailStudent.parent_name || '—'}</span>
                   </div>
-                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
-                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Relation</span>
-                    <span className="font-bold text-gray-900 mt-0.5 block">{detailStudent.parent_relation || 'Parent'}</span>
+                  <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Relation</span>
+                    <span className="text-sm sm:text-base font-extrabold text-gray-900 mt-0.5 block">{detailStudent.parent_relation || 'Parent'}</span>
                   </div>
-                  <div className="bg-white p-2.5 rounded-xl border border-gray-200">
-                    <span className="text-[#590231] block text-[10px] uppercase font-black tracking-wider">Guardian Contact</span>
-                    <span className="font-bold text-gray-900 mt-0.5 flex items-center gap-1.5">
-                      <Phone className="w-3 h-3 text-emerald-600" />
+                  <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Guardian Contact</span>
+                    <span className="text-sm sm:text-base font-extrabold text-gray-900 mt-0.5 flex items-center gap-1.5">
+                      <Phone className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span>{detailStudent.parent_contact || detailStudent.phone}</span>
                     </span>
                   </div>
@@ -1292,6 +1326,8 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 onChange={setEditAvatarUrl}
                 label="Student Profile Photo"
                 initials={editFullName ? editFullName.slice(0, 2).toUpperCase() : 'ST'}
+                studentName={editFullName}
+                rollNumber={editingStudent.roll_number}
                 maxSizeMB={1}
               />
 
@@ -1325,8 +1361,24 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 </div>
               </div>
 
-              {/* Row 2: Age & Gender */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Row 2: Date of Birth, Age & Gender */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    value={editDateOfBirth}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditDateOfBirth(val);
+                      const autoAge = calculateAge(val);
+                      if (autoAge) setEditAge(autoAge);
+                    }}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                     Age (Years)
@@ -1582,6 +1634,8 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 onChange={setAvatarUrl}
                 label="Student Profile Photo"
                 initials={fullName ? fullName.slice(0, 2).toUpperCase() : 'ST'}
+                studentName={fullName}
+                rollNumber={nextAutoId}
                 maxSizeMB={1}
               />
 
@@ -1599,8 +1653,24 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 />
               </div>
 
-              {/* Row 2: Age & Gender */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Row 2: Date of Birth, Age & Gender */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDateOfBirth(val);
+                      const autoAge = calculateAge(val);
+                      if (autoAge) setAge(autoAge);
+                    }}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                     Age (Years)

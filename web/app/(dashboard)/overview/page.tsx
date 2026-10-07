@@ -23,7 +23,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
-export const revalidate = 0; // Fresh dynamic data
+export const revalidate = 15; // Fast client router cache with dynamic background revalidation
 
 export default async function OverviewPage() {
   const [metrics, finance, todaySessions, allCourses, allBatches] = await Promise.all([

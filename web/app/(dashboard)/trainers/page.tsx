@@ -2,7 +2,7 @@ import React from 'react';
 import { getTrainers, getCourses, getBatches } from '@/lib/academy';
 import TrainersListClient from '@/components/trainers/TrainersListClient';
 
-export const revalidate = 0;
+export const revalidate = 15;
 
 export default async function TrainersPage() {
   const [trainers, courses, batches] = await Promise.all([

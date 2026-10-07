@@ -5,7 +5,7 @@ import { getAnnouncements } from '@/lib/announcements';
 import { getCourses, getBatches } from '@/lib/academy';
 import AnnouncementsClient from '@/components/announcements/AnnouncementsClient';
 
-export const revalidate = 0; // Dynamic real-time data
+export const revalidate = 15;
 
 export default async function AnnouncementsPage() {
   const user = await getCurrentUser();

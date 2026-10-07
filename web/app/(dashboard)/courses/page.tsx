@@ -2,7 +2,7 @@ import React from 'react';
 import { getCourses, getCourseCategories } from '@/lib/academy';
 import CourseListClient from '@/components/courses/CourseListClient';
 
-export const revalidate = 0;
+export const revalidate = 15;
 
 export default async function CoursesPage() {
   const [courses, categories] = await Promise.all([
