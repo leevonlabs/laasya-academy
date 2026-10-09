@@ -4,8 +4,10 @@ import '../../core/services/supabase_service.dart';
 import '../auth/portal_landing_screen.dart';
 import '../student/student_messages_screen.dart';
 import '../student/student_video_library_screen.dart';
+import 'trainer_announcements_screen.dart';
 import 'trainer_profile_details_screen.dart';
 import 'trainer_salaries_screen.dart';
+import 'trainer_share_video_screen.dart';
 
 class TrainerSettingsTab extends StatefulWidget {
   const TrainerSettingsTab({super.key});
@@ -300,7 +302,45 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                   ),
                   const Divider(height: 1, indent: 64),
 
-                  // 2. Video Library Option
+                  // 2. Announcements Broadcasts (Faculty Broadcasts to assigned courses/batches)
+                  _settingsTile(
+                    icon: Icons.campaign_rounded,
+                    iconBg: const Color(0xFFE8F5E9),
+                    iconColor: const Color(0xFF2E7D32),
+                    title: 'Announcements',
+                    subtitle: 'Broadcast notices & circulars to your enrolled disciples',
+                    badgeText: 'BROADCAST',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TrainerAnnouncementsScreen(trainerProfile: _profile),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, indent: 64),
+
+                  // 3. Share Video (Share YouTube / Drive links with enrolled students)
+                  _settingsTile(
+                    icon: Icons.video_call_rounded,
+                    iconBg: const Color(0xFFFCE7F3),
+                    iconColor: const Color(0xFF9D174D),
+                    title: 'Share Video',
+                    subtitle: 'Share YouTube & Drive links with your enrolled batches',
+                    badgeText: 'MEDIA SHARE',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TrainerShareVideoScreen(trainerProfile: _profile),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, indent: 64),
+
+                  // 4. Video Library Option (View Academy Wide Vaults)
                   _settingsTile(
                     icon: Icons.video_library_rounded,
                     iconBg: const Color(0xFFFEF3C7),
@@ -321,7 +361,7 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                   ),
                   const Divider(height: 1, indent: 64),
 
-                  // 3. Compensation & Pay Slips
+                  // 5. Compensation & Pay Slips
                   _settingsTile(
                     icon: Icons.receipt_long_rounded,
                     iconBg: const Color(0xFFDEF7EC),
@@ -340,7 +380,7 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                   ),
                   const Divider(height: 1, indent: 64),
 
-                  // 4. Academy Messages
+                  // 6. Academy Messages
                   _settingsTile(
                     icon: Icons.chat_bubble_rounded,
                     iconBg: const Color(0xFFE8F4FD),

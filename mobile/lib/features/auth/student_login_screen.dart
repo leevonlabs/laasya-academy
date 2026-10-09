@@ -11,68 +11,19 @@ class StudentLoginScreen extends StatefulWidget {
 }
 
 class _StudentLoginScreenState extends State<StudentLoginScreen> {
-  final _identifierController = TextEditingController(text: '9912345678');
-  final _passwordController = TextEditingController(text: 'Student@123');
+  final _identifierController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _rememberMe = true;
   bool _isLoading = false;
   String? _errorMessage;
-  String _selectedId = 'st-1';
-
-  final List<Map<String, String>> _demoStudents = [
-    {
-      'id': 'st-1',
-      'name': 'Ananya Rao',
-      'roll': 'LCA-10021',
-      'mobile': '9912345678',
-      'course': 'Bharathanatyam (Batch A)',
-      'initials': 'AR',
-      'password': 'Student@123',
-    },
-    {
-      'id': 'st-2',
-      'name': 'Sneha Reddy',
-      'roll': 'LCA-10022',
-      'mobile': '9912345680',
-      'course': 'Bharathanatyam (Batch A)',
-      'initials': 'SR',
-      'password': 'Student@123',
-    },
-    {
-      'id': 'st-3',
-      'name': 'Meera Nambiar',
-      'roll': 'LCA-10023',
-      'mobile': '9912345682',
-      'course': 'Carnatic Vocal Music',
-      'initials': 'MN',
-      'password': 'Student@123',
-    },
-    {
-      'id': 'st-4',
-      'name': 'Kiran Kumar',
-      'roll': 'LCA-10024',
-      'mobile': '9912345684',
-      'course': 'Kuchipudi Classical Dance',
-      'initials': 'KK',
-      'password': 'Student@123',
-    },
-  ];
 
   @override
   void dispose() {
     _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  void _fillStudent(Map<String, String> stu) {
-    setState(() {
-      _selectedId = stu['id']!;
-      _identifierController.text = stu['mobile']!;
-      _passwordController.text = stu['password']!;
-      _errorMessage = null;
-    });
   }
 
   Future<void> _handleStudentLogin() async {
@@ -366,92 +317,6 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                                   Icon(Icons.arrow_forward_rounded, size: 18, color: LaasyaColors.accentGold),
                                 ],
                               ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 26),
-
-                    // Quick Select Demo Students
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: LaasyaColors.background,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: LaasyaColors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Select Enrolled Student Account',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: LaasyaColors.primaryDark),
-                              ),
-                              Text(
-                                '1-Tap to Load',
-                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: LaasyaColors.primary),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          ..._demoStudents.map((stu) {
-                            final isSel = _selectedId == stu['id'];
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 8.0),
-                              child: InkWell(
-                                onTap: () => _fillStudent(stu),
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: isSel ? Colors.white : Colors.white.withOpacity(0.6),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: isSel ? LaasyaColors.primary : const Color(0xFFE5D4DE),
-                                      width: isSel ? 2 : 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 17,
-                                        backgroundColor: isSel ? LaasyaColors.primary : Colors.grey.shade400,
-                                        child: Text(
-                                          stu['initials']!,
-                                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              '${stu['name']} (${stu['roll']})',
-                                              style: TextStyle(
-                                                fontSize: 12.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: isSel ? LaasyaColors.primaryDark : LaasyaColors.textDark,
-                                              ),
-                                            ),
-                                            Text(
-                                              '${stu['course']} • Mobile: ${stu['mobile']}',
-                                              style: const TextStyle(fontSize: 10.5, color: LaasyaColors.textMuted),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      if (isSel)
-                                        const Icon(Icons.check_circle_rounded, color: LaasyaColors.primary, size: 18),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
                       ),
                     ),
                   ],

@@ -3,14 +3,20 @@ import { query, queryOne } from './db';
 export interface VideoLibraryItem {
   id: string;
   title: string;
-  category: 'event_folder';
-  drive_url: string;
+  category: 'event_folder' | 'event_video' | 'student_folder' | 'guru_share' | string;
+  drive_url?: string | null;
+  youtube_url?: string | null;
+  shared_by_type?: 'admin' | 'guru' | string;
+  trainer_id?: string | null;
+  trainer_name?: string | null;
   description?: string | null;
   event_name?: string | null;
   event_date?: string | null;
   target_student_id?: string | null;
   target_student_name?: string | null;
   target_student_roll?: string | null;
+  target_students?: any[] | null;
+  target_student_names?: string | null;
   target_course_id?: string | null;
   target_course_title?: string | null;
   target_batch_id?: string | null;
@@ -56,22 +62,41 @@ export interface EnrolledStudent {
 }
 
 // -----------------------------------------------------------------------------
-// GET ALL EVENT FOLDERS
-// -----------------------------------------------------------------------------
 export async function getVideoLibraryItems(filters?: {
   courseId?: string;
   courseTitle?: string;
   batchId?: string;
   search?: string;
+  category?: string;
+  sharedByType?: string; // 'admin' | 'guru' | 'all'
+  trainerId?: string;
 }): Promise<VideoLibraryItem[]> {
   try {
     let sql = `
       SELECT *
       FROM video_library
-      WHERE (category = 'event_folder' OR category IS NULL OR category = '')
+      WHERE 1=1
     `;
     const params: any[] = [];
     let idx = 1;
+
+    if (filters?.category && filters.category !== 'all') {
+      sql += ` AND category = $${idx}`;
+      params.push(filters.category);
+      idx++;
+    }
+
+    if (filters?.sharedByType && filters.sharedByType !== 'all') {
+      sql += ` AND shared_by_type = $${idx}`;
+      params.push(filters.sharedByType);
+      idx++;
+    }
+
+    if (filters?.trainerId) {
+      sql += ` AND trainer_id = $${idx}`;
+      params.push(filters.trainerId);
+      idx++;
+    }
 
     if (filters?.courseId) {
       sql += ` AND (
@@ -105,6 +130,7 @@ export async function getVideoLibraryItems(filters?: {
         OR event_name ILIKE $${idx} 
         OR target_course_title ILIKE $${idx}
         OR description ILIKE $${idx}
+        OR trainer_name ILIKE $${idx}
       )`;
       params.push(`%${filters.search}%`);
       idx++;
@@ -218,11 +244,22 @@ export async function getStudentsForCourse(courseId: string, batchId?: string): 
 }
 
 // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // CREATE AN EVENT FOLDER LINK (SINGLE COURSE OR BATCH)
 // -----------------------------------------------------------------------------
+function isValidUuid(id?: string | null): boolean {
+  if (!id) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id.trim());
+}
+
 export async function createEventFolder(data: {
   title: string;
-  drive_url: string;
+  drive_url?: string | null;
+  youtube_url?: string | null;
+  shared_by_type?: string;
+  trainer_id?: string | null;
+  trainer_name?: string | null;
+  category?: string;
   description?: string;
   event_name?: string;
   event_date?: string;
@@ -230,15 +267,25 @@ export async function createEventFolder(data: {
   target_course_title?: string | null;
   target_batch_id?: string | null;
   target_batch_name?: string | null;
+  target_students?: any[] | null;
+  target_student_names?: string | null;
   access_level?: string;
   created_by?: string;
 }): Promise<VideoLibraryItem | null> {
   try {
+    const category = data.category || (data.shared_by_type === 'guru' ? 'guru_share' : 'event_folder');
+    const validCourseId = isValidUuid(data.target_course_id) ? data.target_course_id : null;
+    const validBatchId = isValidUuid(data.target_batch_id) ? data.target_batch_id : null;
+
     const sql = `
       INSERT INTO video_library (
         title,
         category,
         drive_url,
+        youtube_url,
+        shared_by_type,
+        trainer_id,
+        trainer_name,
         description,
         event_name,
         event_date,
@@ -248,24 +295,33 @@ export async function createEventFolder(data: {
         target_batch_name,
         access_level,
         created_by,
+        target_students,
+        target_student_names,
         is_active,
         created_at,
         updated_at
-      ) VALUES ($1, 'event_folder', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, NOW(), NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18, true, NOW(), NOW())
       RETURNING *;
     `;
     const params = [
       data.title,
-      data.drive_url,
+      category,
+      data.drive_url || null,
+      data.youtube_url || null,
+      data.shared_by_type || 'admin',
+      data.trainer_id || null,
+      data.trainer_name || null,
       data.description || '',
       data.event_name || data.title,
       data.event_date || new Date().toISOString().split('T')[0],
-      data.target_course_id || null,
+      validCourseId,
       data.target_course_title || null,
-      data.target_batch_id || null,
+      validBatchId,
       data.target_batch_name || 'All Batches',
-      data.access_level || (data.target_batch_id ? 'Batch' : data.target_course_id ? 'Course' : 'All Students'),
-      data.created_by || 'Academy Owner',
+      data.access_level || (validBatchId ? 'Batch' : validCourseId ? 'Course' : 'All Students'),
+      data.created_by || data.trainer_name || 'Academy Owner',
+      JSON.stringify(data.target_students || []),
+      data.target_student_names || null,
     ];
     return await queryOne<VideoLibraryItem>(sql, params);
   } catch (error) {
@@ -279,7 +335,11 @@ export async function createEventFolder(data: {
 // -----------------------------------------------------------------------------
 export async function createUniversalEventFolders(data: {
   title: string;
-  drive_url: string;
+  drive_url?: string | null;
+  youtube_url?: string | null;
+  shared_by_type?: string;
+  trainer_id?: string | null;
+  trainer_name?: string | null;
   description?: string;
   event_name?: string;
   event_date?: string;
@@ -287,16 +347,18 @@ export async function createUniversalEventFolders(data: {
   created_by?: string;
 }): Promise<VideoLibraryItem[]> {
   try {
-    const isAll = data.selected_courses.length >= 18;
+    const isAll = data.selected_courses.length >= 8;
     const accessLevel = isAll ? 'All Students' : 'Multiple Courses';
 
-    // Insert a parent multi-course record or records per selected course
-    // Inserting with target_courses jsonb gives full traceability
     const sql = `
       INSERT INTO video_library (
         title,
         category,
         drive_url,
+        youtube_url,
+        shared_by_type,
+        trainer_id,
+        trainer_name,
         description,
         event_name,
         event_date,
@@ -309,18 +371,22 @@ export async function createUniversalEventFolders(data: {
         is_active,
         created_at,
         updated_at
-      ) VALUES ($1, 'event_folder', $2, $3, $4, $5, $6, $7, $8, 'All Batches', $9, $10, true, NOW(), NOW())
+      ) VALUES ($1, 'event_folder', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'All Batches', $13, $14, true, NOW(), NOW())
       RETURNING *;
     `;
     const params = [
       data.title,
-      data.drive_url,
+      data.drive_url || null,
+      data.youtube_url || null,
+      data.shared_by_type || 'admin',
+      data.trainer_id || null,
+      data.trainer_name || null,
       data.description || '',
       data.event_name || data.title,
       data.event_date || new Date().toISOString().split('T')[0],
       JSON.stringify(data.selected_courses),
       data.selected_courses.length === 1 ? data.selected_courses[0].id : null,
-      data.selected_courses.length === 1 ? data.selected_courses[0].title : (isAll ? 'All 18 Academy Courses' : `${data.selected_courses.length} Selected Courses`),
+      data.selected_courses.length === 1 ? data.selected_courses[0].title : (isAll ? 'All Academy Courses' : `${data.selected_courses.length} Selected Courses`),
       accessLevel,
       data.created_by || 'Academy Owner',
     ];

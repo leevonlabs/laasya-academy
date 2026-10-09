@@ -34,15 +34,6 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
     });
   }
 
-  void _fillAndLogin(String id, String pass, bool isStudent) {
-    setState(() {
-      _isStudent = isStudent;
-      _identifierController.text = id;
-      _passwordController.text = pass;
-      _errorMessage = null;
-    });
-    _handleLogin();
-  }
 
   Future<void> _handleLogin() async {
     setState(() {
@@ -67,7 +58,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
 
       if (profile == null) {
         throw Exception(
-          'Invalid credentials. Tap a demo button below for quick access.',
+          'Invalid credentials. Please verify your mobile number / roll number and password.',
         );
       }
 
@@ -472,62 +463,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 28),
-
-                  // 8. Clean, Compact Quick Demo Access
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: Colors.grey.shade300)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        child: Text(
-                          'Quick Demo Access',
-                          style: TextStyle(color: Colors.grey.shade500, fontSize: 11.5),
-                        ),
-                      ),
-                      Expanded(child: Divider(color: Colors.grey.shade300)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _fillAndLogin('9845012345', 'student123', true),
-                          icon: const Icon(Icons.school_outlined, size: 16),
-                          label: const Text(
-                            'Student Demo',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: LaasyaColors.primary,
-                            side: const BorderSide(color: Color(0xFFF0D5E4)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            backgroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _fillAndLogin('anusha@laasyaacademy.com', 'Guru@123', false),
-                          icon: const Icon(Icons.person_outline, size: 16),
-                          label: const Text(
-                            'Guru Demo',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: LaasyaColors.primary,
-                            side: const BorderSide(color: Color(0xFFF0D5E4)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            backgroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),

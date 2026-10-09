@@ -100,12 +100,12 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
               const Divider(),
               const SizedBox(height: 12),
 
-              _detailRow(Icons.person_rounded, 'Assigned Revered Guru', course['trainer_name']!),
-              _detailRow(Icons.groups_rounded, 'Batch Name', course['batch_name']!),
-              _detailRow(Icons.access_time_rounded, 'Timings & Days', course['timings']!),
-              _detailRow(Icons.room_rounded, 'Hall / Location', course['room']!),
-              _detailRow(Icons.calendar_today_rounded, 'Start Date & Duration', '${course['start_date']} (${course['duration']})'),
-              _detailRow(Icons.payments_rounded, 'Course Fee', course['fee']!),
+              _detailRow(Icons.person_rounded, 'Assigned Revered Guru', course['trainer_name'] ?? 'Assigned Guru'),
+              _detailRow(Icons.groups_rounded, 'Batch Name', course['batch_name'] ?? 'Active Batch'),
+              _detailRow(Icons.access_time_rounded, 'Timings & Days', course['timings'] ?? 'Regular Schedule'),
+              _detailRow(Icons.room_rounded, 'Hall / Location', course['room'] ?? 'Academy Hall'),
+              _detailRow(Icons.payments_rounded, 'Monthly Course Fee', course['fee'] ?? '₹2,000 / month'),
+              _detailRow(Icons.check_circle_outline_rounded, 'Enrollment Status', 'Active Registered Disciple'),
 
               const SizedBox(height: 24),
               SizedBox(
@@ -298,8 +298,8 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Duration: ${course['duration']}',
-                                  style: const TextStyle(fontSize: 11.5, color: LaasyaColors.textMuted),
+                                  'Batch: ${course['batch_name'] ?? 'Assigned Batch'}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: LaasyaColors.primaryDark),
                                 ),
                                 OutlinedButton(
                                   onPressed: () => _showCourseDetails(course),

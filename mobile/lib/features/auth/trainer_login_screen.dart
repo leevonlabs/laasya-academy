@@ -11,59 +11,19 @@ class TrainerLoginScreen extends StatefulWidget {
 }
 
 class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
-  final _identifierController = TextEditingController(text: 'anusha@laasyaacademy.com');
-  final _passwordController = TextEditingController(text: 'Guru@123');
+  final _identifierController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _rememberMe = true;
   bool _isLoading = false;
   String? _errorMessage;
-  String _selectedId = 'guru-anusha';
-
-  final List<Map<String, String>> _demoTrainers = [
-    {
-      'id': 'guru-anusha',
-      'name': 'Guru Anusha',
-      'role': 'Master Instructor • Kuchipudi Classical Dance',
-      'email': 'anusha@laasyaacademy.com',
-      'mobile': '+91 8151 998 899',
-      'initials': 'GA',
-      'password': 'Guru@123',
-    },
-    {
-      'id': 'guru-amos',
-      'name': 'Guru Amos',
-      'role': 'Master Instructor • Western & Bollywood Dance',
-      'email': 'amos@laasyaacademy.com',
-      'mobile': '+91 8155 889 988',
-      'initials': 'AM',
-      'password': 'Guru@123',
-    },
-    {
-      'id': 'guru-manikandan',
-      'name': 'Guru Manikandan',
-      'role': 'Revered Guru • Bharatanatyam Classical Dance',
-      'email': 'manikandan@laasyaacademy.com',
-      'mobile': '+91 98450 12345',
-      'initials': 'GM',
-      'password': 'Guru@123',
-    },
-  ];
 
   @override
   void dispose() {
     _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  void _fillTrainer(Map<String, String> tr) {
-    setState(() {
-      _selectedId = tr['id']!;
-      _identifierController.text = tr['email']!;
-      _passwordController.text = tr['password']!;
-      _errorMessage = null;
-    });
   }
 
   Future<void> _handleTrainerLogin() async {
@@ -360,92 +320,6 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                                   Icon(Icons.arrow_forward_rounded, size: 18, color: LaasyaColors.accentGold),
                                 ],
                               ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 26),
-
-                    // Quick Select Demo Trainers
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: LaasyaColors.background,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: LaasyaColors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Select Guru Account',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: LaasyaColors.primaryDark),
-                              ),
-                              Text(
-                                '1-Tap to Load',
-                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: LaasyaColors.primary),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          ..._demoTrainers.map((tr) {
-                            final isSel = _selectedId == tr['id'];
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 8.0),
-                              child: InkWell(
-                                onTap: () => _fillTrainer(tr),
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: isSel ? Colors.white : Colors.white.withOpacity(0.6),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: isSel ? LaasyaColors.primary : const Color(0xFFE5D4DE),
-                                      width: isSel ? 2 : 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 17,
-                                        backgroundColor: isSel ? const Color(0xFF590231) : Colors.grey.shade400,
-                                        child: Text(
-                                          tr['initials']!,
-                                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              tr['name']!,
-                                              style: TextStyle(
-                                                fontSize: 12.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: isSel ? LaasyaColors.primaryDark : LaasyaColors.textDark,
-                                              ),
-                                            ),
-                                            Text(
-                                              tr['role']!,
-                                              style: const TextStyle(fontSize: 10.5, color: LaasyaColors.textMuted),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      if (isSel)
-                                        const Icon(Icons.check_circle_rounded, color: LaasyaColors.primary, size: 18),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
                       ),
                     ),
                   ],

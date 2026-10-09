@@ -96,6 +96,29 @@ export interface Student {
   enrolled_batches_count?: number;
   attendance_rate?: number;
   enrolled_batches?: StudentEnrolledBatch[];
+  course_attendance?: StudentCourseAttendanceSummary[];
+  total_attendance?: {
+    this_month_held: number;
+    this_month_absent: number;
+    last_month_held: number;
+    last_month_absent: number;
+  };
+}
+
+export interface StudentCourseAttendanceSummary {
+  course_id: string;
+  course_title: string;
+  this_month_held: number;
+  this_month_absent: number;
+  last_month_held: number;
+  last_month_absent: number;
+}
+
+export interface BatchScheduleSlot {
+  day: string;
+  startTime: string;
+  endTime: string;
+  room: string;
 }
 
 export interface Batch {
@@ -113,7 +136,9 @@ export interface Batch {
   max_capacity: number;
   is_active: boolean;
   enrolled_count: number;
+  schedules?: BatchScheduleSlot[];
 }
+
 
 export interface ClassSession {
   id: string;
@@ -526,6 +551,11 @@ export async function createRoom(name: string, capacity: number = 25): Promise<R
   return room;
 }
 
+export async function deleteRoom(id: string): Promise<boolean> {
+  await query('DELETE FROM public.rooms WHERE id = $1', [id]);
+  return true;
+}
+
 // -------------------------------------------------------------
 // STUDENTS
 // -------------------------------------------------------------
@@ -557,8 +587,8 @@ export async function getStudents(): Promise<Student[]> {
       CASE WHEN s.roll_number ~ '^LCA-[0-9]+$' THEN CAST(SUBSTRING(s.roll_number FROM 5) AS INT) ELSE 999999 END ASC,
       p.full_name ASC;
   `;
-  // Fetch students, batch enrollments, and fee invoice summaries concurrently
-  const [students, enrollments, invoiceSummaries] = await Promise.all([
+  // Fetch students, batch enrollments, fee invoice summaries, and live course attendance counts concurrently
+  const [students, enrollments, invoiceSummaries, attendanceSummaries] = await Promise.all([
     query<Student>(sql),
     query<{
       student_id: string;
@@ -613,6 +643,41 @@ export async function getStudents(): Promise<Student[]> {
       FROM public.student_fee_invoices
       WHERE status IN ('unpaid', 'partial', 'overdue')
       GROUP BY student_id;
+    `),
+    query<StudentCourseAttendanceSummary & { student_id: string }>(`
+      SELECT 
+        be.student_id,
+        b.course_id,
+        c.title as course_title,
+        COUNT(DISTINCT CASE 
+          WHEN cs.session_date >= DATE_TRUNC('month', CURRENT_DATE) 
+           AND cs.session_date <= CURRENT_DATE 
+          THEN cs.id 
+        END)::int as this_month_held,
+        COUNT(DISTINCT CASE 
+          WHEN cs.session_date >= DATE_TRUNC('month', CURRENT_DATE) 
+           AND cs.session_date <= CURRENT_DATE 
+           AND LOWER(a.status) = 'absent' 
+          THEN cs.id 
+        END)::int as this_month_absent,
+        COUNT(DISTINCT CASE 
+          WHEN cs.session_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') 
+           AND cs.session_date < DATE_TRUNC('month', CURRENT_DATE) 
+          THEN cs.id 
+        END)::int as last_month_held,
+        COUNT(DISTINCT CASE 
+          WHEN cs.session_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') 
+           AND cs.session_date < DATE_TRUNC('month', CURRENT_DATE) 
+           AND LOWER(a.status) = 'absent' 
+          THEN cs.id 
+        END)::int as last_month_absent
+      FROM public.batch_enrollments be
+      JOIN public.batches b ON b.id = be.batch_id
+      JOIN public.courses c ON c.id = b.course_id
+      LEFT JOIN public.class_sessions cs ON cs.batch_id = b.id
+      LEFT JOIN public.attendance a ON a.session_id = cs.id AND a.student_id = be.student_id
+      WHERE be.status = 'active'
+      GROUP BY be.student_id, b.course_id, c.title;
     `)
   ]);
 
@@ -647,15 +712,37 @@ export async function getStudents(): Promise<Student[]> {
     });
   }
 
-  // Calculate current month's due date formatted as "dd and month name" (e.g. "30 Sep", "30 aug")
+  const attMap = new Map<string, StudentCourseAttendanceSummary[]>();
+  for (const att of attendanceSummaries) {
+    if (!attMap.has(att.student_id)) {
+      attMap.set(att.student_id, []);
+    }
+    attMap.get(att.student_id)!.push({
+      course_id: att.course_id,
+      course_title: att.course_title,
+      this_month_held: Number(att.this_month_held || 0),
+      this_month_absent: Number(att.this_month_absent || 0),
+      last_month_held: Number(att.last_month_held || 0),
+      last_month_absent: Number(att.last_month_absent || 0)
+    });
+  }
+
+  // Calculate current month's due date formatted as "05 [month name]" (e.g. "05 Oct")
   const now = new Date();
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const day = lastDay.getDate();
-  const month = lastDay.toLocaleString('en-US', { month: 'short' });
-  const currentMonthDueDate = `${day} ${month}`; // e.g. "30 Sep"
+  const month = now.toLocaleString('en-US', { month: 'short' });
+  const currentMonthDueDate = `05 ${month}`; // e.g. "05 Oct"
 
   for (const st of students) {
     st.enrolled_batches = enrollMap.get(st.id) || [];
+    st.course_attendance = attMap.get(st.id) || [];
+    
+    // Combined total attendance across all enrolled courses for this student
+    st.total_attendance = st.course_attendance.reduce((acc, ca) => ({
+      this_month_held: acc.this_month_held + (Number(ca.this_month_held) || 0),
+      this_month_absent: acc.this_month_absent + (Number(ca.this_month_absent) || 0),
+      last_month_held: acc.last_month_held + (Number(ca.last_month_held) || 0),
+      last_month_absent: acc.last_month_absent + (Number(ca.last_month_absent) || 0),
+    }), { this_month_held: 0, this_month_absent: 0, last_month_held: 0, last_month_absent: 0 });
     
     // Total Monthly Fee: sum of fees of all courses the student has joined
     const totalMonthly = st.enrolled_batches.reduce((sum, b) => sum + (Number(b.monthly_fee) || 0), 0);
@@ -967,14 +1054,14 @@ export async function getBatches(): Promise<Batch[]> {
       b.id, b.course_id, c.title as course_title, c.category as course_category,
       b.trainer_id, p.full_name as trainer_name,
       b.name, b.days_of_week, b.start_time, b.end_time, b.room_or_hall,
-      b.max_capacity, b.is_active,
+      b.max_capacity, b.is_active, b.schedules,
       COUNT(be.id)::int as enrolled_count
     FROM public.batches b
     JOIN public.courses c ON c.id = b.course_id
     JOIN public.trainers t ON t.id = b.trainer_id
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batch_enrollments be ON be.batch_id = b.id AND be.status = 'active'
-    GROUP BY b.id, b.course_id, c.title, c.category, b.trainer_id, p.full_name
+    GROUP BY b.id, b.course_id, c.title, c.category, b.trainer_id, p.full_name, b.schedules
     ORDER BY b.start_time, b.name;
   `;
   return query<Batch>(sql);
@@ -989,14 +1076,20 @@ export async function createBatch(data: {
   end_time: string;
   room_or_hall: string;
   max_capacity: number;
+  schedules?: BatchScheduleSlot[];
 }) {
   return queryOne<Batch>(`
-    INSERT INTO public.batches (course_id, trainer_id, name, days_of_week, start_time, end_time, room_or_hall, max_capacity, is_active)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+    INSERT INTO public.batches (
+      course_id, trainer_id, name, days_of_week, 
+      start_time, end_time, room_or_hall, max_capacity, 
+      is_active, schedules
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9)
     RETURNING *;
   `, [
     data.course_id, data.trainer_id, data.name, data.days_of_week,
-    data.start_time, data.end_time, data.room_or_hall, data.max_capacity
+    data.start_time, data.end_time, data.room_or_hall, data.max_capacity,
+    JSON.stringify(data.schedules || [])
   ]);
 }
 
@@ -1010,6 +1103,7 @@ export async function updateBatch(id: string, data: {
   room_or_hall?: string;
   max_capacity?: number;
   is_active?: boolean;
+  schedules?: BatchScheduleSlot[];
 }) {
   return queryOne<Batch>(`
     UPDATE public.batches
@@ -1022,14 +1116,17 @@ export async function updateBatch(id: string, data: {
         room_or_hall = COALESCE($8, room_or_hall),
         max_capacity = COALESCE($9, max_capacity),
         is_active = COALESCE($10, is_active),
+        schedules = COALESCE($11::jsonb, schedules),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
   `, [
     id, data.name, data.course_id, data.trainer_id, data.days_of_week,
-    data.start_time, data.end_time, data.room_or_hall, data.max_capacity, data.is_active
+    data.start_time, data.end_time, data.room_or_hall, data.max_capacity, data.is_active,
+    data.schedules ? JSON.stringify(data.schedules) : null
   ]);
 }
+
 
 export async function deleteBatch(id: string) {
   await query(`DELETE FROM public.batch_enrollments WHERE batch_id = $1`, [id]);

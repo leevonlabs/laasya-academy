@@ -1,11 +1,70 @@
-import { query } from './db';
+import { query, queryOne } from './db';
 import { getExpenses } from './expenses';
 
 // -------------------------------------------------------------
 // TYPES
 // -------------------------------------------------------------
 
-export type ReportType = 'attendance' | 'fees' | 'salaries' | 'income_expenses';
+export type ReportType = 'attendance' | 'fees' | 'salaries' | 'income_expenses' | 'absence' | 'batch_attendance' | 'batch';
+
+export interface BatchAttendanceReportRow {
+  batch_id: string;
+  batch_name: string;
+  course_id: string;
+  course_name: string;
+  trainer_id: string;
+  trainer_name: string;
+  trainer_contact: string;
+  total_registered_students: number;
+  total_classes_held: number;
+  total_absences: number;
+  absence_percentage: number;
+}
+
+export interface BatchAttendanceReportSummary {
+  totalCourses: number;
+  totalBatches: number;
+  totalStudents: number;
+}
+
+export interface AbsenceReportRow {
+  student_id: string;
+  student_name: string;
+  roll_number: string;
+  student_contact: string;
+  parent_contact: string;
+  total_classes_held: number;
+  total_absent_days: number;
+  total_present_days: number;
+}
+
+export interface StudentCourseAbsenceRow {
+  course_id: string;
+  course_name: string;
+  batch_id: string;
+  batch_name: string;
+  total_classes_held: number;
+  total_present_days: number;
+  total_absent_days: number;
+}
+
+export interface SessionAttendanceAuditRow {
+  session_id: string;
+  session_date: string;
+  trainer_name: string;
+  course_name: string;
+  batch_name: string;
+  audit_status: string;
+  remarks?: string | null;
+}
+
+export interface StudentAbsenceProfile {
+  student_id: string;
+  student_name: string;
+  roll_number: string;
+  student_contact: string;
+  parent_contact: string;
+}
 
 export interface AttendanceReportSummary {
   totalSessions: number;
@@ -32,6 +91,7 @@ export interface FeesReportSummary {
   totalDiscounts: number;
   totalRefunds: number;
   paymentMethodBreakdown: { method: string; count: number; total: number }[];
+  paymentStatusBreakdown?: { status: string; label: string; count: number; total: number }[];
 }
 
 export interface FeesReportRow {
@@ -98,7 +158,9 @@ export interface IncomeExpensesReportRow {
 // -------------------------------------------------------------
 export async function getAttendanceReport(filters: {
   courseId?: string;
+  courseIds?: string[];
   batchId?: string;
+  batchIds?: string[];
   studentId?: string;
   startDate?: string;
   endDate?: string;
@@ -129,12 +191,18 @@ export async function getAttendanceReport(filters: {
     `;
     const params: any[] = [];
 
-    if (filters.courseId && filters.courseId !== 'all') {
+    if (filters.courseIds && filters.courseIds.length > 0) {
+      params.push(filters.courseIds);
+      sql += ` AND c.id = ANY($${params.length}::uuid[])`;
+    } else if (filters.courseId && filters.courseId !== 'all') {
       params.push(filters.courseId);
       sql += ` AND c.id = $${params.length}`;
     }
 
-    if (filters.batchId && filters.batchId !== 'all') {
+    if (filters.batchIds && filters.batchIds.length > 0) {
+      params.push(filters.batchIds);
+      sql += ` AND b.id = ANY($${params.length}::uuid[])`;
+    } else if (filters.batchId && filters.batchId !== 'all') {
       params.push(filters.batchId);
       sql += ` AND b.id = $${params.length}`;
     }
@@ -200,12 +268,33 @@ export async function getAttendanceReport(filters: {
   }
 }
 
+export function formatFifthOfMonth(dateStrOrPeriod?: string | null): string {
+  if (!dateStrOrPeriod) return '05/10/2026';
+  let d = new Date(dateStrOrPeriod);
+  if (isNaN(d.getTime())) {
+    const match = String(dateStrOrPeriod).match(/([a-zA-Z]+)\s+(\d{4})/);
+    if (match) {
+      const mNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+      const mIdx = mNames.findIndex(m => m.startsWith(match[1].toLowerCase()));
+      if (mIdx !== -1) {
+        d = new Date(parseInt(match[2], 10), mIdx, 5);
+      }
+    }
+  }
+  if (isNaN(d.getTime())) return '05/10/2026';
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `05/${mm}/${yyyy}`;
+}
+
 // -------------------------------------------------------------
 // 2. FEES REPORT
 // -------------------------------------------------------------
 export async function getFeesReport(filters: {
   courseId?: string;
+  courseIds?: string[];
   batchId?: string;
+  batchIds?: string[];
   status?: string;
   startDate?: string;
   endDate?: string;
@@ -245,16 +334,22 @@ export async function getFeesReport(filters: {
       JOIN public.profiles p ON p.id = s.profile_id
       LEFT JOIN public.courses c ON c.id = i.course_id
       LEFT JOIN public.batches b ON b.id = i.batch_id
-      WHERE 1=1
+      WHERE (i.paid_amount > 0 OR i.status IN ('paid', 'partial'))
     `;
     const params: any[] = [];
 
-    if (filters.courseId && filters.courseId !== 'all') {
+    if (filters.courseIds && filters.courseIds.length > 0) {
+      params.push(filters.courseIds);
+      sql += ` AND i.course_id = ANY($${params.length}::uuid[])`;
+    } else if (filters.courseId && filters.courseId !== 'all') {
       params.push(filters.courseId);
       sql += ` AND i.course_id = $${params.length}`;
     }
 
-    if (filters.batchId && filters.batchId !== 'all') {
+    if (filters.batchIds && filters.batchIds.length > 0) {
+      params.push(filters.batchIds);
+      sql += ` AND i.batch_id = ANY($${params.length}::uuid[])`;
+    } else if (filters.batchId && filters.batchId !== 'all') {
       params.push(filters.batchId);
       sql += ` AND i.batch_id = $${params.length}`;
     }
@@ -276,14 +371,20 @@ export async function getFeesReport(filters: {
 
     sql += ` ORDER BY i.due_date DESC, i.created_at DESC;`;
 
-    const records = await query<FeesReportRow>(sql, params);
+    const rawRecords = await query<FeesReportRow>(sql, params);
+
+    // Format due_date to 5th of every month
+    const records = rawRecords.map(r => ({
+      ...r,
+      due_date: formatFifthOfMonth(r.fee_period || r.due_date)
+    }));
 
     // Calculate Summary from the exact matched records
     let totalCollected = 0;
     let totalOutstanding = 0;
     let totalOverdue = 0;
     let totalDiscounts = 0;
-    const refunds = 0; // standard refund tracker
+    const refunds = 0;
 
     for (const r of records) {
       totalCollected += Number(r.paid_amount) || 0;
@@ -294,21 +395,26 @@ export async function getFeesReport(filters: {
       }
     }
 
-    // Payment method breakdown from actual payments
-    const paymentsSql = `
-      SELECT 
-        UPPER(payment_method) as method,
-        COUNT(*)::int as count,
-        COALESCE(SUM(amount_paid), 0)::float as total
-      FROM public.student_fee_payments
-      GROUP BY UPPER(payment_method);
-    `;
-    const pmRows = await query<{ method: string; count: number; total: number }>(paymentsSql);
-
-    const formattedBreakdown = pmRows.length > 0 ? pmRows : [
-      { method: 'UPI', count: 12, total: Math.round(totalCollected * 0.65) },
-      { method: 'BANK_TRANSFER', count: 5, total: Math.round(totalCollected * 0.25) },
-      { method: 'CASH', count: 3, total: Math.round(totalCollected * 0.10) }
+    // Payment status breakdown: All Status, Partial (orange), Paid (green)
+    const paymentStatusBreakdown = [
+      {
+        status: 'all',
+        label: 'All Status',
+        count: records.length,
+        total: totalCollected
+      },
+      {
+        status: 'partial',
+        label: 'Partial',
+        count: records.filter(r => r.status === 'partial').length,
+        total: records.filter(r => r.status === 'partial').reduce((sum, r) => sum + (Number(r.paid_amount) || 0), 0)
+      },
+      {
+        status: 'paid',
+        label: 'Paid',
+        count: records.filter(r => r.status === 'paid').length,
+        total: records.filter(r => r.status === 'paid').reduce((sum, r) => sum + (Number(r.paid_amount) || 0), 0)
+      }
     ];
 
     return {
@@ -318,7 +424,8 @@ export async function getFeesReport(filters: {
         totalOverdue,
         totalDiscounts,
         totalRefunds: refunds,
-        paymentMethodBreakdown: formattedBreakdown
+        paymentMethodBreakdown: [],
+        paymentStatusBreakdown
       },
       records,
       generatedAt: new Date().toISOString()
@@ -332,7 +439,12 @@ export async function getFeesReport(filters: {
         totalOverdue: 0,
         totalDiscounts: 0,
         totalRefunds: 0,
-        paymentMethodBreakdown: []
+        paymentMethodBreakdown: [],
+        paymentStatusBreakdown: [
+          { status: 'all', label: 'All Status', count: 0, total: 0 },
+          { status: 'partial', label: 'Partial', count: 0, total: 0 },
+          { status: 'paid', label: 'Paid', count: 0, total: 0 }
+        ]
       },
       records: [],
       generatedAt: new Date().toISOString()
@@ -596,3 +708,428 @@ export async function getIncomeVsExpensesReport(filters: {
     };
   }
 }
+
+// -------------------------------------------------------------
+// 5. ABSENCE REPORT (3-TIER DRILLDOWN)
+// -------------------------------------------------------------
+
+/**
+ * Level 1: Overall student absence report across all enrolled courses
+ */
+export async function getAbsenceReport(filters: {
+  studentIds?: string[];
+  sort?: 'high_absence' | 'low_absence';
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  records: AbsenceReportRow[];
+  totalStudents: number;
+  generatedAt: string;
+}> {
+  try {
+    const params: any[] = [];
+    let sql = `
+      SELECT 
+        s.id as student_id,
+        COALESCE(p.full_name, 'Unknown Student') as student_name,
+        COALESCE(s.roll_number, 'N/A') as roll_number,
+        COALESCE(p.phone, 'N/A') as student_contact,
+        COALESCE(s.parent_contact, s.emergency_contact, p.alternate_phone, 'N/A') as parent_contact,
+        COUNT(DISTINCT cs.id)::int as total_classes_held,
+        COUNT(DISTINCT CASE WHEN LOWER(a.status) = 'absent' THEN cs.id END)::int as total_absent_days,
+        COUNT(DISTINCT CASE WHEN LOWER(a.status) = 'present' THEN cs.id END)::int as total_present_days
+      FROM public.students s
+      JOIN public.profiles p ON p.id = s.profile_id
+      JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
+      JOIN public.batches b ON b.id = be.batch_id
+      JOIN public.courses c ON c.id = b.course_id
+      LEFT JOIN public.class_sessions cs ON cs.batch_id = be.batch_id
+        AND cs.session_date <= CURRENT_DATE
+    `;
+
+    if (filters.startDate) {
+      params.push(filters.startDate);
+      sql += ` AND cs.session_date >= $${params.length}::date`;
+    }
+    if (filters.endDate) {
+      params.push(filters.endDate);
+      sql += ` AND cs.session_date <= $${params.length}::date`;
+    }
+
+    sql += `
+      LEFT JOIN public.attendance a ON a.session_id = cs.id AND a.student_id = s.id
+      WHERE 1=1
+    `;
+
+    if (filters.studentIds && filters.studentIds.length > 0) {
+      params.push(filters.studentIds);
+      sql += ` AND s.id = ANY($${params.length}::uuid[])`;
+    }
+
+    sql += `
+      GROUP BY s.id, p.full_name, s.roll_number, p.phone, s.parent_contact, s.emergency_contact, p.alternate_phone
+    `;
+
+    if (filters.sort === 'low_absence') {
+      sql += ` ORDER BY total_absent_days ASC, p.full_name ASC`;
+    } else {
+      // Default: High Absence
+      sql += ` ORDER BY total_absent_days DESC, p.full_name ASC`;
+    }
+
+    const records = await query<AbsenceReportRow>(sql, params);
+
+    return {
+      records: records.map(r => ({
+        ...r,
+        total_classes_held: Number(r.total_classes_held || 0),
+        total_absent_days: Number(r.total_absent_days || 0),
+        total_present_days: Number(r.total_present_days || 0),
+      })),
+      totalStudents: records.length,
+      generatedAt: new Date().toISOString()
+    };
+  } catch (err) {
+    console.error('Error in getAbsenceReport:', err);
+    return {
+      records: [],
+      totalStudents: 0,
+      generatedAt: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * Level 2: Student course-wise absence breakdown
+ */
+export async function getStudentCourseAbsenceReport(filters: {
+  studentId: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  student: StudentAbsenceProfile | null;
+  records: StudentCourseAbsenceRow[];
+  totalClassesHeld: number;
+  totalPresentDays: number;
+  totalAbsentDays: number;
+  generatedAt: string;
+}> {
+  try {
+    // 1. Fetch Student Profile
+    const studentProfileSql = `
+      SELECT 
+        s.id as student_id,
+        COALESCE(p.full_name, 'Unknown Student') as student_name,
+        COALESCE(s.roll_number, 'N/A') as roll_number,
+        COALESCE(p.phone, 'N/A') as student_contact,
+        COALESCE(s.parent_contact, s.emergency_contact, p.alternate_phone, 'N/A') as parent_contact
+      FROM public.students s
+      JOIN public.profiles p ON p.id = s.profile_id
+      WHERE s.id = $1
+    `;
+    const studentProfile = await queryOne<StudentAbsenceProfile>(studentProfileSql, [filters.studentId]);
+
+    // 2. Fetch Course & Batch Breakdown
+    const params: any[] = [filters.studentId];
+    let sql = `
+      SELECT 
+        c.id as course_id,
+        c.title as course_name,
+        b.id as batch_id,
+        b.name as batch_name,
+        COUNT(DISTINCT cs.id)::int as total_classes_held,
+        COUNT(DISTINCT CASE WHEN LOWER(a.status) = 'present' THEN cs.id END)::int as total_present_days,
+        COUNT(DISTINCT CASE WHEN LOWER(a.status) = 'absent' THEN cs.id END)::int as total_absent_days
+      FROM public.batch_enrollments be
+      JOIN public.batches b ON b.id = be.batch_id
+      JOIN public.courses c ON c.id = b.course_id
+      LEFT JOIN public.class_sessions cs ON cs.batch_id = b.id
+        AND cs.session_date <= CURRENT_DATE
+    `;
+
+    if (filters.startDate) {
+      params.push(filters.startDate);
+      sql += ` AND cs.session_date >= $${params.length}::date`;
+    }
+    if (filters.endDate) {
+      params.push(filters.endDate);
+      sql += ` AND cs.session_date <= $${params.length}::date`;
+    }
+
+    sql += `
+      LEFT JOIN public.attendance a ON a.session_id = cs.id AND a.student_id = be.student_id
+      WHERE be.student_id = $1 AND be.status = 'active'
+      GROUP BY c.id, c.title, b.id, b.name
+      ORDER BY total_absent_days DESC, c.title ASC
+    `;
+
+    const rawRecords = await query<StudentCourseAbsenceRow>(sql, params);
+    const records = rawRecords.map(r => ({
+      ...r,
+      total_classes_held: Number(r.total_classes_held || 0),
+      total_present_days: Number(r.total_present_days || 0),
+      total_absent_days: Number(r.total_absent_days || 0),
+    }));
+
+    const totalClassesHeld = records.reduce((sum, r) => sum + r.total_classes_held, 0);
+    const totalPresentDays = records.reduce((sum, r) => sum + r.total_present_days, 0);
+    const totalAbsentDays = records.reduce((sum, r) => sum + r.total_absent_days, 0);
+
+    return {
+      student: studentProfile,
+      records,
+      totalClassesHeld,
+      totalPresentDays,
+      totalAbsentDays,
+      generatedAt: new Date().toISOString()
+    };
+  } catch (err) {
+    console.error('Error in getStudentCourseAbsenceReport:', err);
+    return {
+      student: null,
+      records: [],
+      totalClassesHeld: 0,
+      totalPresentDays: 0,
+      totalAbsentDays: 0,
+      generatedAt: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * Level 3: Individual session attendance details for student & course/batch
+ */
+export async function getStudentBatchSessionAudit(filters: {
+  studentId: string;
+  batchId: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  student: StudentAbsenceProfile | null;
+  courseName: string;
+  batchName: string;
+  records: SessionAttendanceAuditRow[];
+  totalSessions: number;
+  presentCount: number;
+  absentCount: number;
+  generatedAt: string;
+}> {
+  try {
+    // 1. Fetch Student Profile
+    const studentProfileSql = `
+      SELECT 
+        s.id as student_id,
+        COALESCE(p.full_name, 'Unknown Student') as student_name,
+        COALESCE(s.roll_number, 'N/A') as roll_number,
+        COALESCE(p.phone, 'N/A') as student_contact,
+        COALESCE(s.parent_contact, s.emergency_contact, p.alternate_phone, 'N/A') as parent_contact
+      FROM public.students s
+      JOIN public.profiles p ON p.id = s.profile_id
+      WHERE s.id = $1
+    `;
+    const student = await queryOne<StudentAbsenceProfile>(studentProfileSql, [filters.studentId]);
+
+    // 2. Fetch Batch & Course Names
+    const batchInfoSql = `
+      SELECT c.title as course_name, b.name as batch_name
+      FROM public.batches b
+      JOIN public.courses c ON c.id = b.course_id
+      WHERE b.id = $1
+    `;
+    const batchInfo = await queryOne<{ course_name: string; batch_name: string }>(batchInfoSql, [filters.batchId]);
+
+    // 3. Fetch Sessions with Attendance
+    const params: any[] = [filters.studentId, filters.batchId];
+    let sql = `
+      SELECT 
+        cs.id as session_id,
+        TO_CHAR(cs.session_date, 'DD/MM/YYYY') as session_date,
+        COALESCE(tp.full_name, 'Unassigned Trainer') as trainer_name,
+        c.title as course_name,
+        b.name as batch_name,
+        CASE 
+          WHEN LOWER(a.status) = 'present' THEN 'Present'
+          WHEN LOWER(a.status) = 'absent' THEN 'Absent'
+          WHEN cs.session_date > CURRENT_DATE THEN 'Scheduled'
+          ELSE 'Unmarked'
+        END as audit_status,
+        a.remarks
+      FROM public.class_sessions cs
+      JOIN public.batches b ON b.id = cs.batch_id
+      JOIN public.courses c ON c.id = b.course_id
+      LEFT JOIN public.trainers t ON t.id = cs.trainer_id
+      LEFT JOIN public.profiles tp ON tp.id = t.profile_id
+      LEFT JOIN public.attendance a ON a.session_id = cs.id AND a.student_id = $1
+      WHERE cs.batch_id = $2
+        AND cs.session_date <= CURRENT_DATE
+    `;
+
+    if (filters.startDate) {
+      params.push(filters.startDate);
+      sql += ` AND cs.session_date >= $${params.length}::date`;
+    }
+    if (filters.endDate) {
+      params.push(filters.endDate);
+      sql += ` AND cs.session_date <= $${params.length}::date`;
+    }
+
+    sql += ` ORDER BY cs.session_date DESC`;
+
+    const records = await query<SessionAttendanceAuditRow>(sql, params);
+
+    const presentCount = records.filter(r => r.audit_status === 'Present').length;
+    const absentCount = records.filter(r => r.audit_status === 'Absent').length;
+
+    return {
+      student,
+      courseName: batchInfo?.course_name || 'Course',
+      batchName: batchInfo?.batch_name || 'Batch',
+      records,
+      totalSessions: records.length,
+      presentCount,
+      absentCount,
+      generatedAt: new Date().toISOString()
+    };
+  } catch (err) {
+    console.error('Error in getStudentBatchSessionAudit:', err);
+    return {
+      student: null,
+      courseName: 'Course',
+      batchName: 'Batch',
+      records: [],
+      totalSessions: 0,
+      presentCount: 0,
+      absentCount: 0,
+      generatedAt: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * Batch Attendance Report:
+ * Summarizes registered students, classes held, absences, and absence percentage per batch.
+ */
+export async function getBatchAttendanceReport(filters: {
+  courseIds?: string[];
+  batchIds?: string[];
+  sort?: 'high_absence' | 'low_absence';
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  records: BatchAttendanceReportRow[];
+  summary: BatchAttendanceReportSummary;
+  generatedAt: string;
+}> {
+  try {
+    const params: any[] = [];
+    let sql = `
+      SELECT 
+        b.id as batch_id,
+        b.name as batch_name,
+        c.id as course_id,
+        c.title as course_name,
+        COALESCE(t.id::text, '') as trainer_id,
+        COALESCE(tp.full_name, 'Unassigned Trainer') as trainer_name,
+        COALESCE(tp.phone, 'N/A') as trainer_contact,
+        (SELECT COUNT(*)::int FROM public.batch_enrollments be WHERE be.batch_id = b.id AND be.status = 'active') as total_registered_students,
+        COUNT(DISTINCT cs.id)::int as total_classes_held,
+        COUNT(DISTINCT CASE WHEN LOWER(a.status) = 'absent' THEN a.id END)::int as total_absences,
+        COUNT(DISTINCT CASE WHEN LOWER(a.status) = 'present' THEN a.id END)::int as total_presents
+      FROM public.batches b
+      JOIN public.courses c ON c.id = b.course_id
+      LEFT JOIN public.trainers t ON t.id = b.trainer_id
+      LEFT JOIN public.profiles tp ON tp.id = t.profile_id
+      LEFT JOIN public.class_sessions cs ON cs.batch_id = b.id
+        AND cs.session_date <= CURRENT_DATE
+    `;
+
+    if (filters.startDate) {
+      params.push(filters.startDate);
+      sql += ` AND cs.session_date >= $${params.length}::date`;
+    }
+    if (filters.endDate) {
+      params.push(filters.endDate);
+      sql += ` AND cs.session_date <= $${params.length}::date`;
+    }
+
+    sql += `
+      LEFT JOIN public.attendance a ON a.session_id = cs.id
+      WHERE 1=1
+    `;
+
+    if (filters.courseIds && filters.courseIds.length > 0) {
+      params.push(filters.courseIds);
+      sql += ` AND c.id = ANY($${params.length}::uuid[])`;
+    }
+
+    if (filters.batchIds && filters.batchIds.length > 0) {
+      params.push(filters.batchIds);
+      sql += ` AND b.id = ANY($${params.length}::uuid[])`;
+    }
+
+    sql += `
+      GROUP BY b.id, b.name, c.id, c.title, t.id, tp.full_name, tp.phone
+    `;
+
+    const rawRows = await query<any>(sql, params);
+
+    const mapped: BatchAttendanceReportRow[] = rawRows.map(r => {
+      const totalReg = Number(r.total_registered_students || 0);
+      const classesHeld = Number(r.total_classes_held || 0);
+      const absences = Number(r.total_absences || 0);
+      const presents = Number(r.total_presents || 0);
+      const totalMarked = absences + presents;
+
+      const pct = totalMarked > 0 
+        ? Math.round((absences / totalMarked) * 1000) / 10 
+        : (classesHeld > 0 && totalReg > 0 ? Math.round((absences / (classesHeld * totalReg)) * 1000) / 10 : 0);
+
+      return {
+        batch_id: r.batch_id,
+        batch_name: r.batch_name,
+        course_id: r.course_id,
+        course_name: r.course_name,
+        trainer_id: r.trainer_id,
+        trainer_name: r.trainer_name,
+        trainer_contact: r.trainer_contact,
+        total_registered_students: totalReg,
+        total_classes_held: classesHeld,
+        total_absences: absences,
+        absence_percentage: pct
+      };
+    });
+
+    if (filters.sort === 'low_absence') {
+      mapped.sort((a, b) => a.absence_percentage - b.absence_percentage || a.total_absences - b.total_absences || a.course_name.localeCompare(b.course_name));
+    } else {
+      // Default: high_absence
+      mapped.sort((a, b) => b.absence_percentage - a.absence_percentage || b.total_absences - a.total_absences || a.course_name.localeCompare(b.course_name));
+    }
+
+    const distinctCourses = new Set(mapped.map(m => m.course_id)).size;
+    const totalBatches = mapped.length;
+    const totalStudents = mapped.reduce((acc, m) => acc + m.total_registered_students, 0);
+
+    return {
+      records: mapped,
+      summary: {
+        totalCourses: distinctCourses,
+        totalBatches,
+        totalStudents
+      },
+      generatedAt: new Date().toISOString()
+    };
+  } catch (err) {
+    console.error('Error in getBatchAttendanceReport:', err);
+    return {
+      records: [],
+      summary: {
+        totalCourses: 0,
+        totalBatches: 0,
+        totalStudents: 0
+      },
+      generatedAt: new Date().toISOString()
+    };
+  }
+}
+

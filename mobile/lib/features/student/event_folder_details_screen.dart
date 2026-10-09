@@ -38,11 +38,11 @@ class EventFolderDetailsScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _openDriveUrl(BuildContext context, String url) async {
+  Future<void> _launchUrlDirectly(BuildContext context, String url, String label) async {
     final cleanUrl = url.trim();
     if (cleanUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No Google Drive link available')),
+        SnackBar(content: Text('No $label available')),
       );
       return;
     }
@@ -51,16 +51,14 @@ class EventFolderDetailsScreen extends StatelessWidget {
       final uri = Uri.parse(cleanUrl);
       final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!launched) {
-        // Fallback launch
         await launchUrl(uri);
       }
     } catch (e) {
-      // In web or restricted environments, copy to clipboard and open in new tab
       Clipboard.setData(ClipboardData(text: cleanUrl));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Drive link copied: $cleanUrl'),
+            content: Text('$label copied: $cleanUrl'),
             backgroundColor: LaasyaColors.primary,
           ),
         );
@@ -68,7 +66,7 @@ class EventFolderDetailsScreen extends StatelessWidget {
     }
   }
 
-  void _copyLink(BuildContext context, String url, String title) {
+  void _copyLink(BuildContext context, String url, String label) {
     Clipboard.setData(ClipboardData(text: url.trim()));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -78,7 +76,7 @@ class EventFolderDetailsScreen extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Google Drive link copied for "$title"!',
+                '$label copied to clipboard!',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
@@ -99,7 +97,10 @@ class EventFolderDetailsScreen extends StatelessWidget {
     final batch = (folder['target_batch_name'] ?? 'All Batches').toString();
     final eventDateRaw = folder['event_date'];
     final uploadDateRaw = folder['created_at'] ?? folder['event_date'];
-    final driveUrl = (folder['drive_url'] ?? '').toString();
+    final driveUrl = (folder['drive_url'] ?? '').toString().trim();
+    final youtubeUrl = (folder['youtube_url'] ?? '').toString().trim();
+    final hasDrive = driveUrl.isNotEmpty;
+    final hasYoutube = youtubeUrl.isNotEmpty;
     final desc = (folder['description'] ?? 'Official event shoot video media and high-resolution photography.').toString();
     final createdBy = (folder['created_by'] ?? 'Academy Director').toString();
 
@@ -358,47 +359,105 @@ class EventFolderDetailsScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // =================================================================
-            // 4. GOOGLE DRIVE ACTIONS (JUST SIMPLE 2 BUTTONS)
+            // 4. MEDIA ACTIONS (SHOWS ONLY THE LINK(S) SHARED)
             // =================================================================
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF590231),
-                  foregroundColor: Colors.white,
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                onPressed: () => _openDriveUrl(context, driveUrl),
-                icon: const Icon(Icons.open_in_new_rounded, size: 20, color: LaasyaColors.accentGold),
-                label: const Text(
-                  'Open in Google Drive',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.2),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: LaasyaColors.primary,
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFFF0D5E4), width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                onPressed: () => _copyLink(context, driveUrl, title),
-                icon: const Icon(Icons.copy_rounded, size: 18, color: LaasyaColors.primary),
-                label: const Text(
-                  'Copy Drive Link',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            if (hasDrive) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF03543F),
+                    foregroundColor: Colors.white,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: () => _launchUrlDirectly(context, driveUrl, 'Google Drive link'),
+                  icon: const Icon(Icons.add_to_drive_rounded, size: 20, color: Color(0xFF31C48D)),
+                  label: const Text(
+                    'Open in Google Drive',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.2),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF03543F),
+                    backgroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0xFFC7EBD9), width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: () => _copyLink(context, driveUrl, 'Google Drive link'),
+                  icon: const Icon(Icons.copy_rounded, size: 17, color: Color(0xFF03543F)),
+                  label: const Text(
+                    'Copy Drive Link',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              if (hasYoutube) const SizedBox(height: 18),
+            ],
+
+            if (hasYoutube) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE53E3E),
+                    foregroundColor: Colors.white,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: () => _launchUrlDirectly(context, youtubeUrl, 'YouTube link'),
+                  icon: const Icon(Icons.play_circle_fill_rounded, size: 22, color: Colors.white),
+                  label: const Text(
+                    'Open in YouTube',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFE53E3E),
+                    backgroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0xFFFED7D7), width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: () => _copyLink(context, youtubeUrl, 'YouTube link'),
+                  icon: const Icon(Icons.copy_rounded, size: 17, color: Color(0xFFE53E3E)),
+                  label: const Text(
+                    'Copy YouTube Link',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+
+            if (!hasDrive && !hasYoutube)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: const Center(
+                  child: Text(
+                    'No active media links attached to this event.',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                ),
+              ),
 
             const SizedBox(height: 24),
           ],

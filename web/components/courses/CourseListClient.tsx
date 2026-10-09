@@ -1040,20 +1040,18 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
 
             <div className="space-y-4">
               {/* Highlight Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-rose-100">
-                  <span className="text-[10px] font-black text-[#590231] uppercase tracking-wider block">Monthly Fee</span>
+              <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-rose-100 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-black text-[#590231] uppercase tracking-wider block">Monthly Tuition Fee</span>
                   <span className="text-lg font-black text-[#8A064D] mt-0.5 flex items-center">
                     ₹{Number(viewingCourse.monthly_fee).toLocaleString('en-IN')}
                     <span className="text-xs font-bold text-gray-500 ml-1">/ month</span>
                   </span>
                 </div>
-
-                <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-100">
-                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider block">Course Duration</span>
-                  <span className="text-lg font-black text-gray-800 mt-0.5 flex items-center gap-1">
-                    <Clock className="w-4 h-4 text-[#8A064D]" />
-                    <span>{viewingCourse.duration_months} Months</span>
+                <div className="text-right">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider block">Status</span>
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full inline-block mt-0.5">
+                    {viewingCourse.is_active !== false ? 'Active Academic Course' : 'Inactive'}
                   </span>
                 </div>
               </div>
@@ -1266,33 +1264,18 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Monthly Fee (INR ₹) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={editFee}
-                    onChange={(e) => setEditFee(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Duration (Months) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    value={editDuration}
-                    onChange={(e) => setEditDuration(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Monthly Fee (INR ₹) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  value={editFee}
+                  onChange={(e) => setEditFee(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
+                />
               </div>
 
               <div>
@@ -1467,33 +1450,18 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Monthly Fee (₹) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={newFee}
-                    onChange={(e) => setNewFee(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Duration (Months) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    value={newDuration}
-                    onChange={(e) => setNewDuration(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Monthly Fee (₹) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  value={newFee}
+                  onChange={(e) => setNewFee(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
+                />
               </div>
 
               <div>

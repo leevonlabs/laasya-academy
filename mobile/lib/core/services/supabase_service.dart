@@ -176,12 +176,53 @@ class SupabaseService {
     required String email,
     required String password,
   }) async {
-    final identifier = email.trim().toLowerCase().replaceAll(' ', '');
+    final identifier = email.trim();
+
+    // 1. Authenticate against central Academy API (authenticates all 300 students and 14 Gurus)
+    try {
+      final uri = Uri.parse('http://localhost:3000/api/auth/mobile-login');
+      final res = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'identifier': identifier,
+          'password': password,
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['success'] == true && decoded['profile'] != null) {
+          _cachedProfile = Map<String, dynamic>.from(decoded['profile']);
+          return _cachedProfile;
+        }
+      } else if (res.statusCode == 401 || res.statusCode == 400 || res.statusCode == 404) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['error'] != null) {
+          throw Exception(decoded['error']);
+        }
+      }
+    } catch (e) {
+      if (e.toString().contains('Exception:')) rethrow;
+      debugPrint('Mobile login API connection notice: $e');
+    }
 
     if (_isInitialized && _client != null) {
       try {
+        String resolvedEmail = identifier;
+        if (!identifier.contains('@')) {
+          try {
+            final lookupRes = await _client!.rpc('lookup_user_email', params: {'p_identifier': identifier});
+            if (lookupRes != null && lookupRes.toString().trim().isNotEmpty) {
+              resolvedEmail = lookupRes.toString().trim();
+            }
+          } catch (rpcErr) {
+            debugPrint('RPC lookup_user_email error: $rpcErr');
+          }
+        }
+
         final res = await _client!.auth.signInWithPassword(
-          email: identifier,
+          email: resolvedEmail,
           password: password,
         );
         if (res.user != null) {
@@ -192,6 +233,7 @@ class SupabaseService {
         debugPrint('Cloud login error: $e. Falling back to local verification.');
       }
     }
+
 
     // -------------------------------------------------------------------------
     // Faculty & Revered Gurus (Trainer Login)
@@ -593,6 +635,28 @@ class SupabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getTrainerBatches() async {
+    // 1. Live fetch from local / web backend API
+    try {
+      final prof = _cachedProfile;
+      final tName = prof?['full_name'] ?? '';
+      final tPhone = prof?['phone'] ?? '';
+      final nameParam = Uri.encodeComponent(tName);
+      final phoneParam = Uri.encodeComponent(tPhone);
+      final uri = Uri.parse('http://localhost:3000/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam');
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['success'] == true && decoded['batches'] is List) {
+          final liveBatches = List<Map<String, dynamic>>.from(decoded['batches']);
+          if (liveBatches.isNotEmpty) {
+            return liveBatches;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Live API fetch error for trainer batches: $e');
+    }
+
     return [
       {
         'id': 'batch-201',
@@ -745,18 +809,49 @@ class SupabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getStudentEnrolledCourses() async {
+    final prof = _cachedProfile;
+    if (prof != null) {
+      final enrolled = prof['enrolled_courses'];
+      if (enrolled is List && enrolled.isNotEmpty) {
+        return List<Map<String, dynamic>>.from(enrolled);
+      }
+      if (prof['course'] != null) {
+        return [
+          {
+            'id': prof['id'] ?? 'c-1',
+            'title': prof['course'] ?? 'Classical Dance',
+            'telugu_name': prof['course_category'] ?? 'Indian Arts',
+            'category': prof['course_category'] ?? 'Classical Dance',
+            'trainer_name': prof['trainer_name'] ?? 'Assigned Guru',
+            'batch_name': prof['batch'] ?? 'Batch A',
+            'batch_id': 'batch-current',
+            'timings': prof['timings'] ?? 'Mon, Wed, Fri • 17:00 - 18:30',
+            'room': prof['room_or_hall'] ?? 'Natya Mandapam (Room 101)',
+            'start_date': '01 Jan 2026',
+            'status': 'Active',
+            'fee': '₹${prof['total_monthly_fee'] ?? 2000} / month',
+            'attendance_rate': 92,
+            'month_attendance': '92% (11/12 classes)',
+            'month_attended': 11,
+            'month_total': 12,
+            'syllabus_covered': 'Classical technique, mudras, & foundational practice',
+            'dress_code': 'Practice attire or uniform with ghungroos firmly pinned',
+          }
+        ];
+      }
+    }
+
     return [
       {
         'id': 'c-1',
         'title': 'Bharathanatyam',
         'telugu_name': 'Classical Indian Dance',
         'category': 'Classical Dance',
-        'trainer_name': 'Guru Smt. Radhika Sharma',
+        'trainer_name': 'Guru Smt. Nandana',
         'batch_name': 'Batch A (Beginners)',
         'batch_id': 'batch-201',
         'timings': 'Mon, Wed, Fri • 17:00 - 18:30',
         'room': 'Natya Mandapam (Room 101)',
-        'duration': '12 Months (Foundation to Arangetram)',
         'start_date': '01 Jan 2026',
         'status': 'Active',
         'fee': '₹2,500 / month',
@@ -766,27 +861,6 @@ class SupabaseService {
         'month_total': 12,
         'syllabus_covered': 'Adavu Steps 1-8, Alarippu rhythm bols',
         'dress_code': 'Practice Saree or Salwar with Dupatta firmly pinned',
-      },
-      {
-        'id': 'c-2',
-        'title': 'Carnatic Vocal Music',
-        'telugu_name': 'Classical Carnatic Sangeetham',
-        'category': 'Vocal & Music',
-        'trainer_name': 'Vidwan Sri K. Venkatesh',
-        'batch_name': 'Morning Ragas',
-        'batch_id': 'batch-203',
-        'timings': 'Tue, Thu, Sat • 07:30 - 08:45',
-        'room': 'Sangeetha Shala (Room 202)',
-        'duration': '24 Months',
-        'start_date': '15 Jan 2026',
-        'status': 'Active',
-        'fee': '₹2,000 / month',
-        'attendance_rate': 85,
-        'month_attendance': '85% (9/11 classes)',
-        'month_attended': 9,
-        'month_total': 11,
-        'syllabus_covered': 'Sarali Varisai, Janta Varisai, Mayamalavagowla Raga',
-        'dress_code': 'Traditional modest attire with notebook & shruti box',
       }
     ];
   }

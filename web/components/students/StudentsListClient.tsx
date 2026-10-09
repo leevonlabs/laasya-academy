@@ -760,6 +760,25 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                       </span>
                     </div>
 
+                    {/* Combined Live Attendance Counts: Current Month & Last Month */}
+                    {s.total_attendance && (
+                      <div className="mb-3.5 p-2 px-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]/80 flex items-center justify-between text-[11px] font-semibold text-gray-700">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-gray-500 font-medium">This Month:</span>
+                          <span className="font-black text-emerald-600 tabular-nums">{s.total_attendance.this_month_held}</span>
+                          <span className="text-gray-400">/</span>
+                          <span className="font-black text-rose-600 tabular-nums">{s.total_attendance.this_month_absent}</span>
+                        </div>
+                        <span className="text-gray-300">|</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-gray-500 font-medium">Last Month:</span>
+                          <span className="font-black text-emerald-600 tabular-nums">{s.total_attendance.last_month_held}</span>
+                          <span className="text-gray-400">/</span>
+                          <span className="font-black text-rose-600 tabular-nums">{s.total_attendance.last_month_absent}</span>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Student Info with Profile Photo */}
                     <div className="flex items-start gap-3.5 my-1.5">
                       {s.avatar_url ? (
@@ -894,6 +913,18 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                               <span className="capitalize">{s.status || 'Active'}</span>
                             </span>
                           </div>
+                          {s.total_attendance && (
+                            <div className="mt-2 flex items-center gap-2 text-[10px] font-semibold text-gray-600">
+                              <span>
+                                This: <span className="font-black text-emerald-600 tabular-nums">{s.total_attendance.this_month_held}</span>/<span className="font-black text-rose-600 tabular-nums">{s.total_attendance.this_month_absent}</span>
+                              </span>
+                              <span className="text-gray-300">|</span>
+                              <span>
+                                Last: <span className="font-black text-emerald-600 tabular-nums">{s.total_attendance.last_month_held}</span>/<span className="font-black text-rose-600 tabular-nums">{s.total_attendance.last_month_absent}</span>
+                              </span>
+                            </div>
+                          )}
+
                         </td>
 
                         <td className="py-3.5 px-5">

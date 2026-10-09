@@ -3,22 +3,16 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, ArrowRight, ShieldCheck, Sparkles, AlertCircle, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { Lock, Phone, ArrowRight, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('director@laasyaacademy.com');
-  const [password, setPassword] = useState('Laasya@Owner2026');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const fillCredentials = () => {
-    setEmail('director@laasyaacademy.com');
-    setPassword('Laasya@Owner2026');
-    setError(null);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,12 +23,12 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ phone, password })
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to sign in.');
+        throw new Error(data.error || 'Failed to sign in. Please verify your credentials.');
       }
 
       router.push('/overview');
@@ -63,7 +57,7 @@ export default function LoginPage() {
               alt="Laasya Cultural Academy Logo" 
               width={280} 
               height={82} 
-              className="object-contain drop-shadow-xl"
+              className="object-contain drop-shadow-xl w-auto h-auto"
               priority
             />
           </div>
@@ -77,54 +71,44 @@ export default function LoginPage() {
         {/* Login Form Body */}
         <div className="bg-white p-8 sm:p-9 rounded-b-3xl shadow-2xl border-x border-b border-[#F0D5E4]">
           <div className="mb-7 text-center">
-            <h2 className="text-2xl font-bold text-[#2D041A]">Welcome, Director</h2>
-            {/* Clean 2-Line Description */}
+            <h2 className="text-2xl font-bold text-[#2D041A]">Academy Admin Sign In</h2>
             <p className="text-sm font-semibold text-[#8A064D] mt-2 leading-relaxed">
-              Executive Administration & Academic Operations Portal
+              Central Administration & Operational Management
             </p>
             <p className="text-xs text-gray-500 mt-1 leading-relaxed max-w-md mx-auto">
-              Secure access for academy directors to manage courses, gurus, batches, fees, and institution records.
+              Please enter your registered admin phone number and password to access the portal.
             </p>
           </div>
 
           {error && (
             <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl p-4 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
-              <span className="font-medium">{error}</span>
+              <span className="font-medium text-xs leading-relaxed">{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-bold text-[#2D041A] mb-2">
-                Director Email Address
+                Admin Phone Number
               </label>
               <div className="relative">
-                <Mail className="w-5 h-5 text-[#8A064D] absolute left-3.5 top-3.5 pointer-events-none" />
+                <Phone className="w-5 h-5 text-[#8A064D] absolute left-3.5 top-3.5 pointer-events-none" />
                 <input
-                  type="email"
+                  type="tel"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="director@laasyaacademy.com"
-                  className="w-full pl-11 pr-4 py-3 bg-[#FFF9FB] border border-[#F0D5E4] rounded-xl text-base text-[#2D041A] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:border-[#8A064D] focus:bg-white transition"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Enter phone number (e.g. 7780763121)"
+                  className="w-full pl-11 pr-4 py-3 bg-[#FFF9FB] border border-[#F0D5E4] rounded-xl text-base text-[#2D041A] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:border-[#8A064D] focus:bg-white transition font-medium"
                 />
               </div>
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-bold text-[#2D041A]">
-                  Password
-                </label>
-                <button
-                  type="button"
-                  onClick={fillCredentials}
-                  className="text-xs text-[#8A064D] hover:text-[#590231] hover:underline font-bold cursor-pointer transition"
-                >
-                  Reset to default
-                </button>
-              </div>
+              <label className="block text-sm font-bold text-[#2D041A] mb-2">
+                Password
+              </label>
               <div className="relative">
                 <Lock className="w-5 h-5 text-[#8A064D] absolute left-3.5 top-3.5 pointer-events-none" />
                 <input
@@ -132,7 +116,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
+                  placeholder="Enter admin password"
                   className="w-full pl-11 pr-11 py-3 bg-[#FFF9FB] border border-[#F0D5E4] rounded-xl text-base text-[#2D041A] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:border-[#8A064D] focus:bg-white transition"
                 />
                 <button
@@ -154,9 +138,9 @@ export default function LoginPage() {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 rounded text-[#8A064D] accent-[#8A064D] focus:ring-[#8A064D] cursor-pointer"
                 />
-                <span className="font-semibold text-gray-700">Remember me</span>
+                <span className="font-semibold text-gray-700 text-xs">Keep me signed in</span>
               </label>
-              <span className="text-xs font-semibold text-[#8C5E77]">Owner Session Protected</span>
+              <span className="text-xs font-semibold text-[#8C5E77]">Secure SSL Authentication</span>
             </div>
 
             <button
@@ -168,41 +152,17 @@ export default function LoginPage() {
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Access Management Portal</span>
+                  <span>Sign In to Admin Portal</span>
                   <ArrowRight className="w-5 h-5 text-[#F9E33A]" />
                 </>
               )}
             </button>
           </form>
-
-          {/* Quick Demo Helper */}
-          <div className="mt-7 pt-6 border-t border-[#F0D5E4]/60">
-            <button
-              type="button"
-              onClick={fillCredentials}
-              className="w-full bg-[#FFF9FB] hover:bg-[#FDF2F7] border border-[#F0D5E4] rounded-2xl p-4 text-center transition cursor-pointer text-left flex items-center justify-between shadow-2xs hover:border-[#8A064D]/30"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#8A064D]/10 border border-[#F0D5E4] flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-5 h-5 text-[#8A064D]" />
-                </div>
-                <div>
-                  <p className="text-sm text-[#590231] font-bold">
-                    1-Click Auto-Fill Director Credentials
-                  </p>
-                  <p className="text-xs text-[#6E3955] font-semibold mt-0.5 tabular-nums">
-                    director@laasyaacademy.com • Laasya@Owner2026
-                  </p>
-                </div>
-              </div>
-              <CheckCircle2 className="w-5 h-5 text-[#8A064D] shrink-0" />
-            </button>
-          </div>
         </div>
 
         {/* Footer info */}
         <p className="text-center text-xs font-medium text-rose-100/80 mt-5">
-          Laasya Cultural Academy Management System • Protected by Supabase RLS
+          Laasya Cultural Academy Management Portal • Authorized Personnel Only
         </p>
       </div>
     </div>

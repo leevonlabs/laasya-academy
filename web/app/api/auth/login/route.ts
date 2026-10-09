@@ -3,13 +3,15 @@ import { authenticateOwner, setSessionCookie } from '@/lib/auth';
 
 export async function POST(req: Request) {
   try {
-    const { email, password } = await req.json();
+    const body = await req.json();
+    const identifier = body.phone || body.identifier || body.email;
+    const { password } = body;
 
-    if (!email || !password) {
-      return NextResponse.json({ success: false, error: 'Email and password are required.' }, { status: 400 });
+    if (!identifier || !password) {
+      return NextResponse.json({ success: false, error: 'Phone number and password are required.' }, { status: 400 });
     }
 
-    const res = await authenticateOwner(email, password);
+    const res = await authenticateOwner(identifier, password);
     if (!res.success || !res.user) {
       return NextResponse.json({ success: false, error: res.error || 'Authentication failed.' }, { status: 401 });
     }

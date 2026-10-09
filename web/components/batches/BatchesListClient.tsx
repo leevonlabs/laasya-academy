@@ -28,6 +28,8 @@ import {
   RotateCcw
 } from 'lucide-react';
 import SearchableRoomSelect from './SearchableRoomSelect';
+import VacantRoomsView from './VacantRoomsView';
+import TimetableView from './TimetableView';
 
 interface Props {
   initialBatches: Batch[];
@@ -40,6 +42,7 @@ interface ScheduleEntry {
   day: string;
   startTime: string;
   endTime: string;
+  room: string;
 }
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -48,6 +51,8 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   const [batches, setBatches] = useState<Batch[]>(initialBatches);
   const [rooms, setRooms] = useState<Room[]>(initialRooms);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showVacantRooms, setShowVacantRooms] = useState(false);
+  const [showTimetable, setShowTimetable] = useState(false);
   
   // Searchable Multi-Select Course Filter State
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
@@ -143,6 +148,23 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     }
   };
 
+  const handleHeaderDeleteRoom = async (roomId: string, roomName: string) => {
+    if (!confirm(`Are you sure you want to delete room "${roomName}"?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/rooms?id=${encodeURIComponent(roomId)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete room');
+      setRooms(prev => prev.filter(r => r.id !== roomId));
+      showFeedback('success', `Room "${roomName}" deleted successfully!`);
+    } catch (err: any) {
+      showFeedback('error', err.message || 'Error deleting room');
+    }
+  };
+
   // -------------------------------------------------------------
   // HELPER: Filter Gurus by Course
   // -------------------------------------------------------------
@@ -198,8 +220,8 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   const [addRoom, setAddRoom] = useState('Natya Mandapam (Room 101)');
   const [addCapacity, setAddCapacity] = useState(25);
   const [addSchedules, setAddSchedules] = useState<ScheduleEntry[]>([
-    { day: 'Monday', startTime: '09:00', endTime: '11:00' },
-    { day: 'Wednesday', startTime: '10:00', endTime: '12:00' }
+    { day: 'Monday', startTime: '09:00', endTime: '10:00', room: 'Natya Mandapam (Room 101)' },
+    { day: 'Wednesday', startTime: '10:00', endTime: '11:00', room: 'Sangeetha Shala (Room 102)' }
   ]);
 
   // When opening Add Modal
@@ -213,8 +235,8 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     setAddRoom('Natya Mandapam (Room 101)');
     setAddCapacity(25);
     setAddSchedules([
-      { day: 'Monday', startTime: '09:00', endTime: '11:00' },
-      { day: 'Wednesday', startTime: '10:00', endTime: '12:00' }
+      { day: 'Monday', startTime: '09:00', endTime: '10:00', room: rooms[0]?.name || 'Natya Mandapam (Room 101)' },
+      { day: 'Wednesday', startTime: '10:00', endTime: '11:00', room: rooms[1]?.name || rooms[0]?.name || 'Sangeetha Shala (Room 102)' }
     ]);
     setIsAddOpen(true);
   };
@@ -243,21 +265,31 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     setEditCourseId(batch.course_id);
     setEditTrainerId(batch.trainer_id);
     setEditBatchName(batch.name);
-    setEditRoom(batch.room_or_hall || 'Main Hall');
+    setEditRoom(batch.room_or_hall || 'Natya Mandapam (Room 101)');
     setEditCapacity(batch.max_capacity || 25);
     setEditIsActive(batch.is_active ?? true);
 
-    const sTime = batch.start_time ? batch.start_time.substring(0, 5) : '09:00';
-    const eTime = batch.end_time ? batch.end_time.substring(0, 5) : '11:00';
-    const days = (batch.days_of_week && batch.days_of_week.length > 0) 
-      ? batch.days_of_week 
-      : ['Monday', 'Wednesday'];
+    if (batch.schedules && batch.schedules.length > 0) {
+      setEditSchedules(batch.schedules.map(s => ({
+        day: s.day,
+        startTime: s.startTime ? s.startTime.substring(0, 5) : '09:00',
+        endTime: s.endTime ? s.endTime.substring(0, 5) : '10:00',
+        room: s.room || batch.room_or_hall || (rooms[0]?.name || 'Natya Mandapam (Room 101)')
+      })));
+    } else {
+      const sTime = batch.start_time ? batch.start_time.substring(0, 5) : '09:00';
+      const eTime = batch.end_time ? batch.end_time.substring(0, 5) : '10:00';
+      const days = (batch.days_of_week && batch.days_of_week.length > 0) 
+        ? batch.days_of_week 
+        : ['Monday', 'Wednesday'];
 
-    setEditSchedules(days.map(d => ({
-      day: d,
-      startTime: sTime,
-      endTime: eTime
-    })));
+      setEditSchedules(days.map(d => ({
+        day: d,
+        startTime: sTime,
+        endTime: eTime,
+        room: batch.room_or_hall || (rooms[0]?.name || 'Natya Mandapam (Room 101)')
+      })));
+    }
   };
 
   // Schedule array handlers
@@ -265,7 +297,8 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     const newEntry: ScheduleEntry = {
       day: 'Friday',
       startTime: '14:00',
-      endTime: '16:00'
+      endTime: '15:00',
+      room: rooms[0]?.name || 'Natya Mandapam (Room 101)'
     };
     if (mode === 'add') {
       setAddSchedules(prev => [...prev, newEntry]);
@@ -273,6 +306,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
       setEditSchedules(prev => [...prev, newEntry]);
     }
   };
+
 
   const removeScheduleRow = (index: number, mode: 'add' | 'edit') => {
     if (mode === 'add') {
@@ -348,7 +382,8 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     try {
       const distinctDays = Array.from(new Set(addSchedules.map(s => s.day)));
       const primaryStart = addSchedules[0]?.startTime ? `${addSchedules[0].startTime}:00` : '09:00:00';
-      const primaryEnd = addSchedules[0]?.endTime ? `${addSchedules[0].endTime}:00` : '11:00:00';
+      const primaryEnd = addSchedules[0]?.endTime ? `${addSchedules[0].endTime}:00` : '10:00:00';
+      const primaryRoom = addSchedules[0]?.room || addRoom.trim() || 'Natya Mandapam (Room 101)';
 
       const res = await fetch('/api/batches', {
         method: 'POST',
@@ -360,8 +395,9 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
           days_of_week: distinctDays,
           start_time: primaryStart,
           end_time: primaryEnd,
-          room_or_hall: addRoom.trim(),
-          max_capacity: Number(addCapacity)
+          room_or_hall: primaryRoom,
+          max_capacity: Number(addCapacity),
+          schedules: addSchedules
         })
       });
 
@@ -379,7 +415,8 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
         course_title: crs?.title || 'Course',
         course_category: crs?.category || 'Category',
         trainer_name: trn?.full_name || 'Guru',
-        enrolled_count: 0
+        enrolled_count: 0,
+        schedules: addSchedules
       };
 
       setBatches(prev => [...prev, completeBatch]);
@@ -400,7 +437,8 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     try {
       const distinctDays = Array.from(new Set(editSchedules.map(s => s.day)));
       const primaryStart = editSchedules[0]?.startTime ? `${editSchedules[0].startTime}:00` : '09:00:00';
-      const primaryEnd = editSchedules[0]?.endTime ? `${editSchedules[0].endTime}:00` : '11:00:00';
+      const primaryEnd = editSchedules[0]?.endTime ? `${editSchedules[0].endTime}:00` : '10:00:00';
+      const primaryRoom = editSchedules[0]?.room || editRoom.trim() || 'Natya Mandapam (Room 101)';
 
       const res = await fetch('/api/batches', {
         method: 'PUT',
@@ -413,9 +451,10 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
           days_of_week: distinctDays,
           start_time: primaryStart,
           end_time: primaryEnd,
-          room_or_hall: editRoom.trim(),
+          room_or_hall: primaryRoom,
           max_capacity: Number(editCapacity),
-          is_active: editIsActive
+          is_active: editIsActive,
+          schedules: editSchedules
         })
       });
 
@@ -441,13 +480,15 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 days_of_week: distinctDays,
                 start_time: primaryStart,
                 end_time: primaryEnd,
-                room_or_hall: editRoom.trim(),
+                room_or_hall: primaryRoom,
                 max_capacity: Number(editCapacity),
-                is_active: editIsActive
+                is_active: editIsActive,
+                schedules: editSchedules
               }
             : b
         )
       );
+
 
       if (viewingBatch && viewingBatch.id === editingBatch.id) {
         setViewingBatch({
@@ -503,6 +544,50 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     }
   };
 
+  if (showTimetable) {
+    return (
+      <div className="space-y-6">
+        <TimetableView onBack={() => setShowTimetable(false)} />
+      </div>
+    );
+  }
+
+  if (showVacantRooms) {
+    return (
+      <div className="space-y-6">
+        {/* Toast Feedback Notification */}
+        {feedbackMsg && (
+          <div className={`p-4 rounded-2xl flex items-center justify-between shadow-lg border transition-all animate-in fade-in slide-in-from-top-4 ${
+            feedbackMsg.type === 'success' 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900' 
+              : 'bg-rose-50 border-rose-200 text-rose-900'
+          }`}>
+            <div className="flex items-center gap-2.5">
+              {feedbackMsg.type === 'success' ? (
+                <Check className="w-5 h-5 text-emerald-600" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-rose-600" />
+              )}
+              <span className="text-xs font-semibold">{feedbackMsg.text}</span>
+            </div>
+            <button 
+              onClick={() => setFeedbackMsg(null)}
+              className="p-1 hover:bg-black/5 rounded-lg transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        <VacantRoomsView
+          batches={batches}
+          rooms={rooms}
+          onBack={() => setShowVacantRooms(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       
@@ -544,7 +629,34 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* View Timetable Trigger Button */}
+          <button
+            type="button"
+            onClick={() => setShowTimetable(true)}
+            className="bg-[#FFF2F8] hover:bg-[#FFE5F0] text-[#8A064D] border border-[#F0D5E4] px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xs transition flex items-center gap-2 cursor-pointer hover:border-[#8A064D]/50 active:scale-95"
+            title="View Weekly Master Timetable"
+          >
+            <Calendar className="w-4 h-4 text-[#8A064D]" />
+            <span>View Timetable</span>
+            <span className="text-[10px] bg-[#8A064D] text-white font-extrabold px-2 py-0.5 rounded-full">
+              Weekly
+            </span>
+          </button>
+
+          {/* Vacant Rooms Trigger Button */}
+          <button
+            type="button"
+            onClick={() => setShowVacantRooms(true)}
+            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xs transition flex items-center gap-2 cursor-pointer hover:border-emerald-400 active:scale-95"
+          >
+            <DoorOpen className="w-4 h-4 text-emerald-600" />
+            <span>Vacant Rooms</span>
+            <span className="text-[10px] bg-emerald-200/70 text-emerald-950 font-extrabold px-2 py-0.5 rounded-full border border-emerald-300">
+              Live Matrix
+            </span>
+          </button>
+
           {/* Rooms Option Dropdown */}
           <div className="relative" ref={roomsDropdownRef}>
             <button
@@ -658,15 +770,28 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                       return (
                         <div
                           key={r.id}
-                          className="p-2 hover:bg-[#FFF9FB] rounded-xl flex items-center justify-between transition border border-transparent hover:border-[#F0D5E4]"
+                          className="p-2 hover:bg-[#FFF9FB] rounded-xl flex items-center justify-between transition border border-transparent hover:border-[#F0D5E4] group"
                         >
                           <div className="min-w-0 pr-2">
                             <p className="text-xs font-semibold text-[#2D041A] truncate">{r.name}</p>
                             <p className="text-[10px] text-gray-400">Capacity: {r.capacity || 25} seats</p>
                           </div>
-                          <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full shrink-0 font-medium">
-                            {roomBatches.length} {roomBatches.length === 1 ? 'batch' : 'batches'}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                              {roomBatches.length} {roomBatches.length === 1 ? 'batch' : 'batches'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleHeaderDeleteRoom(r.id, r.name);
+                              }}
+                              title={`Delete ${r.name}`}
+                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -1020,36 +1145,69 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                     </span>
                     <strong className="text-gray-900 font-bold">{b.trainer_name}</strong>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 flex items-center gap-2 font-medium">
-                      <Clock className="w-4 h-4 text-[#8A064D]" />
-                      <span>Timing</span>
-                    </span>
-                    <strong className="text-gray-900 font-bold font-mono">
-                      {b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}
-                    </strong>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 flex items-center gap-2 font-medium">
-                      <MapPin className="w-4 h-4 text-[#8A064D]" />
-                      <span>Hall / Room</span>
-                    </span>
-                    <strong className="text-gray-900 font-bold truncate max-w-[160px] text-right">
-                      {b.room_or_hall || 'Main Hall'}
-                    </strong>
-                  </div>
-                </div>
 
-                {/* Class Days Pills */}
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {(b.days_of_week || []).map((day, idx) => (
-                    <span 
-                      key={idx}
-                      className="text-xs font-bold bg-[#FFF9FB] text-gray-800 border border-[#F0D5E4] px-3 py-1 rounded-xl shadow-2xs"
-                    >
-                      {day.substring(0, 3)}
-                    </span>
-                  ))}
+                  {b.schedules && b.schedules.length > 0 ? (
+                    <div className="pt-2 border-t border-gray-200/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                          Weekly Day & Room Slots
+                        </span>
+                        <span className="text-[10px] bg-white border border-[#F0D5E4] text-[#8A064D] px-2 py-0.5 rounded-full font-bold shadow-2xs">
+                          {b.schedules.length} Slots
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {b.schedules.map((slot, sIdx) => (
+                          <div key={sIdx} className="bg-white p-2 rounded-xl border border-gray-200/80 flex items-center justify-between text-xs shadow-2xs">
+                            <div className="flex items-center gap-1.5 font-bold text-[#8A064D]">
+                              <span className="bg-[#FFF2F8] text-[#8A064D] px-1.5 py-0.5 rounded-md text-[11px] border border-[#F0D5E4]">
+                                {slot.day?.substring(0, 3)}
+                              </span>
+                              <span className="font-mono text-gray-800 text-[11px]">
+                                {slot.startTime?.substring(0, 5)} - {slot.endTime?.substring(0, 5)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 truncate max-w-[130px]" title={slot.room}>
+                              <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
+                              <span className="truncate">{slot.room}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600 flex items-center gap-2 font-medium">
+                          <Clock className="w-4 h-4 text-[#8A064D]" />
+                          <span>Timing</span>
+                        </span>
+                        <strong className="text-gray-900 font-bold font-mono">
+                          {b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}
+                        </strong>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600 flex items-center gap-2 font-medium">
+                          <MapPin className="w-4 h-4 text-[#8A064D]" />
+                          <span>Hall / Room</span>
+                        </span>
+                        <strong className="text-gray-900 font-bold truncate max-w-[160px] text-right">
+                          {b.room_or_hall || 'Main Hall'}
+                        </strong>
+                      </div>
+                      {/* Class Days Pills */}
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {(b.days_of_week || []).map((day, idx) => (
+                          <span 
+                            key={idx}
+                            className="text-xs font-bold bg-[#FFF9FB] text-gray-800 border border-[#F0D5E4] px-2.5 py-0.5 rounded-xl shadow-2xs"
+                          >
+                            {day.substring(0, 3)}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1179,19 +1337,38 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                     <Calendar className="w-4 h-4 text-[#8A064D]" />
                     <span>Weekly Class Schedule</span>
                   </span>
-                  <span className="text-[11px] text-gray-500">
-                    {viewingBatch.days_of_week?.length || 0} Days / week
+                  <span className="text-[11px] text-gray-500 font-medium">
+                    {viewingBatch.schedules?.length || viewingBatch.days_of_week?.length || 0} Slots / week
                   </span>
                 </div>
                 <div className="space-y-1.5">
-                  {(viewingBatch.days_of_week || []).map((day, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-xs bg-white px-3 py-2 rounded-xl border border-gray-200">
-                      <span className="font-semibold text-gray-800">{day}</span>
-                      <span className="font-mono text-gray-600 font-medium">
-                        {viewingBatch.start_time?.substring(0, 5)} - {viewingBatch.end_time?.substring(0, 5)}
-                      </span>
-                    </div>
-                  ))}
+                  {viewingBatch.schedules && viewingBatch.schedules.length > 0 ? (
+                    viewingBatch.schedules.map((slot, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs bg-white px-3 py-2 rounded-xl border border-gray-200">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[#8A064D] bg-[#FFF2F8] px-2 py-0.5 rounded-md border border-[#F0D5E4]">
+                            {slot.day}
+                          </span>
+                          <span className="font-mono text-gray-700 font-medium">
+                            {slot.startTime?.substring(0, 5)} - {slot.endTime?.substring(0, 5)}
+                          </span>
+                        </div>
+                        <span className="text-emerald-800 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200 flex items-center gap-1 text-[11px]">
+                          <MapPin className="w-3 h-3 text-emerald-600" />
+                          <span>{slot.room}</span>
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    (viewingBatch.days_of_week || []).map((day, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs bg-white px-3 py-2 rounded-xl border border-gray-200">
+                        <span className="font-semibold text-gray-800">{day}</span>
+                        <span className="font-mono text-gray-600 font-medium">
+                          {viewingBatch.start_time?.substring(0, 5)} - {viewingBatch.end_time?.substring(0, 5)}
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -1355,13 +1532,14 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
 
                 <div className="space-y-2">
                   {addSchedules.map((entry, idx) => (
-                    <div key={idx} className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-gray-200 shadow-2xs">
+                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white p-3 rounded-2xl border border-gray-200 shadow-2xs">
                       {/* Day select */}
-                      <div className="flex-1">
+                      <div className="w-full sm:w-32">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase sm:hidden mb-1 block">Day</label>
                         <select
                           value={entry.day}
                           onChange={(e) => updateScheduleRow(idx, 'day', e.target.value, 'add')}
-                          className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium"
+                          className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-[#8A064D]"
                         >
                           {DAYS_OF_WEEK.map(d => (
                             <option key={d} value={d}>{d}</option>
@@ -1369,26 +1547,34 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                         </select>
                       </div>
 
-                      {/* Start Time */}
-                      <div className="w-28">
+                      {/* Time range */}
+                      <div className="flex items-center gap-1.5 flex-1">
                         <input
                           type="time"
                           value={entry.startTime}
                           onChange={(e) => updateScheduleRow(idx, 'startTime', e.target.value, 'add')}
-                          className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs"
+                          className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono"
                         />
-                      </div>
-
-                      <span className="text-xs text-gray-400 font-semibold">to</span>
-
-                      {/* End Time */}
-                      <div className="w-28">
+                        <span className="text-xs text-gray-400 font-semibold px-0.5">to</span>
                         <input
                           type="time"
                           value={entry.endTime}
                           onChange={(e) => updateScheduleRow(idx, 'endTime', e.target.value, 'add')}
-                          className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs"
+                          className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono"
                         />
+                      </div>
+
+                      {/* Room select */}
+                      <div className="w-full sm:w-48">
+                        <select
+                          value={entry.room}
+                          onChange={(e) => updateScheduleRow(idx, 'room', e.target.value, 'add')}
+                          className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+                        >
+                          {rooms.map(r => (
+                            <option key={r.id} value={r.name}>{r.name}</option>
+                          ))}
+                        </select>
                       </div>
 
                       {/* Remove Button */}
@@ -1396,7 +1582,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                         <button
                           type="button"
                           onClick={() => removeScheduleRow(idx, 'add')}
-                          className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg transition"
+                          className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg transition self-end sm:self-center cursor-pointer"
                           title="Remove this slot"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -1423,6 +1609,10 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                       setAddRoom(newRoom.name);
                       if (newRoom.capacity) setAddCapacity(newRoom.capacity);
                       showFeedback('success', `Room "${newRoom.name}" created and selected!`);
+                    }}
+                    onRoomDeleted={(roomId) => {
+                      setRooms(prev => prev.filter(r => r.id !== roomId));
+                      showFeedback('success', 'Room deleted');
                     }}
                   />
                 </div>
@@ -1546,12 +1736,14 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
 
                 <div className="space-y-2">
                   {editSchedules.map((entry, idx) => (
-                    <div key={idx} className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-gray-200 shadow-2xs">
-                      <div className="flex-1">
+                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white p-3 rounded-2xl border border-gray-200 shadow-2xs">
+                      {/* Day select */}
+                      <div className="w-full sm:w-32">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase sm:hidden mb-1 block">Day</label>
                         <select
                           value={entry.day}
                           onChange={(e) => updateScheduleRow(idx, 'day', e.target.value, 'edit')}
-                          className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium"
+                          className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-[#8A064D]"
                         >
                           {DAYS_OF_WEEK.map(d => (
                             <option key={d} value={d}>{d}</option>
@@ -1559,31 +1751,43 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                         </select>
                       </div>
 
-                      <div className="w-28">
+                      {/* Time range */}
+                      <div className="flex items-center gap-1.5 flex-1">
                         <input
                           type="time"
                           value={entry.startTime}
                           onChange={(e) => updateScheduleRow(idx, 'startTime', e.target.value, 'edit')}
-                          className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs"
+                          className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono"
                         />
-                      </div>
-
-                      <span className="text-xs text-gray-400 font-semibold">to</span>
-
-                      <div className="w-28">
+                        <span className="text-xs text-gray-400 font-semibold px-0.5">to</span>
                         <input
                           type="time"
                           value={entry.endTime}
                           onChange={(e) => updateScheduleRow(idx, 'endTime', e.target.value, 'edit')}
-                          className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs"
+                          className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono"
                         />
                       </div>
 
+                      {/* Room select */}
+                      <div className="w-full sm:w-48">
+                        <select
+                          value={entry.room}
+                          onChange={(e) => updateScheduleRow(idx, 'room', e.target.value, 'edit')}
+                          className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+                        >
+                          {rooms.map(r => (
+                            <option key={r.id} value={r.name}>{r.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Remove Button */}
                       {editSchedules.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeScheduleRow(idx, 'edit')}
-                          className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg transition"
+                          className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg transition self-end sm:self-center cursor-pointer"
+                          title="Remove this slot"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -1609,6 +1813,10 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                       setEditRoom(newRoom.name);
                       if (newRoom.capacity) setEditCapacity(newRoom.capacity);
                       showFeedback('success', `Room "${newRoom.name}" created and selected!`);
+                    }}
+                    onRoomDeleted={(roomId) => {
+                      setRooms(prev => prev.filter(r => r.id !== roomId));
+                      showFeedback('success', 'Room deleted');
                     }}
                   />
                 </div>

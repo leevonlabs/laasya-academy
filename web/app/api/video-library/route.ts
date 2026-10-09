@@ -24,6 +24,9 @@ export async function GET(request: NextRequest) {
     const courseTitle = searchParams.get('courseTitle') || undefined;
     const batchId = searchParams.get('batchId') || undefined;
     const search = searchParams.get('search') || undefined;
+    const category = searchParams.get('category') || undefined;
+    const sharedByType = searchParams.get('shared_by_type') || searchParams.get('sharedByType') || undefined;
+    const trainerId = searchParams.get('trainerId') || undefined;
     const includeCourses = searchParams.get('includeCourses') === 'true';
     const courseStudents = searchParams.get('courseStudents');
 
@@ -33,7 +36,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, students }, { headers: corsHeaders });
     }
 
-    const items = await getVideoLibraryItems({ courseId, courseTitle, batchId, search });
+    const items = await getVideoLibraryItems({
+      courseId,
+      courseTitle,
+      batchId,
+      search,
+      category,
+      sharedByType,
+      trainerId
+    });
 
     let courses = undefined;
     if (includeCourses) {
@@ -64,6 +75,10 @@ export async function POST(request: NextRequest) {
     const {
       title,
       drive_url,
+      youtube_url,
+      shared_by_type,
+      trainer_id,
+      trainer_name,
       description,
       event_name,
       event_date,
@@ -74,18 +89,23 @@ export async function POST(request: NextRequest) {
       target_batch_id,
       target_batch_name,
       access_level,
+      created_by,
+      category,
     } = body;
 
     if (!title || !title.trim()) {
       return NextResponse.json(
-        { success: false, error: 'Event Title is required' },
+        { success: false, error: 'Video / Event Title is required' },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    if (!drive_url || !drive_url.trim()) {
+    const cleanDriveUrl = drive_url && drive_url.trim().length > 0 ? drive_url.trim() : null;
+    const cleanYoutubeUrl = youtube_url && youtube_url.trim().length > 0 ? youtube_url.trim() : null;
+
+    if (!cleanDriveUrl && !cleanYoutubeUrl) {
       return NextResponse.json(
-        { success: false, error: 'Google Drive folder link is required' },
+        { success: false, error: 'Please provide at least a Google Drive link or YouTube link' },
         { status: 400, headers: corsHeaders }
       );
     }
@@ -94,12 +114,16 @@ export async function POST(request: NextRequest) {
     if (is_universal && Array.isArray(selected_courses) && selected_courses.length > 0) {
       const result = await createUniversalEventFolders({
         title: title.trim(),
-        drive_url: drive_url.trim(),
+        drive_url: cleanDriveUrl,
+        youtube_url: cleanYoutubeUrl,
+        shared_by_type: shared_by_type || 'admin',
+        trainer_id: trainer_id || null,
+        trainer_name: trainer_name || null,
         description: description?.trim() || '',
         event_name: event_name?.trim() || title.trim(),
         event_date,
         selected_courses,
-        created_by: 'Academy Owner',
+        created_by: created_by || (shared_by_type === 'guru' ? (trainer_name || 'Guru Faculty') : 'Academy Owner'),
       });
       return NextResponse.json(
         { success: true, item: result[0], count: selected_courses.length },
@@ -110,7 +134,12 @@ export async function POST(request: NextRequest) {
     // Single course or specific batch sharing
     const item = await createEventFolder({
       title: title.trim(),
-      drive_url: drive_url.trim(),
+      drive_url: cleanDriveUrl,
+      youtube_url: cleanYoutubeUrl,
+      shared_by_type: shared_by_type || 'admin',
+      trainer_id: trainer_id || null,
+      trainer_name: trainer_name || null,
+      category: category || (shared_by_type === 'guru' ? 'guru_share' : 'event_folder'),
       description: description?.trim() || '',
       event_name: event_name?.trim() || title.trim(),
       event_date,
@@ -118,8 +147,10 @@ export async function POST(request: NextRequest) {
       target_course_title,
       target_batch_id,
       target_batch_name: target_batch_name || 'All Batches',
+      target_students: body.target_students || null,
+      target_student_names: body.target_student_names || null,
       access_level,
-      created_by: 'Academy Owner',
+      created_by: created_by || (shared_by_type === 'guru' ? (trainer_name || 'Guru Faculty') : 'Academy Owner'),
     });
 
     return NextResponse.json({ success: true, item }, { headers: corsHeaders });

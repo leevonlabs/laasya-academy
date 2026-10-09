@@ -187,7 +187,7 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
                                           children: [
                                             Expanded(
                                               child: Text(
-                                                item['title']!,
+                                                (item['title']?.toString() ?? 'Academy Update'),
                                                 style: TextStyle(
                                                   fontSize: 13.5,
                                                   fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
@@ -208,12 +208,12 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
                                         ),
                                         const SizedBox(height: 6),
                                         Text(
-                                          item['message']!,
+                                          (item['message']?.toString() ?? ''),
                                           style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.35),
                                         ),
                                         const SizedBox(height: 8),
                                         Text(
-                                          item['date']!,
+                                          (item['date']?.toString() ?? 'Recent'),
                                           style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
                                         ),
                                       ],

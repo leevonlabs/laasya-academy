@@ -21,6 +21,9 @@ export interface Announcement {
   is_deleted: boolean;
   deleted_at?: string | null;
   created_by: string;
+  sender_role?: 'admin' | 'trainer' | string;
+  trainer_id?: string | null;
+  trainer_name?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -82,6 +85,9 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
         a.is_deleted, 
         a.deleted_at::text as deleted_at, 
         a.created_by, 
+        a.sender_role,
+        a.trainer_id,
+        a.trainer_name,
         a.created_at::text as created_at, 
         a.updated_at::text as updated_at
       FROM public.announcements a
@@ -169,6 +175,11 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
 // -------------------------------------------------------------
 // CREATE ANNOUNCEMENT
 // -------------------------------------------------------------
+function isValidUuid(id?: string | null): boolean {
+  if (!id) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id.trim());
+}
+
 export async function createAnnouncement(data: {
   title: string;
   message: string;
@@ -177,6 +188,8 @@ export async function createAnnouncement(data: {
   target_course_title?: string | null;
   target_batch_id?: string | null;
   target_batch_name?: string | null;
+  target_students?: any[] | null;
+  target_student_names?: string | null;
   type_tag: string;
   publish_date: string;
   expiry_date?: string | null;
@@ -185,6 +198,9 @@ export async function createAnnouncement(data: {
   announcement_type?: string;
   action_links?: Array<{ title: string; url: string }> | null;
   created_by?: string;
+  sender_role?: string;
+  trainer_id?: string | null;
+  trainer_name?: string | null;
 }): Promise<Announcement> {
   if (!data.title || data.title.trim() === '') {
     throw new Error('Title is required');
@@ -214,6 +230,9 @@ export async function createAnnouncement(data: {
     expiryDate = pub.toISOString().split('T')[0];
   }
 
+  const validCourseId = isValidUuid(data.target_course_id) ? data.target_course_id : null;
+  const validBatchId = isValidUuid(data.target_batch_id) ? data.target_batch_id : null;
+
   const [row] = await query<Announcement>(`
     INSERT INTO public.announcements (
       title,
@@ -231,8 +250,13 @@ export async function createAnnouncement(data: {
       image_url,
       announcement_type,
       created_by,
-      action_links
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb)
+      sender_role,
+      trainer_id,
+      trainer_name,
+      action_links,
+      target_students,
+      target_student_names
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20::jsonb, $21)
     RETURNING 
       id, 
       title, 
@@ -253,15 +277,20 @@ export async function createAnnouncement(data: {
       is_deleted, 
       deleted_at::text as deleted_at, 
       created_by, 
+      sender_role,
+      trainer_id,
+      trainer_name,
+      target_students,
+      target_student_names,
       created_at::text as created_at, 
       updated_at::text as updated_at;
   `, [
     data.title.trim(),
     data.message.trim(),
     data.audience,
-    data.target_course_id || null,
+    validCourseId,
     data.target_course_title || null,
-    data.target_batch_id || null,
+    validBatchId,
     data.target_batch_name || null,
     data.type_tag,
     data.publish_date,
@@ -270,8 +299,13 @@ export async function createAnnouncement(data: {
     deliveryStatus,
     data.image_url || null,
     annType,
-    data.created_by || 'Academy Director',
-    JSON.stringify(data.action_links || [])
+    data.created_by || data.trainer_name || 'Academy Director',
+    data.sender_role || 'admin',
+    data.trainer_id || null,
+    data.trainer_name || null,
+    JSON.stringify(data.action_links || []),
+    JSON.stringify(data.target_students || []),
+    data.target_student_names || null
   ]);
 
   return row;

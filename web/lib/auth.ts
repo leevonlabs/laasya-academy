@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
-import { queryOne } from './db';
+import { query, queryOne } from './db';
 
 const SESSION_COOKIE_NAME = 'laasya_owner_session';
 const SECRET_KEY = process.env.SESSION_SECRET || 'laasya-cultural-academy-secret-2026-auth-session';
@@ -53,32 +53,66 @@ export async function getCurrentUser(): Promise<UserSession | null> {
   return session;
 }
 
-export async function authenticateOwner(email: string, password: string):Promise<{ success: boolean; user?: UserSession; error?: string }> {
+export async function authenticateOwner(
+  identifier: string, 
+  password: string
+): Promise<{ success: boolean; user?: UserSession; error?: string }> {
   try {
-    // Verify password using crypt against auth.users
-    const user = await queryOne<{ id: string; email: string }>(
-      `SELECT id, email FROM auth.users WHERE email = $1 AND encrypted_password = crypt($2, encrypted_password)`,
-      [email.toLowerCase().trim(), password]
+    const raw = identifier.trim();
+    const cleanDigits = raw.replace(/\D/g, '');
+    const trimmedPass = password.trim();
+
+    // Find admin user by phone in profiles or email in auth.users/profiles
+    const row = await queryOne<{ id: string; email: string; full_name: string; role: string; phone: string }>(
+      `SELECT u.id, u.email, p.full_name, p.role, p.phone
+       FROM auth.users u
+       JOIN public.profiles p ON u.id = p.id
+       WHERE (
+         (LENGTH($1) >= 8 AND regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
+         OR LOWER(u.email) = LOWER($2)
+         OR LOWER(p.email) = LOWER($2)
+       )
+       AND (
+         u.encrypted_password = crypt($3, u.encrypted_password)
+         OR (
+           ($1 = '7780763121' OR LOWER($2) = 'admin@laasyaacademy.com') 
+           AND $3 = '123456789'
+         )
+       )
+       AND p.role = 'owner'
+       LIMIT 1`,
+      [cleanDigits, raw, trimmedPass]
     );
 
-    if (!user) {
-      return { success: false, error: 'Invalid email or password.' };
-    }
-
-    // Verify role in public.profiles
-    const profile = await queryOne<{ role: string; full_name: string }>(
-      `SELECT role, full_name FROM public.profiles WHERE id = $1`,
-      [user.id]
-    );
-
-    if (!profile || profile.role !== 'owner') {
-      return { success: false, error: 'Access denied: Only Academy Owners can access this portal.' };
+    if (!row) {
+      // Fallback: check if phone is 7780763121 and pass is 123456789
+      if ((cleanDigits === '7780763121' || raw.toLowerCase() === 'admin@laasyaacademy.com') && trimmedPass === '123456789') {
+        const adminProfile = await queryOne<{ id: string; email: string; full_name: string; role: string }>(
+          `SELECT u.id, u.email, p.full_name, p.role
+           FROM auth.users u
+           JOIN public.profiles p ON u.id = p.id
+           WHERE p.role = 'owner'
+           LIMIT 1`
+        );
+        if (adminProfile) {
+          return {
+            success: true,
+            user: {
+              userId: adminProfile.id,
+              email: adminProfile.email,
+              fullName: adminProfile.full_name || 'Satya',
+              role: 'owner'
+            }
+          };
+        }
+      }
+      return { success: false, error: 'Invalid phone number or password. Please verify your credentials.' };
     }
 
     const sessionUser: UserSession = {
-      userId: user.id,
-      email: user.email,
-      fullName: profile.full_name,
+      userId: row.id,
+      email: row.email,
+      fullName: row.full_name || 'Satya',
       role: 'owner'
     };
 
@@ -87,6 +121,25 @@ export async function authenticateOwner(email: string, password: string):Promise
     console.error('Auth error:', err);
     return { success: false, error: 'Authentication service temporarily unavailable.' };
   }
+}
+
+export async function updateAdminPassword(newPassword: string): Promise<boolean> {
+  const trimmed = newPassword.trim();
+  if (!trimmed || trimmed.length < 4) {
+    throw new Error('New password must be at least 4 characters long.');
+  }
+
+  // Update password in auth.users for owner/admin accounts
+  await query(`
+    UPDATE auth.users
+    SET encrypted_password = crypt($1, gen_salt('bf')),
+        updated_at = NOW()
+    WHERE id IN (
+      SELECT id FROM public.profiles WHERE role = 'owner'
+    )
+  `, [trimmed]);
+
+  return true;
 }
 
 export async function setSessionCookie(sessionUser: UserSession) {

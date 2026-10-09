@@ -148,7 +148,7 @@ export default function StudentFeesClient({
   };
 
   // -------------------------------------------------------------
-  // DATE FORMATTER: Month End Date in DD/MM/YY format (e.g. 30/09/26, 31/03/26)
+  // DATE FORMATTER: Month Due Date on 5th in DD/MM/YY format (e.g. 05/09/26, 05/10/26)
   // -------------------------------------------------------------
   const formatMonthEndDdMmYy = (dateStrOrPeriod?: string | null) => {
     let d = new Date();
@@ -157,20 +157,19 @@ export default function StudentFeesClient({
       if (!isNaN(parsed.getTime())) {
         d = parsed;
       } else {
-        const match = dateStrOrPeriod.match(/([a-zA-Z]+)\s+(\d{4})/);
+        const match = String(dateStrOrPeriod).match(/([a-zA-Z]+)\s+(\d{4})/);
         if (match) {
           const mNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
           const mIdx = mNames.findIndex(m => m.startsWith(match[1].toLowerCase()));
           if (mIdx !== -1) {
-            d = new Date(parseInt(match[2], 10), mIdx, 1);
+            d = new Date(parseInt(match[2], 10), mIdx, 5);
           }
         }
       }
     }
     const year = d.getFullYear();
     const month = d.getMonth();
-    const lastDay = new Date(year, month + 1, 0).getDate();
-    const dd = String(lastDay).padStart(2, '0');
+    const dd = '05';
     const mm = String(month + 1).padStart(2, '0');
     const yy = String(year).slice(-2);
     return `${dd}/${mm}/${yy}`;

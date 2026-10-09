@@ -941,6 +941,11 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                         <div>
                           <div className="flex items-center gap-2 font-black text-sm">
                             <span>Scheduled for: {pubDateStr}</span>
+                            {ann.sender_role === 'trainer' && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-amber-900 border border-amber-300">
+                                Guru Broadcast • {ann.trainer_name || 'Faculty'}
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] text-amber-100 flex items-center gap-2">
                             <span>Target: <strong>{ann.audience}</strong></span>
@@ -1226,12 +1231,23 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                   <div className="bg-[#075E54] px-6 py-3.5 text-white flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-full bg-white/20 border border-emerald-300 flex items-center justify-center font-black text-xs text-emerald-200">
-                        LC
+                        {ann.sender_role === 'trainer' ? 'GR' : 'LC'}
                       </div>
                       <div>
                         <div className="flex items-center gap-1.5 font-black text-sm">
-                          <span>Academy Administration (Sri Ramesh Rao)</span>
-                          <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                          {ann.sender_role === 'trainer' ? (
+                            <>
+                              <span className="text-[#F9E33A]">Guru Broadcast: Guru {ann.trainer_name || 'Faculty Member'}</span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F9E33A]/20 text-[#F9E33A] border border-[#F9E33A]/40">
+                                GURU
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span>Academy Administration (Sri Ramesh Rao)</span>
+                              <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                            </>
+                          )}
                         </div>
                         <div className="text-[11px] text-emerald-100 flex items-center gap-2">
                           <span>Target: <strong>{ann.audience}</strong></span>

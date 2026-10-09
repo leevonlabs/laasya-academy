@@ -69,16 +69,16 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              item['title']!,
+                              (item['title']?.toString() ?? 'Academy Update'),
                               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              item['message']!,
+                              (item['message']?.toString() ?? ''),
                               style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.35),
                             ),
                             const SizedBox(height: 6),
-                            Text(item['date']!, style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500)),
+                            Text((item['date']?.toString() ?? 'Recent'), style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500)),
                           ],
                         ),
                       ),

@@ -274,7 +274,7 @@ export async function recordStudentFeePayment(data: {
   const newStatus = newBalance <= 0 ? 'paid' : 'partial';
 
   // Generate unique receipt number
-  const receiptNum = `LCA-REC-${Math.floor(100000 + Math.random() * 900000)}`;
+  const receiptNum = `LCA-REC-${Date.now().toString().slice(-6)}${Math.floor(100 + Math.random() * 900)}`;
 
   // 1. Insert payment record
   const [payment] = await query<FeePayment>(`
@@ -318,10 +318,21 @@ export async function createStudentFeeInvoice(data: {
   discount_amount?: number;
   notes?: string;
 }) {
-  const invNumber = `LCA-INV-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+  const invNumber = `LCA-INV-${Date.now().toString().slice(-6)}${Math.floor(100 + Math.random() * 900)}`;
   const discount = Number(data.discount_amount || 0);
   const total = Number(data.total_amount);
   const balance = Math.max(0, total - discount);
+
+  let dueDate = data.due_date;
+  if (!dueDate) {
+    const now = new Date();
+    dueDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-05`;
+  } else {
+    const parsed = new Date(dueDate);
+    if (!isNaN(parsed.getTime())) {
+      dueDate = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-05`;
+    }
+  }
 
   return queryOne<StudentFeeInvoice>(`
     INSERT INTO public.student_fee_invoices (
@@ -336,7 +347,7 @@ export async function createStudentFeeInvoice(data: {
     data.batch_id || null,
     invNumber,
     data.fee_period,
-    data.due_date,
+    dueDate,
     total,
     discount,
     balance,
@@ -452,7 +463,7 @@ export async function collectStudentFee(data: {
   const now = new Date();
   const monthName = now.toLocaleString('en-US', { month: 'long' });
   const period = data.fee_period || `${monthName} ${now.getFullYear()}`;
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  const fifthDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-05`;
 
   const totalBillable = data.amount_paid + discountAmt;
 
@@ -461,7 +472,7 @@ export async function collectStudentFee(data: {
     course_id: enroll?.course_id,
     batch_id: enroll?.batch_id,
     fee_period: period,
-    due_date: lastDay,
+    due_date: fifthDay,
     total_amount: totalBillable > 0 ? totalBillable : Number(enroll?.monthly_fee || data.amount_paid),
     discount_amount: discountAmt,
     notes: data.remarks || 'Collected at academy desk'

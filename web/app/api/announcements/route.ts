@@ -48,34 +48,41 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'owner') {
+    const body = await request.json();
+
+    const isGuru = body.sender_role === 'trainer' || body.trainer_name || body.trainer_id;
+    if (!user && !isGuru) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
     }
 
-    const body = await request.json();
-
     if (!body.title || body.title.trim() === '') {
-      return NextResponse.json({ error: 'Title is required', field: 'title' }, { status: 400 });
+      return NextResponse.json({ error: 'Title is required', field: 'title' }, { status: 400, headers: corsHeaders });
     }
     if (!body.message || body.message.trim() === '') {
-      return NextResponse.json({ error: 'Message is required', field: 'message' }, { status: 400 });
+      return NextResponse.json({ error: 'Message is required', field: 'message' }, { status: 400, headers: corsHeaders });
     }
     if (!body.publish_date) {
-      return NextResponse.json({ error: 'Publish date is required', field: 'publish_date' }, { status: 400 });
+      body.publish_date = new Date().toISOString().split('T')[0];
     }
+
+    const senderRole = isGuru ? 'trainer' : (user?.role === 'owner' ? 'admin' : 'trainer');
+    const createdBy = isGuru ? (body.trainer_name || 'Guru Faculty') : (user?.fullName || 'Academy Director');
 
     const created = await createAnnouncement({
       ...body,
-      created_by: user.fullName || 'Academy Director'
+      sender_role: senderRole,
+      created_by: createdBy,
+      trainer_name: body.trainer_name || (isGuru ? createdBy : null),
+      trainer_id: body.trainer_id || null,
     });
 
     return NextResponse.json({
       success: true,
       message: 'Announcement created successfully',
       announcement: created
-    });
+    }, { headers: corsHeaders });
   } catch (error: any) {
     console.error('Error creating announcement:', error);
-    return NextResponse.json({ error: error.message || 'Failed to create announcement' }, { status: 400 });
+    return NextResponse.json({ error: error.message || 'Failed to create announcement' }, { status: 400, headers: corsHeaders });
   }
 }

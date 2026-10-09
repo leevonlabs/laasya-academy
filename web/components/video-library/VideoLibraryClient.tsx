@@ -25,7 +25,8 @@ import {
   ArrowLeft,
   Filter,
   SlidersHorizontal,
-  RotateCcw
+  RotateCcw,
+  GraduationCap
 } from 'lucide-react';
 import { CourseWithDetails, VideoLibraryItem, EnrolledStudent } from '@/lib/videoLibrary';
 
@@ -38,8 +39,8 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
   const [courses, setCourses] = useState<CourseWithDetails[]>(initialCourses);
   const [items, setItems] = useState<VideoLibraryItem[]>(initialItems);
 
-  // Top Tab Switcher: 'course_wise' (default) vs 'all_videos'
-  const [activeTab, setActiveTab] = useState<'course_wise' | 'all_videos'>('course_wise');
+  // Top Tab Switcher: 'course_wise' (default) vs 'all_videos' vs 'guru_share'
+  const [activeTab, setActiveTab] = useState<'course_wise' | 'all_videos' | 'guru_share'>('course_wise');
 
   // Dedicated Course Page View state (when clicked from Course-Wise)
   const [selectedCourseSubpage, setSelectedCourseSubpage] = useState<CourseWithDetails | null>(null);
@@ -47,6 +48,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
   // Subpage Share Form State
   const [subpageShareTitle, setSubpageShareTitle] = useState('');
   const [subpageShareDriveUrl, setSubpageShareDriveUrl] = useState('');
+  const [subpageShareYoutubeUrl, setSubpageShareYoutubeUrl] = useState('');
   const [subpageShareDate, setSubpageShareDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [subpageShareDesc, setSubpageShareDesc] = useState('');
   const [subpageTargetBatch, setSubpageTargetBatch] = useState<'all' | string>('all');
@@ -62,6 +64,13 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
   const [allVideosMonthFilter, setAllVideosMonthFilter] = useState('all');
   const [allVideosYearFilter, setAllVideosYearFilter] = useState('all');
 
+  // Guru Share Tab Filters
+  const [guruShareSearch, setGuruShareSearch] = useState('');
+  const [guruShareTrainerFilter, setGuruShareTrainerFilter] = useState('all');
+  const [guruShareCourseFilter, setGuruShareCourseFilter] = useState('all');
+  const [guruShareMonthFilter, setGuruShareMonthFilter] = useState('all');
+  const [guruShareYearFilter, setGuruShareYearFilter] = useState('all');
+
   // Search & Filter state for courses grid
   const [courseSearch, setCourseSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -70,6 +79,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
   const [isUniversalModalOpen, setIsUniversalModalOpen] = useState(false);
   const [universalTitle, setUniversalTitle] = useState('');
   const [universalDriveUrl, setUniversalDriveUrl] = useState('');
+  const [universalYoutubeUrl, setUniversalYoutubeUrl] = useState('');
   const [universalDate, setUniversalDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [universalDesc, setUniversalDesc] = useState('');
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>(() => initialCourses.map(c => c.id));
@@ -86,6 +96,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
   const [isCourseShareOpen, setIsCourseShareOpen] = useState(false);
   const [courseShareTitle, setCourseShareTitle] = useState('');
   const [courseShareDriveUrl, setCourseShareDriveUrl] = useState('');
+  const [courseShareYoutubeUrl, setCourseShareYoutubeUrl] = useState('');
   const [courseShareDate, setCourseShareDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [courseShareDesc, setCourseShareDesc] = useState('');
   const [targetBatchOption, setTargetBatchOption] = useState<'all' | string>('all');
@@ -100,10 +111,10 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const copyToClipboard = (text: string, id: string) => {
+  const copyToClipboard = (text: string, id: string, label: string = 'Link') => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    showToast('Google Drive link copied to clipboard!');
+    showToast(`${label} copied to clipboard!`);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -222,12 +233,62 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
     });
   }, [items, allVideosSearch, allVideosMonthFilter, allVideosYearFilter]);
 
+  // Distinct Gurus who have shared links
+  const guruNames = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach(i => {
+      if ((i.shared_by_type === 'guru' || i.category === 'guru_share') && i.trainer_name) {
+        set.add(i.trainer_name);
+      }
+    });
+    return Array.from(set).sort();
+  }, [items]);
+
+  // All Guru Shared items
+  const guruSharedItems = useMemo(() => {
+    return items.filter(i => i.shared_by_type === 'guru' || i.category === 'guru_share' || Boolean(i.trainer_id));
+  }, [items]);
+
+  // Filtered Guru Shared items
+  const guruFilteredItems = useMemo(() => {
+    return guruSharedItems.filter(item => {
+      if (guruShareTrainerFilter !== 'all' && item.trainer_name !== guruShareTrainerFilter) {
+        return false;
+      }
+      if (guruShareCourseFilter !== 'all' && item.target_course_id !== guruShareCourseFilter && item.target_course_title !== guruShareCourseFilter) {
+        return false;
+      }
+      if (guruShareMonthFilter !== 'all' && item.event_date) {
+        const m = (new Date(item.event_date).getMonth() + 1).toString();
+        if (m !== guruShareMonthFilter) return false;
+      }
+      if (guruShareYearFilter !== 'all' && item.event_date) {
+        const y = new Date(item.event_date).getFullYear().toString();
+        if (y !== guruShareYearFilter) return false;
+      }
+      if (guruShareSearch.trim()) {
+        const q = guruShareSearch.toLowerCase();
+        const matchTitle = item.title?.toLowerCase().includes(q);
+        const matchTrainer = item.trainer_name?.toLowerCase().includes(q);
+        const matchCourse = item.target_course_title?.toLowerCase().includes(q);
+        const matchBatch = item.target_batch_name?.toLowerCase().includes(q);
+        const matchDesc = item.description?.toLowerCase().includes(q);
+        if (!matchTitle && !matchTrainer && !matchCourse && !matchBatch && !matchDesc) return false;
+      }
+      return true;
+    });
+  }, [guruSharedItems, guruShareTrainerFilter, guruShareCourseFilter, guruShareMonthFilter, guruShareYearFilter, guruShareSearch]);
+
   // Handle Subpage Share Link Submit
   const handleSubpageShareSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCourseSubpage) return;
-    if (!subpageShareTitle.trim() || !subpageShareDriveUrl.trim()) {
-      alert('Please provide both the Event Title and Google Drive folder link.');
+    if (!subpageShareTitle.trim()) {
+      alert('Please provide the Event Title.');
+      return;
+    }
+    if (!subpageShareDriveUrl.trim() && !subpageShareYoutubeUrl.trim()) {
+      alert('Please provide at least a Google Drive link or YouTube link.');
       return;
     }
 
@@ -243,7 +304,8 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: subpageShareTitle.trim(),
-          drive_url: subpageShareDriveUrl.trim(),
+          drive_url: subpageShareDriveUrl.trim() || null,
+          youtube_url: subpageShareYoutubeUrl.trim() || null,
           event_name: subpageShareTitle.trim(),
           event_date: subpageShareDate,
           description: subpageShareDesc.trim(),
@@ -274,8 +336,9 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
 
       setSubpageShareTitle('');
       setSubpageShareDriveUrl('');
+      setSubpageShareYoutubeUrl('');
       setSubpageShareDesc('');
-      showToast(`Event Drive link shared with ${selectedBatch ? selectedBatch.name : 'All Batches'}!`);
+      showToast(`Event link shared with ${selectedBatch ? selectedBatch.name : 'All Batches'}!`);
     } catch (err: any) {
       alert(err.message || 'Error sharing folder');
     } finally {
@@ -336,8 +399,12 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
   // Handle Universal Share Submit
   const handleUniversalShareSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!universalTitle.trim() || !universalDriveUrl.trim()) {
-      alert('Please provide both the Event Title and Google Drive folder link.');
+    if (!universalTitle.trim()) {
+      alert('Please provide the Event Title.');
+      return;
+    }
+    if (!universalDriveUrl.trim() && !universalYoutubeUrl.trim()) {
+      alert('Please provide at least a Google Drive link or YouTube link.');
       return;
     }
     if (selectedCourseIds.length === 0) {
@@ -356,7 +423,8 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: universalTitle.trim(),
-          drive_url: universalDriveUrl.trim(),
+          drive_url: universalDriveUrl.trim() || null,
+          youtube_url: universalYoutubeUrl.trim() || null,
           event_name: universalTitle.trim(),
           event_date: universalDate,
           description: universalDesc.trim(),
@@ -390,8 +458,9 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
       setIsUniversalModalOpen(false);
       setUniversalTitle('');
       setUniversalDriveUrl('');
+      setUniversalYoutubeUrl('');
       setUniversalDesc('');
-      showToast(`Event Drive link successfully shared with ${selectedCourseIds.length} courses!`);
+      showToast(`Event link successfully shared with ${selectedCourseIds.length} courses!`);
     } catch (err: any) {
       alert(err.message || 'Error sharing event link');
     } finally {
@@ -403,8 +472,12 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
   const handleCourseShareSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCourse) return;
-    if (!courseShareTitle.trim() || !courseShareDriveUrl.trim()) {
-      alert('Please provide both the Event Title and Google Drive folder link.');
+    if (!courseShareTitle.trim()) {
+      alert('Please provide the Event Title.');
+      return;
+    }
+    if (!courseShareDriveUrl.trim() && !courseShareYoutubeUrl.trim()) {
+      alert('Please provide at least a Google Drive link or YouTube link.');
       return;
     }
 
@@ -420,7 +493,8 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: courseShareTitle.trim(),
-          drive_url: courseShareDriveUrl.trim(),
+          drive_url: courseShareDriveUrl.trim() || null,
+          youtube_url: courseShareYoutubeUrl.trim() || null,
           event_name: courseShareTitle.trim(),
           event_date: courseShareDate,
           description: courseShareDesc.trim(),
@@ -452,8 +526,9 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
       setIsCourseShareOpen(false);
       setCourseShareTitle('');
       setCourseShareDriveUrl('');
+      setCourseShareYoutubeUrl('');
       setCourseShareDesc('');
-      showToast(`Event Drive folder shared to ${activeCourse.title}!`);
+      showToast(`Event link shared to ${activeCourse.title}!`);
     } catch (err: any) {
       alert(err.message || 'Error sharing folder');
     } finally {
@@ -592,6 +667,30 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                 {items.length} Links
               </span>
             </button>
+
+            {/* 3. Guru Share Tab */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('guru_share');
+                setSelectedCourseSubpage(null);
+              }}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs md:text-sm font-black transition-all cursor-pointer ${
+                activeTab === 'guru_share'
+                  ? 'bg-gradient-to-r from-[#D4AF37] to-[#F9E33A] text-[#2D041A] shadow-md'
+                  : 'text-white/80 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Guru Share</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                activeTab === 'guru_share'
+                  ? 'bg-[#2D041A] text-[#F9E33A]'
+                  : 'bg-white/20 text-white'
+              }`}>
+                {guruSharedItems.length} Shared
+              </span>
+            </button>
           </div>
 
           <div className="text-xs text-rose-100/90 font-medium hidden sm:flex items-center gap-2">
@@ -599,7 +698,9 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
             <span>
               {activeTab === 'course_wise' 
                 ? (selectedCourseSubpage ? `Managing: ${selectedCourseSubpage.title}` : 'Select a course to share & view links')
-                : 'Universal broadcast history & all drive folders'}
+                : activeTab === 'all_videos'
+                ? 'Universal broadcast history & all media folders'
+                : 'Videos shared by faculty Gurus to their students'}
             </span>
           </div>
         </div>
@@ -742,19 +843,35 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                   </div>
                 </div>
 
-                {/* 3. Google Drive Folder Link */}
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Google Drive Folder Link (URL) <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="url"
-                    required
-                    placeholder="https://drive.google.com/drive/folders/..."
-                    value={subpageShareDriveUrl}
-                    onChange={e => setSubpageShareDriveUrl(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-mono font-medium text-gray-900 focus:bg-white focus:ring-2 focus:ring-[#8A064D]/30 focus:border-[#8A064D]"
-                  />
+                {/* 3. Media Links: Google Drive & YouTube */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5 flex items-center justify-between">
+                      <span>Google Drive Link</span>
+                      <span className="text-[10px] text-gray-400 font-normal">Optional if YouTube is provided</span>
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://drive.google.com/drive/folders/..."
+                      value={subpageShareDriveUrl}
+                      onChange={e => setSubpageShareDriveUrl(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-mono font-medium text-gray-900 focus:bg-white focus:ring-2 focus:ring-[#8A064D]/30 focus:border-[#8A064D]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-rose-700 uppercase tracking-wide mb-1.5 flex items-center justify-between">
+                      <span>YouTube Video Link</span>
+                      <span className="text-[10px] text-gray-400 font-normal">Optional if Drive is provided</span>
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://www.youtube.com/watch?v=... or youtu.be/..."
+                      value={subpageShareYoutubeUrl}
+                      onChange={e => setSubpageShareYoutubeUrl(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-rose-200 bg-rose-50/30 text-xs font-mono font-medium text-gray-900 focus:bg-white focus:ring-2 focus:ring-rose-500/30 focus:border-rose-600"
+                    />
+                  </div>
                 </div>
 
                 {/* 4. Instructions / Description */}
@@ -930,35 +1047,61 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                           )}
                         </div>
 
-                        {/* Two simple buttons: Copy Drive Link & Open in Google Drive */}
-                        <div className="pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(item.drive_url, item.id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 hover:border-[#8A064D] text-gray-700 hover:text-[#8A064D] text-xs font-bold bg-white transition shadow-2xs cursor-pointer active:scale-95"
-                          >
-                            {copiedId === item.id ? (
-                              <>
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                <span className="text-emerald-700">Copied!</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3.5 h-3.5 text-gray-500" />
-                                <span>Copy Drive Link</span>
-                              </>
-                            )}
-                          </button>
+                        {/* Action buttons: Support both YouTube and Drive */}
+                        <div className="pt-2.5 border-t border-gray-100 space-y-2">
+                          {item.youtube_url && (
+                            <div className="flex items-center justify-between gap-2 bg-rose-50/50 p-2 rounded-xl border border-rose-100">
+                              <span className="text-[11px] font-bold text-rose-800 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-red-600 shrink-0" />
+                                <span className="truncate">YouTube Video</span>
+                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(item.youtube_url!, `${item.id}-yt`, 'YouTube Link')}
+                                  className="px-2.5 py-1 rounded-lg bg-white border border-rose-200 text-rose-800 text-[11px] font-bold hover:bg-rose-50 transition cursor-pointer"
+                                >
+                                  {copiedId === `${item.id}-yt` ? 'Copied!' : 'Copy'}
+                                </button>
+                                <a
+                                  href={item.youtube_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                >
+                                  <span>Open</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                            </div>
+                          )}
 
-                          <a
-                            href={item.drive_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#590231] hover:bg-[#740340] text-white text-xs font-bold shadow-2xs transition cursor-pointer active:scale-95"
-                          >
-                            <span>Open in Google Drive</span>
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
+                          {item.drive_url && (
+                            <div className="flex items-center justify-between gap-2 bg-[#FFF9FB] p-2 rounded-xl border border-[#F0D5E4]">
+                              <span className="text-[11px] font-bold text-[#8A064D] flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-[#8A064D] shrink-0" />
+                                <span className="truncate">Google Drive</span>
+                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(item.drive_url!, `${item.id}-gd`, 'Drive Link')}
+                                  className="px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-700 text-[11px] font-bold hover:bg-gray-50 transition cursor-pointer"
+                                >
+                                  {copiedId === `${item.id}-gd` ? 'Copied!' : 'Copy'}
+                                </button>
+                                <a
+                                  href={item.drive_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2.5 py-1 rounded-lg bg-[#590231] hover:bg-[#740340] text-white text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                >
+                                  <span>Open Drive</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -1128,7 +1271,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
             </div>
           </div>
         )
-      ) : (
+      ) : activeTab === 'all_videos' ? (
         /* ===================================================================== */
         /* TAB 2: ALL VIDEOS (SHARED HISTORY & UNIVERSAL SHARE LINK) */
         /* ===================================================================== */
@@ -1141,7 +1284,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                 <span>Universal Event Link Broadcast</span>
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Share a single event Google Drive folder across all or multiple selected courses at once.
+                Share an event Google Drive folder or YouTube video across all or multiple selected courses at once.
               </p>
             </div>
             <button
@@ -1162,10 +1305,10 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
               <div>
                 <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <Video className="w-5 h-5 text-[#8A064D]" />
-                  <span>All Active Event Drive Folders ({allVideosFilteredItems.length})</span>
+                  <span>All Active Event Media Folders ({allVideosFilteredItems.length})</span>
                 </h2>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Complete history of event folders shared across academy disciplines
+                  Complete history of event folders and video links shared across academy disciplines
                 </p>
               </div>
 
@@ -1220,13 +1363,13 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
             {allVideosFilteredItems.length === 0 ? (
               <div className="p-8 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
                 <FolderPlus className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm font-bold text-gray-700">No event drive folders match criteria</p>
+                <p className="text-sm font-bold text-gray-700">No event folders match criteria</p>
                 <p className="text-xs text-gray-500 mt-1">
                   Use the Universal Share button or switch to Course-Wise to share new links.
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {allVideosFilteredItems.map((item, idx) => {
                   const formattedDate = item.event_date
                     ? new Date(item.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -1235,76 +1378,401 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                   return (
                     <div
                       key={`all-items-${item.id}-${idx}`}
-                      className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-[#FFF9FB] px-3 rounded-xl transition-colors"
+                      className="bg-white rounded-3xl p-5 border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
                     >
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-[#DEF7EC] text-[#03543F]">
-                            EVENT FOLDER
-                          </span>
-                          <span className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-gray-100 text-gray-600">
-                            {item.access_level === 'All Students'
-                              ? 'All 18 Courses'
-                              : item.target_course_title || 'Universal Shoot'}
-                          </span>
-                          {item.target_batch_name && item.target_batch_name !== 'All Batches' && (
-                            <span className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-[#F3E8EE] text-[#8A064D]">
-                              Batch: {item.target_batch_name}
+                      {/* Top Badges & Actions */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#DEF7EC] text-[#03543F] border border-emerald-200">
+                              EVENT MEDIA
                             </span>
-                          )}
-                          <span className="text-xs text-gray-400">• {formattedDate}</span>
+                            <span className="px-2.5 py-0.5 rounded-lg text-[10.5px] font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-100">
+                              {item.access_level === 'All Students'
+                                ? 'All 18 Courses'
+                                : item.target_course_title || 'Universal Shoot'}
+                            </span>
+                            {item.target_batch_name && item.target_batch_name !== 'All Batches' && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-700">
+                                {item.target_batch_name}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-gray-400 font-medium flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-gray-400" />
+                              {formattedDate}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteItem(item.id)}
+                              title="Delete Link"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
 
-                        <h4 className="font-bold text-sm md:text-base text-gray-900">{item.title}</h4>
+                        {/* Title */}
+                        <h4 className="font-bold text-base text-[#2D041A] leading-snug pt-1">
+                          {item.title}
+                        </h4>
 
+                        {/* Description */}
                         {item.description && (
-                          <p className="text-xs text-gray-600 line-clamp-2 max-w-3xl">{item.description}</p>
+                          <p className="text-xs text-gray-600 bg-[#FFF9FB] p-2.5 rounded-xl border border-[#F0D5E4]/60 line-clamp-2">
+                            {item.description}
+                          </p>
                         )}
-
-                        <div className="flex items-center gap-2 pt-1 text-xs text-[#8A064D]">
-                          <LinkIcon className="w-3.5 h-3.5 shrink-0" />
-                          <span className="font-mono text-[11px] truncate max-w-md text-gray-500">
-                            {item.drive_url}
-                          </span>
-                        </div>
                       </div>
 
-                      {/* Actions: Copy & Open */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => copyToClipboard(item.drive_url, item.id)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 hover:border-[#8A064D] text-gray-700 hover:text-[#8A064D] text-xs font-semibold bg-white transition shadow-2xs cursor-pointer active:scale-95"
-                        >
-                          {copiedId === item.id ? (
-                            <>
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              <span className="text-emerald-700">Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5 text-gray-500" />
-                              <span>Copy Link</span>
-                            </>
+                      {/* Interactive Media Links Deck */}
+                      <div className="space-y-2 pt-2 border-t border-gray-100">
+                        {item.drive_url && (
+                          <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                <LinkIcon className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <span className="text-[11px] font-bold text-emerald-900 block truncate">Google Drive Media Folder</span>
+                                <span className="text-[10px] text-emerald-700 font-mono truncate block max-w-xs">{item.drive_url}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(item.drive_url!, `${item.id}-drive`, 'Drive Link')}
+                                className="px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-800 text-[11px] font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                              >
+                                {copiedId === `${item.id}-drive` ? 'Copied' : 'Copy'}
+                              </button>
+                              <a
+                                href={item.drive_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1.5 rounded-xl bg-[#03543F] hover:bg-[#023e2f] text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                              >
+                                <span>Open Drive</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+                        )}
+
+                        {item.youtube_url && (
+                          <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-rose-50/70 border border-rose-200/80">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                <Video className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <span className="text-[11px] font-bold text-rose-950 block truncate">YouTube Recording Broadcast</span>
+                                <span className="text-[10px] text-rose-700 font-mono truncate block max-w-xs">{item.youtube_url}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(item.youtube_url!, `${item.id}-yt`, 'YouTube Link')}
+                                className="px-2.5 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-800 text-[11px] font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
+                              >
+                                {copiedId === `${item.id}-yt` ? 'Copied' : 'Copy'}
+                              </button>
+                              <a
+                                href={item.youtube_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                              >
+                                <span>Open YouTube</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* ===================================================================== */
+        /* TAB 3: GURU SHARE (FACULTY SHARED MEDIA ARCHIVE)                      */
+        /* ===================================================================== */
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header Summary Banner */}
+          <div className="bg-gradient-to-r from-[#2D041A] via-[#590231] to-[#8A064D] text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-[#D4AF37]/30 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+            <div className="space-y-2 z-10">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#F9E33A] font-mono text-xs font-bold border border-[#D4AF37]/30 uppercase tracking-wider">
+                <GraduationCap className="w-4 h-4 text-[#F9E33A]" />
+                Faculty Contributions • Guru Share Hub
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-white">
+                Links Shared by Gurus
+              </h2>
+              <p className="text-xs sm:text-sm text-rose-100/90 max-w-xl leading-relaxed">
+                Centralized archive of practice recordings, event videos, and learning resources shared by faculty Gurus directly to their assigned course disciples.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 z-10 shrink-0">
+              <div className="bg-black/25 backdrop-blur-md border border-white/15 px-4 py-3 rounded-2xl text-center">
+                <span className="text-[10px] uppercase font-bold text-rose-200 block">Total Guru Shares</span>
+                <span className="text-2xl font-black text-[#F9E33A] mt-0.5 block">{guruSharedItems.length}</span>
+              </div>
+              <div className="bg-black/25 backdrop-blur-md border border-white/15 px-4 py-3 rounded-2xl text-center">
+                <span className="text-[10px] uppercase font-bold text-rose-200 block">Active Gurus</span>
+                <span className="text-2xl font-black text-white mt-0.5 block">{guruNames.length}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Guru Share Filter Controls */}
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#F0D5E4] space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-gray-100">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Video className="w-5 h-5 text-[#8A064D]" />
+                  <span>Shared Resource Archive ({guruFilteredItems.length})</span>
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Filter by Guru, enrolled course, or search resource titles
+                </p>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Search */}
+                <div className="relative w-full sm:w-60">
+                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search guru links..."
+                    value={guruShareSearch}
+                    onChange={e => setGuruShareSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-gray-200 text-xs bg-[#FFF9FB] focus:outline-hidden focus:ring-1 focus:ring-[#8A064D]"
+                  />
+                  {guruShareSearch && (
+                    <button
+                      onClick={() => setGuruShareSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Guru Filter */}
+                <select
+                  value={guruShareTrainerFilter}
+                  onChange={e => setGuruShareTrainerFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer"
+                >
+                  <option value="all">All Gurus ({guruNames.length})</option>
+                  {guruNames.map(name => (
+                    <option key={`guru-filter-${name}`} value={name}>
+                      Guru {name}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Course Filter */}
+                <select
+                  value={guruShareCourseFilter}
+                  onChange={e => setGuruShareCourseFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer max-w-[180px] truncate"
+                >
+                  <option value="all">All Courses</option>
+                  {courses.map(c => (
+                    <option key={`guru-course-${c.id}`} value={c.title}>
+                      {c.title}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Month Filter */}
+                <select
+                  value={guruShareMonthFilter}
+                  onChange={e => setGuruShareMonthFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer"
+                >
+                  {MONTHS.map(m => (
+                    <option key={`guru-month-${m.value}`} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Year Filter */}
+                <select
+                  value={guruShareYearFilter}
+                  onChange={e => setGuruShareYearFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer"
+                >
+                  <option value="all">All Years</option>
+                  {availableYears.filter(y => y !== 'all').map(y => (
+                    <option key={`guru-year-${y}`} value={y}>
+                      Year {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Content List */}
+            {guruFilteredItems.length === 0 ? (
+              <div className="p-12 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
+                <GraduationCap className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm font-bold text-gray-700">No resources shared by Gurus yet</p>
+                <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                  When faculty Gurus share video or Google Drive links with their enrolled batches via the Guru mobile app, all links will automatically be cataloged and manageable here.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {guruFilteredItems.map((item, idx) => {
+                  const formattedDate = item.event_date
+                    ? new Date(item.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                    : 'Recent Share';
+                  const guruInitials = (item.trainer_name || 'G').charAt(0).toUpperCase();
+
+                  return (
+                    <div
+                      key={`guru-item-${item.id}-${idx}`}
+                      className="bg-white rounded-3xl p-5 border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                    >
+                      {/* Top Header: Guru Author & Meta */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#590231] text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+                              {guruInitials}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-sm text-[#2D041A] truncate">
+                                  Guru {item.trainer_name || 'Faculty Member'}
+                                </span>
+                                <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 text-[9px] font-extrabold uppercase border border-emerald-200">
+                                  Verified
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-gray-400 font-medium flex items-center gap-1 mt-0.5">
+                                <Calendar className="w-3 h-3 text-gray-400" />
+                                {formattedDate}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleDeleteItem(item.id)}
+                            title="Remove Guru Link (Admin Moderation)"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Badges Row: Course, Batch, Disciples */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          <span className="px-2.5 py-0.5 rounded-lg text-[10.5px] font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-100">
+                            {item.target_course_title || 'Enrolled Course'}
+                          </span>
+                          {item.target_batch_name && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-700">
+                              {item.target_batch_name}
+                            </span>
                           )}
-                        </button>
+                          {item.target_student_names && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 max-w-xs truncate" title={item.target_student_names}>
+                              Disciples: {item.target_student_names}
+                            </span>
+                          )}
+                        </div>
 
-                        <a
-                          href={item.drive_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#590231] hover:bg-[#740340] text-white text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer"
-                        >
-                          <span>Open Drive</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
+                        {/* Title */}
+                        <h4 className="font-bold text-base text-[#2D041A] leading-snug">
+                          {item.title}
+                        </h4>
 
-                        <button
-                          onClick={() => handleDeleteItem(item.id)}
-                          title="Remove Event Folder"
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {/* Description */}
+                        {item.description && (
+                          <p className="text-xs text-gray-600 bg-[#FFF9FB] p-2.5 rounded-xl border border-[#F0D5E4]/60 line-clamp-2">
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Interactive Media Links Deck */}
+                      <div className="space-y-2 pt-2 border-t border-gray-100">
+                        {item.drive_url && (
+                          <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                <LinkIcon className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <span className="text-[11px] font-bold text-emerald-900 block truncate">Google Drive Media Folder</span>
+                                <span className="text-[10px] text-emerald-700 font-mono truncate block max-w-xs">{item.drive_url}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(item.drive_url!, `${item.id}-drive`, 'Drive Link')}
+                                className="px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-800 text-[11px] font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                              >
+                                {copiedId === `${item.id}-drive` ? 'Copied' : 'Copy'}
+                              </button>
+                              <a
+                                href={item.drive_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1.5 rounded-xl bg-[#03543F] hover:bg-[#023e2f] text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                              >
+                                <span>Open Drive</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+                        )}
+
+                        {item.youtube_url && (
+                          <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-rose-50/70 border border-rose-200/80">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                <Video className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <span className="text-[11px] font-bold text-rose-950 block truncate">YouTube Recording Broadcast</span>
+                                <span className="text-[10px] text-rose-700 font-mono truncate block max-w-xs">{item.youtube_url}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(item.youtube_url!, `${item.id}-yt`, 'YouTube Link')}
+                                className="px-2.5 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-800 text-[11px] font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
+                              >
+                                {copiedId === `${item.id}-yt` ? 'Copied' : 'Copy'}
+                              </button>
+                              <a
+                                href={item.youtube_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                              >
+                                <span>Open YouTube</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -1357,26 +1825,47 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                 />
               </div>
 
-              {/* Google Drive URL */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Google Drive Folder Link <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="url"
-                    required
-                    placeholder="https://drive.google.com/drive/folders/..."
-                    value={universalDriveUrl}
-                    onChange={e => setUniversalDriveUrl(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 font-mono text-xs"
-                  />
-                  <LinkIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              {/* Google Drive & YouTube Links */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Google Drive URL */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <span>Google Drive Folder Link</span>
+                    <span className="text-[10.5px] text-gray-400 font-normal lowercase">(Optional if YouTube provided)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="url"
+                      placeholder="https://drive.google.com/drive/folders/..."
+                      value={universalDriveUrl}
+                      onChange={e => setUniversalDriveUrl(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 font-mono text-xs"
+                    />
+                    <LinkIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
                 </div>
-                <p className="text-[11px] text-gray-500 mt-1">
-                  Ensure the Drive folder link sharing permission is set to &quot;Anyone with the link can view&quot;.
-                </p>
+
+                {/* YouTube URL */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <span>YouTube Video / Playlist Link</span>
+                    <span className="text-[10.5px] text-gray-400 font-normal lowercase">(Optional if Drive provided)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="url"
+                      placeholder="https://youtube.com/watch?v=... or playlist"
+                      value={universalYoutubeUrl}
+                      onChange={e => setUniversalYoutubeUrl(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 font-mono text-xs"
+                    />
+                    <Video className="w-4 h-4 text-rose-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
               </div>
+              <p className="text-[11px] text-gray-500 -mt-2">
+                Provide either a Google Drive folder link, a YouTube link, or both. Disciples will see the corresponding platforms directly in their mobile app.
+              </p>
 
               {/* Event Date */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1482,7 +1971,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmittingUniversal || selectedCourseIds.length === 0}
+                  disabled={isSubmittingUniversal || (!universalDriveUrl.trim() && !universalYoutubeUrl.trim()) || selectedCourseIds.length === 0}
                   className="px-6 py-2.5 rounded-xl bg-[#590231] hover:bg-[#740340] text-white font-bold text-xs shadow-md disabled:opacity-50 transition-all flex items-center gap-2"
                 >
                   {isSubmittingUniversal ? (
@@ -1594,15 +2083,15 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Google Drive Link */}
-                      <div className="md:col-span-2">
-                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                          Google Drive Folder Link <span className="text-rose-500">*</span>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                          <span>Google Drive Link</span>
+                          <span className="text-[10px] text-gray-400 font-normal lowercase">(Optional if YouTube provided)</span>
                         </label>
                         <input
                           type="url"
-                          required
                           placeholder="https://drive.google.com/drive/folders/..."
                           value={courseShareDriveUrl}
                           onChange={e => setCourseShareDriveUrl(e.target.value)}
@@ -1610,6 +2099,23 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                         />
                       </div>
 
+                      {/* YouTube Link */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                          <span>YouTube Link</span>
+                          <span className="text-[10px] text-gray-400 font-normal lowercase">(Optional if Drive provided)</span>
+                        </label>
+                        <input
+                          type="url"
+                          placeholder="https://youtube.com/watch?v=..."
+                          value={courseShareYoutubeUrl}
+                          onChange={e => setCourseShareYoutubeUrl(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs font-mono focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Shoot Date */}
                       <div>
                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
@@ -1622,20 +2128,20 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                           className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
                         />
                       </div>
-                    </div>
 
-                    {/* Description */}
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                        Instructions / Description
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Stage rehearsals, masterclass footages, and group photo album."
-                        value={courseShareDesc}
-                        onChange={e => setCourseShareDesc(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
-                      />
+                      {/* Description */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                          Instructions / Description
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Stage rehearsals, masterclass footages."
+                          value={courseShareDesc}
+                          onChange={e => setCourseShareDesc(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
+                        />
+                      </div>
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
@@ -1648,10 +2154,10 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                       </button>
                       <button
                         type="submit"
-                        disabled={isSubmittingCourseShare}
+                        disabled={isSubmittingCourseShare || (!courseShareDriveUrl.trim() && !courseShareYoutubeUrl.trim())}
                         className="px-4 py-1.5 rounded-lg bg-[#590231] hover:bg-[#740340] text-white font-bold text-xs shadow-xs disabled:opacity-50"
                       >
-                        {isSubmittingCourseShare ? 'Saving...' : 'Share Event Folder'}
+                        {isSubmittingCourseShare ? 'Saving...' : 'Share Event Links'}
                       </button>
                     </div>
                   </form>
@@ -1701,23 +2207,47 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                           <p className="text-[11px] text-gray-600 line-clamp-1">{item.description}</p>
                         )}
 
-                        <div className="flex items-center justify-between pt-1 border-t border-gray-100 text-[11px]">
-                          <button
-                            onClick={() => copyToClipboard(item.drive_url, item.id)}
-                            className="text-[#8A064D] hover:underline flex items-center gap-1 font-semibold"
-                          >
-                            <Copy className="w-3 h-3" />
-                            <span>{copiedId === item.id ? 'Copied!' : 'Copy Drive Link'}</span>
-                          </button>
-                          <a
-                            href={item.drive_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-gray-600 hover:text-gray-900 flex items-center gap-1 font-medium"
-                          >
-                            <span>Open</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-gray-100 text-[11px]">
+                          {item.drive_url && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => copyToClipboard(item.drive_url!, `${item.id}-drive`, 'Drive Link')}
+                                className="text-[#8A064D] hover:underline flex items-center gap-1 font-semibold"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>{copiedId === `${item.id}-drive` ? 'Copied!' : 'Copy Drive'}</span>
+                              </button>
+                              <a
+                                href={item.drive_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-gray-600 hover:text-gray-900 flex items-center gap-1 font-medium"
+                              >
+                                <span>Drive</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          )}
+                          {item.youtube_url && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => copyToClipboard(item.youtube_url!, `${item.id}-yt`, 'YouTube Link')}
+                                className="text-rose-600 hover:underline flex items-center gap-1 font-semibold"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>{copiedId === `${item.id}-yt` ? 'Copied!' : 'Copy YouTube'}</span>
+                              </button>
+                              <a
+                                href={item.youtube_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-red-600 hover:text-red-800 flex items-center gap-1 font-medium"
+                              >
+                                <span>YouTube</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}

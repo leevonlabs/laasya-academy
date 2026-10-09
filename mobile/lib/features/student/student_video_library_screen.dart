@@ -437,34 +437,296 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
     );
   }
 
-  // Direct redirection to Google Drive URL via url_launcher
-  Future<void> _openDriveUrlDirectly(String url) async {
+  // Launch external URL safely
+  Future<void> _launchExternalUrl(String url) async {
     final cleanUrl = url.trim();
-    if (cleanUrl.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No Google Drive link available')),
-      );
-      return;
-    }
-
+    if (cleanUrl.isEmpty) return;
     try {
       final uri = Uri.parse(cleanUrl);
       final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!launched) {
         await launchUrl(uri);
       }
-    } catch (e) {
-      // Fallback: copy to clipboard
+    } catch (_) {
       await Clipboard.setData(ClipboardData(text: cleanUrl));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Drive link copied: $cleanUrl'),
+            content: Text('Link copied to clipboard: $cleanUrl'),
             backgroundColor: LaasyaColors.primary,
           ),
         );
       }
     }
+  }
+
+  void _copyUrlToClipboard(String url, String label) {
+    final cleanUrl = url.trim();
+    if (cleanUrl.isEmpty) return;
+    Clipboard.setData(ClipboardData(text: cleanUrl));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$label copied to clipboard!'),
+        backgroundColor: const Color(0xFF03543F),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // Media options bottom sheet (shows YouTube and Drive options or only the link that exists)
+  void _openMediaOptions(Map<String, dynamic> item) {
+    final driveUrl = (item['drive_url'] ?? '').toString().trim();
+    final youtubeUrl = (item['youtube_url'] ?? '').toString().trim();
+    final hasDrive = driveUrl.isNotEmpty;
+    final hasYoutube = youtubeUrl.isNotEmpty;
+    final title = (item['title'] ?? 'Event Media').toString();
+
+    if (!hasDrive && !hasYoutube) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No media link available for this item')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Access Event Media',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: LaasyaColors.textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF8A064D),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Google Drive Section (Show ONLY if hasDrive)
+            if (hasDrive) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3FAF7),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFC7EBD9)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDEF7EC),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.add_to_drive_rounded, color: Color(0xFF03543F), size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Google Drive Folder',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF03543F),
+                                ),
+                              ),
+                              Text(
+                                'Photos, videos & high-res media clips',
+                                style: TextStyle(fontSize: 11, color: Colors.black54),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _launchExternalUrl(driveUrl);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF03543F),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              elevation: 0,
+                            ),
+                            icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                            label: const Text('Open in Drive', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            _copyUrlToClipboard(driveUrl, 'Drive link');
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF03543F),
+                            side: const BorderSide(color: Color(0xFF03543F)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                          ),
+                          icon: const Icon(Icons.copy_rounded, size: 14),
+                          label: const Text('Copy', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (hasYoutube) const SizedBox(height: 12),
+            ],
+
+            // YouTube Section (Show ONLY if hasYoutube)
+            if (hasYoutube) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF5F5),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFFED7D7)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFDE8E8),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.play_circle_fill_rounded, color: Color(0xFFE53E3E), size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'YouTube Video / Playlist',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF9B1C1C),
+                                ),
+                              ),
+                              Text(
+                                'Performance streams & choreography recordings',
+                                style: TextStyle(fontSize: 11, color: Colors.black54),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _launchExternalUrl(youtubeUrl);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFE53E3E),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              elevation: 0,
+                            ),
+                            icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                            label: const Text('Open YouTube', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            _copyUrlToClipboard(youtubeUrl, 'YouTube link');
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFE53E3E),
+                            side: const BorderSide(color: Color(0xFFE53E3E)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                          ),
+                          icon: const Icon(Icons.copy_rounded, size: 14),
+                          label: const Text('Copy', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   bool _matchesCourse(Map<String, dynamic> item) {
@@ -993,7 +1255,6 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                           final batch = (item['target_batch_name'] ?? 'All Batches').toString();
                           final eventDateRaw = item['event_date'];
                           final uploadDateRaw = item['created_at'] ?? item['event_date'];
-                          final driveUrl = (item['drive_url'] ?? '').toString();
 
                           final eventDateFormatted = _formatDate(eventDateRaw);
                           final uploadDateFormatted = _formatDate(uploadDateRaw);
@@ -1202,10 +1463,10 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                                         ),
                                       ),
                                       const SizedBox(width: 10),
-                                      // Open in Drive Button: Directly redirects to Google Drive URL
+                                      // Open Button: Opens media options (Drive / YouTube)
                                       Expanded(
                                         child: ElevatedButton.icon(
-                                          onPressed: () => _openDriveUrlDirectly(driveUrl),
+                                          onPressed: () => _openMediaOptions(item),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: const Color(0xFF590231),
                                             foregroundColor: Colors.white,
@@ -1215,7 +1476,7 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                                           ),
                                           icon: const Icon(Icons.open_in_new_rounded, size: 15, color: LaasyaColors.accentGold),
                                           label: const Text(
-                                            'Open in Drive',
+                                            'Open',
                                             style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
                                           ),
                                         ),

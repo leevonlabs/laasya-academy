@@ -2,13 +2,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Room } from '@/lib/academy';
-import { DoorOpen, ChevronDown, Search, Plus, Check, Loader2, X } from 'lucide-react';
+import { DoorOpen, ChevronDown, Search, Plus, Check, Loader2, X, Trash2 } from 'lucide-react';
 
 export interface SearchableRoomSelectProps {
   value: string;
   onChange: (roomName: string, capacity?: number) => void;
   rooms: Room[];
   onRoomCreated?: (newRoom: Room) => void;
+  onRoomDeleted?: (roomId: string) => void;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -18,6 +19,7 @@ export default function SearchableRoomSelect({
   onChange,
   rooms,
   onRoomCreated,
+  onRoomDeleted,
   placeholder = 'Select a classroom or hall...',
   disabled = false
 }: SearchableRoomSelectProps) {
@@ -92,6 +94,28 @@ export default function SearchableRoomSelect({
       setErrorMsg(err.message || 'Error creating room');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteRoom = async (roomId: string, roomName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Are you sure you want to delete room "${roomName}"?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/rooms?id=${encodeURIComponent(roomId)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete room');
+      if (onRoomDeleted) {
+        onRoomDeleted(roomId);
+      }
+      if (value === roomName) {
+        onChange('');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error deleting room');
     }
   };
 
@@ -216,31 +240,41 @@ export default function SearchableRoomSelect({
               filteredRooms.map((r) => {
                 const isSelected = value?.toLowerCase().trim() === r.name.toLowerCase().trim();
                 return (
-                  <button
+                  <div
                     key={r.id}
-                    type="button"
-                    onClick={() => {
-                      onChange(r.name, r.capacity);
-                      setIsOpen(false);
-                      setSearch('');
-                    }}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition cursor-pointer ${
+                    className={`w-full px-2.5 py-1 rounded-lg text-xs flex items-center justify-between transition group ${
                       isSelected
                         ? 'bg-[#FFF2F8] text-[#8A064D] font-bold'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    <div className="flex items-center gap-2 truncate pr-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onChange(r.name, r.capacity);
+                        setIsOpen(false);
+                        setSearch('');
+                      }}
+                      className="flex items-center gap-2 truncate pr-2 flex-1 text-left cursor-pointer py-1"
+                    >
                       <DoorOpen className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-[#8A064D]' : 'text-gray-400'}`} />
                       <span className="truncate">{r.name}</span>
-                    </div>
+                    </button>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
                         {r.capacity || 25} seats
                       </span>
                       {isSelected && <Check className="w-3.5 h-3.5 text-[#8A064D]" />}
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteRoom(r.id, r.name, e)}
+                        title={`Delete ${r.name}`}
+                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                  </button>
+                  </div>
                 );
               })
             ) : (
