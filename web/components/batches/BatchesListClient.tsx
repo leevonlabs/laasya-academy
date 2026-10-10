@@ -69,6 +69,12 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   const [headerRoomSaving, setHeaderRoomSaving] = useState(false);
   const roomsDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Edit Room Modal State
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+  const [editRoomName, setEditRoomName] = useState('');
+  const [editRoomCapacity, setEditRoomCapacity] = useState(25);
+  const [editingRoomSaving, setEditingRoomSaving] = useState(false);
+
   // Modals
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [viewingBatch, setViewingBatch] = useState<Batch | null>(null);
@@ -162,6 +168,38 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
       showFeedback('success', `Room "${roomName}" deleted successfully!`);
     } catch (err: any) {
       showFeedback('error', err.message || 'Error deleting room');
+    }
+  };
+
+  const handleHeaderEditRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRoom) return;
+    const trimmed = editRoomName.trim();
+    if (!trimmed) {
+      showFeedback('error', 'Please enter a valid room name');
+      return;
+    }
+    setEditingRoomSaving(true);
+    try {
+      const res = await fetch('/api/rooms', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingRoom.id,
+          name: trimmed,
+          capacity: Number(editRoomCapacity) || 25
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update room');
+      setRooms(prev => prev.map(r => r.id === editingRoom.id ? data.room : r).sort((a, b) => a.name.localeCompare(b.name)));
+      setBatches(prev => prev.map(b => (b.room === editingRoom.name || b.room_or_hall === editingRoom.name) ? { ...b, room: trimmed, room_or_hall: trimmed } : b));
+      setEditingRoom(null);
+      showFeedback('success', `Room "${trimmed}" updated successfully!`);
+    } catch (err: any) {
+      showFeedback('error', err.message || 'Error updating room');
+    } finally {
+      setEditingRoomSaving(false);
     }
   };
 
@@ -780,6 +818,19 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                             <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
                               {roomBatches.length} {roomBatches.length === 1 ? 'batch' : 'batches'}
                             </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingRoom(r);
+                                setEditRoomName(r.name);
+                                setEditRoomCapacity(r.capacity || 25);
+                              }}
+                              title={`Edit ${r.name}`}
+                              className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1903,6 +1954,85 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 {saving ? 'Deleting...' : 'Yes, Delete Batch'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT ROOM MODAL */}
+      {editingRoom && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-amber-100 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-50 rounded-xl text-amber-700">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-[#2D041A]">Edit Room Name</h3>
+                  <p className="text-xs text-gray-500">Update classroom / hall name and capacity</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingRoom(null)}
+                className="p-1 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleHeaderEditRoom} className="space-y-4">
+              <div>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Room Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editRoomName}
+                  onChange={(e) => setEditRoomName(e.target.value)}
+                  placeholder="e.g. Natya Shala 1"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Seating Capacity
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={200}
+                  required
+                  value={editRoomCapacity}
+                  onChange={(e) => setEditRoomCapacity(Number(e.target.value))}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs font-semibold text-amber-900">
+                💡 Changing the room name will automatically update all existing batches assigned to this room.
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingRoom(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editingRoomSaving || !editRoomName.trim()}
+                  className="px-5 py-2 rounded-xl text-xs font-black bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer"
+                >
+                  {editingRoomSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

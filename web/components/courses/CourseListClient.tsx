@@ -139,6 +139,11 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
   // Delete Category Modal State
   const [deletingCategoryName, setDeletingCategoryName] = useState<string | null>(null);
 
+  // Edit / Rename Category State
+  const [editingCategoryName, setEditingCategoryName] = useState<string | null>(null);
+  const [renameCategoryInput, setRenameCategoryInput] = useState<string>('');
+  const [renamingCategory, setRenamingCategory] = useState(false);
+
   // View Details Modal State
   const [viewingCourse, setViewingCourse] = useState<Course | null>(null);
 
@@ -367,6 +372,39 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
     }
   };
 
+  // Rename Category
+  const handleRenameCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategoryName || !renameCategoryInput.trim()) return;
+    const newName = renameCategoryInput.trim();
+    if (newName === editingCategoryName) {
+      setEditingCategoryName(null);
+      return;
+    }
+    setRenamingCategory(true);
+    try {
+      const res = await fetch('/api/courses/categories', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldName: editingCategoryName, newName })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to rename category');
+
+      setCategories(prev => prev.map(c => c === editingCategoryName ? newName : c).sort());
+      setCourses(prev => prev.map(c => c.category === editingCategoryName ? { ...c, category: newName } : c));
+      if (selectedCategory === editingCategoryName) {
+        setSelectedCategory(newName);
+      }
+      setEditingCategoryName(null);
+      showCelebratoryToast(`Category renamed to "${newName}" successfully!`);
+    } catch (err: any) {
+      alert(err.message || 'Error renaming category');
+    } finally {
+      setRenamingCategory(false);
+    }
+  };
+
   // Add Course
   const handleAddCourse = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -577,16 +615,6 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2.5 shrink-0">
-            {/* ADD NEW CATEGORY BUTTON */}
-            <button
-              onClick={() => setIsAddCategoryOpen(true)}
-              className="bg-white hover:bg-[#FFF2F8] border border-[#8A064D] text-[#8A064D] px-4.5 py-2.5 rounded-2xl text-sm font-black shadow-xs transition flex items-center gap-2 cursor-pointer"
-              title="Add a new course category"
-            >
-              <FolderPlus className="w-4 h-4 text-[#8A064D]" />
-              <span>+ New Category</span>
-            </button>
-
             {/* ADD COURSE BUTTON */}
             <button
               onClick={openAddModal}
@@ -633,18 +661,8 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
               {isCategoryDropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-3xl shadow-2xl border border-[#F0D5E4] p-4 z-50 animate-in fade-in zoom-in-95 duration-150">
                   <div className="flex items-center justify-between pb-2.5 border-b border-gray-100 mb-3">
-                    <span className="text-[11px] font-black uppercase text-[#590231] tracking-wider">Existing Categories</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCategoryDropdownOpen(false);
-                        setIsAddCategoryOpen(true);
-                      }}
-                      className="text-[11px] font-bold text-[#8A064D] hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Add New</span>
-                    </button>
+                    <span className="text-[11px] font-black uppercase text-[#590231] tracking-wider">Course Categories</span>
+                    <span className="text-[10px] font-bold text-gray-400">{categories.length} Total</span>
                   </div>
 
                   {/* Search within categories */}
@@ -721,7 +739,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                               }}
                               className="flex-1 flex items-center justify-between cursor-pointer mr-2"
                             >
-                              <span className="truncate max-w-[160px]">{cat}</span>
+                              <span className="truncate max-w-[150px]">{cat}</span>
                               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                                 isSelected ? 'bg-[#8A064D] text-white' : 'bg-gray-100 text-gray-500'
                               }`}>
@@ -729,23 +747,54 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                               </span>
                             </div>
 
-                            {/* DELETE CATEGORY BUTTON */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setIsCategoryDropdownOpen(false);
-                                setDeletingCategoryName(cat);
-                              }}
-                              className="p-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                              title={`Delete Category "${cat}"`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {/* ACTION BUTTONS: EDIT & DELETE */}
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsCategoryDropdownOpen(false);
+                                  setEditingCategoryName(cat);
+                                  setRenameCategoryInput(cat);
+                                }}
+                                className="p-1 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                                title={`Edit / Rename Category "${cat}"`}
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsCategoryDropdownOpen(false);
+                                  setDeletingCategoryName(cat);
+                                }}
+                                className="p-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                title={`Delete Category "${cat}"`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         );
                       })
                     )}
+                  </div>
+
+                  {/* Box Type Button: + Add New Category */}
+                  <div className="pt-3 mt-2 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCategoryDropdownOpen(false);
+                        setIsAddCategoryOpen(true);
+                      }}
+                      className="w-full py-2.5 px-3 rounded-xl border-2 border-dashed border-[#8A064D] text-[#8A064D] bg-[#FFF2F8] hover:bg-[#FFE6F2] font-black text-xs flex items-center justify-center gap-2 shadow-2xs transition cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4 text-[#8A064D]" />
+                      <span>+ Add New Category</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -1554,6 +1603,72 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                   className="px-5 py-2 rounded-xl text-xs font-black bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer"
                 >
                   {saving ? 'Creating...' : 'Create Category'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* 4.5 EDIT / RENAME CATEGORY MODAL */}
+      {/* ================================================================= */}
+      {editingCategoryName && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-amber-100 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-50 rounded-xl text-amber-700">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-[#2D041A]">Rename Category</h3>
+                  <p className="text-xs text-gray-500">Update category discipline name</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCategoryName(null)}
+                className="p-1 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRenameCategory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Category Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={renameCategoryInput}
+                  onChange={(e) => setRenameCategoryInput(e.target.value)}
+                  placeholder="e.g. Classical Dance"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  autoFocus
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs font-semibold text-amber-900">
+                💡 Renaming will automatically update all existing courses and batches currently linked to this category.
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingCategoryName(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={renamingCategory || !renameCategoryInput.trim()}
+                  className="px-5 py-2 rounded-xl text-xs font-black bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer"
+                >
+                  {renamingCategory ? 'Saving...' : 'Save Name'}
                 </button>
               </div>
             </form>

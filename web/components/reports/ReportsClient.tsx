@@ -27,7 +27,10 @@ import {
   ArrowDownWideNarrow,
   Phone,
   ChevronRight,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Printer,
+  Sparkles,
+  Check
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { Course, Batch, Student, Trainer } from '@/lib/academy';
@@ -67,6 +70,77 @@ function getCurrentMonthRange() {
   };
 }
 
+interface ColumnDef {
+  key: string;
+  label: string;
+}
+
+const ATTENDANCE_COLUMNS: ColumnDef[] = [
+  { key: 'session_date', label: 'Session Date' },
+  { key: 'student_name', label: 'Student Name' },
+  { key: 'roll_number', label: 'Roll Number' },
+  { key: 'course_title', label: 'Course' },
+  { key: 'batch_name', label: 'Batch' },
+  { key: 'status', label: 'Audit Status' },
+  { key: 'remarks', label: 'Remarks' },
+];
+
+const BATCH_ATTENDANCE_COLUMNS: ColumnDef[] = [
+  { key: 'course_name', label: 'Course Name' },
+  { key: 'batch_name', label: 'Batch Name' },
+  { key: 'trainer_name', label: 'Trainer Name' },
+  { key: 'trainer_contact', label: 'Trainer Contact' },
+  { key: 'total_registered_students', label: 'Registered Students' },
+  { key: 'total_classes_held', label: 'Classes Held' },
+  { key: 'total_absences', label: 'Total Absences' },
+  { key: 'absence_percentage', label: 'Absence %' },
+];
+
+const ABSENCE_COLUMNS: ColumnDef[] = [
+  { key: 'student_name', label: 'Student Name' },
+  { key: 'roll_number', label: 'Roll Number' },
+  { key: 'student_contact', label: 'Student Contact' },
+  { key: 'parent_contact', label: 'Parent Contact' },
+  { key: 'total_classes_held', label: 'Classes Held' },
+  { key: 'total_absent_days', label: 'Absent Days' },
+];
+
+const FEES_COLUMNS: ColumnDef[] = [
+  { key: 'invoice_number', label: 'Invoice #' },
+  { key: 'student_name', label: 'Student' },
+  { key: 'course_title', label: 'Course' },
+  { key: 'fee_period', label: 'Fee Period' },
+  { key: 'due_date', label: 'Due Date' },
+  { key: 'total_amount', label: 'Billed' },
+  { key: 'discount_amount', label: 'Disc' },
+  { key: 'paid_amount', label: 'Paid' },
+  { key: 'balance_amount', label: 'Balance' },
+  { key: 'status', label: 'Status' },
+];
+
+const SALARIES_COLUMNS: ColumnDef[] = [
+  { key: 'invoice_number', label: 'Invoice #' },
+  { key: 'invoice_date', label: 'Invoice Date' },
+  { key: 'trainer_name', label: 'Guru Name' },
+  { key: 'display_title', label: 'Title' },
+  { key: 'payroll_month', label: 'Month' },
+  { key: 'classes_conducted', label: 'Classes' },
+  { key: 'base_salary', label: 'Base' },
+  { key: 'bonus_amount', label: 'Bonus' },
+  { key: 'deductions', label: 'Deductions' },
+  { key: 'net_salary', label: 'Net Payable' },
+  { key: 'status', label: 'Status' },
+];
+
+const INCOME_EXPENSES_COLUMNS: ColumnDef[] = [
+  { key: 'date', label: 'Date' },
+  { key: 'type', label: 'Flow Type' },
+  { key: 'category', label: 'Category' },
+  { key: 'description', label: 'Description' },
+  { key: 'payment_method', label: 'Method' },
+  { key: 'amount', label: 'Amount' },
+];
+
 interface Props {
   courses: Course[];
   batches: Batch[];
@@ -76,6 +150,49 @@ interface Props {
 
 export default function ReportsClient({ courses, batches, students, trainers }: Props) {
   const [activeType, setActiveType] = useState<ReportType>('attendance');
+
+  // View Mode: 'directory' (Hub with 4 main reports + All Available Reports list) or 'subpage'
+  const [reportView, setReportView] = useState<'directory' | 'subpage'>('directory');
+
+  // Modals for Filter Columns (F3) and Export Now (F4)
+  const [isFilterColumnsOpen, setIsFilterColumnsOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  // Column visibility map (column key -> boolean)
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({});
+
+  const isColVisible = (key: string): boolean => {
+    return visibleColumns[key] !== false;
+  };
+
+  const toggleColumn = (key: string) => {
+    setVisibleColumns(prev => ({
+      ...prev,
+      [key]: prev[key] === false ? true : false,
+    }));
+  };
+
+  // Keyboard Shortcuts: F2 (View Report), F3 (Filter Columns), F4 (Export Now)
+  useEffect(() => {
+    if (reportView !== 'subpage') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        setRefreshKey(k => k + 1);
+      } else if (e.key === 'F3') {
+        e.preventDefault();
+        setIsFilterColumnsOpen(prev => !prev);
+      } else if (e.key === 'F4') {
+        e.preventDefault();
+        setIsExportModalOpen(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [reportView]);
+
 
   const currentMonthRange = useMemo(() => getCurrentMonthRange(), []);
 
@@ -167,6 +284,82 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const getCurrentColumns = useCallback((): ColumnDef[] => {
+    if (activeType === 'attendance') {
+      if (attendanceSubView === 'batch') return BATCH_ATTENDANCE_COLUMNS;
+      if (attendanceSubView === 'absence') return ABSENCE_COLUMNS;
+      return ATTENDANCE_COLUMNS;
+    }
+    if (activeType === 'fees') return FEES_COLUMNS;
+    if (activeType === 'salaries') return SALARIES_COLUMNS;
+    return INCOME_EXPENSES_COLUMNS;
+  }, [activeType, attendanceSubView]);
+
+  const selectAllCurrentColumns = () => {
+    const cols = getCurrentColumns();
+    setVisibleColumns(prev => {
+      const next = { ...prev };
+      cols.forEach(c => { next[c.key] = true; });
+      return next;
+    });
+  };
+
+  const resetDefaultColumns = () => {
+    const cols = getCurrentColumns();
+    setVisibleColumns(prev => {
+      const next = { ...prev };
+      cols.forEach(c => { delete next[c.key]; });
+      return next;
+    });
+  };
+
+  const openReport = (type: ReportType, subView?: 'general' | 'absence' | 'batch') => {
+    setActiveType(type);
+    if (type === 'attendance' && subView) {
+      setAttendanceSubView(subView);
+    }
+    setAbsenceSelectedStudent(null);
+    setAbsenceSelectedBatch(null);
+    setReportView('subpage');
+  };
+
+  const handleBackFromSubpage = () => {
+    if (activeType === 'attendance' && attendanceSubView === 'absence') {
+      if (absenceSelectedBatch) {
+        setAbsenceSelectedBatch(null);
+        return;
+      }
+      if (absenceSelectedStudent) {
+        setAbsenceSelectedStudent(null);
+        return;
+      }
+    }
+    setReportView('directory');
+  };
+
+  const getReportTitle = () => {
+    if (activeType === 'attendance') {
+      return 'Attendance Report';
+    }
+    if (activeType === 'fees') {
+      return 'Students Fee Report';
+    }
+    if (activeType === 'salaries') {
+      return 'Guru Salaries Report';
+    }
+    return 'Income & Expenses Report';
+  };
+
+  const getReportSubtitle = () => {
+    if (activeType === 'attendance') {
+      if (attendanceSubView === 'general') return 'General Report';
+      if (attendanceSubView === 'batch') return 'Batch Attendance Report';
+      return 'Absence Report';
+    }
+    return 'General Report';
+  };
+
 
   // Available batches based on selected course (legacy single-select)
   const availableBatches = useMemo(() => {
@@ -555,9 +748,9 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
         rows.push([r.invoice_number, r.student_name, r.course_title, r.batch_name, r.fee_period, r.due_date, String(r.total_amount), String(r.discount_amount), String(r.paid_amount), String(r.balance_amount), r.status, r.last_payment_date || 'N/A', r.payment_method || 'N/A']);
       });
     } else if (activeType === 'salaries' && salariesData) {
-      rows.push(['Trainer Name', 'Title', 'Payroll Month', 'Base Salary (Rs)', 'Classes Conducted', 'Bonus (Rs)', 'Deductions (Rs)', 'Advance Deducted (Rs)', 'Net Salary (Rs)', 'Status', 'Payment Date', 'Payment Method']);
+      rows.push(['Invoice Number', 'Invoice Date', 'Trainer Name', 'Title', 'Payroll Month', 'Base Salary (Rs)', 'Classes Conducted', 'Bonus (Rs)', 'Deductions (Rs)', 'Advance Deducted (Rs)', 'Net Salary (Rs)', 'Status', 'Payment Date', 'Payment Method']);
       salariesData.records.forEach(r => {
-        rows.push([r.trainer_name, r.display_title, r.payroll_month, String(r.base_salary), String(r.classes_conducted), String(r.bonus_amount), String(r.deduction_amount), String(r.advance_deducted), String(r.net_salary), r.status, r.payment_date || 'N/A', r.payment_method || 'N/A']);
+        rows.push([r.invoice_number || 'N/A', r.invoice_date || 'N/A', r.trainer_name, r.display_title, r.payroll_month, String(r.base_salary), String(r.classes_conducted), String(r.bonus_amount), String(r.deduction_amount), String(r.advance_deducted), String(r.net_salary), r.status, r.payment_date || 'N/A', r.payment_method || 'N/A']);
       });
     } else if (activeType === 'income_expenses' && incomeExpensesData) {
       rows.push(['Date', 'Type', 'Category', 'Description', 'Amount (Rs)', 'Payment Method', 'Reference']);
@@ -616,11 +809,11 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
         rows = attendanceData.records.map(r => [r.session_date, r.course_title, r.batch_name, r.student_name, r.roll_number, r.status, r.remarks || '']);
       }
     } else if (activeType === 'fees' && feesData) {
-      headers = ['Invoice Number', 'Student Name', 'Course', 'Period', 'Due Date', 'Billed (Rs)', 'Paid (Rs)', 'Balance (Rs)', 'Status'];
-      rows = feesData.records.map(r => [r.invoice_number, r.student_name, r.course_title, r.fee_period, r.due_date, String(r.total_amount), String(r.paid_amount), String(r.balance_amount), r.status]);
+      headers = ['Invoice Number', 'Student Name', 'Course', 'Period', 'Due Date', 'Billed (Rs)', 'Discount (Rs)', 'Paid (Rs)', 'Balance (Rs)', 'Status'];
+      rows = feesData.records.map(r => [r.invoice_number, r.student_name, r.course_title, r.fee_period, r.due_date, String(r.total_amount), String(r.discount_amount), String(r.paid_amount), String(r.balance_amount), r.status]);
     } else if (activeType === 'salaries' && salariesData) {
-      headers = ['Guru Name', 'Display Title', 'Month', 'Base (Rs)', 'Classes', 'Bonus (Rs)', 'Net (Rs)', 'Status'];
-      rows = salariesData.records.map(r => [r.trainer_name, r.display_title, r.payroll_month, String(r.base_salary), String(r.classes_conducted), String(r.bonus_amount), String(r.net_salary), r.status]);
+      headers = ['Invoice Number', 'Invoice Date', 'Guru Name', 'Display Title', 'Month', 'Base (Rs)', 'Classes', 'Bonus (Rs)', 'Deductions (Rs)', 'Net (Rs)', 'Status'];
+      rows = salariesData.records.map(r => [r.invoice_number || '—', r.invoice_date || '—', r.trainer_name, r.display_title, r.payroll_month, String(r.base_salary), String(r.classes_conducted), String(r.bonus_amount), String(Number(r.deduction_amount) + Number(r.advance_deducted)), String(r.net_salary), r.status]);
     } else if (activeType === 'income_expenses' && incomeExpensesData) {
       headers = ['Date', 'Type', 'Category', 'Description', 'Amount (Rs)', 'Method', 'Reference'];
       rows = incomeExpensesData.records.map(r => [r.date, r.type, r.category, r.description, String(r.amount), r.payment_method, r.reference || '']);
@@ -864,39 +1057,45 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
           });
         }
       } else if (activeType === 'fees' && feesData) {
-        doc.text('Invoice #', 16, y);
-        doc.text('Student Name', 50, y);
-        doc.text('Period', 105, y);
-        doc.text('Paid (Rs)', 140, y);
-        doc.text('Balance (Rs)', 170, y);
+        doc.text('Invoice #', 14, y);
+        doc.text('Student Name', 45, y);
+        doc.text('Period', 90, y);
+        doc.text('Disc (Rs)', 125, y);
+        doc.text('Paid (Rs)', 150, y);
+        doc.text('Balance (Rs)', 175, y);
         y += 6;
         feesData.records.slice(0, 30).forEach(r => {
           if (y > 275) { doc.addPage(); y = 20; }
           doc.setFont('helvetica', 'normal');
           doc.setTextColor(40, 40, 40);
-          doc.text(String(r.invoice_number), 16, y);
-          doc.text(String(r.student_name).slice(0, 24), 50, y);
-          doc.text(String(r.fee_period), 105, y);
-          doc.text(String(r.paid_amount), 140, y);
-          doc.text(String(r.balance_amount), 170, y);
+          doc.text(String(r.invoice_number), 14, y);
+          doc.text(String(r.student_name).slice(0, 20), 45, y);
+          doc.text(String(r.fee_period), 90, y);
+          doc.text(String(r.discount_amount || 0), 125, y);
+          doc.text(String(r.paid_amount), 150, y);
+          doc.text(String(r.balance_amount), 175, y);
           y += 5.5;
         });
       } else if (activeType === 'salaries' && salariesData) {
-        doc.text('Guru Name', 16, y);
-        doc.text('Month', 65, y);
-        doc.text('Classes', 105, y);
-        doc.text('Net Salary (Rs)', 135, y);
-        doc.text('Status', 170, y);
+        doc.text('Invoice #', 14, y);
+        doc.text('Date', 38, y);
+        doc.text('Guru Name', 62, y);
+        doc.text('Month', 105, y);
+        doc.text('Classes', 130, y);
+        doc.text('Net (Rs)', 155, y);
+        doc.text('Status', 180, y);
         y += 6;
         salariesData.records.slice(0, 30).forEach(r => {
           if (y > 275) { doc.addPage(); y = 20; }
           doc.setFont('helvetica', 'normal');
           doc.setTextColor(40, 40, 40);
-          doc.text(String(r.trainer_name).slice(0, 22), 16, y);
-          doc.text(String(r.payroll_month), 65, y);
-          doc.text(String(r.classes_conducted), 105, y);
-          doc.text(String(r.net_salary), 135, y);
-          doc.text(String(r.status).toUpperCase(), 170, y);
+          doc.text(String(r.invoice_number || '—').slice(0, 10), 14, y);
+          doc.text(String(r.invoice_date || '—').slice(0, 10), 38, y);
+          doc.text(String(r.trainer_name).slice(0, 20), 62, y);
+          doc.text(String(r.payroll_month), 105, y);
+          doc.text(String(r.classes_conducted), 130, y);
+          doc.text(String(r.net_salary), 155, y);
+          doc.text(String(r.status).toUpperCase(), 180, y);
           y += 5.5;
         });
       } else if (activeType === 'income_expenses' && incomeExpensesData) {
@@ -927,537 +1126,552 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     }
   };
 
+  const allReportsList = [
+    {
+      id: 'attendance-general',
+      name: 'General Attendance Report',
+      category: 'Attendance & Audits',
+      type: 'attendance' as ReportType,
+      subView: 'general' as const,
+      icon: <Users className="w-5 h-5" />,
+      description: 'Detailed session-wise daily student check-ins, roll numbers, timestamps, presence status, and instructor remarks.'
+    },
+    {
+      id: 'attendance-batch',
+      name: 'Batch Attendance & Absence Analytics',
+      category: 'Attendance & Audits',
+      type: 'attendance' as ReportType,
+      subView: 'batch' as const,
+      icon: <BarChart3 className="w-5 h-5" />,
+      description: 'Cohort-level aggregate attendance rates, total registered students, classes held, absence counts, and percentage analytics.'
+    },
+    {
+      id: 'attendance-absence',
+      name: 'Student Absence Audit Report',
+      category: 'Attendance & Audits',
+      type: 'attendance' as ReportType,
+      subView: 'absence' as const,
+      icon: <UserX className="w-5 h-5" />,
+      description: 'Student-specific chronic absenteeism tracking, student & parent emergency contacts, course breakdowns, and missed session audit.'
+    },
+    {
+      id: 'fees-tuition',
+      name: 'Students Tuition Fee Report',
+      category: 'Financial & Billing',
+      type: 'fees' as ReportType,
+      icon: <Receipt className="w-5 h-5" />,
+      description: 'Complete fee collection audit, tuition invoices, discounts granted, paid amounts, balance dues, and payment methods.'
+    },
+    {
+      id: 'salaries-payroll',
+      name: 'Guru Salaries & Payroll Report',
+      category: 'Faculty & Payroll',
+      type: 'salaries' as ReportType,
+      icon: <Banknote className="w-5 h-5" />,
+      description: 'Faculty salary statements, invoice numbers, invoice dates, payroll months, classes conducted, bonuses, advance deductions, and net disbursements.'
+    },
+    {
+      id: 'income-expenses',
+      name: 'Income & Expenses Financial Ledger',
+      category: 'Accounting & P&L',
+      type: 'income_expenses' as ReportType,
+      icon: <TrendingUp className="w-5 h-5" />,
+      description: 'Institutional cash flow tracking fee collection income, guru salaries, academy operational expenses, categories, and net surplus.'
+    }
+  ];
+
+  if (reportView === 'directory') {
+    return (
+      <div className="space-y-8 pb-12">
+        {/* Top Banner */}
+        <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D] shadow-xs">
+              <FileText className="w-7 h-7" />
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-black text-[#590231] tracking-tight">
+                Academy Reports & Audits
+              </h1>
+              <p className="text-sm font-semibold text-gray-500 mt-1">
+                Access comprehensive audits, attendance metrics, tuition billing, trainer payroll, and institutional financials.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 4 Main Reports Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* Card 1: Attendance Report */}
+          <button
+            type="button"
+            onClick={() => openReport('attendance', 'general')}
+            className="group bg-white rounded-3xl p-6 border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-lg transition-all duration-300 text-left cursor-pointer flex flex-col justify-between h-full hover:-translate-y-1"
+          >
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] group-hover:bg-[#590231] group-hover:text-[#F9E33A] text-[#8A064D] flex items-center justify-center transition-all duration-300 mb-4">
+                <Users className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-black text-[#590231] group-hover:text-[#8A064D] transition">
+                Attendance Report
+              </h3>
+              <p className="text-xs font-semibold text-gray-500 mt-2 leading-relaxed">
+                Session check-ins, batch attendance ratios, and student absence audits
+              </p>
+            </div>
+            <div className="mt-6 flex items-center justify-between text-xs font-bold text-[#8A064D] group-hover:text-[#590231] pt-4 border-t border-[#F0D5E4]/60">
+              <span>Open Report</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition" />
+            </div>
+          </button>
+
+          {/* Card 2: Students Fee Report */}
+          <button
+            type="button"
+            onClick={() => openReport('fees')}
+            className="group bg-white rounded-3xl p-6 border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-lg transition-all duration-300 text-left cursor-pointer flex flex-col justify-between h-full hover:-translate-y-1"
+          >
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] group-hover:bg-[#590231] group-hover:text-[#F9E33A] text-[#8A064D] flex items-center justify-center transition-all duration-300 mb-4">
+                <Receipt className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-black text-[#590231] group-hover:text-[#8A064D] transition">
+                Students Fee Report
+              </h3>
+              <p className="text-xs font-semibold text-gray-500 mt-2 leading-relaxed">
+                Fee collection, invoice tracking, discounts granted, and pending balances
+              </p>
+            </div>
+            <div className="mt-6 flex items-center justify-between text-xs font-bold text-[#8A064D] group-hover:text-[#590231] pt-4 border-t border-[#F0D5E4]/60">
+              <span>Open Report</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition" />
+            </div>
+          </button>
+
+          {/* Card 3: Guru Salaries Report */}
+          <button
+            type="button"
+            onClick={() => openReport('salaries')}
+            className="group bg-white rounded-3xl p-6 border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-lg transition-all duration-300 text-left cursor-pointer flex flex-col justify-between h-full hover:-translate-y-1"
+          >
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] group-hover:bg-[#590231] group-hover:text-[#F9E33A] text-[#8A064D] flex items-center justify-center transition-all duration-300 mb-4">
+                <Banknote className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-black text-[#590231] group-hover:text-[#8A064D] transition">
+                Guru Salaries Report
+              </h3>
+              <p className="text-xs font-semibold text-gray-500 mt-2 leading-relaxed">
+                Faculty payroll statements, invoice numbers, dates, classes, and net pay
+              </p>
+            </div>
+            <div className="mt-6 flex items-center justify-between text-xs font-bold text-[#8A064D] group-hover:text-[#590231] pt-4 border-t border-[#F0D5E4]/60">
+              <span>Open Report</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition" />
+            </div>
+          </button>
+
+          {/* Card 4: Income & Expenses Report */}
+          <button
+            type="button"
+            onClick={() => openReport('income_expenses')}
+            className="group bg-white rounded-3xl p-6 border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-lg transition-all duration-300 text-left cursor-pointer flex flex-col justify-between h-full hover:-translate-y-1"
+          >
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] group-hover:bg-[#590231] group-hover:text-[#F9E33A] text-[#8A064D] flex items-center justify-center transition-all duration-300 mb-4">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-black text-[#590231] group-hover:text-[#8A064D] transition">
+                Income & Expenses Report
+              </h3>
+              <p className="text-xs font-semibold text-gray-500 mt-2 leading-relaxed">
+                Financial P&L statements, tuition inflows, operational expenses & net margin
+              </p>
+            </div>
+            <div className="mt-6 flex items-center justify-between text-xs font-bold text-[#8A064D] group-hover:text-[#590231] pt-4 border-t border-[#F0D5E4]/60">
+              <span>Open Report</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition" />
+            </div>
+          </button>
+        </div>
+
+        {/* All Available Reports Section */}
+        <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
+          <div className="px-6 md:px-8 py-5 bg-[#FFF9FB] border-b border-[#F0D5E4] flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-black text-[#590231]">All Available Reports</h2>
+              <p className="text-xs font-semibold text-gray-500 mt-0.5">
+                Detailed breakdown and direct access to institutional records and audit statements
+              </p>
+            </div>
+            <span className="text-xs font-black text-[#8A064D] bg-[#FFF2F8] px-3 py-1 rounded-xl border border-[#F0D5E4]">
+              {allReportsList.length} Reports
+            </span>
+          </div>
+
+          <div className="divide-y divide-[#F0D5E4]/60">
+            {allReportsList.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => openReport(item.type, item.subView)}
+                className="p-6 hover:bg-[#FFF9FB] transition flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer group"
+              >
+                <div className="flex items-start md:items-center gap-4 flex-1">
+                  <div className="w-10 h-10 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D] shrink-0 group-hover:scale-105 group-hover:bg-[#590231] group-hover:text-[#F9E33A] transition">
+                    {item.icon}
+                  </div>
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-6 items-center">
+                    <div className="md:col-span-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-black text-[#590231] group-hover:text-[#8A064D] transition">
+                          {item.name}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4]/60">
+                          {item.category}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="md:col-span-8">
+                      <p className="text-xs font-semibold text-gray-600 leading-relaxed">
+                        {item.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                  <span className="text-xs font-black text-[#8A064D] group-hover:text-[#590231] transition">
+                    View Report
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-[#8A064D] group-hover:translate-x-1 transition" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       
-      {/* Top Banner */}
-      <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Subpage Top Header matching reference layout */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D]">
-            <FileText className="w-6 h-6" />
-          </div>
+          <button
+            type="button"
+            onClick={handleBackFromSubpage}
+            className="p-2.5 rounded-2xl bg-white border border-[#F0D5E4] text-[#590231] hover:bg-[#FFF2F8] hover:text-[#8A064D] transition cursor-pointer shadow-xs"
+            title="Back to Reports Hub"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
           <div>
-            <h1 className="text-2xl md:text-3xl font-black text-[#590231] tracking-tight">
-              Academy Reports & Audits
-            </h1>
-            <p className="text-sm font-semibold text-gray-500">
-              Audit attendance, tuition fees, trainer payroll, and income vs expenses with direct export
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl font-black text-[#590231] tracking-tight">
+                {getReportTitle()}
+              </h1>
+            </div>
+            <p className="text-xs sm:text-sm font-bold text-[#2563EB] tracking-wide mt-0.5">
+              {getReportSubtitle()}
             </p>
           </div>
         </div>
 
-        {/* Export Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* 3 Permanent Top Buttons */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* View Report (F2) */}
           <button
-            onClick={exportCSV}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white border border-[#F0D5E4] hover:bg-[#FFF2F8] text-gray-700 hover:text-[#8A064D] text-xs font-black shadow-xs transition cursor-pointer"
-            title="Export filtered records as CSV"
+            type="button"
+            onClick={() => setRefreshKey(k => k + 1)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2D041A] hover:bg-[#1E0211] text-white text-xs font-black shadow-md transition cursor-pointer active:scale-95"
+            title="Collect and refresh report data (F2)"
           >
-            <Download className="w-4 h-4 text-emerald-600" />
-            <span>CSV</span>
+            <TrendingUp className="w-4 h-4 text-[#F9E33A]" />
+            <span>View Report (F2)</span>
           </button>
 
+          {/* Filter Columns (F3) */}
           <button
-            onClick={exportExcel}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white border border-[#F0D5E4] hover:bg-[#FFF2F8] text-gray-700 hover:text-[#8A064D] text-xs font-black shadow-xs transition cursor-pointer"
-            title="Export filtered records as Excel Spreadsheet"
+            type="button"
+            onClick={() => setIsFilterColumnsOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#374151] hover:bg-[#1F2937] text-white text-xs font-black shadow-md transition cursor-pointer active:scale-95"
+            title="Choose which columns appear in the report table (F3)"
           >
-            <FileSpreadsheet className="w-4 h-4 text-green-700" />
-            <span>Excel</span>
+            <SlidersHorizontal className="w-4 h-4 text-gray-300" />
+            <span>Filter Columns (F3)</span>
           </button>
 
+          {/* Export Now (F4) */}
           <button
-            onClick={exportPDF}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-black shadow-md transition border border-[#F9E33A]/60 cursor-pointer"
-            title="Download official PDF report"
+            type="button"
+            onClick={() => setIsExportModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white hover:bg-[#FFF2F8] border border-[#F0D5E4] text-[#590231] text-xs font-black shadow-xs transition cursor-pointer active:scale-95"
+            title="Export filtered records in Excel, CSV, PDF, or Print (F4)"
           >
-            <FileDown className="w-4 h-4 text-[#F9E33A]" />
-            <span>Export PDF</span>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Export Now (F4)</span>
           </button>
         </div>
       </div>
 
-      {/* Report Types Tabs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        
-        {/* Attendance Tab */}
-        <button
-          onClick={() => {
-            setActiveType('attendance');
-            clearFilters();
-          }}
-          className={`p-4 rounded-2xl border text-left transition flex items-center gap-3 cursor-pointer ${
-            activeType === 'attendance'
-              ? 'bg-[#590231] text-white border-[#F9E33A] shadow-md'
-              : 'bg-white text-gray-800 border-[#F0D5E4] hover:bg-[#FFF9FB]'
-          }`}
-        >
-          <div className={`p-2.5 rounded-xl ${activeType === 'attendance' ? 'bg-[#8A064D] text-[#F9E33A]' : 'bg-[#FFF2F8] text-[#8A064D]'}`}>
-            <Users className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-sm font-black tracking-tight">Attendance</div>
-            <div className={`text-[11px] font-semibold ${activeType === 'attendance' ? 'text-rose-200' : 'text-gray-500'}`}>
-              Presence & audit rates
-            </div>
-          </div>
-        </button>
-
-        {/* Fees Tab */}
-        <button
-          onClick={() => {
-            setActiveType('fees');
-            clearFilters();
-          }}
-          className={`p-4 rounded-2xl border text-left transition flex items-center gap-3 cursor-pointer ${
-            activeType === 'fees'
-              ? 'bg-[#590231] text-white border-[#F9E33A] shadow-md'
-              : 'bg-white text-gray-800 border-[#F0D5E4] hover:bg-[#FFF9FB]'
-          }`}
-        >
-          <div className={`p-2.5 rounded-xl ${activeType === 'fees' ? 'bg-[#8A064D] text-[#F9E33A]' : 'bg-[#FFF2F8] text-[#8A064D]'}`}>
-            <Receipt className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-sm font-black tracking-tight">Student Fees</div>
-            <div className={`text-[11px] font-semibold ${activeType === 'fees' ? 'text-rose-200' : 'text-gray-500'}`}>
-              Collections & dues
-            </div>
-          </div>
-        </button>
-
-        {/* Salaries Tab */}
-        <button
-          onClick={() => {
-            setActiveType('salaries');
-            clearFilters();
-          }}
-          className={`p-4 rounded-2xl border text-left transition flex items-center gap-3 cursor-pointer ${
-            activeType === 'salaries'
-              ? 'bg-[#590231] text-white border-[#F9E33A] shadow-md'
-              : 'bg-white text-gray-800 border-[#F0D5E4] hover:bg-[#FFF9FB]'
-          }`}
-        >
-          <div className={`p-2.5 rounded-xl ${activeType === 'salaries' ? 'bg-[#8A064D] text-[#F9E33A]' : 'bg-[#FFF2F8] text-[#8A064D]'}`}>
-            <Banknote className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-sm font-black tracking-tight">Guru Salaries</div>
-            <div className={`text-[11px] font-semibold ${activeType === 'salaries' ? 'text-rose-200' : 'text-gray-500'}`}>
-              Payroll & bonuses
-            </div>
-          </div>
-        </button>
-
-        {/* Income vs Expenses Tab */}
-        <button
-          onClick={() => {
-            setActiveType('income_expenses');
-            clearFilters();
-          }}
-          className={`p-4 rounded-2xl border text-left transition flex items-center gap-3 cursor-pointer ${
-            activeType === 'income_expenses'
-              ? 'bg-[#590231] text-white border-[#F9E33A] shadow-md'
-              : 'bg-white text-gray-800 border-[#F0D5E4] hover:bg-[#FFF9FB]'
-          }`}
-        >
-          <div className={`p-2.5 rounded-xl ${activeType === 'income_expenses' ? 'bg-[#8A064D] text-[#F9E33A]' : 'bg-[#FFF2F8] text-[#8A064D]'}`}>
-            <TrendingUp className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-sm font-black tracking-tight">Income vs Expenses</div>
-            <div className={`text-[11px] font-semibold ${activeType === 'income_expenses' ? 'text-rose-200' : 'text-gray-500'}`}>
-              P&L and net surplus
-            </div>
-          </div>
-        </button>
-
-      </div>
-
-      {/* Attendance Sub-view Switcher: General Report vs Absence Report vs Batch Attendance Report */}
+      {/* Attendance Sub-view Switcher if viewing attendance report */}
       {activeType === 'attendance' && (
-        <div className="bg-white rounded-3xl p-3 border border-[#F0D5E4] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => {
-                setAttendanceSubView('general');
-                setAbsenceSelectedStudent(null);
-                setAbsenceSelectedBatch(null);
-              }}
-              className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
-                attendanceSubView === 'general'
-                  ? 'bg-[#590231] text-white shadow-md'
-                  : 'bg-[#FFF9FB] text-gray-700 hover:text-[#8A064D] hover:bg-[#FFF2F8] border border-[#F0D5E4]'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>General Report</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAttendanceSubView('absence');
-                setAbsenceSelectedStudent(null);
-                setAbsenceSelectedBatch(null);
-              }}
-              className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
-                attendanceSubView === 'absence'
-                  ? 'bg-[#590231] text-white shadow-md'
-                  : 'bg-[#FFF9FB] text-gray-700 hover:text-[#8A064D] hover:bg-[#FFF2F8] border border-[#F0D5E4]'
-              }`}
-            >
-              <UserX className="w-4 h-4 text-[#F9E33A]" />
-              <span>Absence Report</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAttendanceSubView('batch');
-                setAbsenceSelectedStudent(null);
-                setAbsenceSelectedBatch(null);
-              }}
-              className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
-                attendanceSubView === 'batch'
-                  ? 'bg-[#590231] text-white shadow-md'
-                  : 'bg-[#FFF9FB] text-gray-700 hover:text-[#8A064D] hover:bg-[#FFF2F8] border border-[#F0D5E4]'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4 text-[#F9E33A]" />
-              <span>Batch Attendance Report</span>
-            </button>
-          </div>
-
-          <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-gray-500 pr-2">
-            {attendanceSubView === 'general' ? (
-              <span>Auditing class session rosters & presence rate</span>
-            ) : attendanceSubView === 'absence' ? (
-              <span>Track overall absences, course breakdowns & session audits</span>
-            ) : (
-              <span>Audit batch-level registered students, classes held & absence %</span>
-            )}
-          </div>
+        <div className="flex items-center gap-2 bg-[#FFF2F8] p-1.5 rounded-2xl border border-[#F0D5E4] w-fit">
+          <button
+            type="button"
+            onClick={() => {
+              setAttendanceSubView('general');
+              setAbsenceSelectedStudent(null);
+              setAbsenceSelectedBatch(null);
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
+              attendanceSubView === 'general'
+                ? 'bg-[#590231] text-white shadow-xs'
+                : 'text-gray-700 hover:text-[#8A064D]'
+            }`}
+          >
+            General Report
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAttendanceSubView('batch');
+              setAbsenceSelectedStudent(null);
+              setAbsenceSelectedBatch(null);
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
+              attendanceSubView === 'batch'
+                ? 'bg-[#590231] text-white shadow-xs'
+                : 'text-gray-700 hover:text-[#8A064D]'
+            }`}
+          >
+            Batch Attendance
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAttendanceSubView('absence');
+              setAbsenceSelectedStudent(null);
+              setAbsenceSelectedBatch(null);
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
+              attendanceSubView === 'absence'
+                ? 'bg-[#590231] text-white shadow-xs'
+                : 'text-gray-700 hover:text-[#8A064D]'
+            }`}
+          >
+            Student Absence Audit
+          </button>
         </div>
       )}
 
-      {/* Dynamic Filters Bar based on active report type */}
-      <div className="bg-white rounded-3xl p-6 border border-[#F0D5E4] shadow-xs space-y-4">
-        
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#F0D5E4]/60 pb-3">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-[#8A064D]" />
-            <span className="text-xs font-black text-[#590231] uppercase tracking-wider">
-              {activeType === 'attendance' && attendanceSubView === 'absence'
-                ? 'Absence Report Parameters & Filters'
-                : activeType === 'attendance' && attendanceSubView === 'batch'
-                ? 'Batch Attendance Report Parameters & Filters'
-                : `${activeType.replace('_', ' ')} Report Parameters & Filters`}
-            </span>
-          </div>
-
-          {/* Timestamp & Date Range Quick Filter */}
-          <div className="flex flex-wrap items-center gap-3">
+      {/* Stacked Horizontal Filters Section matching reference layout */}
+      <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#F0D5E4] shadow-xs space-y-4">
+        {/* Row 1: Date Range */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+          <label className="w-28 sm:w-32 text-sm font-bold text-gray-700 shrink-0">
+            Date Range:
+          </label>
+          <div className="w-full sm:max-w-md">
             {activeType === 'attendance' && (attendanceSubView === 'absence' || attendanceSubView === 'batch') ? (
               <MonthYearRangeFilter
                 startDate={startDate}
                 endDate={endDate}
-                align="right"
+                align="left"
                 onApply={({ startDate: s, endDate: e }) => {
                   setStartDate(s);
                   setEndDate(e);
                 }}
+                className="w-full"
               />
             ) : (
               <DateRangeQuickFilter
                 startDate={startDate}
                 endDate={endDate}
-                align="right"
+                align="left"
                 onApply={({ startDate: s, endDate: e }) => {
                   setStartDate(s);
                   setEndDate(e);
                 }}
-                placeholder="Select Report Date Range"
+                placeholder="Select Date Range"
+                className="w-full"
               />
             )}
-            <span className="flex items-center gap-1 text-emerald-800 font-bold text-xs bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200">
-              <Clock className="w-3.5 h-3.5 text-emerald-600" />
-              Generated: {currentGeneratedAt ? new Date(currentGeneratedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'Live'}
-            </span>
           </div>
         </div>
 
-        {/* Dynamic Filter Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          
-          {/* Attendance Report Filters: Batch Attendance Report */}
-          {activeType === 'attendance' && attendanceSubView === 'batch' && (
-            <>
-              {/* Course: Searchable multi-select */}
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">
-                  Course (Multi-select)
-                </label>
-                <CourseMultiSearchSelect
-                  courses={courseOptions}
-                  selectedIds={selectedCourseIds}
-                  onChange={(ids) => {
-                    setSelectedCourseIds(ids);
-                    if (ids.length > 0) {
-                      setSelectedBatchIds(prev => prev.filter(bId => {
-                        const batch = batches.find(b => b.id === bId);
-                        return batch && ids.includes(batch.course_id);
-                      }));
-                    }
-                  }}
-                  placeholder="All Courses (Multi-select)"
-                  className="w-full"
-                />
-              </div>
-
-              {/* Batch: Searchable multi-select, filtered based on selected courses */}
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">
-                  Batch (Multi-select)
-                </label>
-                <BatchMultiSearchSelect
-                  batches={availableBatchOptions}
-                  selectedIds={selectedBatchIds}
-                  onChange={(ids) => setSelectedBatchIds(ids)}
-                  placeholder="All Batches (Multi-select)"
-                  className="w-full"
-                />
-              </div>
-
-              {/* Month and Year: date range selection */}
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">
-                  Month & Year Range
-                </label>
-                <MonthYearRangeFilter
-                  startDate={startDate}
-                  endDate={endDate}
-                  align="right"
-                  onApply={({ startDate: s, endDate: e }) => {
-                    setStartDate(s);
-                    setEndDate(e);
-                  }}
-                  className="w-full"
-                />
-              </div>
-            </>
-          )}
-
-          {/* Attendance Report Filters: Absence */}
-          {activeType === 'attendance' && attendanceSubView === 'absence' && (
-            <>
-              {/* Sort: High Absence (default) / Low Absence */}
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">
-                  Sort
-                </label>
-                <select
-                  value={absenceSort}
-                  onChange={(e) => setAbsenceSort(e.target.value as 'high_absence' | 'low_absence')}
-                  className="w-full px-3 py-2 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
-                >
-                  <option value="high_absence">High Absence (default)</option>
-                  <option value="low_absence">Low Absence</option>
-                </select>
-              </div>
-
-              {/* Student Name: Searchable + multi-select */}
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">
-                  Student Name (Multi-select)
-                </label>
-                <StudentMultiSearchSelect
-                  students={studentOptions}
-                  selectedIds={absenceSelectedStudentIds}
-                  onChange={(ids) => setAbsenceSelectedStudentIds(ids)}
-                  placeholder="All Students (Multi-select)"
-                  className="w-full"
-                />
-              </div>
-
-              {/* Month & Year: Select range */}
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">
-                  Month & Year Range
-                </label>
-                <MonthYearRangeFilter
-                  startDate={startDate}
-                  endDate={endDate}
-                  align="right"
-                  onApply={({ startDate: s, endDate: e }) => {
-                    setStartDate(s);
-                    setEndDate(e);
-                  }}
-                  className="w-full"
-                />
-              </div>
-            </>
-          )}
-
-          {/* Attendance Report Filters: General */}
-          {activeType === 'attendance' && attendanceSubView === 'general' && (
-            <>
-              {/* Course: Searchable + multi-select */}
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Course (Multi-select)</label>
-                <CourseMultiSearchSelect
-                  courses={courseOptions}
-                  selectedIds={selectedCourseIds}
-                  onChange={(ids) => {
-                    setSelectedCourseIds(ids);
-                    if (ids.length > 0) {
-                      setSelectedBatchIds(prev => prev.filter(bId => {
-                        const batch = batches.find(b => b.id === bId);
-                        return batch && ids.includes(batch.course_id);
-                      }));
-                    }
-                  }}
-                  placeholder="All Courses (Multi-select)"
-                  className="w-full"
-                />
-              </div>
-
-              {/* Batch: Searchable + multi-select with Course in brackets */}
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Batch (Multi-select)</label>
-                <BatchMultiSearchSelect
-                  batches={availableBatchOptions}
-                  selectedIds={selectedBatchIds}
-                  onChange={(ids) => setSelectedBatchIds(ids)}
-                  placeholder="All Batches (Multi-select)"
-                  className="w-full"
-                />
-              </div>
-
-              {/* Student (Searchable) */}
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Student</label>
-                <StudentSearchSelect
-                  students={studentOptions}
-                  value={selectedStudentId === 'all' ? '' : selectedStudentId}
-                  onChange={(id) => setSelectedStudentId(id || 'all')}
-                  placeholder="All Students (Search)"
-                  className="w-full"
-                />
-              </div>
-            </>
-          )}
-
-          {/* Fees Report Filters: Course, Batch, Status */}
-          {activeType === 'fees' && (
-            <>
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Course (Multi-select)</label>
-                <CourseMultiSearchSelect
-                  courses={courseOptions}
-                  selectedIds={selectedCourseIds}
-                  onChange={(ids) => {
-                    setSelectedCourseIds(ids);
-                    if (ids.length > 0) {
-                      setSelectedBatchIds(prev => prev.filter(bId => {
-                        const batch = batches.find(b => b.id === bId);
-                        return batch && ids.includes(batch.course_id);
-                      }));
-                    }
-                  }}
-                  placeholder="All Courses (Multi-select)"
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Batch (Multi-select)</label>
-                <BatchMultiSearchSelect
-                  batches={availableBatchOptions}
-                  selectedIds={selectedBatchIds}
-                  onChange={(ids) => setSelectedBatchIds(ids)}
-                  placeholder="All Batches (Multi-select)"
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Payment Status</label>
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
-                >
-                  <option value="all">All Status</option>
-                  <option value="partial">Partial</option>
-                  <option value="paid">Paid</option>
-                </select>
-              </div>
-            </>
-          )}
-
-          {/* Salaries Report Filters: Trainer (Searchable), Status */}
-          {activeType === 'salaries' && (
-            <>
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Trainer / Guru (Searchable)</label>
-                <TrainerSearchSelect
-                  trainers={trainerOptions}
-                  value={selectedTrainerId === 'all' ? '' : selectedTrainerId}
-                  onChange={(id) => setSelectedTrainerId(id || 'all')}
-                  placeholder="All Gurus / Faculty"
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-black text-gray-600 uppercase block mb-1">Disbursement Status</label>
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-bold text-gray-800"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="paid">Paid</option>
-                  <option value="pending">Pending</option>
-                </select>
-              </div>
-
-              <div className="flex items-end pb-1">
-                {hasActiveFilters && (
-                  <button
-                    onClick={clearFilters}
-                    className="flex items-center gap-1 px-4 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-[#8A064D] text-xs font-bold cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    <span>Clear filters</span>
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* Income vs Expenses Report Filters */}
-          {activeType === 'income_expenses' && (
-            <div className="sm:col-span-3 flex flex-wrap items-center justify-between gap-3 bg-[#FFF9FB] p-3.5 rounded-2xl border border-[#F0D5E4]/60">
-              <span className="text-xs font-semibold text-gray-600">
-                Auditing combined fee collections, faculty salaries, and operational expenses matching the selected date range.
-              </span>
-              {hasActiveFilters && (
-                <button
-                  onClick={clearFilters}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-[#8A064D] text-xs font-bold cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  <span>Clear filters</span>
-                </button>
-              )}
+        {/* Row 2: Course (for Attendance General/Batch & Fees) */}
+        {(activeType === 'fees' || (activeType === 'attendance' && attendanceSubView !== 'absence')) && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            <label className="w-28 sm:w-32 text-sm font-bold text-gray-700 shrink-0">
+              Course:
+            </label>
+            <div className="w-full sm:max-w-md">
+              <CourseMultiSearchSelect
+                courses={courseOptions}
+                selectedIds={selectedCourseIds}
+                onChange={(ids) => {
+                  setSelectedCourseIds(ids);
+                  if (ids.length > 0) {
+                    setSelectedBatchIds(prev => prev.filter(bId => {
+                      const batch = batches.find(b => b.id === bId);
+                      return batch && ids.includes(batch.course_id);
+                    }));
+                  }
+                }}
+                placeholder="+ Select Course"
+                className="w-full"
+              />
             </div>
+          </div>
+        )}
+
+        {/* Row 3: Batch (for Attendance General/Batch & Fees) */}
+        {(activeType === 'fees' || (activeType === 'attendance' && attendanceSubView !== 'absence')) && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            <label className="w-28 sm:w-32 text-sm font-bold text-gray-700 shrink-0">
+              Batch:
+            </label>
+            <div className="w-full sm:max-w-md">
+              <BatchMultiSearchSelect
+                batches={availableBatchOptions}
+                selectedIds={selectedBatchIds}
+                onChange={(ids) => setSelectedBatchIds(ids)}
+                placeholder="+ Select Batch"
+                className="w-full"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Student Filter */}
+        {activeType === 'attendance' && attendanceSubView === 'general' && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            <label className="w-28 sm:w-32 text-sm font-bold text-gray-700 shrink-0">
+              Student:
+            </label>
+            <div className="w-full sm:max-w-md">
+              <StudentSearchSelect
+                students={studentOptions}
+                value={selectedStudentId === 'all' ? '' : selectedStudentId}
+                onChange={(id) => setSelectedStudentId(id || 'all')}
+                placeholder="+ Select Student"
+                className="w-full"
+              />
+            </div>
+          </div>
+        )}
+
+        {activeType === 'attendance' && attendanceSubView === 'absence' && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            <label className="w-28 sm:w-32 text-sm font-bold text-gray-700 shrink-0">
+              Student:
+            </label>
+            <div className="w-full sm:max-w-md">
+              <StudentMultiSearchSelect
+                students={studentOptions}
+                selectedIds={absenceSelectedStudentIds}
+                onChange={(ids) => setAbsenceSelectedStudentIds(ids)}
+                placeholder="+ Select Student"
+                className="w-full"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Guru / Faculty Filter (Salaries) */}
+        {activeType === 'salaries' && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            <label className="w-28 sm:w-32 text-sm font-bold text-gray-700 shrink-0">
+              Guru / Faculty:
+            </label>
+            <div className="w-full sm:max-w-md">
+              <TrainerSearchSelect
+                trainers={trainerOptions}
+                value={selectedTrainerId === 'all' ? '' : selectedTrainerId}
+                onChange={(id) => setSelectedTrainerId(id || 'all')}
+                placeholder="+ Select Guru"
+                className="w-full"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Status Filter (Attendance General, Fees, Salaries) */}
+        {(activeType === 'fees' || activeType === 'salaries') && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            <label className="w-28 sm:w-32 text-sm font-bold text-gray-700 shrink-0">
+              Status:
+            </label>
+            <div className="w-full sm:max-w-md">
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#F0D5E4] text-xs font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
+              >
+                <option value="all">All Statuses</option>
+                {activeType === 'fees' ? (
+                  <>
+                    <option value="paid">Paid</option>
+                    <option value="partial">Partial</option>
+                    <option value="overdue">Overdue</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="paid">Paid</option>
+                    <option value="pending">Pending</option>
+                  </>
+                )}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Sort Filter (Attendance Batch & Absence) */}
+        {activeType === 'attendance' && (attendanceSubView === 'batch' || attendanceSubView === 'absence') && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            <label className="w-28 sm:w-32 text-sm font-bold text-gray-700 shrink-0">
+              Sort By:
+            </label>
+            <div className="w-full sm:max-w-md">
+              <select
+                value={attendanceSubView === 'batch' ? batchAttendanceSort : absenceSort}
+                onChange={(e) => {
+                  const val = e.target.value as 'high_absence' | 'low_absence';
+                  if (attendanceSubView === 'batch') {
+                    setBatchAttendanceSort(val);
+                  } else {
+                    setAbsenceSort(val);
+                  }
+                }}
+                className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#F0D5E4] text-xs font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
+              >
+                <option value="high_absence">High Absence (Default)</option>
+                <option value="low_absence">Low Absence</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Action Row: Clear Filters and Live Timestamp */}
+        <div className="flex items-center justify-between pt-2 border-t border-[#F0D5E4]/60">
+          <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+            <Clock className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Generated: {currentGeneratedAt ? new Date(currentGeneratedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'Live'}</span>
+          </div>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-[#8A064D] text-xs font-bold cursor-pointer transition border border-rose-200"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Reset Filters</span>
+            </button>
           )}
-
         </div>
-
       </div>
 
       {/* Loading Indicator */}
@@ -1652,43 +1866,57 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-[#FFF2F8] text-[#590231] border-b border-[#F0D5E4] text-xs font-black uppercase tracking-wider">
-                        <th className="py-3 px-5">Session Date</th>
-                        <th className="py-3 px-5">Student</th>
-                        <th className="py-3 px-5">Roll No</th>
-                        <th className="py-3 px-5">Course</th>
-                        <th className="py-3 px-5">Batch</th>
-                        <th className="py-3 px-5 text-center">Audit Status</th>
-                        <th className="py-3 px-5">Remarks</th>
+                        {isColVisible('session_date') && <th className="py-3 px-5">Session Date</th>}
+                        {isColVisible('student_name') && <th className="py-3 px-5">Student</th>}
+                        {isColVisible('roll_number') && <th className="py-3 px-5">Roll No</th>}
+                        {isColVisible('course_title') && <th className="py-3 px-5">Course</th>}
+                        {isColVisible('batch_name') && <th className="py-3 px-5">Batch</th>}
+                        {isColVisible('status') && <th className="py-3 px-5 text-center">Audit Status</th>}
+                        {isColVisible('remarks') && <th className="py-3 px-5">Remarks</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F0D5E4]/60">
                       {attendanceData.records.map((r, i) => (
                         <tr key={i} className="hover:bg-[#FFF9FB] transition">
-                          <td className="py-3.5 px-5 font-bold text-gray-700 whitespace-nowrap tabular-nums">
-                            {r.session_date ? new Date(r.session_date).toLocaleDateString('en-GB') : '—'}
-                          </td>
-                          <td className="py-3.5 px-5 font-bold text-gray-900">
-                            {r.student_name}
-                          </td>
-                          <td className="py-3.5 px-5 font-semibold text-[#6E3955] tabular-nums">
-                            {r.roll_number}
-                          </td>
-                          <td className="py-3.5 px-5 font-semibold text-gray-800">
-                            {r.course_title}
-                          </td>
-                          <td className="py-3.5 px-5 font-semibold text-gray-600">
-                            {r.batch_name}
-                          </td>
-                          <td className="py-3.5 px-5 text-center">
-                            <span className={`px-2.5 py-1 rounded-xl text-xs font-black ${
-                              r.status === 'present' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                            }`}>
-                              {r.status.toUpperCase()}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-5 text-xs text-gray-500">
-                            {r.remarks || '—'}
-                          </td>
+                          {isColVisible('session_date') && (
+                            <td className="py-3.5 px-5 font-bold text-gray-700 whitespace-nowrap tabular-nums">
+                              {r.session_date ? new Date(r.session_date).toLocaleDateString('en-GB') : '—'}
+                            </td>
+                          )}
+                          {isColVisible('student_name') && (
+                            <td className="py-3.5 px-5 font-bold text-gray-900">
+                              {r.student_name}
+                            </td>
+                          )}
+                          {isColVisible('roll_number') && (
+                            <td className="py-3.5 px-5 font-semibold text-[#6E3955] tabular-nums">
+                              {r.roll_number}
+                            </td>
+                          )}
+                          {isColVisible('course_title') && (
+                            <td className="py-3.5 px-5 font-semibold text-gray-800">
+                              {r.course_title}
+                            </td>
+                          )}
+                          {isColVisible('batch_name') && (
+                            <td className="py-3.5 px-5 font-semibold text-gray-600">
+                              {r.batch_name}
+                            </td>
+                          )}
+                          {isColVisible('status') && (
+                            <td className="py-3.5 px-5 text-center">
+                              <span className={`px-2.5 py-1 rounded-xl text-xs font-black ${
+                                r.status === 'present' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {r.status.toUpperCase()}
+                              </span>
+                            </td>
+                          )}
+                          {isColVisible('remarks') && (
+                            <td className="py-3.5 px-5 text-xs text-gray-500">
+                              {r.remarks || '—'}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -2221,59 +2449,75 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-[#FFF2F8] text-[#590231] border-b border-[#F0D5E4] text-xs font-black uppercase tracking-wider">
-                        <th className="py-3 px-5">Course Name</th>
-                        <th className="py-3 px-5">Batch Name</th>
-                        <th className="py-3 px-5">Trainer Name</th>
-                        <th className="py-3 px-5">Trainer Contact Number</th>
-                        <th className="py-3 px-5 text-center">Total Registered Students</th>
-                        <th className="py-3 px-5 text-center">Total Classes Held</th>
-                        <th className="py-3 px-5 text-center">Total Absences</th>
-                        <th className="py-3 px-5 text-center">Absence Percentage (%)</th>
+                        {isColVisible('course_name') && <th className="py-3 px-5">Course Name</th>}
+                        {isColVisible('batch_name') && <th className="py-3 px-5">Batch Name</th>}
+                        {isColVisible('trainer_name') && <th className="py-3 px-5">Trainer Name</th>}
+                        {isColVisible('trainer_contact') && <th className="py-3 px-5">Trainer Contact Number</th>}
+                        {isColVisible('total_registered_students') && <th className="py-3 px-5 text-center">Total Registered Students</th>}
+                        {isColVisible('total_classes_held') && <th className="py-3 px-5 text-center">Total Classes Held</th>}
+                        {isColVisible('total_absences') && <th className="py-3 px-5 text-center">Total Absences</th>}
+                        {isColVisible('absence_percentage') && <th className="py-3 px-5 text-center">Absence Percentage (%)</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F0D5E4]/60">
                       {batchAttendanceData.records.map((r) => (
                         <tr key={r.batch_id} className="hover:bg-[#FFF9FB] transition">
-                          <td className="py-3.5 px-5 font-bold text-gray-900">
-                            {r.course_name}
-                          </td>
-                          <td className="py-3.5 px-5 font-bold text-[#8A064D]">
-                            {r.batch_name}
-                          </td>
-                          <td className="py-3.5 px-5 font-semibold text-gray-800">
-                            {r.trainer_name}
-                          </td>
-                          <td className="py-3.5 px-5 font-semibold text-gray-700 tabular-nums">
-                            {r.trainer_contact}
-                          </td>
-                          <td className="py-3.5 px-5 text-center font-bold text-gray-900 tabular-nums">
-                            {r.total_registered_students}
-                          </td>
-                          <td className="py-3.5 px-5 text-center">
-                            <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl font-black text-xs tabular-nums inline-block">
-                              {r.total_classes_held}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-5 text-center">
-                            <span className={`px-3 py-1 rounded-xl text-xs font-black tabular-nums inline-block ${
-                              r.total_absences > 0
-                                ? 'bg-rose-50 text-rose-800 border border-rose-200'
-                                : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                            }`}>
-                              {r.total_absences}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-5 text-center">
-                            <span className={`px-3 py-1 rounded-xl text-xs font-black tabular-nums inline-block ${
-                              r.absence_percentage > 20
-                                ? 'bg-rose-100 text-rose-800 border border-rose-300 font-extrabold'
-                                : r.absence_percentage > 10
-                                ? 'bg-amber-100 text-amber-800 border border-amber-300 font-bold'
-                                : 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold'
-                            }`}>
-                              {r.absence_percentage}%
-                            </span>
-                          </td>
+                          {isColVisible('course_name') && (
+                            <td className="py-3.5 px-5 font-bold text-gray-900">
+                              {r.course_name}
+                            </td>
+                          )}
+                          {isColVisible('batch_name') && (
+                            <td className="py-3.5 px-5 font-bold text-[#8A064D]">
+                              {r.batch_name}
+                            </td>
+                          )}
+                          {isColVisible('trainer_name') && (
+                            <td className="py-3.5 px-5 font-semibold text-gray-800">
+                              {r.trainer_name}
+                            </td>
+                          )}
+                          {isColVisible('trainer_contact') && (
+                            <td className="py-3.5 px-5 font-semibold text-gray-700 tabular-nums">
+                              {r.trainer_contact}
+                            </td>
+                          )}
+                          {isColVisible('total_registered_students') && (
+                            <td className="py-3.5 px-5 text-center font-bold text-gray-900 tabular-nums">
+                              {r.total_registered_students}
+                            </td>
+                          )}
+                          {isColVisible('total_classes_held') && (
+                            <td className="py-3.5 px-5 text-center">
+                              <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl font-black text-xs tabular-nums inline-block">
+                                {r.total_classes_held}
+                              </span>
+                            </td>
+                          )}
+                          {isColVisible('total_absences') && (
+                            <td className="py-3.5 px-5 text-center">
+                              <span className={`px-3 py-1 rounded-xl text-xs font-black tabular-nums inline-block ${
+                                r.total_absences > 0
+                                  ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                              }`}>
+                                {r.total_absences}
+                              </span>
+                            </td>
+                          )}
+                          {isColVisible('absence_percentage') && (
+                            <td className="py-3.5 px-5 text-center">
+                              <span className={`px-3 py-1 rounded-xl text-xs font-black tabular-nums inline-block ${
+                                r.absence_percentage > 20
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-300 font-extrabold'
+                                  : r.absence_percentage > 10
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-300 font-bold'
+                                  : 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold'
+                              }`}>
+                                {r.absence_percentage}%
+                              </span>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -2438,59 +2682,78 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-[#FFF2F8] text-[#590231] border-b border-[#F0D5E4] text-xs font-black uppercase tracking-wider">
-                        <th className="py-3 px-5">Invoice #</th>
-                        <th className="py-3 px-5">Student</th>
-                        <th className="py-3 px-5">Course</th>
-                        <th className="py-3 px-5">Fee Period</th>
-                        <th className="py-3 px-5">Due Date</th>
-                        <th className="py-3 px-5 text-right">Billed</th>
-                        <th className="py-3 px-5 text-right">Paid</th>
-                        <th className="py-3 px-5 text-right">Balance</th>
-                        <th className="py-3 px-5 text-center">Status</th>
+                        {isColVisible('invoice_number') && <th className="py-3 px-5">Invoice #</th>}
+                        {isColVisible('student_name') && <th className="py-3 px-5">Student</th>}
+                        {isColVisible('course_title') && <th className="py-3 px-5">Course</th>}
+                        {isColVisible('fee_period') && <th className="py-3 px-5">Fee Period</th>}
+                        {isColVisible('due_date') && <th className="py-3 px-5">Due Date</th>}
+                        {isColVisible('total_amount') && <th className="py-3 px-5 text-right">Billed</th>}
+                        {isColVisible('discount_amount') && <th className="py-3 px-5 text-right">Disc</th>}
+                        {isColVisible('paid_amount') && <th className="py-3 px-5 text-right">Paid</th>}
+                        {isColVisible('balance_amount') && <th className="py-3 px-5 text-right">Balance</th>}
+                        {isColVisible('status') && <th className="py-3 px-5 text-center">Status</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F0D5E4]/60">
                       {feesData.records.map((r, i) => (
                         <tr key={i} className="hover:bg-[#FFF9FB] transition">
-                          <td className="py-3.5 px-5 font-bold text-gray-900 whitespace-nowrap tabular-nums">
-                            {r.invoice_number}
-                          </td>
-                          <td className="py-3.5 px-5 font-bold text-gray-900">
-                            {r.student_name}
-                          </td>
-                          <td className="py-3.5 px-5 font-semibold text-gray-700">
-                            {r.course_title}
-                          </td>
-                          <td className="py-3.5 px-5 font-semibold text-[#6E3955]">
-                            {r.fee_period}
-                          </td>
-                          <td className="py-3.5 px-5 font-semibold text-gray-600 whitespace-nowrap tabular-nums">
-                            {r.due_date || '—'}
-                          </td>
-                          <td className="py-3.5 px-5 text-right font-semibold text-gray-700 tabular-nums">
-                            ₹{Number(r.total_amount).toLocaleString('en-IN')}
-                          </td>
-                          <td className="py-3.5 px-5 text-right font-black text-emerald-700 tabular-nums">
-                            <div>₹{Number(r.paid_amount).toLocaleString('en-IN')}</div>
-                            {Number(r.discount_amount) > 0 && (
-                              <div className="text-[10px] font-semibold text-rose-600 mt-0.5 tabular-nums">
-                                Disc: -₹{Number(r.discount_amount).toLocaleString('en-IN')}
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-5 text-right font-black text-amber-700 tabular-nums">
-                            ₹{Number(r.balance_amount).toLocaleString('en-IN')}
-                          </td>
-                          <td className="py-3.5 px-5 text-center">
-                            <span className={`px-2.5 py-1 rounded-xl text-xs font-black ${
-                              r.status === 'paid' ? 'bg-emerald-100 text-emerald-800' :
-                              r.status === 'partial' ? 'bg-amber-100 text-amber-800' :
-                              r.status === 'overdue' ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-600'
-                            }`}>
-                              {r.status.toUpperCase()}
-                            </span>
-                          </td>
+                          {isColVisible('invoice_number') && (
+                            <td className="py-3.5 px-5 font-bold text-gray-900 whitespace-nowrap tabular-nums">
+                              {r.invoice_number}
+                            </td>
+                          )}
+                          {isColVisible('student_name') && (
+                            <td className="py-3.5 px-5 font-bold text-gray-900">
+                              {r.student_name}
+                            </td>
+                          )}
+                          {isColVisible('course_title') && (
+                            <td className="py-3.5 px-5 font-semibold text-gray-700">
+                              {r.course_title}
+                            </td>
+                          )}
+                          {isColVisible('fee_period') && (
+                            <td className="py-3.5 px-5 font-semibold text-[#6E3955]">
+                              {r.fee_period}
+                            </td>
+                          )}
+                          {isColVisible('due_date') && (
+                            <td className="py-3.5 px-5 font-semibold text-gray-600 whitespace-nowrap tabular-nums">
+                              {r.due_date || '—'}
+                            </td>
+                          )}
+                          {isColVisible('total_amount') && (
+                            <td className="py-3.5 px-5 text-right font-semibold text-gray-700 tabular-nums">
+                              ₹{Number(r.total_amount).toLocaleString('en-IN')}
+                            </td>
+                          )}
+                          {isColVisible('discount_amount') && (
+                            <td className="py-3.5 px-5 text-right font-bold text-rose-600 tabular-nums">
+                              {Number(r.discount_amount) > 0 ? `₹${Number(r.discount_amount).toLocaleString('en-IN')}` : '—'}
+                            </td>
+                          )}
+                          {isColVisible('paid_amount') && (
+                            <td className="py-3.5 px-5 text-right font-black text-emerald-700 tabular-nums">
+                              ₹{Number(r.paid_amount).toLocaleString('en-IN')}
+                            </td>
+                          )}
+                          {isColVisible('balance_amount') && (
+                            <td className="py-3.5 px-5 text-right font-black text-amber-700 tabular-nums">
+                              ₹{Number(r.balance_amount).toLocaleString('en-IN')}
+                            </td>
+                          )}
+                          {isColVisible('status') && (
+                            <td className="py-3.5 px-5 text-center">
+                              <span className={`px-2.5 py-1 rounded-xl text-xs font-black ${
+                                r.status === 'paid' ? 'bg-emerald-100 text-emerald-800' :
+                                r.status === 'partial' ? 'bg-amber-100 text-amber-800' :
+                                r.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>
+                                {r.status.toUpperCase()}
+                              </span>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -2565,51 +2828,81 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-[#FFF2F8] text-[#590231] border-b border-[#F0D5E4] text-xs font-black uppercase tracking-wider">
-                        <th className="py-3 px-5">Guru Name</th>
-                        <th className="py-3 px-5">Title</th>
-                        <th className="py-3 px-5">Month</th>
-                        <th className="py-3 px-5 text-center">Classes</th>
-                        <th className="py-3 px-5 text-right">Base</th>
-                        <th className="py-3 px-5 text-right">Bonus</th>
-                        <th className="py-3 px-5 text-right">Deductions</th>
-                        <th className="py-3 px-5 text-right">Net Payable</th>
-                        <th className="py-3 px-5 text-center">Status</th>
+                        {isColVisible('invoice_number') && <th className="py-3 px-5">Invoice #</th>}
+                        {isColVisible('invoice_date') && <th className="py-3 px-5">Invoice Date</th>}
+                        {isColVisible('trainer_name') && <th className="py-3 px-5">Guru Name</th>}
+                        {isColVisible('display_title') && <th className="py-3 px-5">Title</th>}
+                        {isColVisible('payroll_month') && <th className="py-3 px-5">Month</th>}
+                        {isColVisible('classes_conducted') && <th className="py-3 px-5 text-center">Classes</th>}
+                        {isColVisible('base_salary') && <th className="py-3 px-5 text-right">Base</th>}
+                        {isColVisible('bonus_amount') && <th className="py-3 px-5 text-right">Bonus</th>}
+                        {isColVisible('deductions') && <th className="py-3 px-5 text-right">Deductions</th>}
+                        {isColVisible('net_salary') && <th className="py-3 px-5 text-right">Net Payable</th>}
+                        {isColVisible('status') && <th className="py-3 px-5 text-center">Status</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F0D5E4]/60">
                       {salariesData.records.map((r, i) => (
                         <tr key={i} className="hover:bg-[#FFF9FB] transition">
-                          <td className="py-3.5 px-5 font-bold text-gray-900">
-                            {r.trainer_name}
-                          </td>
-                          <td className="py-3.5 px-5 font-semibold text-gray-600">
-                            {r.display_title}
-                          </td>
-                          <td className="py-3.5 px-5 font-bold text-[#8A064D] tabular-nums">
-                            {r.payroll_month}
-                          </td>
-                          <td className="py-3.5 px-5 text-center font-bold text-gray-700 tabular-nums">
-                            {r.classes_conducted}
-                          </td>
-                          <td className="py-3.5 px-5 text-right font-semibold text-gray-700 tabular-nums">
-                            ₹{Number(r.base_salary).toLocaleString('en-IN')}
-                          </td>
-                          <td className="py-3.5 px-5 text-right font-semibold text-[#854D0E] tabular-nums">
-                            +₹{Number(r.bonus_amount).toLocaleString('en-IN')}
-                          </td>
-                          <td className="py-3.5 px-5 text-right font-semibold text-red-600 tabular-nums">
-                            -₹{(Number(r.deduction_amount) + Number(r.advance_deducted)).toLocaleString('en-IN')}
-                          </td>
-                          <td className="py-3.5 px-5 text-right font-black text-base text-[#590231] tabular-nums">
-                            ₹{Number(r.net_salary).toLocaleString('en-IN')}
-                          </td>
-                          <td className="py-3.5 px-5 text-center">
-                            <span className={`px-2.5 py-1 rounded-xl text-xs font-black ${
-                              r.status === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {r.status.toUpperCase()}
-                            </span>
-                          </td>
+                          {isColVisible('invoice_number') && (
+                            <td className="py-3.5 px-5 font-bold text-gray-900 whitespace-nowrap tabular-nums">
+                              {r.invoice_number || '—'}
+                            </td>
+                          )}
+                          {isColVisible('invoice_date') && (
+                            <td className="py-3.5 px-5 font-semibold text-gray-600 whitespace-nowrap tabular-nums">
+                              {r.invoice_date || '—'}
+                            </td>
+                          )}
+                          {isColVisible('trainer_name') && (
+                            <td className="py-3.5 px-5 font-bold text-gray-900">
+                              {r.trainer_name}
+                            </td>
+                          )}
+                          {isColVisible('display_title') && (
+                            <td className="py-3.5 px-5 font-semibold text-gray-600">
+                              {r.display_title}
+                            </td>
+                          )}
+                          {isColVisible('payroll_month') && (
+                            <td className="py-3.5 px-5 font-bold text-[#8A064D] tabular-nums">
+                              {r.payroll_month}
+                            </td>
+                          )}
+                          {isColVisible('classes_conducted') && (
+                            <td className="py-3.5 px-5 text-center font-bold text-gray-700 tabular-nums">
+                              {r.classes_conducted}
+                            </td>
+                          )}
+                          {isColVisible('base_salary') && (
+                            <td className="py-3.5 px-5 text-right font-semibold text-gray-700 tabular-nums">
+                              ₹{Number(r.base_salary).toLocaleString('en-IN')}
+                            </td>
+                          )}
+                          {isColVisible('bonus_amount') && (
+                            <td className="py-3.5 px-5 text-right font-semibold text-[#854D0E] tabular-nums">
+                              +₹{Number(r.bonus_amount).toLocaleString('en-IN')}
+                            </td>
+                          )}
+                          {isColVisible('deductions') && (
+                            <td className="py-3.5 px-5 text-right font-semibold text-red-600 tabular-nums">
+                              -₹{(Number(r.deduction_amount) + Number(r.advance_deducted)).toLocaleString('en-IN')}
+                            </td>
+                          )}
+                          {isColVisible('net_salary') && (
+                            <td className="py-3.5 px-5 text-right font-black text-base text-[#590231] tabular-nums">
+                              ₹{Number(r.net_salary).toLocaleString('en-IN')}
+                            </td>
+                          )}
+                          {isColVisible('status') && (
+                            <td className="py-3.5 px-5 text-center">
+                              <span className={`px-2.5 py-1 rounded-xl text-xs font-black ${
+                                r.status === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {r.status.toUpperCase()}
+                              </span>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -2745,43 +3038,55 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-[#FFF2F8] text-[#590231] border-b border-[#F0D5E4] text-xs font-black uppercase tracking-wider">
-                        <th className="py-3 px-5">Date</th>
-                        <th className="py-3 px-5">Flow Type</th>
-                        <th className="py-3 px-5">Category</th>
-                        <th className="py-3 px-5">Description</th>
-                        <th className="py-3 px-5">Method</th>
-                        <th className="py-3 px-5 text-right">Amount</th>
+                        {isColVisible('date') && <th className="py-3 px-5">Date</th>}
+                        {isColVisible('type') && <th className="py-3 px-5">Flow Type</th>}
+                        {isColVisible('category') && <th className="py-3 px-5">Category</th>}
+                        {isColVisible('description') && <th className="py-3 px-5">Description</th>}
+                        {isColVisible('payment_method') && <th className="py-3 px-5">Method</th>}
+                        {isColVisible('amount') && <th className="py-3 px-5 text-right">Amount</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F0D5E4]/60">
                       {incomeExpensesData.records.map((r, i) => (
                         <tr key={i} className="hover:bg-[#FFF9FB] transition">
-                          <td className="py-3.5 px-5 font-bold text-gray-700 whitespace-nowrap tabular-nums">
-                            {r.date ? new Date(r.date).toLocaleDateString('en-GB') : '—'}
-                          </td>
-                          <td className="py-3.5 px-5">
-                            <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black ${
-                              r.type === 'Income' ? 'bg-emerald-100 text-emerald-800' :
-                              r.type === 'Salary Expense' ? 'bg-rose-100 text-rose-800' :
-                              'bg-amber-100 text-amber-800'
+                          {isColVisible('date') && (
+                            <td className="py-3.5 px-5 font-bold text-gray-700 whitespace-nowrap tabular-nums">
+                              {r.date ? new Date(r.date).toLocaleDateString('en-GB') : '—'}
+                            </td>
+                          )}
+                          {isColVisible('type') && (
+                            <td className="py-3.5 px-5">
+                              <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black ${
+                                r.type === 'Income' ? 'bg-emerald-100 text-emerald-800' :
+                                r.type === 'Salary Expense' ? 'bg-rose-100 text-rose-800' :
+                                'bg-amber-100 text-amber-800'
+                              }`}>
+                                {r.type}
+                              </span>
+                            </td>
+                          )}
+                          {isColVisible('category') && (
+                            <td className="py-3.5 px-5 font-bold text-gray-800">
+                              {r.category}
+                            </td>
+                          )}
+                          {isColVisible('description') && (
+                            <td className="py-3.5 px-5 font-semibold text-gray-600 max-w-xs truncate">
+                              {r.description}
+                            </td>
+                          )}
+                          {isColVisible('payment_method') && (
+                            <td className="py-3.5 px-5 text-xs text-gray-500">
+                              {r.payment_method}
+                            </td>
+                          )}
+                          {isColVisible('amount') && (
+                            <td className={`py-3.5 px-5 text-right font-black tabular-nums ${
+                              r.type === 'Income' ? 'text-emerald-700' : 'text-[#8A064D]'
                             }`}>
-                              {r.type}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-5 font-bold text-gray-800">
-                            {r.category}
-                          </td>
-                          <td className="py-3.5 px-5 font-semibold text-gray-600 max-w-xs truncate">
-                            {r.description}
-                          </td>
-                          <td className="py-3.5 px-5 text-xs text-gray-500">
-                            {r.payment_method}
-                          </td>
-                          <td className={`py-3.5 px-5 text-right font-black tabular-nums ${
-                            r.type === 'Income' ? 'text-emerald-700' : 'text-[#8A064D]'
-                          }`}>
-                            {r.type === 'Income' ? '+' : '-'}₹{Number(r.amount).toLocaleString('en-IN')}
-                          </td>
+                              {r.type === 'Income' ? '+' : '-'}₹{Number(r.amount).toLocaleString('en-IN')}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -2791,6 +3096,201 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
             </>
           )}
 
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* FILTER COLUMNS MODAL (F3) */}
+      {/* ========================================================= */}
+      {isFilterColumnsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-[#F0D5E4] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="px-6 py-5 bg-[#FFF2F8] border-b border-[#F0D5E4] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#590231] text-white flex items-center justify-center">
+                  <SlidersHorizontal className="w-5 h-5 text-[#F9E33A]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-[#590231]">Filter Table Columns</h3>
+                  <p className="text-xs font-bold text-[#8A064D]">Choose which columns appear in the active report</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFilterColumnsOpen(false)}
+                className="p-2 rounded-xl text-gray-500 hover:text-gray-800 hover:bg-white/80 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100 text-xs font-bold">
+                <span className="text-gray-500">Visible in report table</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={selectAllCurrentColumns}
+                    className="text-[#8A064D] hover:underline cursor-pointer"
+                  >
+                    Select All
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={resetDefaultColumns}
+                    className="text-gray-600 hover:underline cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {getCurrentColumns().map(col => {
+                  const isVisible = visibleColumns[col.key] !== false;
+                  return (
+                    <label
+                      key={col.key}
+                      className="flex items-center justify-between p-3 rounded-2xl border border-gray-100 hover:border-[#F0D5E4] hover:bg-[#FFF9FB] transition cursor-pointer"
+                    >
+                      <span className="text-sm font-bold text-gray-800">{col.label}</span>
+                      <input
+                        type="checkbox"
+                        checked={isVisible}
+                        onChange={() => toggleColumn(col.key)}
+                        className="w-5 h-5 rounded-lg text-[#8A064D] focus:ring-[#8A064D] accent-[#8A064D] cursor-pointer"
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsFilterColumnsOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-[#590231] text-white text-xs font-black shadow-md hover:bg-[#430124] transition cursor-pointer"
+              >
+                Apply Columns (F3)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* EXPORT OPTIONS MODAL (F4) */}
+      {/* ========================================================= */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-[#F0D5E4] shadow-2xl overflow-hidden flex flex-col">
+            <div className="px-6 py-5 bg-[#FFF2F8] border-b border-[#F0D5E4] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#590231] text-white flex items-center justify-center">
+                  <Download className="w-5 h-5 text-[#F9E33A]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-[#590231]">Export Report Data</h3>
+                  <p className="text-xs font-bold text-[#8A064D]">{currentRecordCount} records available for export</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExportModalOpen(false)}
+                className="p-2 rounded-xl text-gray-500 hover:text-gray-800 hover:bg-white/80 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-3">
+              {/* Excel */}
+              <button
+                type="button"
+                onClick={() => {
+                  exportExcel();
+                  setIsExportModalOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-4 rounded-2xl border border-[#F0D5E4] hover:bg-[#FFF9FB] hover:border-[#8A064D] transition text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 group-hover:scale-105 transition">
+                    <FileSpreadsheet className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-black text-gray-900 group-hover:text-[#8A064D]">Excel Spreadsheet (.xls)</div>
+                    <div className="text-xs font-semibold text-gray-500">Formatted workbook with headers & totals</div>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#8A064D] transition" />
+              </button>
+
+              {/* CSV */}
+              <button
+                type="button"
+                onClick={() => {
+                  exportCSV();
+                  setIsExportModalOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-4 rounded-2xl border border-[#F0D5E4] hover:bg-[#FFF9FB] hover:border-[#8A064D] transition text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 group-hover:scale-105 transition">
+                    <Download className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-black text-gray-900 group-hover:text-[#8A064D]">CSV File (.csv)</div>
+                    <div className="text-xs font-semibold text-gray-500">Universal comma-separated tabular data</div>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#8A064D] transition" />
+              </button>
+
+              {/* PDF */}
+              <button
+                type="button"
+                onClick={() => {
+                  exportPDF();
+                  setIsExportModalOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-4 rounded-2xl border border-[#F0D5E4] hover:bg-[#FFF9FB] hover:border-[#8A064D] transition text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-[#8A064D] group-hover:scale-105 transition">
+                    <FileDown className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-black text-gray-900 group-hover:text-[#8A064D]">Official PDF Document (.pdf)</div>
+                    <div className="text-xs font-semibold text-gray-500">Printable document with institutional branding</div>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#8A064D] transition" />
+              </button>
+
+              {/* Print */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsExportModalOpen(false);
+                  window.print();
+                }}
+                className="w-full flex items-center justify-between p-4 rounded-2xl border border-[#F0D5E4] hover:bg-[#FFF9FB] hover:border-[#8A064D] transition text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-700 group-hover:scale-105 transition">
+                    <Printer className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-black text-gray-900 group-hover:text-[#8A064D]">Print View / Save as PDF</div>
+                    <div className="text-xs font-semibold text-gray-500">Browser native print dialog</div>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#8A064D] transition" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

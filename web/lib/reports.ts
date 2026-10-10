@@ -120,6 +120,8 @@ export interface SalariesReportSummary {
 }
 
 export interface SalariesReportRow {
+  invoice_number?: string;
+  invoice_date?: string;
   trainer_name: string;
   display_title: string;
   payroll_month: string;
@@ -469,6 +471,8 @@ export async function getSalariesReport(filters: {
   try {
     let sql = `
       SELECT 
+        COALESCE(r.transaction_reference, 'INV-GURU-' || UPPER(SUBSTRING(r.id::text, 1, 8))) as invoice_number,
+        COALESCE(r.payment_date::text, r.created_at::date::text, '2026-10-01') as invoice_date,
         p.full_name as trainer_name,
         COALESCE(t.display_title, 'Classical Guru') as display_title,
         r.payroll_month,

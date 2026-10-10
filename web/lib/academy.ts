@@ -133,6 +133,8 @@ export interface Batch {
   start_time: string;
   end_time: string;
   room_or_hall: string;
+  room?: string;
+  monthly_fee?: number;
   max_capacity: number;
   is_active: boolean;
   enrolled_count: number;
@@ -251,6 +253,26 @@ export async function deleteCourseCategory(name: string): Promise<void> {
   await query(`DELETE FROM public.course_categories WHERE LOWER(name) = LOWER($1)`, [trimmed]);
   // Remove category from courses so they become 'No Category'
   await query(`UPDATE public.courses SET category = '' WHERE LOWER(category) = LOWER($1)`, [trimmed]);
+}
+
+export async function renameCourseCategory(oldName: string, newName: string): Promise<string> {
+  const trimmedOld = oldName.trim();
+  const trimmedNew = newName.trim();
+  if (!trimmedOld || !trimmedNew) throw new Error('Category name cannot be empty');
+
+  // Insert new category
+  await query(
+    `INSERT INTO public.course_categories (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`,
+    [trimmedNew]
+  );
+  // Delete old category
+  await query(`DELETE FROM public.course_categories WHERE LOWER(name) = LOWER($1)`, [trimmedOld]);
+  // Update courses referencing oldName
+  await query(
+    `UPDATE public.courses SET category = $1 WHERE LOWER(category) = LOWER($2)`,
+    [trimmedNew, trimmedOld]
+  );
+  return trimmedNew;
 }
 
 export async function getCourses(category?: string): Promise<Course[]> {
@@ -554,6 +576,33 @@ export async function createRoom(name: string, capacity: number = 25): Promise<R
 export async function deleteRoom(id: string): Promise<boolean> {
   await query('DELETE FROM public.rooms WHERE id = $1', [id]);
   return true;
+}
+
+export async function updateRoom(id: string, name: string, capacity?: number): Promise<Room> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Room name cannot be empty');
+  const existing = await queryOne<Room>('SELECT * FROM public.rooms WHERE id = $1', [id]);
+  if (!existing) throw new Error('Room not found');
+
+  const room = await queryOne<Room>(`
+    UPDATE public.rooms
+    SET name = $1, capacity = COALESCE($2, capacity)
+    WHERE id = $3
+    RETURNING *;
+  `, [trimmed, capacity !== undefined ? capacity : null, id]);
+
+  if (!room) throw new Error('Failed to update room');
+
+  // Also update batch room_or_hall if it matched existing room name
+  if (existing.name !== trimmed) {
+    await query(`
+      UPDATE public.batches
+      SET room_or_hall = $1
+      WHERE room_or_hall = $2
+    `, [trimmed, existing.name]);
+  }
+
+  return room;
 }
 
 // -------------------------------------------------------------
@@ -988,13 +1037,21 @@ export async function updateStudent(id: string, data: {
   // Update batch enrollments if batch_ids provided
   if (data.batch_ids) {
     await query(`DELETE FROM public.batch_enrollments WHERE student_id = $1`, [id]);
+    const enrollStatus = data.status === 'inactive' ? 'inactive' : 'active';
     for (const bId of data.batch_ids) {
       await query(`
         INSERT INTO public.batch_enrollments (batch_id, student_id, status)
-        VALUES ($1, $2, 'active')
-        ON CONFLICT (batch_id, student_id) DO UPDATE SET status = 'active';
-      `, [bId, id]);
+        VALUES ($1, $2, $3)
+        ON CONFLICT (batch_id, student_id) DO UPDATE SET status = $3;
+      `, [bId, id, enrollStatus]);
     }
+  } else if (data.status) {
+    // If only status changed (e.g. active to inactive toggle)
+    await query(`
+      UPDATE public.batch_enrollments
+      SET status = $1
+      WHERE student_id = $2;
+    `, [data.status, id]);
   }
 
   const prof = await queryOne<{ full_name: string; email: string; phone: string; avatar_url: string }>(
@@ -1055,12 +1112,13 @@ export async function getBatches(): Promise<Batch[]> {
       b.trainer_id, p.full_name as trainer_name,
       b.name, b.days_of_week, b.start_time, b.end_time, b.room_or_hall,
       b.max_capacity, b.is_active, b.schedules,
-      COUNT(be.id)::int as enrolled_count
+      COUNT(DISTINCT CASE WHEN st.status = 'active' THEN be.id END)::int as enrolled_count
     FROM public.batches b
     JOIN public.courses c ON c.id = b.course_id
     JOIN public.trainers t ON t.id = b.trainer_id
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batch_enrollments be ON be.batch_id = b.id AND be.status = 'active'
+    LEFT JOIN public.students st ON st.id = be.student_id
     GROUP BY b.id, b.course_id, c.title, c.category, b.trainer_id, p.full_name, b.schedules
     ORDER BY b.start_time, b.name;
   `;

@@ -28,7 +28,8 @@ import {
   IndianRupee,
   AlertTriangle,
   ZoomIn,
-  Maximize2
+  Maximize2,
+  ArrowLeft
 } from 'lucide-react';
 
 interface Props {
@@ -46,6 +47,51 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
   // View mode: 'grid' as first preference
   const [viewMode, setViewMode] = useState<'grid' | 'row'>('grid');
+
+  // Dedicated Full Page View Mode ('list' | 'register' | 'edit')
+  const [pageMode, setPageMode] = useState<'list' | 'register' | 'edit'>('list');
+
+  // Helper for batch timing minutes calculation
+  const parseTimeToMinutes = (tStr?: string): number => {
+    if (!tStr) return 0;
+    const clean = tStr.trim().toLowerCase();
+    const isPM = clean.includes('pm');
+    const isAM = clean.includes('am');
+    const timeOnly = clean.replace(/[ap]m/, '').trim();
+    const parts = timeOnly.split(':').map(Number);
+    let hours = parts[0] || 0;
+    const mins = parts[1] || 0;
+    if (isPM && hours < 12) hours += 12;
+    if (isAM && hours === 12) hours = 0;
+    return hours * 60 + mins;
+  };
+
+  // Helper to detect timing clash between two batches
+  const checkBatchClash = (batchA: Batch, batchB: Batch): { hasClash: boolean; reason: string } => {
+    if (batchA.id === batchB.id) return { hasClash: false, reason: '' };
+
+    const daysA = (batchA.days_of_week || []).map(d => d.toLowerCase().slice(0, 3));
+    const daysB = (batchB.days_of_week || []).map(d => d.toLowerCase().slice(0, 3));
+    const commonDays = daysA.filter(d => daysB.includes(d));
+    if (commonDays.length === 0) return { hasClash: false, reason: '' };
+
+    const startA = parseTimeToMinutes(batchA.start_time);
+    const endA = parseTimeToMinutes(batchA.end_time) || (startA + 60);
+    const startB = parseTimeToMinutes(batchB.start_time);
+    const endB = parseTimeToMinutes(batchB.end_time) || (startB + 60);
+
+    if (startA < endB && startB < endA) {
+      const dayNames = (batchA.days_of_week || []).filter(d =>
+        (batchB.days_of_week || []).some(bDay => bDay.toLowerCase().slice(0, 3) === d.toLowerCase().slice(0, 3))
+      ).join(', ');
+      return {
+        hasClash: true,
+        reason: `Schedule clash with "${batchB.name}" on ${dayNames} (${batchA.start_time?.slice(0, 5)} - ${batchA.end_time?.slice(0, 5)})`
+      };
+    }
+
+    return { hasClash: false, reason: '' };
+  };
 
   // Modals state
   // 1. Details Modal
@@ -187,7 +233,30 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   const activeCount = useMemo(() => students.filter(s => s.status === 'active').length, [students]);
   const inactiveCount = useMemo(() => students.filter(s => s.status === 'inactive' || s.status === 'suspended').length, [students]);
 
-  // Open Edit Modal with pre-filled details
+  // Toggle Student Status (Active <-> Inactive)
+  const handleToggleStudentStatus = async (s: Student) => {
+    const newStatus = s.status === 'active' ? 'inactive' : 'active';
+    try {
+      const res = await fetch('/api/students', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: s.id,
+          status: newStatus
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update student status');
+      }
+      setStudents(prev => prev.map(item => item.id === s.id ? { ...item, status: newStatus } : item));
+      showToast(`Student ${s.full_name} marked as ${newStatus.toUpperCase()}. Enrolled batch seats adjusted.`);
+    } catch (err: any) {
+      alert(err.message || 'Error updating status');
+    }
+  };
+
+  // Open Edit Modal / Full Page with pre-filled details
   const handleOpenEdit = (s: Student) => {
     setEditingStudent(s);
     setEditFullName(s.full_name);
@@ -210,9 +279,10 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     const enrolledBatchIds = (s.enrolled_batches || []).map(b => b.batch_id);
     setEditSelectedCourseIds(enrolledCourseIds);
     setEditSelectedBatchIds(enrolledBatchIds);
+    setPageMode('edit');
   };
 
-  // Open Register Modal
+  // Open Register Full Page
   const handleOpenRegister = () => {
     setFullName('');
     setDateOfBirth('');
@@ -229,7 +299,8 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     setAdvancePaid(0);
     setSelectedCourseIds(courses.slice(0, 1).map(c => c.id));
     setSelectedBatchIds([]);
-    setIsAddOpen(true);
+    setIsAddOpen(false);
+    setPageMode('register');
   };
 
   // Course selection toggles in Register
@@ -244,9 +315,26 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   };
 
   const handleToggleBatch = (batchId: string) => {
-    setSelectedBatchIds(prev =>
-      prev.includes(batchId) ? prev.filter(id => id !== batchId) : [...prev, batchId]
-    );
+    const targetBatch = batches.find(b => b.id === batchId);
+    if (!targetBatch) return;
+
+    if (selectedBatchIds.includes(batchId)) {
+      setSelectedBatchIds(prev => prev.filter(id => id !== batchId));
+      return;
+    }
+
+    // Check scheduling clash against already selected batches
+    const clashingBatch = batches
+      .filter(b => selectedBatchIds.includes(b.id))
+      .find(selectedB => checkBatchClash(targetBatch, selectedB).hasClash);
+
+    if (clashingBatch) {
+      const clashInfo = checkBatchClash(targetBatch, clashingBatch);
+      alert(`⚠️ TIMING CLASH DETECTED!\n\n${clashInfo.reason}\n\nA student cannot be enrolled in batches with overlapping days and timings.`);
+      return;
+    }
+
+    setSelectedBatchIds(prev => [...prev, batchId]);
   };
 
   // Course selection toggles in Edit
@@ -261,9 +349,26 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   };
 
   const handleEditToggleBatch = (batchId: string) => {
-    setEditSelectedBatchIds(prev =>
-      prev.includes(batchId) ? prev.filter(id => id !== batchId) : [...prev, batchId]
-    );
+    const targetBatch = batches.find(b => b.id === batchId);
+    if (!targetBatch) return;
+
+    if (editSelectedBatchIds.includes(batchId)) {
+      setEditSelectedBatchIds(prev => prev.filter(id => id !== batchId));
+      return;
+    }
+
+    // Check scheduling clash against already selected batches
+    const clashingBatch = batches
+      .filter(b => editSelectedBatchIds.includes(b.id))
+      .find(selectedB => checkBatchClash(targetBatch, selectedB).hasClash);
+
+    if (clashingBatch) {
+      const clashInfo = checkBatchClash(targetBatch, clashingBatch);
+      alert(`⚠️ TIMING CLASH DETECTED!\n\n${clashInfo.reason}\n\nA student cannot be enrolled in batches with overlapping days and timings.`);
+      return;
+    }
+
+    setEditSelectedBatchIds(prev => [...prev, batchId]);
   };
 
   // Helper to auto-calculate chronological age from Date of Birth
@@ -570,6 +675,913 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   const registerAvailableBatches = batches.filter(b => selectedCourseIds.includes(b.course_id));
   const editAvailableBatches = batches.filter(b => editSelectedCourseIds.includes(b.course_id));
 
+  // DEDICATED FULL PAGE FOR REGISTERING NEW DISCIPLE
+  if (pageMode === 'register') {
+    const totalMonthlyCalculated = registerAvailableBatches
+      .filter(b => selectedBatchIds.includes(b.id))
+      .reduce((acc, b) => acc + (b.monthly_fee || 0), 0);
+    const calculatedDue = totalMonthlyCalculated - Number(advancePaid || 0);
+
+    return (
+      <div className="space-y-6 pb-12 animate-in fade-in duration-200">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setPageMode('list')}
+              className="p-2.5 rounded-2xl bg-[#FFF2F8] hover:bg-rose-100 text-[#8A064D] border border-rose-200 transition cursor-pointer"
+              title="Back to Students List"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-lg border border-rose-100">
+                  {nextAutoId}
+                </span>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  New Admission
+                </span>
+              </div>
+              <h1 className="text-2xl font-black text-[#2D041A] tracking-tight mt-1">
+                Register New Disciple
+              </h1>
+              <p className="text-xs text-gray-500 font-medium">
+                Enter complete admission profile, contact information, and assign conflict-free batches.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPageMode('list')}
+              className="px-5 py-2.5 rounded-2xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={savingNew || !fullName.trim()}
+              onClick={handleRegisterStudent}
+              className="px-6 py-2.5 rounded-2xl bg-[#8A064D] hover:bg-[#70043E] text-white text-xs font-black shadow-md transition disabled:opacity-50 flex items-center gap-2 cursor-pointer border border-[#F9E33A]/40"
+            >
+              {savingNew ? (
+                <>
+                  <Sparkles className="w-4 h-4 animate-spin text-[#F9E33A]" />
+                  <span>Registering Disciple...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 text-[#F9E33A]" />
+                  <span>Register Disciple</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* 2-Column Responsive Form Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column (7 cols): Personal & Contact & Guardian Details */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Personal Details Card */}
+            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+              <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+                <User className="w-4 h-4 text-[#8A064D]" />
+                <span>Personal Information</span>
+              </h2>
+
+              <PhotoUploadInput
+                value={avatarUrl}
+                onChange={setAvatarUrl}
+                label="Student Profile Photo"
+                initials={fullName ? fullName.slice(0, 2).toUpperCase() : 'ST'}
+                studentName={fullName}
+                rollNumber={nextAutoId}
+                maxSizeMB={1}
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Student Full Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter full name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Student ID <span className="text-[10px] text-gray-400 font-normal">(System Generated)</span>
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    readOnly
+                    value={nextAutoId}
+                    className="w-full px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-mono font-black text-[#8A064D] cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDateOfBirth(val);
+                      const autoAge = calculateAge(val);
+                      if (autoAge) setAge(autoAge);
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                      Age (Years)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      placeholder="14"
+                      value={age}
+                      onChange={(e) => setAge(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                      Gender
+                    </label>
+                    <select
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value as any)}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
+                    >
+                      <option value="female">Female</option>
+                      <option value="male">Male</option>
+                      <option value="trans">Trans</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Student Email
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="student@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Primary Phone Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="10-digit mobile"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Residential Address
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Complete residential address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Guardian & Admission Card */}
+            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+              <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+                <ShieldCheck className="w-4 h-4 text-[#8A064D]" />
+                <span>Parent / Guardian & Admission Details</span>
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Guardian Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Parent / Guardian"
+                    value={parentName}
+                    onChange={(e) => setParentName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Relation
+                  </label>
+                  <select
+                    value={parentRelation}
+                    onChange={(e) => setParentRelation(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
+                  >
+                    <option value="Mother">Mother</option>
+                    <option value="Father">Father</option>
+                    <option value="Guardian">Guardian</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Guardian Phone <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="10-digit number"
+                    value={parentContact}
+                    onChange={(e) => setParentContact(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Joining Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={joiningDate}
+                    onChange={(e) => setJoiningDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Advance Paid (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={advancePaid}
+                    onChange={(e) => setAdvancePaid(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-emerald-800 focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column (5 cols): Course & Batch Allocation with Clash & Capacity Checking */}
+          <div className="lg:col-span-5 space-y-6">
+            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-[#8A064D]" />
+                  <span>Course & Batch Enrollment</span>
+                </h2>
+                <span className="text-[11px] font-bold text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-full border border-rose-100">
+                  {selectedBatchIds.length} Batches Selected
+                </span>
+              </div>
+
+              {/* Course Selection Pills */}
+              <div>
+                <label className="block text-xs font-black text-gray-700 uppercase tracking-wide mb-2">
+                  Select Enrolled Courses:
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {courses.map(crs => {
+                    const isSelected = selectedCourseIds.includes(crs.id);
+                    return (
+                      <button
+                        type="button"
+                        key={crs.id}
+                        onClick={() => handleToggleCourse(crs.id)}
+                        className={`px-3.5 py-2 rounded-2xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/60'
+                            : 'bg-[#FFF9FB] text-gray-700 border border-[#F0D5E4] hover:bg-[#FFF2F8]'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3.5 h-3.5 text-[#F9E33A]" />}
+                        <span>{crs.title}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Available Batches for Selected Courses */}
+              <div className="pt-3 border-t border-gray-100">
+                <label className="block text-xs font-black text-gray-700 uppercase tracking-wide mb-2">
+                  Available Batches (Timings & Schedule):
+                </label>
+
+                {registerAvailableBatches.length === 0 ? (
+                  <div className="p-6 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
+                    Please select at least one course above to see available batch schedules.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+                    {registerAvailableBatches.map(b => {
+                      const isSelected = selectedBatchIds.includes(b.id);
+                      const isFull = (b.enrolled_count || 0) >= (b.max_capacity || 20);
+                      
+                      // Check clash against already selected batches (excluding this one)
+                      const clashingBatch = batches
+                        .filter(otherB => selectedBatchIds.includes(otherB.id) && otherB.id !== b.id)
+                        .find(otherB => checkBatchClash(b, otherB).hasClash);
+                      const clashInfo = clashingBatch ? checkBatchClash(b, clashingBatch) : null;
+
+                      return (
+                        <div
+                          key={b.id}
+                          onClick={() => handleToggleBatch(b.id)}
+                          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#FFF2F8] border-[#8A064D] shadow-2xs ring-1 ring-[#8A064D]'
+                              : clashingBatch
+                              ? 'bg-rose-50/50 border-rose-300 opacity-80'
+                              : isFull
+                              ? 'bg-amber-50/50 border-amber-300'
+                              : 'bg-white border-gray-200 hover:border-[#8A064D]/50 hover:bg-[#FFFDFE]'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {}}
+                                  className="w-4 h-4 rounded text-[#8A064D] focus:ring-[#8A064D]"
+                                />
+                                <span className="font-black text-xs text-[#2D041A]">
+                                  {b.course_title} — {b.name}
+                                </span>
+                              </div>
+
+                              {/* Days and Timings Row */}
+                              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+                                <span className="px-2 py-0.5 rounded-lg bg-gray-100 font-bold text-gray-700 flex items-center gap-1">
+                                  <Calendar className="w-3 h-3 text-[#8A064D]" />
+                                  <span>{b.days_of_week?.join(', ') || 'Regular'}</span>
+                                </span>
+                                <span className="px-2 py-0.5 rounded-lg bg-gray-100 font-bold text-gray-700 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-[#8A064D]" />
+                                  <span>{b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}</span>
+                                </span>
+                              </div>
+
+                              {/* Guru & Room */}
+                              <div className="mt-1 text-[11px] text-gray-500 font-medium flex items-center gap-3">
+                                <span>Guru: <strong className="text-gray-700">{b.trainer_name || 'Assigned'}</strong></span>
+                                <span>Room: <strong className="text-gray-700">{b.room_or_hall || b.room || 'Hall'}</strong></span>
+                              </div>
+                            </div>
+
+                            {/* Capacity Badge */}
+                            <div className="text-right shrink-0">
+                              <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black ${
+                                isFull 
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-200' 
+                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                              }`}>
+                                {b.enrolled_count || 0}/{b.max_capacity || 20} Seats
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Full Warning Message Banner */}
+                          {isFull && !isSelected && (
+                            <div className="mt-2.5 p-2 rounded-xl bg-amber-50 border border-amber-200 text-[11px] font-bold text-amber-900 flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span>⚠️ Batch has reached maximum capacity ({b.enrolled_count}/{b.max_capacity || 20} seats filled).</span>
+                            </div>
+                          )}
+
+                          {/* Timing Clash Warning Banner */}
+                          {clashInfo && (
+                            <div className="mt-2.5 p-2 rounded-xl bg-rose-100 border border-rose-300 text-[11px] font-black text-rose-900 flex items-center gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                              <span>⚠️ {clashInfo.reason}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Dynamic Fee Calculation Card */}
+              <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] space-y-2 text-xs">
+                <div className="flex justify-between items-center text-gray-700">
+                  <span className="font-semibold">Total Monthly Tuition:</span>
+                  <span className="font-black text-sm text-[#2D041A]">₹{totalMonthlyCalculated.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between items-center text-gray-700">
+                  <span className="font-semibold">Advance Payment Applied:</span>
+                  <span className="font-black text-emerald-700">₹{Number(advancePaid || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="pt-2 border-t border-[#F0D5E4] flex justify-between items-center">
+                  <span className="font-black text-[#590231]">Initial Balance Due:</span>
+                  <span className="font-black text-base text-[#8A064D]">₹{Math.max(0, calculatedDue).toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // DEDICATED FULL PAGE FOR EDITING DISCIPLE
+  if (pageMode === 'edit' && editingStudent) {
+    const totalMonthlyCalculated = editAvailableBatches
+      .filter(b => editSelectedBatchIds.includes(b.id))
+      .reduce((acc, b) => acc + (b.monthly_fee || 0), 0);
+    const calculatedDue = totalMonthlyCalculated - Number(editAdvancePaid || 0);
+
+    return (
+      <div className="space-y-6 pb-12 animate-in fade-in duration-200">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setPageMode('list');
+                setEditingStudent(null);
+              }}
+              className="p-2.5 rounded-2xl bg-[#FFF2F8] hover:bg-rose-100 text-[#8A064D] border border-rose-200 transition cursor-pointer"
+              title="Back to Students List"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-lg border border-rose-100">
+                  {editingStudent.roll_number}
+                </span>
+                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                  editStatus === 'active' 
+                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                    : 'text-gray-700 bg-gray-100 border-gray-200'
+                }`}>
+                  {editStatus === 'active' ? 'Active Disciple' : 'Inactive'}
+                </span>
+              </div>
+              <h1 className="text-2xl font-black text-[#2D041A] tracking-tight mt-1">
+                Edit Disciple: {editFullName}
+              </h1>
+              <p className="text-xs text-gray-500 font-medium">
+                Update disciple admission profile, status, contact details, and assigned conflict-free batches.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setPageMode('list');
+                setEditingStudent(null);
+              }}
+              className="px-5 py-2.5 rounded-2xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={savingEdit || !editFullName.trim()}
+              onClick={handleSaveEdit}
+              className="px-6 py-2.5 rounded-2xl bg-[#8A064D] hover:bg-[#70043E] text-white text-xs font-black shadow-md transition disabled:opacity-50 flex items-center gap-2 cursor-pointer border border-[#F9E33A]/40"
+            >
+              {savingEdit ? (
+                <>
+                  <Sparkles className="w-4 h-4 animate-spin text-[#F9E33A]" />
+                  <span>Saving Changes...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 text-[#F9E33A]" />
+                  <span>Save Changes</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* 2-Column Responsive Form Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column (7 cols): Personal & Contact Details */}
+          <div className="lg:col-span-7 space-y-6">
+            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+              <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+                <User className="w-4 h-4 text-[#8A064D]" />
+                <span>Personal & Profile Information</span>
+              </h2>
+
+              <PhotoUploadInput
+                value={editAvatarUrl}
+                onChange={setEditAvatarUrl}
+                label="Student Profile Photo"
+                initials={editFullName ? editFullName.slice(0, 2).toUpperCase() : 'ST'}
+                studentName={editFullName}
+                rollNumber={editingStudent.roll_number}
+                maxSizeMB={1}
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Student Full Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFullName}
+                    onChange={(e) => setEditFullName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Student Status <span className="text-[10px] text-[#8A064D] font-normal">(Active / Inactive)</span>
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
+                  >
+                    <option value="active">Active (Enrolled - Counts in batch capacity)</option>
+                    <option value="inactive">Inactive (Paused / Left - Frees up batch seat)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    value={editDateOfBirth}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditDateOfBirth(val);
+                      const autoAge = calculateAge(val);
+                      if (autoAge) setEditAge(autoAge);
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                      Age (Years)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={editAge}
+                      onChange={(e) => setEditAge(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                      Gender
+                    </label>
+                    <select
+                      value={editGender}
+                      onChange={(e) => setEditGender(e.target.value as any)}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
+                    >
+                      <option value="female">Female</option>
+                      <option value="male">Male</option>
+                      <option value="trans">Trans</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Student Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Primary Phone Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Residential Address
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Guardian & Admission Card */}
+            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+              <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+                <ShieldCheck className="w-4 h-4 text-[#8A064D]" />
+                <span>Parent / Guardian & Admission Info</span>
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Guardian Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editParentName}
+                    onChange={(e) => setEditParentName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Relation
+                  </label>
+                  <select
+                    value={editParentRelation}
+                    onChange={(e) => setEditParentRelation(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
+                  >
+                    <option value="Mother">Mother</option>
+                    <option value="Father">Father</option>
+                    <option value="Guardian">Guardian</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Guardian Phone <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={editParentContact}
+                    onChange={(e) => setEditParentContact(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Joining Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editJoiningDate}
+                    onChange={(e) => setEditJoiningDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Advance Paid (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editAdvancePaid}
+                    onChange={(e) => setEditAdvancePaid(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-emerald-800 focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column (5 cols): Batch Allocation with Timings, Clash Detection & Full Capacity Warning */}
+          <div className="lg:col-span-5 space-y-6">
+            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-[#8A064D]" />
+                  <span>Enrolled Courses & Batches</span>
+                </h2>
+                <span className="text-[11px] font-bold text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-full border border-rose-100">
+                  {editSelectedBatchIds.length} Batches Assigned
+                </span>
+              </div>
+
+              {/* Course Pills */}
+              <div>
+                <label className="block text-xs font-black text-gray-700 uppercase tracking-wide mb-2">
+                  Enrolled Disciplines:
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {courses.map(crs => {
+                    const isSelected = editSelectedCourseIds.includes(crs.id);
+                    return (
+                      <button
+                        type="button"
+                        key={crs.id}
+                        onClick={() => handleEditToggleCourse(crs.id)}
+                        className={`px-3.5 py-2 rounded-2xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/60'
+                            : 'bg-[#FFF9FB] text-gray-700 border border-[#F0D5E4] hover:bg-[#FFF2F8]'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3.5 h-3.5 text-[#F9E33A]" />}
+                        <span>{crs.title}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Batches with Full Details */}
+              <div className="pt-3 border-t border-gray-100">
+                <label className="block text-xs font-black text-gray-700 uppercase tracking-wide mb-2">
+                  Batch Schedule, Timings & Capacity:
+                </label>
+
+                {editAvailableBatches.length === 0 ? (
+                  <div className="p-6 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
+                    Select a course above to manage batch allocations.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+                    {editAvailableBatches.map(b => {
+                      const isSelected = editSelectedBatchIds.includes(b.id);
+                      const isFull = (b.enrolled_count || 0) >= (b.max_capacity || 20);
+
+                      // Check clash against already selected batches (excluding this one)
+                      const clashingBatch = batches
+                        .filter(otherB => editSelectedBatchIds.includes(otherB.id) && otherB.id !== b.id)
+                        .find(otherB => checkBatchClash(b, otherB).hasClash);
+                      const clashInfo = clashingBatch ? checkBatchClash(b, clashingBatch) : null;
+
+                      return (
+                        <div
+                          key={b.id}
+                          onClick={() => handleEditToggleBatch(b.id)}
+                          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#FFF2F8] border-[#8A064D] shadow-2xs ring-1 ring-[#8A064D]'
+                              : clashingBatch
+                              ? 'bg-rose-50/50 border-rose-300 opacity-80'
+                              : isFull
+                              ? 'bg-amber-50/50 border-amber-300'
+                              : 'bg-white border-gray-200 hover:border-[#8A064D]/50 hover:bg-[#FFFDFE]'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {}}
+                                  className="w-4 h-4 rounded text-[#8A064D] focus:ring-[#8A064D]"
+                                />
+                                <span className="font-black text-xs text-[#2D041A]">
+                                  {b.course_title} — {b.name}
+                                </span>
+                              </div>
+
+                              {/* Days & Timings Row */}
+                              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+                                <span className="px-2 py-0.5 rounded-lg bg-gray-100 font-bold text-gray-700 flex items-center gap-1">
+                                  <Calendar className="w-3 h-3 text-[#8A064D]" />
+                                  <span>{b.days_of_week?.join(', ') || 'Regular'}</span>
+                                </span>
+                                <span className="px-2 py-0.5 rounded-lg bg-gray-100 font-bold text-gray-700 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-[#8A064D]" />
+                                  <span>{b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}</span>
+                                </span>
+                              </div>
+
+                              {/* Guru & Room */}
+                              <div className="mt-1 text-[11px] text-gray-500 font-medium flex items-center gap-3">
+                                <span>Guru: <strong className="text-gray-700">{b.trainer_name || 'Assigned'}</strong></span>
+                                <span>Room: <strong className="text-gray-700">{b.room_or_hall || b.room || 'Hall'}</strong></span>
+                              </div>
+                            </div>
+
+                            {/* Capacity Badge */}
+                            <div className="text-right shrink-0">
+                              <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black ${
+                                isFull 
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-200' 
+                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                              }`}>
+                                {b.enrolled_count || 0}/{b.max_capacity || 20} Seats
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Full Warning Message Banner */}
+                          {isFull && !isSelected && (
+                            <div className="mt-2.5 p-2 rounded-xl bg-amber-50 border border-amber-200 text-[11px] font-bold text-amber-900 flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span>⚠️ Batch has reached capacity ({b.enrolled_count}/{b.max_capacity || 20} seats filled).</span>
+                            </div>
+                          )}
+
+                          {/* Timing Clash Warning Banner */}
+                          {clashInfo && (
+                            <div className="mt-2.5 p-2 rounded-xl bg-rose-100 border border-rose-300 text-[11px] font-black text-rose-900 flex items-center gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                              <span>⚠️ {clashInfo.reason}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Dynamic Fee Calculation Card */}
+              <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] space-y-2 text-xs">
+                <div className="flex justify-between items-center text-gray-700">
+                  <span className="font-semibold">Total Monthly Tuition:</span>
+                  <span className="font-black text-sm text-[#2D041A]">₹{totalMonthlyCalculated.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between items-center text-gray-700">
+                  <span className="font-semibold">Advance Payment Applied:</span>
+                  <span className="font-black text-emerald-700">₹{Number(editAdvancePaid || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="pt-2 border-t border-[#F0D5E4] flex justify-between items-center">
+                  <span className="font-black text-[#590231]">Current Balance Due:</span>
+                  <span className="font-black text-base text-[#8A064D]">₹{Math.max(0, calculatedDue).toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
 
@@ -750,14 +1762,31 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                       <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100/80 px-3 py-1 rounded-xl shadow-2xs tabular-nums">
                         {s.roll_number}
                       </span>
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                        s.status === 'active'
-                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                          : 'bg-gray-100 text-gray-600 border border-gray-200'
-                      }`}>
-                        <span className={`w-2 h-2 rounded-full ${s.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                        <span className="capitalize">{s.status || 'Active'}</span>
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                          s.status === 'active'
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                            : 'bg-gray-100 text-gray-600 border border-gray-200'
+                        }`}>
+                          <span className={`w-2 h-2 rounded-full ${s.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                          <span className="capitalize">{s.status || 'Active'}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleStudentStatus(s);
+                          }}
+                          title={`Click to mark ${s.status === 'active' ? 'Inactive' : 'Active'}`}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-black border transition cursor-pointer ${
+                            s.status === 'active'
+                              ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                          }`}
+                        >
+                          {s.status === 'active' ? 'Set Inactive' : 'Set Active'}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Combined Live Attendance Counts: Current Month & Last Month */}
@@ -904,14 +1933,31 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                             <span className="font-mono font-bold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg text-xs tabular-nums">
                               {s.roll_number}
                             </span>
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
-                              s.status === 'active' 
-                                ? 'bg-emerald-50 text-emerald-800' 
-                                : 'bg-gray-100 text-gray-600'
-                            }`}>
-                              <span className={`w-2 h-2 rounded-full ${s.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                              <span className="capitalize">{s.status || 'Active'}</span>
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                                s.status === 'active' 
+                                  ? 'bg-emerald-50 text-emerald-800' 
+                                  : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                <span className={`w-2 h-2 rounded-full ${s.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                <span className="capitalize">{s.status || 'Active'}</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleStudentStatus(s);
+                                }}
+                                title={`Click to mark ${s.status === 'active' ? 'Inactive' : 'Active'}`}
+                                className={`px-2 py-0.5 rounded-lg text-[10px] font-black border transition cursor-pointer ${
+                                  s.status === 'active'
+                                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                                }`}
+                              >
+                                {s.status === 'active' ? 'Set Inactive' : 'Set Active'}
+                              </button>
+                            </div>
                           </div>
                           {s.total_attendance && (
                             <div className="mt-2 flex items-center gap-2 text-[10px] font-semibold text-gray-600">
