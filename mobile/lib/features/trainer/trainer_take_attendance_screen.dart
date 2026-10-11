@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
+import '../../core/services/supabase_service.dart';
 import 'trainer_data_store.dart';
 
 class TrainerTakeAttendanceScreen extends StatefulWidget {
@@ -67,8 +71,37 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
 
   Future<void> _submitAttendance() async {
     setState(() => _isSaving = true);
-    await Future.delayed(const Duration(milliseconds: 600));
     _store.submitAttendance(_batchId);
+
+    try {
+      final prof = SupabaseService().currentUserProfile;
+      final guruName = prof?['full_name'] ?? 'Assigned Guru';
+      final records = _students.map((s) {
+        final st = _store.getStudentStatus(_batchId, s['id']);
+        return {
+          'student_id': s['id'],
+          'name': s['name'],
+          'roll': s['roll'],
+          'status': st.isEmpty ? 'present' : st,
+        };
+      }).toList();
+
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/attendance');
+      await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'batch_id': _batchId,
+          'batch_name': widget.classInfo['batch_name'] ?? 'Batch',
+          'course_id': widget.classInfo['course_id'] ?? '',
+          'course_title': widget.classInfo['course_title'] ?? 'Classical Dance',
+          'trainer_name': guruName,
+          'records': records,
+        }),
+      ).timeout(const Duration(seconds: 15));
+    } catch (e) {
+      debugPrint('Error syncing attendance to backend API: $e');
+    }
 
     if (!mounted) return;
     setState(() {
@@ -184,7 +217,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Closing the session for ${widget.classInfo['course_short_title']} (${widget.classInfo['batch_name']}) will trigger an attention alarm ring for 5 seconds on student and parent mobile devices notifying them that class is complete and to take their child back.',
+              'Closing the session for ${widget.classInfo['course_short_title']} (${widget.classInfo['batch_name']}) will trigger an attention alarm ring for 10 seconds on student and parent mobile devices notifying them that class is complete and to take their child back.',
               style: const TextStyle(fontSize: 13, height: 1.45, color: Colors.black87),
             ),
             const SizedBox(height: 12),
@@ -201,7 +234,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '5-second attention ring with "Stop Ringing" button will play on parents\' phones.',
+                      '10-second attention alarm with "Stop Ringing" button will play on parents\' phones.',
                       style: TextStyle(fontSize: 11, color: Color(0xFF8A064D), fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -530,7 +563,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Finished today\'s class? Tap below to conclude this session and broadcast a 5-second pickup attention chime to parent & student mobile phones.',
+                        'Finished today\'s class? Tap below to conclude this session and broadcast a 10-second pickup attention alarm to parent & student mobile phones.',
                         style: TextStyle(fontSize: 12, color: Colors.black87, height: 1.35),
                       ),
                       const SizedBox(height: 12),
@@ -578,7 +611,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                             ),
                             SizedBox(height: 2),
                             Text(
-                              '5-second pickup attention chime was broadcast to parents\' devices.',
+                              '10-second pickup attention alarm chime was broadcast to parents\' devices.',
                               style: TextStyle(fontSize: 11, color: Color(0xFF03543F)),
                             ),
                           ],

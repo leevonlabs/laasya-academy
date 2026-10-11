@@ -232,7 +232,7 @@ class TrainerDataStore {
       final phoneParam = Uri.encodeComponent(tPhone);
       final idParam = Uri.encodeComponent(tId);
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/trainer/batches?trainerId=$idParam&trainerName=$nameParam&phone=$phoneParam');
-      final res = await http.get(uri).timeout(const Duration(seconds: 5));
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['batches'] is List) {
@@ -422,6 +422,39 @@ class TrainerDataStore {
     return scheduledToday;
   }
 
+  /// Returns all assigned classes across all batches for this trainer
+  List<Map<String, dynamic>> getAllAssignedClasses() {
+    final todayKey = _getTodayDateKey();
+    final List<Map<String, dynamic>> all = [];
+
+    for (var course in courses) {
+      for (var batch in (course['batches'] as List)) {
+        final batchId = batch['id'] as String;
+        final status = _sessionStatus['$todayKey:$batchId'] ?? 'not_started';
+        final students = List<Map<String, dynamic>>.from(batch['students'] ?? []);
+
+        all.add({
+          'course': course,
+          'batch': batch,
+          'course_id': course['id'],
+          'course_title': course['title'],
+          'course_short_title': course['short_title'],
+          'course_color': course['theme_color'],
+          'course_icon': course['icon'],
+          'batch_id': batchId,
+          'batch_number': batch['batch_number'],
+          'batch_name': batch['name'],
+          'timings': batch['timings'],
+          'room': batch['room'],
+          'students': students,
+          'status': status,
+        });
+      }
+    }
+
+    return all;
+  }
+
   String getSessionStatus(String batchId) {
     final todayKey = _getTodayDateKey();
     return _sessionStatus['$todayKey:$batchId'] ?? 'not_started';
@@ -530,7 +563,7 @@ class TrainerDataStore {
           'trainer_name': tName,
           'message': 'The $courseTitle ($batchName) session has concluded. Please come and take your child back from the academy hall safely.',
         }),
-      ).timeout(const Duration(seconds: 4));
+      ).timeout(const Duration(seconds: 15));
     } catch (e) {
       debugPrint('Error broadcasting session alert to server: $e');
     }

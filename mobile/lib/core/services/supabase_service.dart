@@ -191,7 +191,7 @@ class SupabaseService {
           'identifier': identifier,
           'password': password,
         }),
-      ).timeout(const Duration(seconds: 4));
+      ).timeout(const Duration(seconds: 15));
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -652,7 +652,7 @@ class SupabaseService {
       final phoneParam = Uri.encodeComponent(tPhone);
       final idParam = Uri.encodeComponent(tId);
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/trainer/batches?trainerId=$idParam&trainerName=$nameParam&phone=$phoneParam');
-      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['batches'] is List) {
@@ -1051,6 +1051,26 @@ class SupabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getStudentAttendanceHistory() async {
+    try {
+      final prof = _cachedProfile;
+      final studentId = (prof?['id'] ?? prof?['profile_id'] ?? '').toString();
+      if (studentId.isNotEmpty) {
+        final uri = Uri.parse('${ApiConstants.baseUrl}/api/attendance?studentId=$studentId');
+        final res = await http.get(uri).timeout(const Duration(seconds: 15));
+        if (res.statusCode == 200) {
+          final decoded = jsonDecode(res.body);
+          if (decoded is Map && decoded['success'] == true && decoded['history'] is List) {
+            final liveHistory = List<Map<String, dynamic>>.from(decoded['history']);
+            if (liveHistory.isNotEmpty) {
+              return liveHistory;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching live attendance history: $e');
+    }
+
     if (_mockAttendance.isNotEmpty) {
       return _mockAttendance;
     }
@@ -1250,7 +1270,7 @@ class SupabaseService {
     // 2. HTTP API fallback
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements?announcementType=banner');
-      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['announcements'] is List) {
@@ -1308,7 +1328,7 @@ class SupabaseService {
     // 2. HTTP API fallback
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements?announcementType=message');
-      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['announcements'] is List) {
@@ -1380,7 +1400,7 @@ class SupabaseService {
     // 1. Live fetch from web backend API
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/video-library');
-      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['items'] is List) {
@@ -1498,7 +1518,7 @@ class SupabaseService {
     // 1. Live fetch from local / web backend API
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/student-payments');
-      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['payments'] is List) {
@@ -1639,7 +1659,7 @@ class SupabaseService {
     // 1. Live fetch from local / web backend API
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/trainer-salaries');
-      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['salaries'] is List) {

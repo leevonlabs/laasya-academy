@@ -57,7 +57,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
       final uri = Uri.parse(
         '${ApiConstants.baseUrl}/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam',
       );
-      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         if (data['success'] == true) {
@@ -73,7 +73,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
   Future<void> _loadSharedVideos() async {
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/video-library');
-      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         if (data['success'] == true && data['items'] is List) {

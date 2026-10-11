@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/alarm_service.dart';
 import '../trainer/trainer_data_store.dart';
 import 'student_dashboard_tab.dart';
 import 'student_courses_tab.dart';
@@ -30,6 +31,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   @override
   void initState() {
     super.initState();
+    AlarmService.requestNotificationPermission();
     TrainerDataStore.classClosedAlertNotifier.addListener(_onClassClosedAlert);
     _startNetworkAlertPolling();
   }
@@ -37,13 +39,14 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   @override
   void dispose() {
     _alertPollTimer?.cancel();
+    AlarmService.stopAlarmRing();
     TrainerDataStore.classClosedAlertNotifier.removeListener(_onClassClosedAlert);
     super.dispose();
   }
 
   void _startNetworkAlertPolling() {
     _alertPollTimer?.cancel();
-    // Poll every 3 seconds for live class conclusion alerts from Gurus
+    // Poll every 3 seconds for live class conclusion & attendance status alerts
     _alertPollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollSessionAlerts());
   }
 
@@ -53,6 +56,11 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     try {
       final prof = SupabaseService().currentUserProfile;
       final enrolled = prof?['enrolled_courses'];
+      final studentId = (prof?['id'] ?? prof?['profile_id'] ?? '').toString();
+      final rollNumber = (prof?['roll_number'] ?? '').toString();
+      final studentName = (prof?['full_name'] ?? '').toString();
+      final phone = (prof?['phone'] ?? '').toString();
+
       String batchIdsParam = 'all';
       if (enrolled is List && enrolled.isNotEmpty) {
         final bIds = enrolled
@@ -64,8 +72,15 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
         }
       }
 
-      final uri = Uri.parse('${ApiConstants.baseUrl}/api/sessions/alerts?batchIds=$batchIdsParam&sinceSeconds=60');
-      final res = await http.get(uri).timeout(const Duration(seconds: 3));
+      final sIdEnc = Uri.encodeComponent(studentId);
+      final rollEnc = Uri.encodeComponent(rollNumber);
+      final nameEnc = Uri.encodeComponent(studentName);
+      final phoneEnc = Uri.encodeComponent(phone);
+
+      final uri = Uri.parse(
+        '${ApiConstants.baseUrl}/api/sessions/alerts?batchIds=$batchIdsParam&studentId=$sIdEnc&rollNumber=$rollEnc&name=$nameEnc&phone=$phoneEnc&sinceSeconds=1800'
+      );
+      final res = await http.get(uri).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['alerts'] is List) {
@@ -75,7 +90,11 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
             if (alertId.isNotEmpty && !_processedAlertIds.contains(alertId)) {
               _processedAlertIds.add(alertId);
               if (mounted) {
-                _showClassClosedAttentionAlarm(a);
+                if (a['alert_type'] == 'attendance_marked') {
+                  _showAttendanceStatusNotification(a);
+                } else {
+                  _showClassClosedAttentionAlarm(a);
+                }
               }
               break;
             }
@@ -87,6 +106,63 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     } finally {
       _isPolling = false;
     }
+  }
+
+  void _showAttendanceStatusNotification(Map<String, dynamic> alertData) {
+    final status = (alertData['student_status'] ?? 'present').toString().toUpperCase();
+    final isPresent = status == 'PRESENT';
+    final courseTitle = alertData['course_title'] ?? 'Class Session';
+    final batchName = alertData['batch_name'] ?? 'Batch';
+    final trainerName = alertData['trainer_name'] ?? 'Guru';
+
+    // 1. Fire native Android System Notification (appears in notification bar even when user is not live on screen)
+    AlarmService.showAttendanceNotification(
+      title: 'Attendance Marked: $status',
+      message: '$courseTitle ($batchName) • Recorded by Guru $trainerName',
+      isPresent: isPresent,
+    );
+
+    // 2. Audible chime & haptic feedback
+    SystemSound.play(SystemSoundType.alert);
+    HapticFeedback.mediumImpact();
+
+    // 3. Floating in-app notice
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isPresent ? Icons.check_circle_rounded : Icons.cancel_rounded,
+              color: isPresent ? const Color(0xFF31C48D) : const Color(0xFFF98080),
+              size: 26,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Attendance Marked: $status',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Colors.white),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$courseTitle ($batchName) • Recorded by Guru $trainerName',
+                    style: const TextStyle(fontSize: 11.5, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF1E293B),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 6),
+      ),
+    );
   }
 
   void _onClassClosedAlert() {
@@ -103,12 +179,15 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     final courseTitle = alertData['course_title'] ?? 'Classical Dance';
     final batchName = alertData['batch_name'] ?? 'Class Session';
 
-    int secondsRemaining = 5;
+    int secondsRemaining = 10;
     Timer? ringTimer;
 
-    // Trigger immediate alert sound and haptic vibration
-    SystemSound.play(SystemSoundType.alert);
-    HapticFeedback.heavyImpact();
+    // Trigger Android hardware ALARM stream ringtone, alarm vibration pattern, and heads-up notification
+    AlarmService.startAlarmRing(
+      durationSeconds: 10,
+      title: 'CLASS COMPLETED: $courseTitle',
+      message: 'The $courseTitle ($batchName) session has concluded. Please come and take your child back safely.',
+    );
 
     showDialog(
       context: context,
@@ -117,8 +196,6 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             ringTimer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
-              SystemSound.play(SystemSoundType.alert);
-              HapticFeedback.vibrate();
               if (secondsRemaining > 1) {
                 if (ctx.mounted) {
                   setDialogState(() {
@@ -127,6 +204,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
                 }
               } else {
                 timer.cancel();
+                AlarmService.stopAlarmRing();
                 if (ctx.mounted && Navigator.canPop(ctx)) {
                   Navigator.pop(ctx);
                 }
@@ -251,6 +329,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
                       child: ElevatedButton.icon(
                         onPressed: () {
                           ringTimer?.cancel();
+                          AlarmService.stopAlarmRing();
                           if (Navigator.canPop(ctx)) {
                             Navigator.pop(ctx);
                           }
@@ -277,6 +356,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
       },
     ).then((_) {
       ringTimer?.cancel();
+      AlarmService.stopAlarmRing();
     });
   }
 
