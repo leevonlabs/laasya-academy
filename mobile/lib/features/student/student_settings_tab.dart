@@ -6,6 +6,8 @@ import 'student_profile_details_screen.dart';
 import 'student_video_library_screen.dart';
 import 'student_messages_screen.dart';
 import 'student_payments_screen.dart';
+import '../../core/services/alarm_service.dart';
+import '../../core/services/permission_service.dart';
 
 class StudentSettingsTab extends StatefulWidget {
   const StudentSettingsTab({super.key});
@@ -138,6 +140,7 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
     );
 
     if (confirm == true) {
+      await AlarmService.stopBackgroundAlertService();
       await SupabaseService().signOut();
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
@@ -401,7 +404,18 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
               ),
               child: Column(
                 children: [
-                  // 4. Change Password Option
+                  // 1. App Permissions Management
+                  _settingsTile(
+                    icon: Icons.security_rounded,
+                    iconBg: const Color(0xFFDEF7EC),
+                    iconColor: const Color(0xFF03543F),
+                    title: 'App Permissions',
+                    subtitle: 'Notifications, alarms, battery & camera access',
+                    onTap: () => PermissionService.showPermissionsDialog(context),
+                  ),
+                  const Divider(height: 1, indent: 64),
+
+                  // 2. Change Password Option
                   _settingsTile(
                     icon: Icons.lock_reset_rounded,
                     iconBg: const Color(0xFFE1EFFE),

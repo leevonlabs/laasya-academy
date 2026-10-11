@@ -8,6 +8,8 @@ import 'trainer_announcements_screen.dart';
 import 'trainer_profile_details_screen.dart';
 import 'trainer_salaries_screen.dart';
 import 'trainer_share_video_screen.dart';
+import '../../core/services/alarm_service.dart';
+import '../../core/services/permission_service.dart';
 
 class TrainerSettingsTab extends StatefulWidget {
   const TrainerSettingsTab({super.key});
@@ -140,6 +142,7 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
     );
 
     if (confirm == true) {
+      await AlarmService.stopBackgroundAlertService();
       await SupabaseService().signOut();
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
@@ -433,6 +436,18 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
               ),
               child: Column(
                 children: [
+                  // 1. App Permissions Management
+                  _settingsTile(
+                    icon: Icons.security_rounded,
+                    iconBg: const Color(0xFFDEF7EC),
+                    iconColor: const Color(0xFF03543F),
+                    title: 'App Permissions',
+                    subtitle: 'Notifications, alarms, battery & camera access',
+                    onTap: () => PermissionService.showPermissionsDialog(context),
+                  ),
+                  const Divider(height: 1, indent: 64),
+
+                  // 2. Change Password Option
                   _settingsTile(
                     icon: Icons.lock_reset_rounded,
                     iconBg: const Color(0xFFE1EFFE),

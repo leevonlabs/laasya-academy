@@ -33,9 +33,39 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   @override
   void initState() {
     super.initState();
-    AlarmService.requestNotificationPermission();
+    _startBackgroundAlertService();
     TrainerDataStore.classClosedAlertNotifier.addListener(_onClassClosedAlert);
     _startNetworkAlertPolling();
+  }
+
+  Future<void> _startBackgroundAlertService() async {
+    try {
+      final prof = SupabaseService().currentUserProfile;
+      final enrolled = prof?['enrolled_courses'];
+      final studentId = (prof?['id'] ?? prof?['profile_id'] ?? '').toString();
+      final rollNumber = (prof?['roll_number'] ?? '').toString();
+      final studentName = (prof?['full_name'] ?? '').toString();
+      final phone = (prof?['phone'] ?? '').toString();
+
+      String batchIdsParam = 'all';
+      if (enrolled is List && enrolled.isNotEmpty) {
+        final bIds = enrolled
+            .map((e) => e is Map ? e['batch_id']?.toString() : null)
+            .where((id) => id != null && id.isNotEmpty)
+            .toList();
+        if (bIds.isNotEmpty) {
+          batchIdsParam = bIds.join(',');
+        }
+      }
+
+      await AlarmService.startBackgroundAlertService(
+        studentId: studentId,
+        rollNumber: rollNumber,
+        name: studentName,
+        phone: phone,
+        batchIds: batchIdsParam,
+      );
+    } catch (_) {}
   }
 
   @override
@@ -90,39 +120,33 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
 
           if (_isFirstPoll) {
             _isFirstPoll = false;
-            // On startup, mark all historical alerts as seen so old alerts do not spam the user
+            // On startup, mark all historical alerts as seen so past alerts NEVER ring on opening the app
             for (var a in alerts) {
               final alertId = a['id']?.toString() ?? '';
               if (alertId.isNotEmpty) {
-                final createdAtStr = a['created_at']?.toString();
-                bool isVeryRecent = false;
-                if (createdAtStr != null) {
-                  try {
-                    final dt = DateTime.parse(createdAtStr);
-                    if (DateTime.now().toUtc().difference(dt.toUtc()).inSeconds.abs() <= 60) {
-                      isVeryRecent = true;
-                    }
-                  } catch (_) {}
-                }
-                if (!isVeryRecent) {
-                  _globalProcessedAlertIds.add(alertId);
-                }
+                _globalProcessedAlertIds.add(alertId);
+                AlarmService.markAlertProcessed(alertId);
               }
             }
+            return; // Never trigger alarms on initial app launch!
           }
 
-          // Filter strictly fresh alerts not yet handled
-          final freshAlerts = alerts.where((a) {
+          // Filter strictly fresh alerts not yet handled by Flutter or background service
+          final List<Map<String, dynamic>> freshAlerts = [];
+          for (var a in alerts) {
             final id = a['id']?.toString() ?? '';
-            return id.isNotEmpty && !_globalProcessedAlertIds.contains(id);
-          }).toList();
+            if (id.isEmpty) continue;
+            if (_globalProcessedAlertIds.contains(id)) continue;
 
-          // Mark ALL fresh alerts immediately to prevent any looping or repeat triggers
-          for (var a in freshAlerts) {
-            final id = a['id']?.toString() ?? '';
-            if (id.isNotEmpty) {
+            final isProcessedInService = await AlarmService.isAlertProcessed(id);
+            if (isProcessedInService) {
               _globalProcessedAlertIds.add(id);
+              continue;
             }
+
+            _globalProcessedAlertIds.add(id);
+            AlarmService.markAlertProcessed(id);
+            freshAlerts.add(a);
           }
 
           if (freshAlerts.isNotEmpty && mounted) {

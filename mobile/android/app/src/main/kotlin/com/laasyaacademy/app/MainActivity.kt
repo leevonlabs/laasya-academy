@@ -19,6 +19,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.provider.Settings
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -76,6 +77,7 @@ class MainActivity: FlutterActivity() {
                 }
                 "stopAlarmRing" -> {
                     stopAlarm()
+                    LaasyaAlertService.stopActiveAlarm()
                     result.success(true)
                 }
                 "showAttendanceNotification" -> {
@@ -90,6 +92,59 @@ class MainActivity: FlutterActivity() {
                     requestNotificationPermission()
                     result.success(true)
                 }
+                "requestAllPermissions" -> {
+                    requestAllPermissions()
+                    result.success(true)
+                }
+                "requestBatteryOptimization" -> {
+                    requestBatteryOptimization()
+                    result.success(true)
+                }
+                "isIgnoringBatteryOptimizations" -> {
+                    result.success(isIgnoringBatteryOptimizations())
+                }
+                "startBackgroundAlertService" -> {
+                    val studentId = call.argument<String>("student_id") ?: ""
+                    val rollNumber = call.argument<String>("roll_number") ?: ""
+                    val name = call.argument<String>("name") ?: ""
+                    val phone = call.argument<String>("phone") ?: ""
+                    val batchIds = call.argument<String>("batch_ids") ?: "all"
+
+                    val serviceIntent = Intent(this, LaasyaAlertService::class.java).apply {
+                        action = LaasyaAlertService.ACTION_START_MONITORING
+                        putExtra("student_id", studentId)
+                        putExtra("roll_number", rollNumber)
+                        putExtra("name", name)
+                        putExtra("phone", phone)
+                        putExtra("batch_ids", batchIds)
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(serviceIntent)
+                    } else {
+                        startService(serviceIntent)
+                    }
+                    result.success(true)
+                }
+                "stopBackgroundAlertService" -> {
+                    val serviceIntent = Intent(this, LaasyaAlertService::class.java).apply {
+                        action = LaasyaAlertService.ACTION_STOP_MONITORING
+                    }
+                    startService(serviceIntent)
+                    result.success(true)
+                }
+                "markAlertProcessed" -> {
+                    val alertId = call.argument<String>("alert_id") ?: ""
+                    if (alertId.isNotEmpty()) {
+                        val prefs = getSharedPreferences("laasya_processed_alerts", Context.MODE_PRIVATE)
+                        prefs.edit().putBoolean(alertId, true).apply()
+                    }
+                    result.success(true)
+                }
+                "isAlertProcessed" -> {
+                    val alertId = call.argument<String>("alert_id") ?: ""
+                    val prefs = getSharedPreferences("laasya_processed_alerts", Context.MODE_PRIVATE)
+                    result.success(prefs.getBoolean(alertId, false))
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -103,6 +158,64 @@ class MainActivity: FlutterActivity() {
                 ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
             }
         }
+    }
+
+    private fun requestAllPermissions() {
+        val permissionsToRequest = mutableListOf<String>()
+
+        // 1. Notification Permission (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        // 2. Camera Permission
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.CAMERA)
+        }
+
+        // 3. Media / Storage Permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.READ_MEDIA_IMAGES)
+            }
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), 102)
+        }
+    }
+
+    private fun requestBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                }
+            } catch (e: Exception) {
+                try {
+                    val fallbackIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                    startActivity(fallbackIntent)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            return powerManager?.isIgnoringBatteryOptimizations(packageName) ?: true
+        }
+        return true
     }
 
     private fun startAlarm(durationSec: Int, title: String, message: String) {

@@ -27,9 +27,9 @@ export async function POST(request: NextRequest) {
 
     // 1. Insert into session_alerts table
     const alert = await queryOne<any>(`
-      INSERT INTO public.session_alerts (batch_id, batch_name, course_title, trainer_name, message, created_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
-      RETURNING id, batch_id, batch_name, course_title, trainer_name, message, created_at;
+      INSERT INTO public.session_alerts (batch_id, batch_name, course_title, trainer_name, message, alert_type, created_at)
+      VALUES ($1, $2, $3, $4, $5, 'class_closed', NOW())
+      RETURNING id, batch_id, batch_name, course_title, trainer_name, message, alert_type, created_at;
     `, [batch_id, batch_name, course_title, trainer_name || 'Assigned Guru', alertMessage]);
 
     // 2. Also log as a live announcement notification so it appears in notices
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     const windowSeconds = isNaN(secondsParam) || secondsParam < 10 ? 1800 : Math.min(secondsParam, 3600);
 
     const alerts = await query<any>(`
-      SELECT id, batch_id, batch_name, course_title, trainer_name, message, alert_type, 
+      SELECT id, batch_id, batch_name, course_title, trainer_name, message, COALESCE(alert_type, 'class_closed') AS alert_type, 
              target_student_id, student_status, target_roll_number, target_student_name, created_at
       FROM public.session_alerts
       WHERE created_at >= NOW() - ($1 || ' seconds')::interval
