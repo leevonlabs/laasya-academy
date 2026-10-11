@@ -1360,29 +1360,113 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(_mockMessageAnnouncements);
   }
 
+  final Set<String> _readNotifIds = {};
+
   Future<List<Map<String, dynamic>>> getNotifications() async {
+    final notifs = <Map<String, dynamic>>[];
+
+    // 1. Fetch recent live alerts (attendance marked & class closed) for current user
+    try {
+      final prof = _cachedProfile;
+      if (prof != null) {
+        final enrolled = prof['enrolled_courses'];
+        final studentId = (prof['id'] ?? prof['profile_id'] ?? '').toString();
+        final rollNumber = (prof['roll_number'] ?? '').toString();
+        final studentName = (prof['full_name'] ?? '').toString();
+        final phone = (prof['phone'] ?? '').toString();
+
+        String batchIdsParam = 'all';
+        if (enrolled is List && enrolled.isNotEmpty) {
+          final bIds = enrolled
+              .map((e) => e is Map ? e['batch_id']?.toString() : null)
+              .where((id) => id != null && id.isNotEmpty)
+              .toList();
+          if (bIds.isNotEmpty) {
+            batchIdsParam = bIds.join(',');
+          }
+        }
+
+        final sIdEnc = Uri.encodeComponent(studentId);
+        final rollEnc = Uri.encodeComponent(rollNumber);
+        final nameEnc = Uri.encodeComponent(studentName);
+        final phoneEnc = Uri.encodeComponent(phone);
+
+        final uri = Uri.parse(
+          '${ApiConstants.baseUrl}/api/sessions/alerts?batchIds=$batchIdsParam&studentId=$sIdEnc&rollNumber=$rollEnc&name=$nameEnc&phone=$phoneEnc&sinceSeconds=86400'
+        );
+        final res = await http.get(uri).timeout(const Duration(seconds: 8));
+        if (res.statusCode == 200) {
+          final decoded = jsonDecode(res.body);
+          if (decoded is Map && decoded['success'] == true && decoded['alerts'] is List) {
+            final alerts = List<Map<String, dynamic>>.from(decoded['alerts']);
+            for (var a in alerts) {
+              final id = (a['id'] ?? '').toString();
+              final isAttendance = a['alert_type'] == 'attendance_marked';
+              final status = (a['student_status'] ?? 'present').toString().toUpperCase();
+              final courseTitle = a['course_title'] ?? 'Classical Dance';
+              final batchName = a['batch_name'] ?? 'Session';
+              final trainerName = a['trainer_name'] ?? 'Guru';
+
+              final title = isAttendance
+                  ? 'Attendance Confirmed: $status'
+                  : (a['title'] ?? 'Class Session Concluded');
+              final message = isAttendance
+                  ? '$courseTitle ($batchName) • Recorded by Guru $trainerName'
+                  : (a['message'] ?? 'Class concluded. Parents are requested to pick up student.');
+
+              final createdAt = a['created_at']?.toString();
+              String dateStr = 'Today';
+              if (createdAt != null && createdAt.contains('T')) {
+                final timePart = createdAt.split('T')[1].split('.').first;
+                dateStr = 'Today, $timePart';
+              }
+
+              notifs.add({
+                'id': id.isNotEmpty ? id : UniqueKey().toString(),
+                'title': title,
+                'message': message,
+                'type': isAttendance ? 'attendance' : 'class_alert',
+                'status': status,
+                'course_title': courseTitle,
+                'batch_name': batchName,
+                'trainer_name': trainerName,
+                'date': dateStr,
+                'is_read': _readNotifIds.contains(id),
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching session alerts for notifications: $e');
+    }
+
+    // 2. Fetch admin messages & announcements
     final messages = await getMessageAnnouncements();
     final banners = await getBannerAnnouncements();
-    final notifs = <Map<String, dynamic>>[];
+
     for (var m in messages) {
       final item = Map<String, dynamic>.from(m);
+      final id = (item['id'] ?? '').toString();
       item['type'] = (m['type_tag'] ?? 'General').toString().toLowerCase().replaceAll(' ', '_');
       if (item['type'] == 'fee_reminder') item['type'] = 'reminder';
       item['date'] = item['date'] ?? item['publish_date'] ?? 'Today';
-      item['is_read'] = item['is_read'] ?? false;
+      item['is_read'] = _readNotifIds.contains(id) || (item['is_read'] == true);
       notifs.add(item);
     }
     for (var b in banners) {
       final item = Map<String, dynamic>.from(b);
+      final id = (item['id'] ?? '').toString();
       item['type'] = 'announcement';
       item['date'] = item['date'] ?? 'Today';
-      item['is_read'] = item['is_read'] ?? false;
+      item['is_read'] = _readNotifIds.contains(id) || (item['is_read'] == true);
       notifs.add(item);
     }
     return notifs;
   }
 
   Future<void> markNotificationAsRead(String notifId) async {
+    _readNotifIds.add(notifId);
     for (var n in _mockMessageAnnouncements) {
       if (n['id'] == notifId) {
         n['is_read'] = true;

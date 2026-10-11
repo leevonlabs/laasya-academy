@@ -122,61 +122,92 @@ export async function POST(req: NextRequest) {
 
     const sessionId = session.id;
 
-    // 2. Upsert each student attendance record
+    // 2. Fast Batch Upsert: Extract valid student IDs
+    const studentIds = records.map(r => r.student_id || r.id).filter(Boolean);
+
+    if (studentIds.length > 0) {
+      // 2a. Single batch delete of previous attendance records for this session
+      await query(`
+        DELETE FROM public.attendance 
+        WHERE session_id = $1 AND student_id = ANY($2::text[]);
+      `, [sessionId, studentIds]);
+
+      // 2b. Clean up prior attendance alerts for this batch today to avoid alert pile-up
+      await query(`
+        DELETE FROM public.session_alerts 
+        WHERE batch_id = $1 AND alert_type = 'attendance_marked' AND created_at >= CURRENT_DATE;
+      `, [batch_id]);
+    }
+
+    // 3. Multi-row batch insert into public.attendance
+    const attParams: any[] = [sessionId, `Marked by Guru ${guruName}`];
+    const attValuesSql: string[] = [];
+    let pIdx = 3;
+
     for (const rec of records) {
       const studentId = rec.student_id || rec.id;
       const status = rec.status === 'absent' ? 'absent' : 'present';
-      const studentName = rec.name || rec.student_name || 'Disciple';
-      const rollNumber = (rec.roll || rec.roll_number || '').toString();
+      attValuesSql.push(`($1, $${pIdx++}, $${pIdx++}, NOW(), 'trainer_manual', $2, NOW(), NOW())`);
+      attParams.push(studentId, status);
+    }
 
-      // Delete existing entry if any for today's session to allow updating
-      await query(`
-        DELETE FROM public.attendance WHERE session_id = $1 AND student_id = $2;
-      `, [sessionId, studentId]);
-
+    if (attValuesSql.length > 0) {
       await query(`
         INSERT INTO public.attendance (
           session_id, student_id, status, check_in_time, check_in_method, remarks, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, NOW(), 'trainer_manual', $4, NOW(), NOW()
-        );
-      `, [sessionId, studentId, status, `Marked by Guru ${guruName}`]);
+        ) VALUES ${attValuesSql.join(', ')};
+      `, attParams);
+    }
 
-      // 3. Create real-time attendance notification in session_alerts for the student app
+    // 4. Multi-row batch insert into public.session_alerts for real-time mobile sync
+    const alertParams: any[] = [batch_id, bName, cTitle, guruName];
+    const alertValuesSql: string[] = [];
+    let aIdx = 5;
+
+    for (const rec of records) {
+      const studentId = rec.student_id || rec.id;
+      const status = rec.status === 'absent' ? 'absent' : 'present';
       const statusUpper = status.toUpperCase();
       const statusMsg = `Attendance Marked: You have been marked ${statusUpper} for ${cTitle} (${bName}) on ${todayStr} by Guru ${guruName}.`;
+      const rollNumber = (rec.roll || rec.roll_number || '').toString();
+      const studentName = (rec.name || rec.student_name || 'Disciple').toString();
 
+      alertValuesSql.push(`($1, $2, $3, $4, $${aIdx++}, 'attendance_marked', $${aIdx++}, $${aIdx++}, $${aIdx++}, $${aIdx++}, NOW())`);
+      alertParams.push(statusMsg, studentId, status, rollNumber, studentName);
+    }
+
+    if (alertValuesSql.length > 0) {
       await query(`
         INSERT INTO public.session_alerts (
           batch_id, batch_name, course_title, trainer_name, message, alert_type, target_student_id, student_status, target_roll_number, target_student_name, created_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, 'attendance_marked', $6, $7, $8, $9, NOW()
-        );
-      `, [batch_id, bName, cTitle, guruName, statusMsg, studentId, status, rollNumber, studentName]);
+        ) VALUES ${alertValuesSql.join(', ')};
+      `, alertParams);
+    }
 
-      // 4. Create announcement notice so it appears in Notifications tab
-      try {
-        await query(`
-          INSERT INTO public.announcements (
-            title, message, audience, target_batch_name, target_course_title,
-            type_tag, announcement_type, sender_role, trainer_name,
-            publish_date, expiry_date, status, delivery_status, created_by, created_at, updated_at
-          ) VALUES (
-            $1, $2, 'Selected course or batch', $3, $4,
-            'General', 'notification', 'trainer', $5,
-            $6, $6, 'Published', 'System verified (Delivered)', $5, NOW(), NOW()
-          );
-        `, [
-          `Attendance: ${statusUpper} - ${cTitle}`,
-          `Dear ${studentName}, your attendance for today's session in ${cTitle} (${bName}) has been marked as ${statusUpper} by Guru ${guruName}.`,
-          bName,
-          cTitle,
-          guruName,
-          todayStr
-        ]);
-      } catch (annErr) {
-        console.warn('Could not insert attendance announcement copy:', annErr);
-      }
+    // 5. Single consolidated session announcement for Notifications feed
+    const presentCount = records.filter(r => r.status !== 'absent').length;
+    const absentCount = records.length - presentCount;
+    try {
+      await query(`
+        INSERT INTO public.announcements (
+          title, message, audience, target_batch_name, target_course_title,
+          type_tag, announcement_type, sender_role, trainer_name,
+          publish_date, expiry_date, status, delivery_status, created_by, created_at, updated_at
+        ) VALUES (
+          $1, $2, 'Selected course or batch', $3, $4,
+          'Attendance', 'notification', 'trainer', $5,
+          $6, $6, 'Published', 'System verified (Delivered)', $5, NOW(), NOW()
+        );
+      `, [
+        `Attendance Marked: ${cTitle} (${bName})`,
+        `Roll-call completed by Guru ${guruName} on ${todayStr}: ${presentCount} Present, ${absentCount} Absent (${records.length} disciples recorded).`,
+        bName,
+        cTitle,
+        guruName,
+        todayStr
+      ]);
+    } catch (annErr) {
+      console.warn('Could not insert consolidated attendance announcement:', annErr);
     }
 
     return NextResponse.json({ success: true, count: records.length }, { headers: corsHeaders });

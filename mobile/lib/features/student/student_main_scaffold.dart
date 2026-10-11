@@ -25,7 +25,9 @@ class StudentMainScaffold extends StatefulWidget {
 class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   int _currentIndex = 0;
   Timer? _alertPollTimer;
-  final Set<String> _processedAlertIds = {};
+  // Global static set to ensure alerts are NEVER triggered repeatedly across rebuilds/polls
+  static final Set<String> _globalProcessedAlertIds = {};
+  bool _isFirstPoll = true;
   bool _isPolling = false;
 
   @override
@@ -85,18 +87,68 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['alerts'] is List) {
           final alerts = List<Map<String, dynamic>>.from(decoded['alerts']);
-          for (var a in alerts) {
-            final alertId = a['id']?.toString() ?? '';
-            if (alertId.isNotEmpty && !_processedAlertIds.contains(alertId)) {
-              _processedAlertIds.add(alertId);
-              if (mounted) {
-                if (a['alert_type'] == 'attendance_marked') {
-                  _showAttendanceStatusNotification(a);
-                } else {
-                  _showClassClosedAttentionAlarm(a);
+
+          if (_isFirstPoll) {
+            _isFirstPoll = false;
+            // On startup, mark all historical alerts as seen so old alerts do not spam the user
+            for (var a in alerts) {
+              final alertId = a['id']?.toString() ?? '';
+              if (alertId.isNotEmpty) {
+                final createdAtStr = a['created_at']?.toString();
+                bool isVeryRecent = false;
+                if (createdAtStr != null) {
+                  try {
+                    final dt = DateTime.parse(createdAtStr);
+                    if (DateTime.now().toUtc().difference(dt.toUtc()).inSeconds.abs() <= 60) {
+                      isVeryRecent = true;
+                    }
+                  } catch (_) {}
+                }
+                if (!isVeryRecent) {
+                  _globalProcessedAlertIds.add(alertId);
                 }
               }
-              break;
+            }
+          }
+
+          // Filter strictly fresh alerts not yet handled
+          final freshAlerts = alerts.where((a) {
+            final id = a['id']?.toString() ?? '';
+            return id.isNotEmpty && !_globalProcessedAlertIds.contains(id);
+          }).toList();
+
+          // Mark ALL fresh alerts immediately to prevent any looping or repeat triggers
+          for (var a in freshAlerts) {
+            final id = a['id']?.toString() ?? '';
+            if (id.isNotEmpty) {
+              _globalProcessedAlertIds.add(id);
+            }
+          }
+
+          if (freshAlerts.isNotEmpty && mounted) {
+            // Find if there is any class closed alert
+            final classClosedAlert = freshAlerts.cast<Map<String, dynamic>?>().firstWhere(
+              (a) => a?['alert_type'] == 'class_closed',
+              orElse: () => null,
+            );
+            // Find if there is any attendance marked alert
+            final attendanceAlert = freshAlerts.cast<Map<String, dynamic>?>().firstWhere(
+              (a) => a?['alert_type'] == 'attendance_marked',
+              orElse: () => null,
+            );
+
+            if (attendanceAlert != null) {
+              _showAttendanceStatusNotification(attendanceAlert);
+            }
+
+            if (classClosedAlert != null) {
+              if (attendanceAlert != null) {
+                Future.delayed(const Duration(milliseconds: 600), () {
+                  if (mounted) _showClassClosedAttentionAlarm(classClosedAlert);
+                });
+              } else {
+                _showClassClosedAttentionAlarm(classClosedAlert);
+              }
             }
           }
         }
@@ -115,52 +167,122 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     final batchName = alertData['batch_name'] ?? 'Batch';
     final trainerName = alertData['trainer_name'] ?? 'Guru';
 
-    // 1. Fire native Android System Notification (appears in notification bar even when user is not live on screen)
+    // 1. Fire native Android System Notification (appears in notification bar even when user is outside app)
     AlarmService.showAttendanceNotification(
-      title: 'Attendance Marked: $status',
-      message: '$courseTitle ($batchName) • Recorded by Guru $trainerName',
+      title: isPresent ? 'Attendance Confirmed: PRESENT' : 'Attendance Alert: ABSENT',
+      message: '$courseTitle • $batchName (Recorded by Guru $trainerName)',
       isPresent: isPresent,
     );
 
     // 2. Audible chime & haptic feedback
     SystemSound.play(SystemSoundType.alert);
-    HapticFeedback.mediumImpact();
+    HapticFeedback.heavyImpact();
 
-    // 3. Floating in-app notice
+    // 3. Clear any existing snackbars to prevent queue pile-up
+    ScaffoldMessenger.of(context).clearSnackBars();
+
+    // 4. Floating in-app luxury arts notification card
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isPresent ? Icons.check_circle_rounded : Icons.cancel_rounded,
-              color: isPresent ? const Color(0xFF31C48D) : const Color(0xFFF98080),
-              size: 26,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Attendance Marked: $status',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Colors.white),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$courseTitle ($batchName) • Recorded by Guru $trainerName',
-                    style: const TextStyle(fontSize: 11.5, color: Colors.white70),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF1E293B),
+        elevation: 12,
+        backgroundColor: Colors.transparent,
+        padding: EdgeInsets.zero,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 6),
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        duration: const Duration(seconds: 5),
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isPresent
+                  ? [const Color(0xFF064E3B), const Color(0xFF022C22)] // Deep Emerald
+                  : [const Color(0xFF7F1D1D), const Color(0xFF450A0A)], // Deep Crimson
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isPresent ? const Color(0xFF34D399) : const Color(0xFFF87171),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: (isPresent ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withOpacity(0.35),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isPresent ? const Color(0xFF6EE7B7) : const Color(0xFFFCA5A5),
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(
+                  isPresent ? Icons.verified_rounded : Icons.warning_amber_rounded,
+                  color: isPresent ? const Color(0xFF6EE7B7) : const Color(0xFFFCA5A5),
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'ATTENDANCE ${isPresent ? 'PRESENT' : 'ABSENT'}',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.6,
+                            color: isPresent ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'LIVE',
+                            style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '$courseTitle • $batchName',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Recorded by Guru $trainerName',
+                      style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.75)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

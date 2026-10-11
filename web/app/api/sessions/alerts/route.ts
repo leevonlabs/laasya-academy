@@ -136,6 +136,7 @@ export async function GET(request: NextRequest) {
       const targetName = (a.target_student_name || '').toLowerCase();
 
       if (a.alert_type === 'attendance_marked') {
+        // Attendance alert is STRICTLY PERSONAL - ONLY match if targeted to this disciple!
         // 1. Direct ID match
         if (studentIdParam && targetId === studentIdParam.trim().toLowerCase()) return true;
         if (targetId && studentDbIds.includes(targetId)) return true;
@@ -148,14 +149,10 @@ export async function GET(request: NextRequest) {
         if (nameParam && targetName && targetName.includes(nameParam.trim().toLowerCase())) return true;
         if (studentNames.some(n => n && targetName && targetName.includes(n))) return true;
 
-        // 4. Batch match fallback if student is enrolled in this batch
-        if (allowedBatchIds.length > 0 && allowedBatchIds.includes(bId)) return true;
-        if (studentBatchIds.length > 0 && studentBatchIds.includes(bId)) return true;
-
         return false;
       }
 
-      // Class closed alert: matches if student is enrolled in this batch or all batches allowed
+      // Class closed alert: matches if disciple is enrolled in this batch or all batches allowed
       if (allowedBatchIds.length === 0 && studentBatchIds.length === 0) return true; // 'all'
       if (allowedBatchIds.length > 0 && allowedBatchIds.includes(bId)) return true;
       if (studentBatchIds.length > 0 && studentBatchIds.includes(bId)) return true;
@@ -163,7 +160,22 @@ export async function GET(request: NextRequest) {
       return false;
     });
 
-    return NextResponse.json({ success: true, alerts: filtered }, { headers: corsHeaders });
+    // Deduplicate: only return the latest single alert per batch/student to prevent alert loops
+    const deduplicated: any[] = [];
+    const seen = new Set<string>();
+
+    for (const a of filtered) {
+      const key = a.alert_type === 'attendance_marked'
+        ? `att:${a.batch_id}:${a.target_student_id || a.target_roll_number || 'stu'}`
+        : `closed:${a.batch_id}`;
+
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduplicated.push(a);
+      }
+    }
+
+    return NextResponse.json({ success: true, alerts: deduplicated }, { headers: corsHeaders });
   } catch (error: any) {
     console.error('Fetch session alerts error:', error);
     return NextResponse.json(
