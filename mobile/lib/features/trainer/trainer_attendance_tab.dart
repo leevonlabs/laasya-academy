@@ -367,6 +367,49 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                   final isInProgress = status == 'in_progress';
                   final isClosed = status == 'closed';
 
+                  // Dynamic color palettes for clear visual status differentiation:
+                  Color cardBgColor = Colors.white;
+                  Color cardBorderColor = const Color(0xFFF0D5E4);
+                  Color accentStripColor = const Color(0xFFF59E0B); // Amber
+                  Color headerStripColor = cColor.withOpacity(0.06);
+                  Color badgeBgColor = const Color(0xFFFEF3C7);
+                  Color badgeTextColor = const Color(0xFFB45309);
+                  String badgeLabel = 'ROLL-CALL PENDING';
+                  IconData badgeIcon = Icons.hourglass_top_rounded;
+                  String timingsSubtitle = 'Today\'s class • Roll-call not marked';
+
+                  if (isClosed) {
+                    cardBgColor = const Color(0xFFF0FDF4); // Soft Emerald Mint
+                    cardBorderColor = const Color(0xFF34D399); // Solid Emerald Border
+                    accentStripColor = const Color(0xFF059669); // Emerald Strip
+                    headerStripColor = const Color(0xFFDCFCE7);
+                    badgeBgColor = const Color(0xFF059669);
+                    badgeTextColor = Colors.white;
+                    badgeLabel = 'COMPLETED & ALERTED';
+                    badgeIcon = Icons.check_circle_rounded;
+                    timingsSubtitle = 'Session concluded • Parents alerted • Editable today';
+                  } else if (isSubmitted) {
+                    cardBgColor = const Color(0xFFFFFBEB); // Warm Gold Tint
+                    cardBorderColor = const Color(0xFFFBBF24); // Solid Amber-Gold Border
+                    accentStripColor = const Color(0xFFD97706); // Warm Amber Strip
+                    headerStripColor = const Color(0xFFFEF3C7);
+                    badgeBgColor = const Color(0xFFD97706);
+                    badgeTextColor = Colors.white;
+                    badgeLabel = 'ATTENDANCE TAKEN';
+                    badgeIcon = Icons.fact_check_rounded;
+                    timingsSubtitle = 'Roll-call recorded • Ready to close class & alert';
+                  } else if (isInProgress) {
+                    cardBgColor = const Color(0xFFFFF7ED);
+                    cardBorderColor = const Color(0xFFF97316);
+                    accentStripColor = const Color(0xFFEA580C);
+                    headerStripColor = const Color(0xFFFFEDD5);
+                    badgeBgColor = const Color(0xFFEA580C);
+                    badgeTextColor = Colors.white;
+                    badgeLabel = 'IN PROGRESS';
+                    badgeIcon = Icons.pending_actions_rounded;
+                    timingsSubtitle = 'Attendance draft in progress';
+                  }
+
                   return GestureDetector(
                     onTap: () async {
                       await Navigator.push(
@@ -380,13 +423,11 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 14),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardBgColor,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isClosed
-                              ? const Color(0xFF31C48D).withOpacity(0.6)
-                              : (isSubmitted ? const Color(0xFF590231).withOpacity(0.4) : const Color(0xFFF0D5E4)),
-                          width: (isClosed || isSubmitted) ? 1.5 : 1.2,
+                          color: cardBorderColor,
+                          width: (isClosed || isSubmitted) ? 1.8 : 1.2,
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -396,203 +437,262 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                           ),
                         ],
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Card Header strip with Course Title & Status badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: cColor.withOpacity(0.07),
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(item['course_icon'] as IconData, size: 20, color: cColor),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    item['course_title'] as String,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: cColor,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: isClosed
-                                        ? const Color(0xFFDEF7EC)
-                                        : (isSubmitted
-                                            ? const Color(0xFFF3E8EE)
-                                            : (isInProgress ? const Color(0xFFFEF3C7) : const Color(0xFFF3E8EE))),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    isClosed
-                                        ? 'COMPLETED'
-                                        : (isSubmitted
-                                            ? 'ATTENDANCE TAKEN'
-                                            : (isInProgress ? 'IN PROGRESS' : 'NOT STARTED')),
-                                    style: TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: isClosed
-                                          ? const Color(0xFF03543F)
-                                          : (isSubmitted
-                                              ? LaasyaColors.primary
-                                              : (isInProgress ? const Color(0xFF92400E) : Colors.grey.shade700)),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Card Body
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(19),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Left Status Indicator Accent Strip
+                              Container(
+                                width: 6,
+                                color: accentStripColor,
+                              ),
+                              Expanded(
+                                child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                    // Card Header strip with Course Title & Status badge
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: headerStripColor,
+                                        borderRadius: const BorderRadius.only(topRight: Radius.circular(19)),
+                                      ),
+                                      child: Row(
                                         children: [
-                                          Text(
-                                            item['batch_name'] as String,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 15,
-                                              color: LaasyaColors.textDark,
+                                          Icon(item['course_icon'] as IconData, size: 20, color: cColor),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              item['course_title'] as String,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                                color: cColor,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            '${item['batch_number']} • ${item['room']}',
-                                            style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: badgeBgColor,
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(badgeIcon, size: 12, color: badgeTextColor),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  badgeLabel,
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: badgeTextColor,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFFF9FC),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: const Color(0xFFF0D5E4)),
-                                      ),
-                                      child: Text(
-                                        '${students.length} Disciples',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: LaasyaColors.primary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
 
-                                const SizedBox(height: 12),
-
-                                // Timings Highlight Row
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF9F5F8),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.access_time_rounded, size: 16, color: LaasyaColors.primary),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Class Timings: ${item['timings']}',
-                                        style: const TextStyle(
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: LaasyaColors.textDark,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                const SizedBox(height: 14),
-
-                                // Action Row
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: isSubmitted
-                                          ? ElevatedButton.icon(
-                                              onPressed: () => _showCloseClassConfirmation(item),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: const Color(0xFF590231),
-                                                foregroundColor: Colors.white,
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                                padding: const EdgeInsets.symmetric(vertical: 11),
-                                                elevation: 1,
+                                    // Card Body
+                                    Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      item['batch_name'] as String,
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 15,
+                                                        color: LaasyaColors.textDark,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 3),
+                                                    Text(
+                                                      '${item['batch_number']} • ${item['room']}',
+                                                      style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                              icon: const Icon(
-                                                Icons.notifications_active_rounded,
-                                                size: 16,
-                                                color: Colors.white,
-                                              ),
-                                              label: const Text(
-                                                'Close Class & Alert Parents',
-                                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                                              ),
-                                            )
-                                          : ElevatedButton.icon(
-                                              onPressed: () async {
-                                                await Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (_) => TrainerTakeAttendanceScreen(classInfo: item),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  border: Border.all(color: const Color(0xFFF0D5E4)),
+                                                ),
+                                                child: Text(
+                                                  '${students.length} Disciples',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: LaasyaColors.primary,
                                                   ),
-                                                );
-                                                setState(() {});
-                                              },
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: isClosed
-                                                    ? const Color(0xFF03543F)
-                                                    : cColor,
-                                                foregroundColor: Colors.white,
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                                padding: const EdgeInsets.symmetric(vertical: 11),
-                                                elevation: 1,
+                                                ),
                                               ),
-                                              icon: Icon(
-                                                isClosed
-                                                    ? Icons.edit_calendar_rounded
-                                                    : (isInProgress ? Icons.pending_actions_rounded : Icons.how_to_reg_rounded),
-                                                size: 16,
-                                                color: Colors.white,
-                                              ),
-                                              label: Text(
-                                                isClosed
-                                                    ? 'Edit Attendance (Today)'
-                                                    : (isInProgress ? 'Continue Attendance' : 'Start Attendance'),
-                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                                              ),
+                                            ],
+                                          ),
+
+                                          const SizedBox(height: 12),
+
+                                          // Timings & Live Status Row
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(color: cardBorderColor.withOpacity(0.5)),
                                             ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.access_time_rounded, size: 15, color: LaasyaColors.primary),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      'Class Timings: ${item['timings']}',
+                                                      style: const TextStyle(
+                                                        fontSize: 12.5,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: LaasyaColors.textDark,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 3),
+                                                Row(
+                                                  children: [
+                                                    Icon(badgeIcon, size: 13, color: badgeTextColor),
+                                                    const SizedBox(width: 6),
+                                                    Expanded(
+                                                      child: Text(
+                                                        timingsSubtitle,
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          color: badgeTextColor,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          const SizedBox(height: 14),
+
+                                          // Action Row
+                                          Row(
+                                            children: [
+                                              if (isSubmitted) ...[
+                                                Expanded(
+                                                  child: ElevatedButton.icon(
+                                                    onPressed: () => _showCloseClassConfirmation(item),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: const Color(0xFF590231),
+                                                      foregroundColor: Colors.white,
+                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                                      elevation: 1,
+                                                    ),
+                                                    icon: const Icon(
+                                                      Icons.notifications_active_rounded,
+                                                      size: 16,
+                                                      color: Colors.white,
+                                                    ),
+                                                    label: const Text(
+                                                      'Close Class & Alert',
+                                                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                OutlinedButton.icon(
+                                                  onPressed: () async {
+                                                    await Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (_) => TrainerTakeAttendanceScreen(classInfo: item),
+                                                      ),
+                                                    );
+                                                    setState(() {});
+                                                  },
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: const Color(0xFFD97706),
+                                                    side: const BorderSide(color: Color(0xFFFBBF24), width: 1.5),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                                  ),
+                                                  icon: const Icon(Icons.edit_rounded, size: 15),
+                                                  label: const Text('Edit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                                ),
+                                              ] else ...[
+                                                Expanded(
+                                                  child: ElevatedButton.icon(
+                                                    onPressed: () async {
+                                                      await Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                          builder: (_) => TrainerTakeAttendanceScreen(classInfo: item),
+                                                        ),
+                                                      );
+                                                      setState(() {});
+                                                    },
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: isClosed
+                                                          ? const Color(0xFF03543F)
+                                                          : (isInProgress ? const Color(0xFFEA580C) : cColor),
+                                                      foregroundColor: Colors.white,
+                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                                      elevation: 1,
+                                                    ),
+                                                    icon: Icon(
+                                                      isClosed
+                                                          ? Icons.edit_calendar_rounded
+                                                          : (isInProgress ? Icons.pending_actions_rounded : Icons.how_to_reg_rounded),
+                                                      size: 16,
+                                                      color: Colors.white,
+                                                    ),
+                                                    label: Text(
+                                                      isClosed
+                                                          ? 'Edit Attendance (Today)'
+                                                          : (isInProgress ? 'Continue Attendance' : 'Take Roll-Call Attendance'),
+                                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   );

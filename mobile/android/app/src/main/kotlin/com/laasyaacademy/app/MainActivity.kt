@@ -22,6 +22,7 @@ import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.graphics.BitmapFactory
 import androidx.annotation.NonNull
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -267,8 +268,16 @@ class MainActivity: FlutterActivity() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
             )
 
+            val appLogoBitmap = try {
+                BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+            } catch (_: Exception) {
+                null
+            }
+
             val builder = NotificationCompat.Builder(this, channelId)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setLargeIcon(appLogoBitmap)
+                .setColor(0xFF800020.toInt())
                 .setContentTitle(title)
                 .setContentText(message)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(message))
@@ -310,10 +319,16 @@ class MainActivity: FlutterActivity() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
             )
 
-            val iconRes = if (isPresent) android.R.drawable.checkbox_on_background else android.R.drawable.ic_delete
+            val appLogoBitmap = try {
+                BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+            } catch (_: Exception) {
+                null
+            }
 
             val builder = NotificationCompat.Builder(this, channelId)
-                .setSmallIcon(iconRes)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setLargeIcon(appLogoBitmap)
+                .setColor(if (isPresent) 0xFF059669.toInt() else 0xFFDC2626.toInt())
                 .setContentTitle(title)
                 .setContentText(message)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(message))

@@ -21,8 +21,10 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
     _loadNotifications();
   }
 
-  Future<void> _loadNotifications() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadNotifications({bool isRefresh = false}) async {
+    if (!isRefresh && _notifications.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     final data = await SupabaseService().getNotifications();
     if (mounted) {
       setState(() {
@@ -274,7 +276,7 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadNotifications,
+        onRefresh: () => _loadNotifications(isRefresh: true),
         color: LaasyaColors.primary,
         child: Column(
           children: [

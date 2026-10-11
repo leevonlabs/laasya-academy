@@ -8,6 +8,7 @@ import '../../core/services/supabase_service.dart';
 import '../student/student_messages_screen.dart';
 import '../student/student_video_library_screen.dart';
 import 'trainer_salaries_screen.dart';
+import 'trainer_data_store.dart';
 
 class TrainerDashboardTab extends StatefulWidget {
   final VoidCallback onNavigateToClasses;
@@ -1118,14 +1119,49 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
             else
               ..._todaySessions.map((sess) {
                 final batch = sess['batches'];
+                final batchId = (batch?['id'] ?? sess['batch_id'] ?? '').toString();
+                final status = TrainerDataStore().getSessionStatus(batchId);
+                final isSubmitted = status == 'submitted';
+                final isClosed = status == 'closed';
+
+                Color cardBgColor = Colors.white;
+                Color cardBorderColor = const Color(0xFFF0D5E4);
+                Color accentStrip = const Color(0xFFF59E0B);
+                Color badgeBg = const Color(0xFFFEF3C7);
+                Color badgeText = const Color(0xFFB45309);
+                String badgeTextStr = 'ROLL-CALL PENDING';
+                IconData badgeIco = Icons.hourglass_top_rounded;
+                String buttonLabel = 'Start & Take Attendance';
+
+                if (isClosed) {
+                  cardBgColor = const Color(0xFFF0FDF4);
+                  cardBorderColor = const Color(0xFF34D399);
+                  accentStrip = const Color(0xFF059669);
+                  badgeBg = const Color(0xFFDCFCE7);
+                  badgeText = const Color(0xFF047857);
+                  badgeTextStr = 'COMPLETED & ALERTED';
+                  badgeIco = Icons.check_circle_rounded;
+                  buttonLabel = 'View / Edit Attendance';
+                } else if (isSubmitted) {
+                  cardBgColor = const Color(0xFFFFFBEB);
+                  cardBorderColor = const Color(0xFFFBBF24);
+                  accentStrip = const Color(0xFFD97706);
+                  badgeBg = const Color(0xFFFEF3C7);
+                  badgeText = const Color(0xFF92400E);
+                  badgeTextStr = 'ATTENDANCE TAKEN';
+                  badgeIco = Icons.fact_check_rounded;
+                  buttonLabel = 'Close Class & Alert Parents';
+                }
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardBgColor,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFF0D5E4)),
+                    border: Border.all(
+                      color: cardBorderColor,
+                      width: (isClosed || isSubmitted) ? 1.8 : 1.2,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.04),
@@ -1134,70 +1170,90 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                       ),
                     ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(19),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF3E8EE),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              batch?['courses']?['title'] ?? 'Bharathanatyam',
-                              style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFDEF7EC),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFF31C48D).withOpacity(0.3)),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.how_to_reg_rounded, size: 13, color: Color(0xFF03543F)),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Trainer Roll-Call',
-                                  style: TextStyle(color: Color(0xFF03543F), fontWeight: FontWeight.bold, fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        batch?['name'] ?? 'Bharathanatyam - Batch A',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Room: ${batch?['room_or_hall']} • Time: ${sess['start_time']} - ${sess['end_time']}',
-                        style: const TextStyle(fontSize: 12, color: LaasyaColors.textMuted),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
+                          Container(width: 5, color: accentStrip),
                           Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: widget.onNavigateToAttendance,
-                              icon: const Icon(Icons.playlist_add_check_rounded, size: 18),
-                              label: const Text('Start & Take Attendance', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              style: ElevatedButton.styleFrom(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF3E8EE),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          batch?['courses']?['title'] ?? 'Bharatanatyam',
+                                          style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: badgeBg,
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(badgeIco, size: 12, color: badgeText),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              badgeTextStr,
+                                              style: TextStyle(color: badgeText, fontWeight: FontWeight.bold, fontSize: 10),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    batch?['name'] ?? 'Bharatanatyam - Batch A',
+                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Room: ${batch?['room_or_hall']} • Time: ${sess['start_time']} - ${sess['end_time']}',
+                                    style: const TextStyle(fontSize: 12, color: LaasyaColors.textMuted),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          onPressed: widget.onNavigateToAttendance,
+                                          icon: Icon(badgeIco, size: 16),
+                                          label: Text(buttonLabel, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: isClosed
+                                                ? const Color(0xFF03543F)
+                                                : (isSubmitted ? const Color(0xFF590231) : LaasyaColors.primary),
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            padding: const EdgeInsets.symmetric(vertical: 10),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 );
               }),

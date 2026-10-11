@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/supabase_constants.dart';
 import '../constants/api_constants.dart';
@@ -16,9 +17,25 @@ class SupabaseService {
   SupabaseClient get client => _client ?? Supabase.instance.client;
   bool _isInitialized = false;
 
-  // Local demo session cache for resilient testing
+  // Local persistent session cache
   Map<String, dynamic>? _cachedProfile;
   Map<String, dynamic>? get currentUserProfile => _cachedProfile;
+
+  Future<void> _saveProfileToPrefs(Map<String, dynamic> profile) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('saved_user_profile', jsonEncode(profile));
+    } catch (e) {
+      debugPrint('Error saving persistent user profile: $e');
+    }
+  }
+
+  Future<void> _clearProfileFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('saved_user_profile');
+    } catch (_) {}
+  }
   final List<Map<String, dynamic>> _mockAttendance = [];
   final List<Map<String, dynamic>> _mockBannerAnnouncements = [
     {
@@ -154,6 +171,18 @@ class SupabaseService {
   ];
 
   Future<void> initialize() async {
+    // 1. Immediately restore persistent login profile from device storage so app NEVER logs out on close
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedJson = prefs.getString('saved_user_profile');
+      if (savedJson != null && savedJson.isNotEmpty) {
+        _cachedProfile = Map<String, dynamic>.from(jsonDecode(savedJson));
+        debugPrint('Restored persistent login for ${_cachedProfile?['full_name']} (${_cachedProfile?['role']})');
+      }
+    } catch (e) {
+      debugPrint('Error restoring saved profile session: $e');
+    }
+
     try {
       if (SupabaseConstants.supabaseAnonKey.contains('placeholder')) {
         debugPrint('Using demo-ready mode. Set real SUPABASE_ANON_KEY for direct live cloud auth.');
@@ -197,6 +226,7 @@ class SupabaseService {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['profile'] != null) {
           _cachedProfile = Map<String, dynamic>.from(decoded['profile']);
+          await _saveProfileToPrefs(_cachedProfile!);
           return _cachedProfile;
         }
       } else if (res.statusCode == 401 || res.statusCode == 400 || res.statusCode == 404) {
@@ -452,6 +482,7 @@ class SupabaseService {
         'due_date': '10th Oct 2026',
         'next_due_date': '10th Nov 2026',
       };
+      if (_cachedProfile != null) await _saveProfileToPrefs(_cachedProfile!);
       return _cachedProfile;
     }
   }
@@ -476,6 +507,7 @@ class SupabaseService {
 
   Future<void> signOut() async {
     _cachedProfile = null;
+    await _clearProfileFromPrefs();
     if (_isInitialized && _client != null) {
       try {
         await _client!.auth.signOut();
@@ -485,6 +517,18 @@ class SupabaseService {
 
   Future<Map<String, dynamic>?> getCurrentUserProfile() async {
     if (_cachedProfile != null) return _cachedProfile;
+
+    // Check device persistent storage first so user stays logged in across app restarts
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedJson = prefs.getString('saved_user_profile');
+      if (savedJson != null && savedJson.isNotEmpty) {
+        _cachedProfile = Map<String, dynamic>.from(jsonDecode(savedJson));
+        return _cachedProfile;
+      }
+    } catch (e) {
+      debugPrint('Error restoring profile from preferences: $e');
+    }
 
     if (_isInitialized && _client != null) {
       final user = _client!.auth.currentUser;
@@ -1361,11 +1405,27 @@ class SupabaseService {
   }
 
   final Set<String> _readNotifIds = {};
+  List<Map<String, dynamic>> _cachedNotifications = [];
 
   Future<List<Map<String, dynamic>>> getNotifications() async {
-    final notifs = <Map<String, dynamic>>[];
+    // 1. If cached notifications exist, return immediately (<1ms) to eliminate loading spinners and lag
+    if (_cachedNotifications.isNotEmpty) {
+      _refreshNotificationsInBackground();
+      return List<Map<String, dynamic>>.from(_cachedNotifications);
+    }
 
-    // 1. Fetch recent live alerts (attendance marked & class closed) for current user
+    return await _refreshNotificationsInternal();
+  }
+
+  void _refreshNotificationsInBackground() {
+    _refreshNotificationsInternal().catchError((e) {
+      debugPrint('Background notification refresh notice: $e');
+      return <Map<String, dynamic>>[];
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchLiveSessionAlerts() async {
+    final alertsList = <Map<String, dynamic>>[];
     try {
       final prof = _cachedProfile;
       if (prof != null) {
@@ -1394,7 +1454,7 @@ class SupabaseService {
         final uri = Uri.parse(
           '${ApiConstants.baseUrl}/api/sessions/alerts?batchIds=$batchIdsParam&studentId=$sIdEnc&rollNumber=$rollEnc&name=$nameEnc&phone=$phoneEnc&sinceSeconds=86400'
         );
-        final res = await http.get(uri).timeout(const Duration(seconds: 8));
+        final res = await http.get(uri).timeout(const Duration(seconds: 3));
         if (res.statusCode == 200) {
           final decoded = jsonDecode(res.body);
           if (decoded is Map && decoded['success'] == true && decoded['alerts'] is List) {
@@ -1421,7 +1481,7 @@ class SupabaseService {
                 dateStr = 'Today, $timePart';
               }
 
-              notifs.add({
+              alertsList.add({
                 'id': id.isNotEmpty ? id : UniqueKey().toString(),
                 'title': title,
                 'message': message,
@@ -1438,31 +1498,65 @@ class SupabaseService {
         }
       }
     } catch (e) {
-      debugPrint('Error fetching session alerts for notifications: $e');
+      debugPrint('Live session alerts lookup notice: $e');
+    }
+    return alertsList;
+  }
+
+  Future<List<Map<String, dynamic>>> _refreshNotificationsInternal() async {
+    final notifs = <Map<String, dynamic>>[];
+
+    try {
+      // Execute alerts, message announcements, and banners concurrently in parallel
+      final results = await Future.wait([
+        _fetchLiveSessionAlerts(),
+        getMessageAnnouncements(),
+        getBannerAnnouncements(),
+      ]).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => [[], _mockMessageAnnouncements, _mockBannerAnnouncements],
+      );
+
+      final alerts = results[0];
+      final messages = results[1];
+      final banners = results[2];
+
+      notifs.addAll(alerts);
+
+      for (var m in messages) {
+        final item = Map<String, dynamic>.from(m);
+        final id = (item['id'] ?? '').toString();
+        item['type'] = (m['type_tag'] ?? 'General').toString().toLowerCase().replaceAll(' ', '_');
+        if (item['type'] == 'fee_reminder') item['type'] = 'reminder';
+        item['date'] = item['date'] ?? item['publish_date'] ?? 'Today';
+        item['is_read'] = _readNotifIds.contains(id) || (item['is_read'] == true);
+        notifs.add(item);
+      }
+
+      for (var b in banners) {
+        final item = Map<String, dynamic>.from(b);
+        final id = (item['id'] ?? '').toString();
+        item['type'] = 'announcement';
+        item['date'] = item['date'] ?? 'Today';
+        item['is_read'] = _readNotifIds.contains(id) || (item['is_read'] == true);
+        notifs.add(item);
+      }
+
+      _cachedNotifications = notifs;
+    } catch (e) {
+      debugPrint('Notification parallel fetch notice: $e');
+      if (_cachedNotifications.isEmpty) {
+        for (var m in _mockMessageAnnouncements) {
+          notifs.add(Map<String, dynamic>.from(m));
+        }
+        for (var b in _mockBannerAnnouncements) {
+          notifs.add(Map<String, dynamic>.from(b));
+        }
+        _cachedNotifications = notifs;
+      }
     }
 
-    // 2. Fetch admin messages & announcements
-    final messages = await getMessageAnnouncements();
-    final banners = await getBannerAnnouncements();
-
-    for (var m in messages) {
-      final item = Map<String, dynamic>.from(m);
-      final id = (item['id'] ?? '').toString();
-      item['type'] = (m['type_tag'] ?? 'General').toString().toLowerCase().replaceAll(' ', '_');
-      if (item['type'] == 'fee_reminder') item['type'] = 'reminder';
-      item['date'] = item['date'] ?? item['publish_date'] ?? 'Today';
-      item['is_read'] = _readNotifIds.contains(id) || (item['is_read'] == true);
-      notifs.add(item);
-    }
-    for (var b in banners) {
-      final item = Map<String, dynamic>.from(b);
-      final id = (item['id'] ?? '').toString();
-      item['type'] = 'announcement';
-      item['date'] = item['date'] ?? 'Today';
-      item['is_read'] = _readNotifIds.contains(id) || (item['is_read'] == true);
-      notifs.add(item);
-    }
-    return notifs;
+    return List<Map<String, dynamic>>.from(_cachedNotifications);
   }
 
   Future<void> markNotificationAsRead(String notifId) async {

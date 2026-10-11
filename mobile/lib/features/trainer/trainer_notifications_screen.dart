@@ -20,8 +20,10 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _isLoading = true);
+  Future<void> _load({bool isRefresh = false}) async {
+    if (!isRefresh && _notifications.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     final data = await SupabaseService().getNotifications();
     if (mounted) {
       setState(() {
@@ -132,7 +134,7 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
         title: const Text('Guru Notices & Updates'),
       ),
       body: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () => _load(isRefresh: true),
         color: LaasyaColors.primary,
         child: Column(
           children: [
