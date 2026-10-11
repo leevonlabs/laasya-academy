@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
+import '../../core/services/supabase_service.dart';
 import 'trainer_data_store.dart';
 import 'trainer_student_calendar_screen.dart';
 
@@ -22,6 +23,20 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
   void initState() {
     super.initState();
     _selectAllFilters();
+    _syncData();
+  }
+
+  Future<void> _syncData() async {
+    final prof = SupabaseService().currentUserProfile;
+    await _store.syncFromApi(
+      trainerName: prof?['full_name'],
+      phone: prof?['phone'],
+    );
+    if (mounted) {
+      setState(() {
+        _selectAllFilters();
+      });
+    }
   }
 
   void _selectAllFilters() {
@@ -287,7 +302,18 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
   }
 
   void _showFullLengthPhoto(BuildContext context, Map<String, dynamic> stu) {
-    final avatarUrl = stu['avatar_url'] as String? ?? TrainerDataStore.getStudentPhoto(stu['roll']?.toString() ?? stu['id']);
+    final rawAvatar = stu['avatar_url']?.toString().trim();
+    if (rawAvatar == null || rawAvatar.isEmpty || rawAvatar.contains('unsplash.com')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No photo uploaded in system for ${stu['name'] ?? 'this disciple'}.'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: LaasyaColors.primary,
+        ),
+      );
+      return;
+    }
+    final avatarUrl = rawAvatar;
     final name = stu['name']?.toString() ?? 'Disciple';
     final roll = stu['roll']?.toString() ?? '';
 
@@ -378,13 +404,10 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              CircleAvatar(
+                              const CircleAvatar(
                                 radius: 48,
                                 backgroundColor: Colors.white24,
-                                child: Text(
-                                  name.substring(0, 1),
-                                  style: const TextStyle(fontSize: 48, color: Colors.white, fontWeight: FontWeight.bold),
-                                ),
+                                child: Icon(Icons.person_rounded, size: 54, color: Colors.white70),
                               ),
                               const SizedBox(height: 12),
                               Text(
@@ -411,7 +434,8 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
     final primaryColor = enrollments.isNotEmpty
         ? (enrollments.first['course_color'] as Color? ?? LaasyaColors.primary)
         : LaasyaColors.primary;
-    final avatarUrl = stu['avatar_url'] as String? ?? TrainerDataStore.getStudentPhoto(stu['roll']?.toString() ?? stu['id']);
+    final rawAvatar = stu['avatar_url']?.toString().trim();
+    final hasPhoto = rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com');
 
     showModalBottomSheet(
       context: context,
@@ -441,29 +465,28 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
             Row(
               children: [
                 GestureDetector(
-                  onTap: () => _showFullLengthPhoto(context, stu),
+                  onTap: hasPhoto ? () => _showFullLengthPhoto(context, stu) : null,
                   child: Stack(
                     alignment: Alignment.bottomRight,
                     children: [
                       CircleAvatar(
                         radius: 32,
                         backgroundColor: primaryColor.withOpacity(0.12),
-                        backgroundImage: NetworkImage(avatarUrl),
-                        onBackgroundImageError: (_, __) {},
-                        child: Text(
-                          stu['name'].toString().substring(0, 1),
-                          style: TextStyle(color: primaryColor, fontSize: 24, fontWeight: FontWeight.bold),
-                        ),
+                        backgroundImage: hasPhoto ? NetworkImage(rawAvatar) : null,
+                        child: hasPhoto
+                            ? null
+                            : Icon(Icons.person_rounded, size: 34, color: primaryColor.withOpacity(0.7)),
                       ),
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                      if (hasPhoto)
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                          ),
+                          child: const Icon(Icons.fullscreen_rounded, size: 14, color: LaasyaColors.primary),
                         ),
-                        child: const Icon(Icons.fullscreen_rounded, size: 14, color: LaasyaColors.primary),
-                      ),
                     ],
                   ),
                 ),
@@ -775,7 +798,8 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                       final primaryColor = enrollments.isNotEmpty
                           ? (enrollments.first['course_color'] as Color? ?? LaasyaColors.primary)
                           : LaasyaColors.primary;
-                      final avatarUrl = stu['avatar_url'] as String? ?? TrainerDataStore.getStudentPhoto(stu['roll']?.toString() ?? stu['id']);
+                      final rawAvatar = stu['avatar_url']?.toString().trim();
+                      final hasPhoto = rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com');
                       final courseNames = enrollments.map((e) => e['course_short_title'] as String? ?? '').toSet().where((c) => c.isNotEmpty).join(', ');
                       final displayCourse = courseNames.isNotEmpty ? courseNames : 'Classical Dance';
 
@@ -800,18 +824,16 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             child: Row(
                               children: [
-                                // Student Image Avatar (Tappable to view full length photo)
+                                // Student Image Avatar (Tappable to view full length photo only if real photo exists)
                                 GestureDetector(
-                                  onTap: () => _showFullLengthPhoto(context, stu),
+                                  onTap: hasPhoto ? () => _showFullLengthPhoto(context, stu) : null,
                                   child: CircleAvatar(
                                     radius: 22,
                                     backgroundColor: primaryColor.withOpacity(0.14),
-                                    backgroundImage: NetworkImage(avatarUrl),
-                                    onBackgroundImageError: (_, __) {},
-                                    child: Text(
-                                      stu['name'].toString().substring(0, 1),
-                                      style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 16),
-                                    ),
+                                    backgroundImage: hasPhoto ? NetworkImage(rawAvatar) : null,
+                                    child: hasPhoto
+                                        ? null
+                                        : Icon(Icons.person_rounded, size: 24, color: primaryColor.withOpacity(0.7)),
                                   ),
                                 ),
                                 const SizedBox(width: 12),

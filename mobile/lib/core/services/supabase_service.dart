@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/supabase_constants.dart';
 import '../constants/api_constants.dart';
@@ -17,6 +18,7 @@ class SupabaseService {
 
   // Local demo session cache for resilient testing
   Map<String, dynamic>? _cachedProfile;
+  Map<String, dynamic>? get currentUserProfile => _cachedProfile;
   final List<Map<String, dynamic>> _mockAttendance = [];
   final List<Map<String, dynamic>> _mockBannerAnnouncements = [
     {
@@ -867,6 +869,69 @@ class SupabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getStudentSchedule() async {
+    final now = DateTime.now();
+    final dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final currentDayName = dayNames[now.weekday];
+
+    final enrolled = _cachedProfile?['enrolled_courses'];
+    if (enrolled is List && enrolled.isNotEmpty) {
+      final List<Map<String, dynamic>> realSchedule = [];
+      int idx = 1;
+
+      for (var c in enrolled) {
+        if (c is! Map) continue;
+        final courseTitle = c['title']?.toString() ?? 'Classical Arts';
+        final category = c['category']?.toString() ?? 'Classical Dance';
+        final batchName = c['batch_name']?.toString() ?? 'Batch';
+        final batchId = c['batch_id']?.toString() ?? 'b-$idx';
+        final trainer = c['trainer_name']?.toString() ?? 'Assigned Guru';
+        final room = c['room']?.toString() ?? 'Natya Mandapam (Room 101)';
+        final timings = c['timings']?.toString() ?? '05:00 PM - 06:30 PM';
+
+        // Extract days
+        List<String> days = [];
+        final rawTimings = timings.split('•');
+        final daysPart = rawTimings[0];
+        for (var d in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) {
+          if (daysPart.toLowerCase().contains(d.toLowerCase()) || daysPart.toLowerCase().contains(d.substring(0, 3).toLowerCase())) {
+            days.add(d);
+          }
+        }
+        if (days.isEmpty) {
+          days = ['Monday', 'Wednesday', 'Friday'];
+        }
+
+        for (var day in days) {
+          final isToday = day.toLowerCase() == currentDayName.toLowerCase();
+          final diff = (dayNames.indexOf(day) - now.weekday + 7) % 7;
+          final targetDate = now.add(Duration(days: diff));
+          final dateStr = DateFormat('dd-MMMM-yyyy').format(targetDate);
+
+          realSchedule.add({
+            'id': 'sch-${c['id']}-$day',
+            'course': courseTitle,
+            'category': category,
+            'batch': batchName,
+            'batch_id': batchId,
+            'trainer': trainer,
+            'time': rawTimings.length > 1 ? rawTimings[1].trim() : '05:00 PM - 06:30 PM',
+            'room': room,
+            'day': day,
+            'date': dateStr,
+            'status': 'Scheduled',
+            'is_today': isToday,
+            'is_tomorrow': (diff == 1),
+          });
+        }
+        idx++;
+      }
+
+      if (realSchedule.isNotEmpty) {
+        realSchedule.sort((a, b) => dayNames.indexOf(a['day']).compareTo(dayNames.indexOf(b['day'])));
+        return realSchedule;
+      }
+    }
+
     return [
       {
         'id': 'sch-1',

@@ -171,6 +171,9 @@ class _TrainerStudentCalendarScreenState extends State<TrainerStudentCalendarScr
       ...activeEnrollment,
     };
 
+    final rawAvatar = stu['avatar_url']?.toString().trim();
+    final hasPhoto = rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com');
+
     final attendanceMap = _store.getStudentMonthAttendance(
       student: mergedStudent,
       year: year,
@@ -229,10 +232,10 @@ class _TrainerStudentCalendarScreenState extends State<TrainerStudentCalendarScr
                   CircleAvatar(
                     radius: 28,
                     backgroundColor: Colors.white,
-                    child: Text(
-                      stu['name'].toString().substring(0, 1),
-                      style: TextStyle(color: themeColor, fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
+                    backgroundImage: hasPhoto ? NetworkImage(rawAvatar) : null,
+                    child: hasPhoto
+                        ? null
+                        : Icon(Icons.person_rounded, size: 30, color: themeColor),
                   ),
                   const SizedBox(width: 14),
                   Expanded(

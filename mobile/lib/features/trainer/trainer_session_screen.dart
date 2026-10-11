@@ -271,6 +271,8 @@ class _TrainerSessionScreenState extends State<TrainerSessionScreen> {
                         final currentStatus = _attendanceMap[studentId] ?? 'present';
                         final fullName = profile['full_name'] ?? studentItem['name'] ?? 'Student';
                         final rollNumber = student['roll_number'] ?? studentItem['roll_number'] ?? 'LCA-0';
+                        final rawAvatar = (profile['avatar_url'] ?? student['avatar_url'] ?? studentItem['avatar_url'])?.toString().trim();
+                        final hasPhoto = rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com');
 
                         return Container(
                           padding: const EdgeInsets.all(14),
@@ -296,13 +298,10 @@ class _TrainerSessionScreenState extends State<TrainerSessionScreen> {
                               CircleAvatar(
                                 radius: 20,
                                 backgroundColor: const Color(0xFF590231),
-                                child: Text(
-                                  fullName.toString().substring(0, 1).toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                                backgroundImage: hasPhoto ? NetworkImage(rawAvatar) : null,
+                                child: hasPhoto
+                                    ? null
+                                    : const Icon(Icons.person_rounded, size: 22, color: Colors.white70),
                               ),
                               const SizedBox(width: 12),
                               Expanded(

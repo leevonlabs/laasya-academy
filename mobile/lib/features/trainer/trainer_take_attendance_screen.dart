@@ -146,32 +146,14 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
             SizedBox(
               width: double.infinity,
               height: 44,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _showCloseClassConfirmation();
-                },
-                icon: const Icon(Icons.notifications_active_rounded, size: 18),
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF590231),
+                  backgroundColor: LaasyaColors.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                label: const Text('Close Class & Alert Parents', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              height: 40,
-              child: OutlinedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: LaasyaColors.primary,
-                  side: const BorderSide(color: Color(0xFFF0D5E4)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Done for Now', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('Done for Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ),
             ),
           ],
@@ -502,69 +484,6 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
             // 3. STATE: SUBMITTED or CLOSED (Editable till end of day)
             // =================================================================
             else if (_currentStatus == 'submitted' || _currentStatus == 'closed') ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: _currentStatus == 'closed' ? const Color(0xFFFFF2F8) : const Color(0xFFDEF7EC),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _currentStatus == 'closed'
-                        ? const Color(0xFFF0D5E4)
-                        : const Color(0xFF31C48D).withOpacity(0.6),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _currentStatus == 'closed' ? Icons.notifications_off_rounded : Icons.verified_rounded,
-                      color: _currentStatus == 'closed' ? const Color(0xFF8A064D) : const Color(0xFF03543F),
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _currentStatus == 'closed'
-                                ? 'Class Session Closed & Parents Notified'
-                                : 'Attendance Recorded & Saved for Today',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: _currentStatus == 'closed' ? const Color(0xFF8A064D) : const Color(0xFF03543F),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _currentStatus == 'closed'
-                                ? 'Attention chime was broadcast to student/parent devices. Editable till 11:59 PM today.'
-                                : 'Editable till 11:59 PM today ($todayFormatted). You can now close the class when completed.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: _currentStatus == 'closed' ? const Color(0xFF590231) : const Color(0xFF03543F),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: _enableEditing,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _currentStatus == 'closed' ? const Color(0xFF8A064D) : const Color(0xFF03543F),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: const Text('Edit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
               // Summary Stats
               Row(
                 children: [
@@ -575,6 +494,100 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                   _statBadge('Total', '${_students.length}', const Color(0xFFF3E8EE), LaasyaColors.primary),
                 ],
               ),
+
+              const SizedBox(height: 16),
+
+              // Close Class & Alert Parents Container (On top of student list)
+              if (_currentStatus != 'closed') ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF2F8),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFF0D5E4), width: 1.2),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF590231).withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.notifications_active_rounded, color: Color(0xFF590231), size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Conclude Session & Alert Parents',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF590231)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Finished today\'s class? Tap below to conclude this session and broadcast a 5-second pickup attention chime to parent & student mobile phones.',
+                        style: TextStyle(fontSize: 12, color: Colors.black87, height: 1.35),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: _showCloseClassConfirmation,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF590231),
+                            foregroundColor: Colors.white,
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.notifications_active_rounded, size: 18),
+                          label: const Text(
+                            'Close Class & Alert Parents',
+                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDEF7EC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF31C48D).withOpacity(0.6)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.check_circle_rounded, color: Color(0xFF03543F), size: 22),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Class Session Concluded • Parents Alerted',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF03543F), fontSize: 13),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              '5-second pickup attention chime was broadcast to parents\' devices.',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF03543F)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 16),
 
@@ -592,137 +605,99 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                 final isAbsent = status == 'absent';
                 final isUnmarked = status.isEmpty;
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isPresent
-                          ? const Color(0xFF31C48D).withOpacity(0.5)
-                          : isAbsent
-                              ? const Color(0xFFF98080).withOpacity(0.5)
-                              : Colors.grey.shade300,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: isPresent
-                            ? const Color(0xFFDEF7EC)
-                            : isAbsent
-                                ? const Color(0xFFFDE8E8)
-                                : Colors.grey.shade100,
-                        child: Text(
-                          stu['name'].toString().substring(0, 1),
-                          style: TextStyle(
-                            color: isPresent
-                                ? const Color(0xFF03543F)
-                                : isAbsent
-                                    ? const Color(0xFF991B1B)
-                                    : Colors.grey.shade700,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(stu['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                            Text(stu['roll']!, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: isPresent
-                              ? const Color(0xFFDEF7EC)
-                              : isAbsent
-                                  ? const Color(0xFFFDE8E8)
-                                  : Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          isUnmarked ? 'NOT MARKED' : (isPresent ? 'PRESENT' : 'ABSENT'),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isPresent
-                                ? const Color(0xFF03543F)
-                                : isAbsent
-                                    ? const Color(0xFF991B1B)
-                                    : Colors.grey.shade700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
+                    final rawAvatar = stu['avatar_url']?.toString().trim();
+                    final hasPhoto = rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com');
 
-              const SizedBox(height: 16),
-              if (_currentStatus != 'closed') ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: _showCloseClassConfirmation,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF590231),
-                      foregroundColor: Colors.white,
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    icon: const Icon(Icons.notifications_active_rounded, size: 20),
-                    label: const Text(
-                      'Close Class & Alert Parents',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ] else ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF2F8),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFF0D5E4)),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle_rounded, color: Color(0xFF8A064D), size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Class Session Concluded • Parents Alerted',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8A064D), fontSize: 13),
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isPresent
+                              ? const Color(0xFF31C48D).withOpacity(0.5)
+                              : isAbsent
+                                  ? const Color(0xFFF98080).withOpacity(0.5)
+                                  : Colors.grey.shade300,
+                        ),
                       ),
-                    ],
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: isPresent
+                                ? const Color(0xFFDEF7EC)
+                                : isAbsent
+                                    ? const Color(0xFFFDE8E8)
+                                    : Colors.grey.shade100,
+                            backgroundImage: hasPhoto ? NetworkImage(rawAvatar) : null,
+                            child: hasPhoto
+                                ? null
+                                : Icon(
+                                    Icons.person_rounded,
+                                    size: 18,
+                                    color: isPresent
+                                        ? const Color(0xFF03543F)
+                                        : isAbsent
+                                            ? const Color(0xFF991B1B)
+                                            : Colors.grey.shade700,
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(stu['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                                Text(stu['roll']!, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isPresent
+                                  ? const Color(0xFFDEF7EC)
+                                  : isAbsent
+                                      ? const Color(0xFFFDE8E8)
+                                      : Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              isUnmarked ? 'NOT MARKED' : (isPresent ? 'PRESENT' : 'ABSENT'),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isPresent
+                                    ? const Color(0xFF03543F)
+                                    : isAbsent
+                                        ? const Color(0xFF991B1B)
+                                        : Colors.grey.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: _enableEditing,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: themeColor,
+                        side: BorderSide(color: themeColor, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        backgroundColor: Colors.white,
+                      ),
+                      icon: const Icon(Icons.edit_calendar_rounded, size: 18),
+                      label: const Text('Edit Attendance of Today', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
-              ],
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: OutlinedButton.icon(
-                  onPressed: _enableEditing,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: themeColor,
-                    side: BorderSide(color: themeColor, width: 1.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  icon: const Icon(Icons.edit_rounded, size: 18),
-                  label: const Text('Edit Attendance For Today', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ),
             ]
 
             // =================================================================
@@ -850,6 +825,8 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                 final isPresent = status == 'present';
                 final isAbsent = status == 'absent';
                 final isUnmarked = status.isEmpty;
+                final rawAvatar = stu['avatar_url']?.toString().trim();
+                final hasPhoto = rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com');
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 9),
@@ -874,10 +851,14 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                       CircleAvatar(
                         radius: 20,
                         backgroundColor: themeColor.withOpacity(0.12),
-                        child: Text(
-                          stu['name'].toString().substring(0, 1),
-                          style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
+                        backgroundImage: hasPhoto ? NetworkImage(rawAvatar) : null,
+                        child: hasPhoto
+                            ? null
+                            : Icon(
+                                Icons.person_rounded,
+                                size: 22,
+                                color: themeColor.withOpacity(0.7),
+                              ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(

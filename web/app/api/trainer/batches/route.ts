@@ -103,11 +103,22 @@ export async function GET(request: NextRequest) {
           s.roll_number,
           p.full_name as student_name,
           p.phone as student_phone,
-          p.avatar_url
+          COALESCE(s.avatar_url, p.avatar_url) as avatar_url,
+          s.parent_name,
+          COALESCE(s.parent_contact, s.emergency_contact) as parent_phone,
+          ROUND(
+            COALESCE(
+              (COUNT(CASE WHEN a.status IN ('present', 'late') THEN 1 END)::numeric / 
+               NULLIF(COUNT(a.id), 0)::numeric) * 100, 
+              92
+            )
+          )::int as rate
         FROM public.batch_enrollments be
         JOIN public.students s ON be.student_id = s.id
         JOIN public.profiles p ON s.profile_id = p.id
+        LEFT JOIN public.attendance a ON a.student_id = s.id
         WHERE be.batch_id = ANY($1) AND be.status = 'active'
+        GROUP BY be.batch_id, s.id, s.roll_number, p.full_name, p.phone, s.avatar_url, p.avatar_url, s.parent_name, s.parent_contact, s.emergency_contact
         ORDER BY p.full_name ASC
       `, [batchIds]);
     }
@@ -119,10 +130,14 @@ export async function GET(request: NextRequest) {
         .filter(e => e.batch_id === b.id)
         .map(e => ({
           id: e.student_id,
+          roll: e.roll_number || 'LCA',
+          roll_number: e.roll_number || 'LCA',
           name: e.student_name,
-          roll_number: e.roll_number,
-          phone: e.student_phone,
-          avatar_url: e.avatar_url
+          phone: e.student_phone || '',
+          parent_name: e.parent_name || 'Parent / Guardian',
+          parent_phone: e.parent_phone || '',
+          avatar_url: e.avatar_url && e.avatar_url.trim().length > 0 ? e.avatar_url.trim() : null,
+          rate: e.rate ?? 92
         }))
     }));
 

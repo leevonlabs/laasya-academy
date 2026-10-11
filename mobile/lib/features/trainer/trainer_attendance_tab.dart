@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/colors.dart';
+import '../../core/services/supabase_service.dart';
 import 'trainer_data_store.dart';
 import 'trainer_take_attendance_screen.dart';
 
@@ -15,6 +16,103 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
   final TrainerDataStore _store = TrainerDataStore();
 
   @override
+  void initState() {
+    super.initState();
+    _syncData();
+  }
+
+  Future<void> _syncData() async {
+    final prof = SupabaseService().currentUserProfile;
+    await _store.syncFromApi(
+      trainerName: prof?['full_name'],
+      phone: prof?['phone'],
+    );
+    if (mounted) setState(() {});
+  }
+
+  void _showCloseClassConfirmation(Map<String, dynamic> item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.notifications_active_rounded, color: Color(0xFF590231), size: 24),
+            SizedBox(width: 10),
+            Text('Close Today\'s Class?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Conclude today\'s class session for ${item['course_short_title']} (${item['batch_name']})?',
+              style: const TextStyle(fontSize: 13, color: Colors.black87),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF2F8),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFF0D5E4)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.ring_volume_rounded, color: Color(0xFF590231), size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'This will send a 5-second attention alarm chime to parents\' phones reminding them to pick up their child.',
+                      style: TextStyle(fontSize: 11.5, color: Color(0xFF590231), height: 1.35),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'You can still edit student attendance until 11:59 PM today.',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _store.closeClassSession(
+                batchId: item['batch_id'] as String,
+                batchName: item['batch_name'] as String,
+                courseTitle: item['course_title'] as String,
+              );
+              setState(() {});
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Class session closed! Attention chime broadcast to parents.'),
+                  backgroundColor: Color(0xFF590231),
+                ),
+              );
+            },
+            icon: const Icon(Icons.check_circle_rounded, size: 18),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF590231),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            label: const Text('Confirm & Alert', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final dayOfWeek = DateFormat('EEEE').format(now);
@@ -25,7 +123,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
       backgroundColor: const Color(0xFFFBF8FA),
       body: RefreshIndicator(
         onRefresh: () async {
-          setState(() {});
+          await _syncData();
         },
         color: LaasyaColors.primary,
         child: SingleChildScrollView(
@@ -195,6 +293,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                   final students = item['students'] as List;
                   final isSubmitted = status == 'submitted';
                   final isInProgress = status == 'in_progress';
+                  final isClosed = status == 'closed';
 
                   return GestureDetector(
                     onTap: () async {
@@ -212,8 +311,10 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isSubmitted ? const Color(0xFF31C48D).withOpacity(0.5) : const Color(0xFFF0D5E4),
-                          width: isSubmitted ? 1.5 : 1.2,
+                          color: isClosed
+                              ? const Color(0xFF31C48D).withOpacity(0.6)
+                              : (isSubmitted ? const Color(0xFF590231).withOpacity(0.4) : const Color(0xFFF0D5E4)),
+                          width: (isClosed || isSubmitted) ? 1.5 : 1.2,
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -252,21 +353,27 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: isSubmitted
+                                    color: isClosed
                                         ? const Color(0xFFDEF7EC)
-                                        : (isInProgress ? const Color(0xFFFEF3C7) : const Color(0xFFF3E8EE)),
+                                        : (isSubmitted
+                                            ? const Color(0xFFF3E8EE)
+                                            : (isInProgress ? const Color(0xFFFEF3C7) : const Color(0xFFF3E8EE))),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    isSubmitted
-                                        ? 'SUBMITTED'
-                                        : (isInProgress ? 'IN PROGRESS' : 'NOT STARTED'),
+                                    isClosed
+                                        ? 'COMPLETED'
+                                        : (isSubmitted
+                                            ? 'ATTENDANCE TAKEN'
+                                            : (isInProgress ? 'IN PROGRESS' : 'NOT STARTED')),
                                     style: TextStyle(
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.bold,
-                                      color: isSubmitted
+                                      color: isClosed
                                           ? const Color(0xFF03543F)
-                                          : (isInProgress ? const Color(0xFF92400E) : LaasyaColors.primary),
+                                          : (isSubmitted
+                                              ? LaasyaColors.primary
+                                              : (isInProgress ? const Color(0xFF92400E) : Colors.grey.shade700)),
                                     ),
                                   ),
                                 ),
@@ -354,35 +461,59 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                                 Row(
                                   children: [
                                     Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          await Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => TrainerTakeAttendanceScreen(classInfo: item),
+                                      child: isSubmitted
+                                          ? ElevatedButton.icon(
+                                              onPressed: () => _showCloseClassConfirmation(item),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFF590231),
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                padding: const EdgeInsets.symmetric(vertical: 11),
+                                                elevation: 1,
+                                              ),
+                                              icon: const Icon(
+                                                Icons.notifications_active_rounded,
+                                                size: 16,
+                                                color: Colors.white,
+                                              ),
+                                              label: const Text(
+                                                'Close Class & Alert Parents',
+                                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                              ),
+                                            )
+                                          : ElevatedButton.icon(
+                                              onPressed: () async {
+                                                await Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) => TrainerTakeAttendanceScreen(classInfo: item),
+                                                  ),
+                                                );
+                                                setState(() {});
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: isClosed
+                                                    ? const Color(0xFF03543F)
+                                                    : cColor,
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                padding: const EdgeInsets.symmetric(vertical: 11),
+                                                elevation: 1,
+                                              ),
+                                              icon: Icon(
+                                                isClosed
+                                                    ? Icons.edit_calendar_rounded
+                                                    : (isInProgress ? Icons.pending_actions_rounded : Icons.how_to_reg_rounded),
+                                                size: 16,
+                                                color: Colors.white,
+                                              ),
+                                              label: Text(
+                                                isClosed
+                                                    ? 'Edit Attendance (Today)'
+                                                    : (isInProgress ? 'Continue Attendance' : 'Start Attendance'),
+                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                              ),
                                             ),
-                                          );
-                                          setState(() {});
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: isSubmitted ? const Color(0xFF03543F) : cColor,
-                                          foregroundColor: Colors.white,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          padding: const EdgeInsets.symmetric(vertical: 11),
-                                          elevation: 1,
-                                        ),
-                                        icon: Icon(
-                                          isSubmitted ? Icons.edit_outlined : Icons.how_to_reg_rounded,
-                                          size: 16,
-                                          color: Colors.white,
-                                        ),
-                                        label: Text(
-                                          isSubmitted
-                                              ? 'Edit Attendance (Today)'
-                                              : (isInProgress ? 'Continue Attendance' : 'Start Attendance'),
-                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
                                     ),
                                   ],
                                 ),

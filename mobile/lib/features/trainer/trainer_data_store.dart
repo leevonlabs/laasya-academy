@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import '../../core/constants/api_constants.dart';
 
 class TrainerDataStore {
   static final TrainerDataStore _instance = TrainerDataStore._internal();
@@ -6,6 +9,9 @@ class TrainerDataStore {
   TrainerDataStore._internal() {
     _initializeData();
   }
+
+  bool _isSynced = false;
+  bool get isSynced => _isSynced;
 
   // 3 Faculty Disciplines handled by Guru Smt. Anusha Sumesh
   final List<Map<String, dynamic>> courses = [
@@ -215,6 +221,146 @@ class TrainerDataStore {
     }
   }
 
+  Future<void> syncFromApi({String? trainerName, String? phone}) async {
+    try {
+      final tName = trainerName ?? '';
+      final tPhone = phone ?? '';
+      final nameParam = Uri.encodeComponent(tName);
+      final phoneParam = Uri.encodeComponent(tPhone);
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam');
+      final res = await http.get(uri).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['success'] == true && decoded['batches'] is List) {
+          final liveBatches = List<Map<String, dynamic>>.from(decoded['batches']);
+          if (liveBatches.isNotEmpty) {
+            _buildCoursesFromLiveBatches(liveBatches);
+            _isSynced = true;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('TrainerDataStore syncFromApi notice: $e');
+    }
+  }
+
+  void _buildCoursesFromLiveBatches(List<Map<String, dynamic>> liveBatches) {
+    final Map<String, Map<String, dynamic>> courseMap = {};
+
+    for (var b in liveBatches) {
+      final cId = (b['course_id'] ?? b['id']).toString();
+      final cTitle = (b['course_title'] ?? 'Classical Arts').toString();
+      final cCategory = (b['course_category'] ?? 'Classical Dance').toString();
+
+      if (!courseMap.containsKey(cId)) {
+        courseMap[cId] = {
+          'id': cId,
+          'title': cTitle,
+          'short_title': cTitle.replaceAll(' Classical Dance', '').replaceAll(' Dance', '').replaceAll(' Music', '').trim(),
+          'category': cCategory,
+          'code': 'LCA-${cTitle.substring(0, cTitle.length >= 2 ? 2 : cTitle.length).toUpperCase()}',
+          'icon': _getCourseIcon(cTitle),
+          'theme_color': _getCourseColor(cTitle),
+          'batches': <Map<String, dynamic>>[],
+        };
+      }
+
+      final rawStudents = b['students'] is List ? (b['students'] as List) : [];
+      final List<Map<String, dynamic>> studentList = [];
+
+      for (var s in rawStudents) {
+        if (s is Map) {
+          final rawAvatar = s['avatar_url']?.toString().trim();
+          final validAvatar = (rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com'))
+              ? rawAvatar
+              : null;
+
+          studentList.add({
+            'id': s['id']?.toString() ?? '',
+            'roll': s['roll']?.toString() ?? s['roll_number']?.toString() ?? 'LCA',
+            'name': s['name']?.toString() ?? 'Disciple',
+            'phone': s['phone']?.toString() ?? '',
+            'parent_name': s['parent_name']?.toString() ?? 'Parent / Guardian',
+            'parent_phone': s['parent_phone']?.toString() ?? '',
+            'rate': (s['rate'] as num?)?.toInt() ?? 92,
+            'avatar_url': validAvatar,
+          });
+        }
+      }
+
+      final daysRaw = b['days_of_week'];
+      List<String> daysList = [];
+      if (daysRaw is List) {
+        daysList = daysRaw.map((e) => e.toString()).toList();
+      } else if (daysRaw != null && daysRaw.toString().isNotEmpty) {
+        daysList = daysRaw.toString().split(',').map((e) => e.trim()).toList();
+      }
+      if (daysList.isEmpty) {
+        daysList = ['Monday', 'Wednesday', 'Friday'];
+      }
+
+      String daysDisplay = daysList.map((d) {
+        if (d.length > 3) return d.substring(0, 3);
+        return d;
+      }).join(', ');
+
+      final timings = (b['start_time'] != null && b['end_time'] != null)
+          ? '${b['start_time']} - ${b['end_time']}'
+          : '05:00 PM - 06:30 PM';
+
+      final batchMap = {
+        'id': b['id'].toString(),
+        'batch_number': b['name']?.toString() ?? 'Batch',
+        'name': b['name']?.toString() ?? 'Batch Session',
+        'timings': timings,
+        'room': b['room_or_hall']?.toString() ?? 'Natya Mandapam (Room 101)',
+        'days': daysList,
+        'schedule_days_display': daysDisplay,
+        'students': studentList,
+      };
+
+      (courseMap[cId]!['batches'] as List<Map<String, dynamic>>).add(batchMap);
+    }
+
+    if (courseMap.isNotEmpty) {
+      courses.clear();
+      courses.addAll(courseMap.values);
+    }
+
+    final todayKey = _getTodayDateKey();
+    if (!_dailyAttendanceRecords.containsKey(todayKey)) {
+      _dailyAttendanceRecords[todayKey] = {};
+    }
+    for (var c in courses) {
+      for (var b in (c['batches'] as List)) {
+        final bId = b['id'].toString();
+        _dailyAttendanceRecords[todayKey]!.putIfAbsent(bId, () => {});
+        _sessionStatus.putIfAbsent('$todayKey:$bId', () => 'not_started');
+      }
+    }
+  }
+
+  Color _getCourseColor(String title) {
+    final lower = title.toLowerCase();
+    if (lower.contains('bharat')) return const Color(0xFF590231);
+    if (lower.contains('kuchipudi')) return const Color(0xFF6B21A8);
+    if (lower.contains('carnatic') || lower.contains('vocal') || lower.contains('music')) return const Color(0xFF0F766E);
+    if (lower.contains('violin')) return const Color(0xFFB45309);
+    if (lower.contains('mridangam') || lower.contains('tablas')) return const Color(0xFF9A3412);
+    if (lower.contains('kathak')) return const Color(0xFFBE185D);
+    return const Color(0xFF590231);
+  }
+
+  IconData _getCourseIcon(String title) {
+    final lower = title.toLowerCase();
+    if (lower.contains('bharat') || lower.contains('dance')) return Icons.self_improvement_rounded;
+    if (lower.contains('kuchipudi')) return Icons.auto_awesome_rounded;
+    if (lower.contains('carnatic') || lower.contains('vocal') || lower.contains('music')) return Icons.music_note_rounded;
+    if (lower.contains('violin')) return Icons.music_video_rounded;
+    if (lower.contains('mridangam')) return Icons.album_rounded;
+    return Icons.school_rounded;
+  }
+
   String _getTodayDateKey() {
     final now = DateTime.now();
     return "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
@@ -416,7 +562,9 @@ class TrainerDataStore {
               'parent_name': stu['parent_name'],
               'parent_phone': stu['parent_phone'],
               'rate': stu['rate'],
-              'avatar_url': stu['avatar_url'] ?? getStudentPhoto(stu['roll']?.toString() ?? sId),
+              'avatar_url': (stu['avatar_url'] != null && stu['avatar_url'].toString().trim().isNotEmpty && !stu['avatar_url'].toString().contains('unsplash.com'))
+                  ? stu['avatar_url'].toString().trim()
+                  : null,
               // Primary enrollment details for calendar defaults
               'course_id': course['id'],
               'course_title': course['title'],
@@ -515,18 +663,8 @@ class TrainerDataStore {
     return monthMap;
   }
 
-  static String getStudentPhoto(String id) {
-    final photos = [
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&auto=format&fit=crop&q=80',
-    ];
-    final idx = id.hashCode.abs() % photos.length;
-    return photos[idx];
+  static String? getStudentPhoto(String id) {
+    // Only real images from the database are permitted; zero random stock photos.
+    return null;
   }
 }

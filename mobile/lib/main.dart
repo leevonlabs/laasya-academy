@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/supabase_service.dart';
+import 'core/services/permission_service.dart';
 import 'features/auth/portal_landing_screen.dart';
 import 'features/trainer/trainer_main_scaffold.dart';
 import 'features/student/student_main_scaffold.dart';
@@ -40,6 +41,9 @@ class _AuthGateState extends State<AuthGate> {
   void initState() {
     super.initState();
     _checkAuthState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PermissionService.requestAppPermissions(context);
+    });
   }
 
   Future<void> _checkAuthState() async {
