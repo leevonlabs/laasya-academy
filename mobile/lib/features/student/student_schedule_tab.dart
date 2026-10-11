@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
 
@@ -57,10 +58,9 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
     final todayClasses = _schedule.where((item) {
-      final isToday = item['is_today'] == true;
-      final day = (item['day'] ?? '').toString().toLowerCase();
-      return isToday || day == 'today' || day == 'monday';
+      return item['is_today'] == true;
     }).toList();
 
     final weekClasses = _schedule.where((item) {
@@ -100,7 +100,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                       Expanded(
                         child: _scheduleTabButton(
                           title: "Today's Schedule",
-                          subtitle: '05 Oct 2026',
+                          subtitle: DateFormat('dd MMM yyyy').format(now),
                           count: todayClasses.length,
                           isSelected: _selectedDay == 'today',
                           onTap: () => setState(() => _selectedDay = 'today'),
@@ -138,6 +138,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                         _weekDayChip('Thursday', 'Thu'),
                         _weekDayChip('Friday', 'Fri'),
                         _weekDayChip('Saturday', 'Sat'),
+                        _weekDayChip('Sunday', 'Sun'),
                       ],
                     ),
                   ),

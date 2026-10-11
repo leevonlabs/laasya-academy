@@ -15,6 +15,8 @@ class TrainerAttendanceTab extends StatefulWidget {
 class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
   final TrainerDataStore _store = TrainerDataStore();
 
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
@@ -27,7 +29,9 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
       trainerName: prof?['full_name'],
       phone: prof?['phone'],
     );
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _showCloseClassConfirmation(Map<String, dynamic> item) {
@@ -121,7 +125,9 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8FA),
-      body: RefreshIndicator(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: LaasyaColors.primary))
+          : RefreshIndicator(
         onRefresh: () async {
           await _syncData();
         },

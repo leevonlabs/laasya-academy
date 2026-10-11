@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../core/constants/api_constants.dart';
+import '../../core/services/supabase_service.dart';
 
 class TrainerDataStore {
   static final TrainerDataStore _instance = TrainerDataStore._internal();
@@ -223,11 +224,14 @@ class TrainerDataStore {
 
   Future<void> syncFromApi({String? trainerName, String? phone}) async {
     try {
-      final tName = trainerName ?? '';
-      final tPhone = phone ?? '';
+      final prof = SupabaseService().currentUserProfile;
+      final tName = (trainerName ?? prof?['full_name'] ?? '').toString().trim();
+      final tPhone = (phone ?? prof?['phone'] ?? '').toString().trim();
+      final tId = (prof?['id'] ?? '').toString().trim();
       final nameParam = Uri.encodeComponent(tName);
       final phoneParam = Uri.encodeComponent(tPhone);
-      final uri = Uri.parse('${ApiConstants.baseUrl}/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam');
+      final idParam = Uri.encodeComponent(tId);
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/trainer/batches?trainerId=$idParam&trainerName=$nameParam&phone=$phoneParam');
       final res = await http.get(uri).timeout(const Duration(seconds: 5));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -388,7 +392,7 @@ class TrainerDataStore {
     for (var course in courses) {
       for (var batch in (course['batches'] as List)) {
         final days = List<String>.from(batch['days'] ?? []);
-        final isToday = days.contains(currentDayName);
+        final isToday = days.any((d) => d.toString().trim().toLowerCase() == currentDayName.toLowerCase());
 
         if (isToday) {
           final batchId = batch['id'] as String;
@@ -412,32 +416,6 @@ class TrainerDataStore {
             'status': status,
           });
         }
-      }
-    }
-
-    if (scheduledToday.isEmpty) {
-      for (var course in courses) {
-        final batch = (course['batches'] as List).first;
-        final batchId = batch['id'] as String;
-        final status = _sessionStatus['$todayKey:$batchId'] ?? 'not_started';
-        final students = List<Map<String, dynamic>>.from(batch['students']);
-
-        scheduledToday.add({
-          'course': course,
-          'batch': batch,
-          'course_id': course['id'],
-          'course_title': course['title'],
-          'course_short_title': course['short_title'],
-          'course_color': course['theme_color'],
-          'course_icon': course['icon'],
-          'batch_id': batchId,
-          'batch_number': batch['batch_number'],
-          'batch_name': batch['name'],
-          'timings': batch['timings'],
-          'room': batch['room'],
-          'students': students,
-          'status': status,
-        });
       }
     }
 
@@ -512,6 +490,7 @@ class TrainerDataStore {
     required String batchId,
     required String batchName,
     required String courseTitle,
+    String? trainerName,
   }) {
     final todayKey = _getTodayDateKey();
     _sessionStatus['$todayKey:$batchId'] = 'closed';
@@ -522,6 +501,39 @@ class TrainerDataStore {
       'timestamp': DateTime.now().toIso8601String(),
       'message': 'Today\'s class for $courseTitle ($batchName) has concluded. Please come and take your child back from the academy hall.',
     };
+
+    _broadcastAlertToServer(
+      batchId: batchId,
+      batchName: batchName,
+      courseTitle: courseTitle,
+      trainerName: trainerName,
+    );
+  }
+
+  Future<void> _broadcastAlertToServer({
+    required String batchId,
+    required String batchName,
+    required String courseTitle,
+    String? trainerName,
+  }) async {
+    try {
+      final prof = SupabaseService().currentUserProfile;
+      final tName = trainerName ?? prof?['full_name'] ?? 'Assigned Guru';
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/sessions/alerts');
+      await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'batch_id': batchId,
+          'batch_name': batchName,
+          'course_title': courseTitle,
+          'trainer_name': tName,
+          'message': 'The $courseTitle ($batchName) session has concluded. Please come and take your child back from the academy hall safely.',
+        }),
+      ).timeout(const Duration(seconds: 4));
+    } catch (e) {
+      debugPrint('Error broadcasting session alert to server: $e');
+    }
   }
 
   bool isClassClosed(String batchId) {

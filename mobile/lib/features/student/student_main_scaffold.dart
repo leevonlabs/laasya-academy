@@ -1,6 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
+import '../../core/services/supabase_service.dart';
 import '../trainer/trainer_data_store.dart';
 import 'student_dashboard_tab.dart';
 import 'student_courses_tab.dart';
@@ -18,17 +23,70 @@ class StudentMainScaffold extends StatefulWidget {
 
 class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   int _currentIndex = 0;
+  Timer? _alertPollTimer;
+  final Set<String> _processedAlertIds = {};
+  bool _isPolling = false;
 
   @override
   void initState() {
     super.initState();
     TrainerDataStore.classClosedAlertNotifier.addListener(_onClassClosedAlert);
+    _startNetworkAlertPolling();
   }
 
   @override
   void dispose() {
+    _alertPollTimer?.cancel();
     TrainerDataStore.classClosedAlertNotifier.removeListener(_onClassClosedAlert);
     super.dispose();
+  }
+
+  void _startNetworkAlertPolling() {
+    _alertPollTimer?.cancel();
+    // Poll every 3 seconds for live class conclusion alerts from Gurus
+    _alertPollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollSessionAlerts());
+  }
+
+  Future<void> _pollSessionAlerts() async {
+    if (_isPolling || !mounted) return;
+    _isPolling = true;
+    try {
+      final prof = SupabaseService().currentUserProfile;
+      final enrolled = prof?['enrolled_courses'];
+      String batchIdsParam = 'all';
+      if (enrolled is List && enrolled.isNotEmpty) {
+        final bIds = enrolled
+            .map((e) => e is Map ? e['batch_id']?.toString() : null)
+            .where((id) => id != null && id.isNotEmpty)
+            .toList();
+        if (bIds.isNotEmpty) {
+          batchIdsParam = bIds.join(',');
+        }
+      }
+
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/sessions/alerts?batchIds=$batchIdsParam&sinceSeconds=60');
+      final res = await http.get(uri).timeout(const Duration(seconds: 3));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['success'] == true && decoded['alerts'] is List) {
+          final alerts = List<Map<String, dynamic>>.from(decoded['alerts']);
+          for (var a in alerts) {
+            final alertId = a['id']?.toString() ?? '';
+            if (alertId.isNotEmpty && !_processedAlertIds.contains(alertId)) {
+              _processedAlertIds.add(alertId);
+              if (mounted) {
+                _showClassClosedAttentionAlarm(a);
+              }
+              break;
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Ignore network hiccup
+    } finally {
+      _isPolling = false;
+    }
   }
 
   void _onClassClosedAlert() {
@@ -48,6 +106,10 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     int secondsRemaining = 5;
     Timer? ringTimer;
 
+    // Trigger immediate alert sound and haptic vibration
+    SystemSound.play(SystemSoundType.alert);
+    HapticFeedback.heavyImpact();
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -55,6 +117,8 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             ringTimer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
+              SystemSound.play(SystemSoundType.alert);
+              HapticFeedback.vibrate();
               if (secondsRemaining > 1) {
                 if (ctx.mounted) {
                   setDialogState(() {

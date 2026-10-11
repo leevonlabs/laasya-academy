@@ -569,6 +569,53 @@ class SupabaseService {
   // TRAINER METHODS
   // ---------------------------------------------------------------------------
   Future<List<Map<String, dynamic>>> getTrainerTodaySessions() async {
+    final batches = await getTrainerBatches();
+    final now = DateTime.now();
+    final dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final currentDayName = dayNames[now.weekday];
+
+    final List<Map<String, dynamic>> todaySessions = [];
+    for (var b in batches) {
+      final daysRaw = b['days_of_week'];
+      List<String> days = [];
+      if (daysRaw is List) {
+        days = daysRaw.map((e) => e.toString()).toList();
+      } else if (daysRaw != null) {
+        days = daysRaw.toString().split(',').map((e) => e.trim()).toList();
+      }
+
+      final isToday = days.any((d) => d.trim().toLowerCase() == currentDayName.toLowerCase());
+      if (isToday) {
+        final enrolledCount = b['enrolled_count'] ?? (b['students'] is List ? (b['students'] as List).length : 0);
+        todaySessions.add({
+          'id': b['id'],
+          'session_date': DateFormat('yyyy-MM-dd').format(now),
+          'start_time': b['start_time'] ?? '17:00',
+          'end_time': b['end_time'] ?? '18:30',
+          'status': 'scheduled',
+          'check_in_code': '482910',
+          'batch_id': b['id'],
+          'batches': {
+            'id': b['id'],
+            'name': b['name'],
+            'room_or_hall': b['room_or_hall'] ?? 'Natya Mandapam (Room 101)',
+            'max_capacity': b['max_capacity'] ?? 20,
+            'enrolled_count': enrolledCount,
+            'courses': {
+              'id': b['course_id'],
+              'title': b['course_title'] ?? 'Classical Dance',
+              'category': b['course_category'] ?? 'Classical Arts',
+            }
+          }
+        });
+      }
+    }
+
+    if (todaySessions.isNotEmpty) {
+      return todaySessions;
+    }
+
+    // Direct Supabase fallback if initialized
     if (_isInitialized && _client != null) {
       try {
         final user = _client!.auth.currentUser;
@@ -587,54 +634,11 @@ class SupabaseService {
           }
         }
       } catch (e) {
-        debugPrint('Cloud query failed: $e. Returning mock today sessions.');
+        debugPrint('Cloud query failed: $e.');
       }
     }
 
-    return [
-      {
-        'id': 'sess-1',
-        'session_date': DateTime.now().toIso8601String().split('T').first,
-        'start_time': '17:00',
-        'end_time': '18:30',
-        'status': 'scheduled',
-        'check_in_code': '482910',
-        'batch_id': 'batch-201',
-        'batches': {
-          'id': 'batch-201',
-          'name': 'Bharathanatyam - Batch A (Beginners)',
-          'room_or_hall': 'Natya Mandapam (Room 101)',
-          'max_capacity': 20,
-          'enrolled_count': 14,
-          'courses': {
-            'id': 'c-1',
-            'title': 'Bharathanatyam',
-            'category': 'Classical Dance',
-          }
-        }
-      },
-      {
-        'id': 'sess-2',
-        'session_date': DateTime.now().toIso8601String().split('T').first,
-        'start_time': '18:45',
-        'end_time': '20:00',
-        'status': 'scheduled',
-        'check_in_code': '923841',
-        'batch_id': 'batch-202',
-        'batches': {
-          'id': 'batch-202',
-          'name': 'Bharathanatyam - Varnam Workshop (Intermediate)',
-          'room_or_hall': 'Saraswathi Nilayam (Hall 2)',
-          'max_capacity': 15,
-          'enrolled_count': 12,
-          'courses': {
-            'id': 'c-1',
-            'title': 'Bharathanatyam',
-            'category': 'Classical Dance',
-          }
-        }
-      }
-    ];
+    return todaySessions;
   }
 
   Future<List<Map<String, dynamic>>> getTrainerBatches() async {
@@ -643,9 +647,11 @@ class SupabaseService {
       final prof = _cachedProfile;
       final tName = prof?['full_name'] ?? '';
       final tPhone = prof?['phone'] ?? '';
+      final tId = prof?['id'] ?? '';
       final nameParam = Uri.encodeComponent(tName);
       final phoneParam = Uri.encodeComponent(tPhone);
-      final uri = Uri.parse('${ApiConstants.baseUrl}/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam');
+      final idParam = Uri.encodeComponent(tId);
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/trainer/batches?trainerId=$idParam&trainerName=$nameParam&phone=$phoneParam');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -873,6 +879,10 @@ class SupabaseService {
     final dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     final currentDayName = dayNames[now.weekday];
 
+    if (_cachedProfile == null) {
+      await getCurrentUserProfile();
+    }
+
     final enrolled = _cachedProfile?['enrolled_courses'];
     if (enrolled is List && enrolled.isNotEmpty) {
       final List<Map<String, dynamic>> realSchedule = [];
@@ -890,15 +900,29 @@ class SupabaseService {
 
         // Extract days
         List<String> days = [];
-        final rawTimings = timings.split('•');
-        final daysPart = rawTimings[0];
-        for (var d in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) {
-          if (daysPart.toLowerCase().contains(d.toLowerCase()) || daysPart.toLowerCase().contains(d.substring(0, 3).toLowerCase())) {
-            days.add(d);
+        if (c['days_of_week'] is List) {
+          days = (c['days_of_week'] as List).map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+        }
+        if (days.isEmpty) {
+          final rawTimings = timings.split(RegExp(r'[•·\-]'));
+          final daysPart = rawTimings[0];
+          for (var d in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) {
+            if (daysPart.toLowerCase().contains(d.toLowerCase()) || daysPart.toLowerCase().contains(d.substring(0, 3).toLowerCase())) {
+              days.add(d);
+            }
           }
         }
         if (days.isEmpty) {
           days = ['Monday', 'Wednesday', 'Friday'];
+        }
+
+        String classTime = '05:00 PM - 06:30 PM';
+        if (c['start_time'] != null && c['end_time'] != null) {
+          classTime = '${c['start_time']} - ${c['end_time']}';
+        } else if (timings.contains('•')) {
+          classTime = timings.split('•').last.trim();
+        } else if (timings.contains('-')) {
+          classTime = timings.trim();
         }
 
         for (var day in days) {
@@ -914,7 +938,7 @@ class SupabaseService {
             'batch': batchName,
             'batch_id': batchId,
             'trainer': trainer,
-            'time': rawTimings.length > 1 ? rawTimings[1].trim() : '05:00 PM - 06:30 PM',
+            'time': classTime,
             'room': room,
             'day': day,
             'date': dateStr,

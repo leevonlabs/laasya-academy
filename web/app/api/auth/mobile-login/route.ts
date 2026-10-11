@@ -196,9 +196,26 @@ export async function POST(request: NextRequest) {
           const advance = Number(student.advance_paid) || 0;
           const due = Math.max(0, fee - advance);
 
+          function formatTime12(timeStr?: string): string {
+            if (!timeStr) return '';
+            const parts = timeStr.trim().split(':');
+            if (parts.length < 2) return timeStr;
+            let hours = parseInt(parts[0], 10);
+            const minutes = parts[1];
+            if (isNaN(hours)) return timeStr;
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12;
+            return `${hours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+          }
+
           const formattedEnrollments = enrollments.map(e => {
-            const days = Array.isArray(e.days_of_week) ? e.days_of_week.join(', ') : 'Weekly';
-            const times = e.start_time && e.end_time ? ` • ${e.start_time} - ${e.end_time}` : '';
+            const daysList = Array.isArray(e.days_of_week)
+              ? e.days_of_week
+              : (typeof e.days_of_week === 'string' ? e.days_of_week.split(',').map((s: string) => s.trim()) : ['Weekly']);
+            const days = daysList.join(', ');
+            const startTime12 = formatTime12(e.start_time);
+            const endTime12 = formatTime12(e.end_time);
+            const times = startTime12 && endTime12 ? ` • ${startTime12} - ${endTime12}` : '';
             return {
               id: e.course_id,
               title: e.course_title,
@@ -207,6 +224,9 @@ export async function POST(request: NextRequest) {
               trainer_name: e.trainer_name || 'Assigned Guru',
               batch_name: e.batch_name || 'Batch',
               batch_id: e.batch_id,
+              days_of_week: daysList,
+              start_time: startTime12 || e.start_time,
+              end_time: endTime12 || e.end_time,
               timings: `${days}${times}`,
               room: e.room_or_hall || 'Natya Mandapam (Room 101)',
               start_date: '01 Jan 2026',
