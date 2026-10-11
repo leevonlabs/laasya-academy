@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
 import 'trainer_create_share_video_screen.dart';
 
 class TrainerShareVideoScreen extends StatefulWidget {
@@ -54,7 +55,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
       final nameParam = Uri.encodeComponent(_trainerName);
       final phoneParam = Uri.encodeComponent(_trainerPhone);
       final uri = Uri.parse(
-        'http://localhost:3000/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam',
+        '${ApiConstants.baseUrl}/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam',
       );
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
@@ -71,7 +72,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
 
   Future<void> _loadSharedVideos() async {
     try {
-      final uri = Uri.parse('http://localhost:3000/api/video-library');
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/video-library');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
@@ -153,7 +154,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
 
     if (confirm == true) {
       try {
-        final res = await http.delete(Uri.parse('http://localhost:3000/api/video-library/$id'));
+        final res = await http.delete(Uri.parse('${ApiConstants.baseUrl}/api/video-library/$id'));
         if (res.statusCode == 200) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

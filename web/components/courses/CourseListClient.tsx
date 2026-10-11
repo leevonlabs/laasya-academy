@@ -31,6 +31,7 @@ import {
   Lock
 } from 'lucide-react';
 import CourseImageUploadInput from '@/components/common/CourseImageUploadInput';
+import AiEnhanceButton from '@/components/common/AiEnhanceButton';
 
 const COURSE_GURUS_MAP: Record<string, string> = {
   'Bharathanatyam': 'Smt. Anusha Sumesh (Founder & Guru)',
@@ -1328,14 +1329,30 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
               </div>
 
               <div>
-                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                  Course Description & Curriculum Details
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
+                    Course Description & Curriculum Details
+                  </label>
+                  <AiEnhanceButton
+                    value={editDesc}
+                    onEnhance={(val) => setEditDesc(val)}
+                    context="classical dance, music, fine arts academy course syllabus and curriculum description"
+                    size="xs"
+                  />
+                </div>
                 <textarea
                   rows={3}
                   value={editDesc}
-                  onChange={(e) => setEditDesc(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
+                  onChange={(e) => {
+                    setEditDesc(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] min-h-[80px] overflow-hidden resize-y transition-all"
                 />
               </div>
 
@@ -1514,15 +1531,31 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
               </div>
 
               <div>
-                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                  Course Description & Curriculum
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
+                    Course Description & Curriculum
+                  </label>
+                  <AiEnhanceButton
+                    value={newDesc}
+                    onEnhance={(val) => setNewDesc(val)}
+                    context="classical dance, music, fine arts academy course syllabus and curriculum description"
+                    size="xs"
+                  />
+                </div>
                 <textarea
                   rows={3}
                   placeholder="Complete description of the course syllabus, target age, prerequisites..."
                   value={newDesc}
-                  onChange={(e) => setNewDesc(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D]"
+                  onChange={(e) => {
+                    setNewDesc(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] min-h-[80px] overflow-hidden resize-y transition-all"
                 />
               </div>
 

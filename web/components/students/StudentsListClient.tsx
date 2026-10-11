@@ -29,7 +29,8 @@ import {
   AlertTriangle,
   ZoomIn,
   Maximize2,
-  ArrowLeft
+  ArrowLeft,
+  Receipt
 } from 'lucide-react';
 
 interface Props {
@@ -114,11 +115,17 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   const [editJoiningDate, setEditJoiningDate] = useState('');
   const [editAdvancePaid, setEditAdvancePaid] = useState<number>(0);
   const [editStatus, setEditStatus] = useState<'active' | 'inactive' | 'suspended'>('active');
-  const [editSelectedCourseIds, setEditSelectedCourseIds] = useState<string[]>([]);
-  const [editSelectedBatchIds, setEditSelectedBatchIds] = useState<string[]>([]);
+  const [editCourseSelections, setEditCourseSelections] = useState<{ courseId: string; batchIds: string[] }[]>([]);
+  const [activeEditCourseId, setActiveEditCourseId] = useState<string>('');
+  const editSelectedCourseIds = useMemo(() => {
+    return Array.from(new Set(editCourseSelections.map(s => s.courseId).filter(Boolean)));
+  }, [editCourseSelections]);
+  const editSelectedBatchIds = useMemo(() => {
+    return Array.from(new Set(editCourseSelections.flatMap(s => s.batchIds)));
+  }, [editCourseSelections]);
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // 3. Register New Student Modal
+  // 3. Register New Student
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [fullName, setFullName] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState<string>('');
@@ -133,9 +140,18 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   const [address, setAddress] = useState('');
   const [joiningDate, setJoiningDate] = useState('2026-09-30');
   const [advancePaid, setAdvancePaid] = useState<number>(0);
-  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
-  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+  const [courseSelections, setCourseSelections] = useState<{ courseId: string; batchIds: string[] }[]>([]);
+  const [activeCourseId, setActiveCourseId] = useState<string>('');
+  const selectedCourseIds = useMemo(() => {
+    return Array.from(new Set(courseSelections.map(s => s.courseId).filter(Boolean)));
+  }, [courseSelections]);
+  const selectedBatchIds = useMemo(() => {
+    return Array.from(new Set(courseSelections.flatMap(s => s.batchIds)));
+  }, [courseSelections]);
   const [savingNew, setSavingNew] = useState(false);
+
+  // Deactivation confirmation modal state
+  const [deactivatingStudent, setDeactivatingStudent] = useState<Student | null>(null);
 
   // 4. Delete Confirmation Modal
   const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
@@ -234,8 +250,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   const inactiveCount = useMemo(() => students.filter(s => s.status === 'inactive' || s.status === 'suspended').length, [students]);
 
   // Toggle Student Status (Active <-> Inactive)
-  const handleToggleStudentStatus = async (s: Student) => {
-    const newStatus = s.status === 'active' ? 'inactive' : 'active';
+  const executeToggleStudentStatus = async (s: Student, newStatus: 'active' | 'inactive') => {
     try {
       const res = await fetch('/api/students', {
         method: 'PUT',
@@ -250,9 +265,18 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         throw new Error(err.error || 'Failed to update student status');
       }
       setStudents(prev => prev.map(item => item.id === s.id ? { ...item, status: newStatus } : item));
-      showToast(`Student ${s.full_name} marked as ${newStatus.toUpperCase()}. Enrolled batch seats adjusted.`);
+      showToast(`Student ${s.full_name} is now ${newStatus.toUpperCase()}. Enrolled batch seats adjusted.`);
     } catch (err: any) {
       alert(err.message || 'Error updating status');
+    }
+  };
+
+  const handleToggleStudentStatus = (s: Student) => {
+    if (s.status === 'active') {
+      // Prompt warning confirmation before making inactive
+      setDeactivatingStudent(s);
+    } else {
+      executeToggleStudentStatus(s, 'active');
     }
   };
 
@@ -274,15 +298,26 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     setEditAdvancePaid(Number(s.advance_paid || 0));
     setEditStatus(s.status || 'active');
 
-    // Pre-fill courses and batches
-    const enrolledCourseIds = Array.from(new Set((s.enrolled_batches || []).map(b => b.course_id)));
-    const enrolledBatchIds = (s.enrolled_batches || []).map(b => b.batch_id);
-    setEditSelectedCourseIds(enrolledCourseIds);
-    setEditSelectedBatchIds(enrolledBatchIds);
+    // Group enrolled batches by course
+    const courseMap = new Map<string, string[]>();
+    (s.enrolled_batches || []).forEach(b => {
+      const existing = courseMap.get(b.course_id) || [];
+      existing.push(b.batch_id);
+      courseMap.set(b.course_id, existing);
+    });
+    const initialSelections: { courseId: string; batchIds: string[] }[] = [];
+    courseMap.forEach((batchIds, courseId) => {
+      initialSelections.push({ courseId, batchIds });
+    });
+    if (initialSelections.length === 0) {
+      initialSelections.push({ courseId: '', batchIds: [] });
+    }
+    setEditCourseSelections(initialSelections);
+    setActiveEditCourseId('');
     setPageMode('edit');
   };
 
-  // Open Register Full Page
+  // Open Register Full Page: Do NOT select any course by default!
   const handleOpenRegister = () => {
     setFullName('');
     setDateOfBirth('');
@@ -297,78 +332,161 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     setAddress('');
     setJoiningDate(new Date().toISOString().split('T')[0]);
     setAdvancePaid(0);
-    setSelectedCourseIds(courses.slice(0, 1).map(c => c.id));
-    setSelectedBatchIds([]);
+    // Start with empty course selection
+    setCourseSelections([]);
+    setActiveCourseId('');
     setIsAddOpen(false);
     setPageMode('register');
   };
 
-  // Course selection toggles in Register
-  const handleToggleCourse = (courseId: string) => {
-    setSelectedCourseIds(prev => {
-      const exists = prev.includes(courseId);
-      const updated = exists ? prev.filter(id => id !== courseId) : [...prev, courseId];
-      const validBatches = batches.filter(b => updated.includes(b.course_id)).map(b => b.id);
-      setSelectedBatchIds(bPrev => bPrev.filter(bId => validBatches.includes(bId)));
-      return updated;
+  // Course & Batch sequential handlers for Register Student
+  const handleSelectBatch = (batchId: string) => {
+    if (!batchId) return;
+    const targetBatch = batches.find(b => b.id === batchId);
+    if (!targetBatch) return;
+
+    // Timing clash validation across existing batches
+    const clashingBatch = batches
+      .filter(b => selectedBatchIds.includes(b.id) && b.id !== batchId)
+      .find(selectedB => checkBatchClash(targetBatch, selectedB).hasClash);
+
+    if (clashingBatch) {
+      const clashInfo = checkBatchClash(targetBatch, clashingBatch);
+      alert(`⚠️ TIMING CLASH DETECTED!\n\n${clashInfo.reason}\n\nA student cannot be enrolled in batches with overlapping days and timings.`);
+      return;
+    }
+
+    const courseId = targetBatch.course_id;
+    setCourseSelections(prev => {
+      const existing = prev.find(s => s.courseId === courseId);
+      if (existing) {
+        if (existing.batchIds.includes(batchId)) return prev;
+        return prev.map(s => s.courseId === courseId ? { ...s, batchIds: [...s.batchIds, batchId] } : s);
+      } else {
+        return [...prev, { courseId, batchIds: [batchId] }];
+      }
     });
+
+    // Automatically redirect back to new course selection!
+    setActiveCourseId('');
+  };
+
+  const handleRemoveBatch = (batchId: string) => {
+    setCourseSelections(prev =>
+      prev
+        .map(s => ({
+          ...s,
+          batchIds: s.batchIds.filter(id => id !== batchId)
+        }))
+        .filter(s => s.batchIds.length > 0)
+    );
+  };
+
+  // Course & Batch sequential handlers for Edit Student
+  const handleSelectEditBatch = (batchId: string) => {
+    if (!batchId) return;
+    const targetBatch = batches.find(b => b.id === batchId);
+    if (!targetBatch) return;
+
+    const clashingBatch = batches
+      .filter(b => editSelectedBatchIds.includes(b.id) && b.id !== batchId)
+      .find(selectedB => checkBatchClash(targetBatch, selectedB).hasClash);
+
+    if (clashingBatch) {
+      const clashInfo = checkBatchClash(targetBatch, clashingBatch);
+      alert(`⚠️ TIMING CLASH DETECTED!\n\n${clashInfo.reason}\n\nA student cannot be enrolled in batches with overlapping days and timings.`);
+      return;
+    }
+
+    const courseId = targetBatch.course_id;
+    setEditCourseSelections(prev => {
+      const existing = prev.find(s => s.courseId === courseId);
+      if (existing) {
+        if (existing.batchIds.includes(batchId)) return prev;
+        return prev.map(s => s.courseId === courseId ? { ...s, batchIds: [...s.batchIds, batchId] } : s);
+      } else {
+        return [...prev, { courseId, batchIds: [batchId] }];
+      }
+    });
+
+    // Automatically redirect back to new course selection!
+    setActiveEditCourseId('');
+  };
+
+  const handleRemoveEditBatch = (batchId: string) => {
+    setEditCourseSelections(prev =>
+      prev
+        .map(s => ({
+          ...s,
+          batchIds: s.batchIds.filter(id => id !== batchId)
+        }))
+        .filter(s => s.batchIds.length > 0)
+    );
+  };
+
+  // Backward-compatibility course and batch togglers for modal views
+  const handleToggleCourse = (courseId: string) => {
+    if (selectedCourseIds.includes(courseId)) {
+      setCourseSelections(prev => prev.filter(sel => sel.courseId !== courseId));
+    } else {
+      setCourseSelections(prev => [...prev.filter(sel => sel.courseId), { courseId, batchIds: [] }]);
+    }
   };
 
   const handleToggleBatch = (batchId: string) => {
-    const targetBatch = batches.find(b => b.id === batchId);
-    if (!targetBatch) return;
-
-    if (selectedBatchIds.includes(batchId)) {
-      setSelectedBatchIds(prev => prev.filter(id => id !== batchId));
-      return;
-    }
-
-    // Check scheduling clash against already selected batches
-    const clashingBatch = batches
-      .filter(b => selectedBatchIds.includes(b.id))
-      .find(selectedB => checkBatchClash(targetBatch, selectedB).hasClash);
-
-    if (clashingBatch) {
-      const clashInfo = checkBatchClash(targetBatch, clashingBatch);
-      alert(`⚠️ TIMING CLASH DETECTED!\n\n${clashInfo.reason}\n\nA student cannot be enrolled in batches with overlapping days and timings.`);
-      return;
-    }
-
-    setSelectedBatchIds(prev => [...prev, batchId]);
-  };
-
-  // Course selection toggles in Edit
-  const handleEditToggleCourse = (courseId: string) => {
-    setEditSelectedCourseIds(prev => {
-      const exists = prev.includes(courseId);
-      const updated = exists ? prev.filter(id => id !== courseId) : [...prev, courseId];
-      const validBatches = batches.filter(b => updated.includes(b.course_id)).map(b => b.id);
-      setEditSelectedBatchIds(bPrev => bPrev.filter(bId => validBatches.includes(bId)));
-      return updated;
+    const b = batches.find(x => x.id === batchId);
+    if (!b) return;
+    const courseId = b.course_id;
+    setCourseSelections(prev => {
+      let found = false;
+      const next = prev.map(sel => {
+        if (sel.courseId === courseId) {
+          found = true;
+          const exists = sel.batchIds.includes(batchId);
+          return {
+            ...sel,
+            batchIds: exists ? sel.batchIds.filter(id => id !== batchId) : [...sel.batchIds, batchId]
+          };
+        }
+        return sel;
+      });
+      if (!found) {
+        next.push({ courseId, batchIds: [batchId] });
+      }
+      return next;
     });
   };
 
+  const handleEditToggleCourse = (courseId: string) => {
+    if (editSelectedCourseIds.includes(courseId)) {
+      setEditCourseSelections(prev => prev.filter(sel => sel.courseId !== courseId));
+    } else {
+      setEditCourseSelections(prev => [...prev.filter(sel => sel.courseId), { courseId, batchIds: [] }]);
+    }
+  };
+
   const handleEditToggleBatch = (batchId: string) => {
-    const targetBatch = batches.find(b => b.id === batchId);
-    if (!targetBatch) return;
-
-    if (editSelectedBatchIds.includes(batchId)) {
-      setEditSelectedBatchIds(prev => prev.filter(id => id !== batchId));
-      return;
-    }
-
-    // Check scheduling clash against already selected batches
-    const clashingBatch = batches
-      .filter(b => editSelectedBatchIds.includes(b.id))
-      .find(selectedB => checkBatchClash(targetBatch, selectedB).hasClash);
-
-    if (clashingBatch) {
-      const clashInfo = checkBatchClash(targetBatch, clashingBatch);
-      alert(`⚠️ TIMING CLASH DETECTED!\n\n${clashInfo.reason}\n\nA student cannot be enrolled in batches with overlapping days and timings.`);
-      return;
-    }
-
-    setEditSelectedBatchIds(prev => [...prev, batchId]);
+    const b = batches.find(x => x.id === batchId);
+    if (!b) return;
+    const courseId = b.course_id;
+    setEditCourseSelections(prev => {
+      let found = false;
+      const next = prev.map(sel => {
+        if (sel.courseId === courseId) {
+          found = true;
+          const exists = sel.batchIds.includes(batchId);
+          return {
+            ...sel,
+            batchIds: exists ? sel.batchIds.filter(id => id !== batchId) : [...sel.batchIds, batchId]
+          };
+        }
+        return sel;
+      });
+      if (!found) {
+        next.push({ courseId, batchIds: [batchId] });
+      }
+      return next;
+    });
   };
 
   // Helper to auto-calculate chronological age from Date of Birth
@@ -881,6 +999,146 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               </div>
             </div>
 
+            {/* Course & Batch Enrollment Card - Sequential Selection Workflow */}
+            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-5">
+              <div className="border-b border-gray-100 pb-3">
+                <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-[#8A064D]" />
+                  <span>Course &amp; Batch Enrollment</span>
+                </h2>
+                <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+                  Select a course from the downward dropdown, then choose a batch. Once a batch is clicked, it is selected and redirects ready for the next course selection. A course can be selected multiple times, but a batch cannot be selected again.
+                </p>
+              </div>
+
+              {/* Sequential Downward Dropdowns Container */}
+              <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] space-y-4">
+                {/* 1. Course Selection Dropdown (Opens downwards) */}
+                <div>
+                  <label className="block text-xs font-black text-gray-800 uppercase tracking-wide mb-1.5">
+                    Select Course / Discipline <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={activeCourseId}
+                    onChange={(e) => setActiveCourseId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] transition cursor-pointer"
+                  >
+                    <option value="">-- Choose Course from Dropdown --</option>
+                    {courses.map(crs => (
+                      <option key={crs.id} value={crs.id}>
+                        {crs.title} ({crs.category}) — ₹{crs.monthly_fee}/month
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Batch Selection Dropdown (Automatically redirects/reveals upon course selection, opens downwards) */}
+                {activeCourseId && (
+                  <div className="animate-in fade-in duration-150 pt-2 border-t border-[#F0D5E4]">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-black text-[#8A064D] uppercase tracking-wide">
+                        Select Batch for {courses.find(c => c.id === activeCourseId)?.title} <span className="text-rose-500">*</span>
+                      </label>
+                      <span className="text-[10px] font-semibold text-gray-500">
+                        (Batches already chosen cannot be selected again)
+                      </span>
+                    </div>
+
+                    {(() => {
+                      const availableBatches = batches.filter(
+                        b => b.course_id === activeCourseId && !selectedBatchIds.includes(b.id)
+                      );
+
+                      if (availableBatches.length === 0) {
+                        return (
+                          <div className="p-3 text-center rounded-xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
+                            No remaining batches available for this course (or all batches already selected).
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleSelectBatch(e.target.value);
+                            }
+                          }}
+                          className="w-full px-3.5 py-2.5 bg-white border-2 border-[#8A064D] rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] transition cursor-pointer shadow-2xs"
+                        >
+                          <option value="">-- Click to Select Batch (Selects &amp; Redirects to Course) --</option>
+                          {availableBatches.map(b => (
+                            <option key={b.id} value={b.id}>
+                              {b.name} • {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)} ({b.days_of_week?.join(', ')}) • Guru: {b.trainer_name}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected / Enrolled Batches Cards */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-[#590231] uppercase tracking-wider">
+                    Enrolled Batches ({selectedBatchIds.length})
+                  </span>
+                  <span className="text-xs font-black text-[#8A064D]">
+                    Total Monthly Fee: ₹{selectedBatchIds.reduce((sum, bId) => {
+                      const b = batches.find(x => x.id === bId);
+                      const crs = courses.find(c => c.id === b?.course_id);
+                      return sum + (crs?.monthly_fee || 2000);
+                    }, 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                {selectedBatchIds.length === 0 ? (
+                  <div className="p-4 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
+                    No batches selected yet. Select a course and batch above to enroll the student.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {selectedBatchIds.map(bId => {
+                      const b = batches.find(x => x.id === bId);
+                      const crs = courses.find(c => c.id === b?.course_id);
+                      return (
+                        <div key={bId} className="p-3.5 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] flex items-start justify-between gap-3 shadow-2xs">
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-black text-[#8A064D] uppercase tracking-wider block truncate">
+                              {crs?.title || 'Course'}
+                            </span>
+                            <span className="text-xs font-bold text-[#2D041A] block truncate mt-0.5">
+                              {b?.name || 'Batch'}
+                            </span>
+                            <span className="text-[10px] text-gray-500 block mt-1">
+                              {b?.start_time?.slice(0, 5)} - {b?.end_time?.slice(0, 5)} • Guru: {b?.trainer_name || 'Assigned Guru'}
+                            </span>
+                            <span className="text-[11px] font-extrabold text-emerald-700 block mt-1">
+                              ₹{crs?.monthly_fee || 2000}/mo
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveBatch(bId)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0"
+                            title="Remove Batch"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column (5 cols): Guardian & Fee Allocation */}
+          <div className="lg:col-span-5 space-y-6">
             {/* Guardian & Admission Card */}
             <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
               <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
@@ -888,7 +1146,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 <span>Parent / Guardian & Admission Details</span>
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                     Guardian Name <span className="text-rose-500">*</span>
@@ -946,7 +1204,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   />
                 </div>
 
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                     Advance Paid (₹)
                   </label>
@@ -960,152 +1218,14 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Right Column (5 cols): Course & Batch Allocation with Clash & Capacity Checking */}
-          <div className="lg:col-span-5 space-y-6">
+            {/* Dynamic Fee Calculation Card */}
             <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-[#8A064D]" />
-                  <span>Course & Batch Enrollment</span>
-                </h2>
-                <span className="text-[11px] font-bold text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-full border border-rose-100">
-                  {selectedBatchIds.length} Batches Selected
-                </span>
-              </div>
+              <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+                <Receipt className="w-4 h-4 text-[#8A064D]" />
+                <span>Tuition &amp; Fee Summary</span>
+              </h2>
 
-              {/* Course Selection Pills */}
-              <div>
-                <label className="block text-xs font-black text-gray-700 uppercase tracking-wide mb-2">
-                  Select Enrolled Courses:
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {courses.map(crs => {
-                    const isSelected = selectedCourseIds.includes(crs.id);
-                    return (
-                      <button
-                        type="button"
-                        key={crs.id}
-                        onClick={() => handleToggleCourse(crs.id)}
-                        className={`px-3.5 py-2 rounded-2xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/60'
-                            : 'bg-[#FFF9FB] text-gray-700 border border-[#F0D5E4] hover:bg-[#FFF2F8]'
-                        }`}
-                      >
-                        {isSelected && <Check className="w-3.5 h-3.5 text-[#F9E33A]" />}
-                        <span>{crs.title}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Available Batches for Selected Courses */}
-              <div className="pt-3 border-t border-gray-100">
-                <label className="block text-xs font-black text-gray-700 uppercase tracking-wide mb-2">
-                  Available Batches (Timings & Schedule):
-                </label>
-
-                {registerAvailableBatches.length === 0 ? (
-                  <div className="p-6 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
-                    Please select at least one course above to see available batch schedules.
-                  </div>
-                ) : (
-                  <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
-                    {registerAvailableBatches.map(b => {
-                      const isSelected = selectedBatchIds.includes(b.id);
-                      const isFull = (b.enrolled_count || 0) >= (b.max_capacity || 20);
-                      
-                      // Check clash against already selected batches (excluding this one)
-                      const clashingBatch = batches
-                        .filter(otherB => selectedBatchIds.includes(otherB.id) && otherB.id !== b.id)
-                        .find(otherB => checkBatchClash(b, otherB).hasClash);
-                      const clashInfo = clashingBatch ? checkBatchClash(b, clashingBatch) : null;
-
-                      return (
-                        <div
-                          key={b.id}
-                          onClick={() => handleToggleBatch(b.id)}
-                          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
-                            isSelected
-                              ? 'bg-[#FFF2F8] border-[#8A064D] shadow-2xs ring-1 ring-[#8A064D]'
-                              : clashingBatch
-                              ? 'bg-rose-50/50 border-rose-300 opacity-80'
-                              : isFull
-                              ? 'bg-amber-50/50 border-amber-300'
-                              : 'bg-white border-gray-200 hover:border-[#8A064D]/50 hover:bg-[#FFFDFE]'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => {}}
-                                  className="w-4 h-4 rounded text-[#8A064D] focus:ring-[#8A064D]"
-                                />
-                                <span className="font-black text-xs text-[#2D041A]">
-                                  {b.course_title} — {b.name}
-                                </span>
-                              </div>
-
-                              {/* Days and Timings Row */}
-                              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
-                                <span className="px-2 py-0.5 rounded-lg bg-gray-100 font-bold text-gray-700 flex items-center gap-1">
-                                  <Calendar className="w-3 h-3 text-[#8A064D]" />
-                                  <span>{b.days_of_week?.join(', ') || 'Regular'}</span>
-                                </span>
-                                <span className="px-2 py-0.5 rounded-lg bg-gray-100 font-bold text-gray-700 flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-[#8A064D]" />
-                                  <span>{b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}</span>
-                                </span>
-                              </div>
-
-                              {/* Guru & Room */}
-                              <div className="mt-1 text-[11px] text-gray-500 font-medium flex items-center gap-3">
-                                <span>Guru: <strong className="text-gray-700">{b.trainer_name || 'Assigned'}</strong></span>
-                                <span>Room: <strong className="text-gray-700">{b.room_or_hall || b.room || 'Hall'}</strong></span>
-                              </div>
-                            </div>
-
-                            {/* Capacity Badge */}
-                            <div className="text-right shrink-0">
-                              <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black ${
-                                isFull 
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-200' 
-                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                              }`}>
-                                {b.enrolled_count || 0}/{b.max_capacity || 20} Seats
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Full Warning Message Banner */}
-                          {isFull && !isSelected && (
-                            <div className="mt-2.5 p-2 rounded-xl bg-amber-50 border border-amber-200 text-[11px] font-bold text-amber-900 flex items-center gap-1.5">
-                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                              <span>⚠️ Batch has reached maximum capacity ({b.enrolled_count}/{b.max_capacity || 20} seats filled).</span>
-                            </div>
-                          )}
-
-                          {/* Timing Clash Warning Banner */}
-                          {clashInfo && (
-                            <div className="mt-2.5 p-2 rounded-xl bg-rose-100 border border-rose-300 text-[11px] font-black text-rose-900 flex items-center gap-1.5">
-                              <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                              <span>⚠️ {clashInfo.reason}</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Dynamic Fee Calculation Card */}
               <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] space-y-2 text-xs">
                 <div className="flex justify-between items-center text-gray-700">
                   <span className="font-semibold">Total Monthly Tuition:</span>
@@ -1120,6 +1240,25 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   <span className="font-black text-base text-[#8A064D]">₹{Math.max(0, calculatedDue).toLocaleString('en-IN')}</span>
                 </div>
               </div>
+
+              <button
+                type="button"
+                disabled={savingNew || !fullName.trim() || selectedBatchIds.length === 0}
+                onClick={handleRegisterStudent}
+                className="w-full py-3 rounded-2xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-black shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {savingNew ? (
+                  <>
+                    <Sparkles className="w-4 h-4 animate-spin text-[#F9E33A]" />
+                    <span>Registering Disciple...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 text-[#F9E33A]" />
+                    <span>Complete Disciple Registration</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -1338,14 +1477,154 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               </div>
             </div>
 
+            {/* Course & Batch Enrollment Card - Sequential Selection Workflow */}
+            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-5">
+              <div className="border-b border-gray-100 pb-3">
+                <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-[#8A064D]" />
+                  <span>Enrolled Courses &amp; Batches</span>
+                </h2>
+                <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+                  Select a course from the downward dropdown, then choose a batch. Once a batch is clicked, it is selected and redirects ready for the next course selection. A course can be selected multiple times, but a batch cannot be selected again.
+                </p>
+              </div>
+
+              {/* Sequential Downward Dropdowns Container */}
+              <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] space-y-4">
+                {/* 1. Course Selection Dropdown (Opens downwards) */}
+                <div>
+                  <label className="block text-xs font-black text-gray-800 uppercase tracking-wide mb-1.5">
+                    Select Course / Discipline <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={activeEditCourseId}
+                    onChange={(e) => setActiveEditCourseId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] transition cursor-pointer"
+                  >
+                    <option value="">-- Choose Course from Dropdown --</option>
+                    {courses.map(crs => (
+                      <option key={crs.id} value={crs.id}>
+                        {crs.title} ({crs.category}) — ₹{crs.monthly_fee}/month
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Batch Selection Dropdown (Automatically redirects/reveals upon course selection, opens downwards) */}
+                {activeEditCourseId && (
+                  <div className="animate-in fade-in duration-150 pt-2 border-t border-[#F0D5E4]">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-black text-[#8A064D] uppercase tracking-wide">
+                        Select Batch for {courses.find(c => c.id === activeEditCourseId)?.title} <span className="text-rose-500">*</span>
+                      </label>
+                      <span className="text-[10px] font-semibold text-gray-500">
+                        (Batches already chosen cannot be selected again)
+                      </span>
+                    </div>
+
+                    {(() => {
+                      const availableBatches = batches.filter(
+                        b => b.course_id === activeEditCourseId && !editSelectedBatchIds.includes(b.id)
+                      );
+
+                      if (availableBatches.length === 0) {
+                        return (
+                          <div className="p-3 text-center rounded-xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
+                            No remaining batches available for this course (or all batches already selected).
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleSelectEditBatch(e.target.value);
+                            }
+                          }}
+                          className="w-full px-3.5 py-2.5 bg-white border-2 border-[#8A064D] rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] transition cursor-pointer shadow-2xs"
+                        >
+                          <option value="">-- Click to Select Batch (Selects &amp; Redirects to Course) --</option>
+                          {availableBatches.map(b => (
+                            <option key={b.id} value={b.id}>
+                              {b.name} • {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)} ({b.days_of_week?.join(', ')}) • Guru: {b.trainer_name}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected / Enrolled Batches Cards */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-[#590231] uppercase tracking-wider">
+                    Enrolled Batches ({editSelectedBatchIds.length})
+                  </span>
+                  <span className="text-xs font-black text-[#8A064D]">
+                    Total Monthly Fee: ₹{editSelectedBatchIds.reduce((sum, bId) => {
+                      const b = batches.find(x => x.id === bId);
+                      const crs = courses.find(c => c.id === b?.course_id);
+                      return sum + (crs?.monthly_fee || 2000);
+                    }, 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                {editSelectedBatchIds.length === 0 ? (
+                  <div className="p-4 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
+                    No batches selected yet. Select a course and batch above to enroll the student.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {editSelectedBatchIds.map(bId => {
+                      const b = batches.find(x => x.id === bId);
+                      const crs = courses.find(c => c.id === b?.course_id);
+                      return (
+                        <div key={bId} className="p-3.5 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] flex items-start justify-between gap-3 shadow-2xs">
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-black text-[#8A064D] uppercase tracking-wider block truncate">
+                              {crs?.title || 'Course'}
+                            </span>
+                            <span className="text-xs font-bold text-[#2D041A] block truncate mt-0.5">
+                              {b?.name || 'Batch'}
+                            </span>
+                            <span className="text-[10px] text-gray-500 block mt-1">
+                              {b?.start_time?.slice(0, 5)} - {b?.end_time?.slice(0, 5)} • Guru: {b?.trainer_name || 'Assigned Guru'}
+                            </span>
+                            <span className="text-[11px] font-extrabold text-emerald-700 block mt-1">
+                              ₹{crs?.monthly_fee || 2000}/mo
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEditBatch(bId)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0"
+                            title="Remove Batch"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column (5 cols): Guardian & Fee Summary */}
+          <div className="lg:col-span-5 space-y-6">
             {/* Guardian & Admission Card */}
             <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
               <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
                 <ShieldCheck className="w-4 h-4 text-[#8A064D]" />
-                <span>Parent / Guardian & Admission Info</span>
+                <span>Parent / Guardian &amp; Admission Info</span>
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                     Guardian Name <span className="text-rose-500">*</span>
@@ -1401,7 +1680,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   />
                 </div>
 
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                     Advance Paid (₹)
                   </label>
@@ -1415,152 +1694,14 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Right Column (5 cols): Batch Allocation with Timings, Clash Detection & Full Capacity Warning */}
-          <div className="lg:col-span-5 space-y-6">
+            {/* Dynamic Fee Calculation & Save Card */}
             <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-[#8A064D]" />
-                  <span>Enrolled Courses & Batches</span>
-                </h2>
-                <span className="text-[11px] font-bold text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-full border border-rose-100">
-                  {editSelectedBatchIds.length} Batches Assigned
-                </span>
-              </div>
+              <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+                <Receipt className="w-4 h-4 text-[#8A064D]" />
+                <span>Fee Summary &amp; Update Record</span>
+              </h2>
 
-              {/* Course Pills */}
-              <div>
-                <label className="block text-xs font-black text-gray-700 uppercase tracking-wide mb-2">
-                  Enrolled Disciplines:
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {courses.map(crs => {
-                    const isSelected = editSelectedCourseIds.includes(crs.id);
-                    return (
-                      <button
-                        type="button"
-                        key={crs.id}
-                        onClick={() => handleEditToggleCourse(crs.id)}
-                        className={`px-3.5 py-2 rounded-2xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/60'
-                            : 'bg-[#FFF9FB] text-gray-700 border border-[#F0D5E4] hover:bg-[#FFF2F8]'
-                        }`}
-                      >
-                        {isSelected && <Check className="w-3.5 h-3.5 text-[#F9E33A]" />}
-                        <span>{crs.title}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Batches with Full Details */}
-              <div className="pt-3 border-t border-gray-100">
-                <label className="block text-xs font-black text-gray-700 uppercase tracking-wide mb-2">
-                  Batch Schedule, Timings & Capacity:
-                </label>
-
-                {editAvailableBatches.length === 0 ? (
-                  <div className="p-6 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
-                    Select a course above to manage batch allocations.
-                  </div>
-                ) : (
-                  <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
-                    {editAvailableBatches.map(b => {
-                      const isSelected = editSelectedBatchIds.includes(b.id);
-                      const isFull = (b.enrolled_count || 0) >= (b.max_capacity || 20);
-
-                      // Check clash against already selected batches (excluding this one)
-                      const clashingBatch = batches
-                        .filter(otherB => editSelectedBatchIds.includes(otherB.id) && otherB.id !== b.id)
-                        .find(otherB => checkBatchClash(b, otherB).hasClash);
-                      const clashInfo = clashingBatch ? checkBatchClash(b, clashingBatch) : null;
-
-                      return (
-                        <div
-                          key={b.id}
-                          onClick={() => handleEditToggleBatch(b.id)}
-                          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
-                            isSelected
-                              ? 'bg-[#FFF2F8] border-[#8A064D] shadow-2xs ring-1 ring-[#8A064D]'
-                              : clashingBatch
-                              ? 'bg-rose-50/50 border-rose-300 opacity-80'
-                              : isFull
-                              ? 'bg-amber-50/50 border-amber-300'
-                              : 'bg-white border-gray-200 hover:border-[#8A064D]/50 hover:bg-[#FFFDFE]'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => {}}
-                                  className="w-4 h-4 rounded text-[#8A064D] focus:ring-[#8A064D]"
-                                />
-                                <span className="font-black text-xs text-[#2D041A]">
-                                  {b.course_title} — {b.name}
-                                </span>
-                              </div>
-
-                              {/* Days & Timings Row */}
-                              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
-                                <span className="px-2 py-0.5 rounded-lg bg-gray-100 font-bold text-gray-700 flex items-center gap-1">
-                                  <Calendar className="w-3 h-3 text-[#8A064D]" />
-                                  <span>{b.days_of_week?.join(', ') || 'Regular'}</span>
-                                </span>
-                                <span className="px-2 py-0.5 rounded-lg bg-gray-100 font-bold text-gray-700 flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-[#8A064D]" />
-                                  <span>{b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}</span>
-                                </span>
-                              </div>
-
-                              {/* Guru & Room */}
-                              <div className="mt-1 text-[11px] text-gray-500 font-medium flex items-center gap-3">
-                                <span>Guru: <strong className="text-gray-700">{b.trainer_name || 'Assigned'}</strong></span>
-                                <span>Room: <strong className="text-gray-700">{b.room_or_hall || b.room || 'Hall'}</strong></span>
-                              </div>
-                            </div>
-
-                            {/* Capacity Badge */}
-                            <div className="text-right shrink-0">
-                              <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black ${
-                                isFull 
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-200' 
-                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                              }`}>
-                                {b.enrolled_count || 0}/{b.max_capacity || 20} Seats
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Full Warning Message Banner */}
-                          {isFull && !isSelected && (
-                            <div className="mt-2.5 p-2 rounded-xl bg-amber-50 border border-amber-200 text-[11px] font-bold text-amber-900 flex items-center gap-1.5">
-                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                              <span>⚠️ Batch has reached capacity ({b.enrolled_count}/{b.max_capacity || 20} seats filled).</span>
-                            </div>
-                          )}
-
-                          {/* Timing Clash Warning Banner */}
-                          {clashInfo && (
-                            <div className="mt-2.5 p-2 rounded-xl bg-rose-100 border border-rose-300 text-[11px] font-black text-rose-900 flex items-center gap-1.5">
-                              <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                              <span>⚠️ {clashInfo.reason}</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Dynamic Fee Calculation Card */}
               <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] space-y-2 text-xs">
                 <div className="flex justify-between items-center text-gray-700">
                   <span className="font-semibold">Total Monthly Tuition:</span>
@@ -1575,6 +1716,25 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   <span className="font-black text-base text-[#8A064D]">₹{Math.max(0, calculatedDue).toLocaleString('en-IN')}</span>
                 </div>
               </div>
+
+              <button
+                type="button"
+                disabled={savingEdit || !editFullName.trim() || editSelectedBatchIds.length === 0}
+                onClick={handleSaveEdit}
+                className="w-full py-3 rounded-2xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-black shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {savingEdit ? (
+                  <>
+                    <Sparkles className="w-4 h-4 animate-spin text-[#F9E33A]" />
+                    <span>Updating Disciple Details...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 text-[#F9E33A]" />
+                    <span>Save Disciple Details</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -1777,14 +1937,15 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                             e.stopPropagation();
                             handleToggleStudentStatus(s);
                           }}
-                          title={`Click to mark ${s.status === 'active' ? 'Inactive' : 'Active'}`}
-                          className={`px-2 py-0.5 rounded-lg text-[10px] font-black border transition cursor-pointer ${
+                          title={`Click to turn ${s.status === 'active' ? 'OFF (Deactivate)' : 'ON (Activate)'}`}
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border transition cursor-pointer shadow-2xs ${
                             s.status === 'active'
-                              ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
-                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                              : 'bg-gray-200 hover:bg-gray-300 text-gray-700 border-gray-300'
                           }`}
                         >
-                          {s.status === 'active' ? 'Set Inactive' : 'Set Active'}
+                          <span className={`w-1.5 h-1.5 rounded-full ${s.status === 'active' ? 'bg-[#F9E33A]' : 'bg-gray-400'}`} />
+                          <span>{s.status === 'active' ? 'ON' : 'OFF'}</span>
                         </button>
                       </div>
                     </div>
@@ -1853,9 +2014,9 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                       </div>
 
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#6E3955] font-semibold text-xs uppercase tracking-wide">Due Date:</span>
+                        <span className="text-[#6E3955] font-semibold text-xs uppercase tracking-wide">Joining Date:</span>
                         <span className="font-mono font-bold text-[#2D041A] bg-white px-2.5 py-1 rounded-xl border border-[#F0D5E4] text-xs shadow-2xs tabular-nums">
-                          {formatDueDateDisplay(s.due_date)}
+                          {formatDdMonthName(s.enrollment_date, true)}
                         </span>
                       </div>
                     </div>
@@ -1948,14 +2109,15 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                                   e.stopPropagation();
                                   handleToggleStudentStatus(s);
                                 }}
-                                title={`Click to mark ${s.status === 'active' ? 'Inactive' : 'Active'}`}
-                                className={`px-2 py-0.5 rounded-lg text-[10px] font-black border transition cursor-pointer ${
+                                title={`Click to turn ${s.status === 'active' ? 'OFF (Deactivate)' : 'ON (Activate)'}`}
+                                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border transition cursor-pointer shadow-2xs ${
                                   s.status === 'active'
-                                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
-                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700 border-gray-300'
                                 }`}
                               >
-                                {s.status === 'active' ? 'Set Inactive' : 'Set Active'}
+                                <span className={`w-1.5 h-1.5 rounded-full ${s.status === 'active' ? 'bg-[#F9E33A]' : 'bg-gray-400'}`} />
+                                <span>{s.status === 'active' ? 'ON' : 'OFF'}</span>
                               </button>
                             </div>
                           </div>
@@ -2055,7 +2217,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       {/* ===================================================================== */}
       {detailStudent && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-7 shadow-2xl border border-[#F0D5E4] max-h-[90vh] overflow-y-auto my-8">
+          <div className="bg-white rounded-3xl max-w-5xl w-full p-6 sm:p-8 shadow-2xl border border-[#F0D5E4] max-h-[90vh] overflow-y-auto my-8">
             
             {/* Modal Header & Hero Section */}
             <div className="flex flex-col sm:flex-row items-start gap-5 pb-6 border-b border-gray-100 mb-5 relative">
@@ -2219,9 +2381,9 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
                   <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs">
                     <span className="text-[#590231]/60 block text-[10px] sm:text-[11px] uppercase font-bold tracking-wider">Email Address</span>
-                    <span className="text-sm sm:text-base font-extrabold text-gray-900 flex items-center gap-1.5 mt-0.5 truncate">
+                    <span className="text-sm sm:text-base font-extrabold text-gray-900 flex items-center gap-1.5 mt-0.5 break-all">
                       <Mail className="w-4 h-4 text-[#8A064D] shrink-0" />
-                      <span className="truncate">{detailStudent.email || '—'}</span>
+                      <span>{detailStudent.email || '—'}</span>
                     </span>
                   </div>
 
@@ -2975,6 +3137,55 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 7. DEACTIVATION CONFIRMATION MODAL */}
+      {/* ===================================================================== */}
+      {deactivatingStudent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-100 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-black text-base text-[#2D041A]">Confirm Student Inactivity</h3>
+                <p className="text-xs text-gray-500 font-semibold">Seat capacity impact warning</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-100 text-xs text-rose-900 space-y-2">
+              <p className="font-bold">
+                Are you sure you want to mark <span className="underline font-black">{deactivatingStudent.full_name}</span> ({deactivatingStudent.roll_number}) as <span className="text-rose-700 font-black">INACTIVE</span>?
+              </p>
+              <p className="text-[11px] text-rose-700 font-medium leading-relaxed">
+                ⚠️ Turning off this disciple will free up their seat count in all enrolled batches and increase available capacity for new admissions.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setDeactivatingStudent(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const s = deactivatingStudent;
+                  setDeactivatingStudent(null);
+                  executeToggleStudentStatus(s, 'inactive');
+                }}
+                className="px-5 py-2.5 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-700 text-white shadow-md transition cursor-pointer"
+              >
+                Yes, Turn Inactive
+              </button>
+            </div>
           </div>
         </div>
       )}

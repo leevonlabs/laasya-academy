@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
 
 class StudentMessagesScreen extends StatefulWidget {
@@ -193,7 +194,7 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
 
     String fullUrl = cleanUrl;
     if (fullUrl.startsWith('/')) {
-      fullUrl = 'http://localhost:3000$fullUrl';
+      fullUrl = '${ApiConstants.baseUrl}$fullUrl';
     }
 
     return Image.network(

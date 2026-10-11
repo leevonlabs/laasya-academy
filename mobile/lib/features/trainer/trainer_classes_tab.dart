@@ -30,7 +30,46 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
     }
   }
 
+  String _getCourseTitle(Map<String, dynamic> b) {
+    if (b['course_title'] != null && b['course_title'].toString().isNotEmpty) {
+      return b['course_title'].toString();
+    }
+    if (b['courses'] is Map && b['courses']['title'] != null) {
+      return b['courses']['title'].toString();
+    }
+    return 'Classical Arts';
+  }
+
+  String _getDays(Map<String, dynamic> b) {
+    final d = b['days_of_week'];
+    if (d is List) return d.join(', ');
+    if (d != null && d.toString().isNotEmpty) return d.toString();
+    return 'Mon, Wed, Fri';
+  }
+
+  String _getRoom(Map<String, dynamic> b) {
+    return b['room_or_hall']?.toString() ?? 'Natya Mandapam';
+  }
+
+  String _getStatus(Map<String, dynamic> b) {
+    return b['status']?.toString() ?? 'Active';
+  }
+
+  String _getName(Map<String, dynamic> b) {
+    return b['name']?.toString() ?? 'Batch Session';
+  }
+
   void _showBatchDetails(Map<String, dynamic> b) {
+    final courseTitle = _getCourseTitle(b);
+    final room = _getRoom(b);
+    final days = _getDays(b);
+    final startTime = b['start_time']?.toString() ?? '17:00';
+    final endTime = b['end_time']?.toString() ?? '18:30';
+    final enrolled = b['enrolled_count']?.toString() ?? '0';
+    final capacity = b['max_capacity']?.toString() ?? '20';
+    final startDate = b['start_date']?.toString() ?? 'Active Session';
+    final duration = b['duration']?.toString() ?? '12 Months';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -57,18 +96,21 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
             ),
             const SizedBox(height: 18),
             Text(
-              b['name']!,
+              _getName(b),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
             ),
             const SizedBox(height: 6),
-            Text('Discipline: ${b['courses']['title']}', style: const TextStyle(fontSize: 13, color: LaasyaColors.primary, fontWeight: FontWeight.w600)),
+            Text(
+              'Discipline: $courseTitle',
+              style: const TextStyle(fontSize: 13, color: LaasyaColors.primary, fontWeight: FontWeight.w600),
+            ),
             const Divider(height: 24),
-            _infoRow(Icons.room_rounded, 'Classroom Hall', b['room_or_hall']!),
-            _infoRow(Icons.calendar_month_rounded, 'Days of Week', (b['days_of_week'] as List).join(', ')),
-            _infoRow(Icons.access_time_rounded, 'Timings', '${b['start_time']} - ${b['end_time']}'),
-            _infoRow(Icons.groups_rounded, 'Capacity', '${b['enrolled_count']} Enrolled / ${b['max_capacity']} Capacity'),
-            _infoRow(Icons.date_range_rounded, 'Batch Start Date', b['start_date']!),
-            _infoRow(Icons.timer_outlined, 'Program Duration', b['duration']!),
+            _infoRow(Icons.room_rounded, 'Classroom Hall', room),
+            _infoRow(Icons.calendar_month_rounded, 'Days of Week', days),
+            _infoRow(Icons.access_time_rounded, 'Timings', '$startTime - $endTime'),
+            _infoRow(Icons.groups_rounded, 'Capacity', '$enrolled Enrolled / $capacity Capacity'),
+            _infoRow(Icons.date_range_rounded, 'Batch Start Date', startDate),
+            _infoRow(Icons.timer_outlined, 'Program Duration', duration),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -105,102 +147,141 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8FA),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _batches.length,
-              itemBuilder: (context, index) {
-                final b = _batches[index];
-                final days = (b['days_of_week'] as List).join(', ');
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFF0D5E4)),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          ? const Center(child: CircularProgressIndicator(color: LaasyaColors.primary))
+          : _batches.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF2F8),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFF0D5E4)),
+                        ),
+                        child: const Icon(Icons.class_outlined, size: 48, color: LaasyaColors.primary),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'No Classes Assigned Yet',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Assigned batches will appear here automatically.',
+                        style: TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
                     ],
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF3E8EE),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                b['courses']['title']!,
-                                style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFDEF7EC),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                b['status']!,
-                                style: const TextStyle(color: Color(0xFF03543F), fontWeight: FontWeight.bold, fontSize: 11),
-                              ),
-                            ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadBatches,
+                  color: LaasyaColors.primary,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _batches.length,
+                    itemBuilder: (context, index) {
+                      final b = _batches[index];
+                      final courseTitle = _getCourseTitle(b);
+                      final room = _getRoom(b);
+                      final days = _getDays(b);
+                      final status = _getStatus(b);
+                      final name = _getName(b);
+                      final startTime = b['start_time']?.toString() ?? '17:00';
+                      final endTime = b['end_time']?.toString() ?? '18:30';
+                      final enrolled = b['enrolled_count']?.toString() ?? '0';
+                      final capacity = b['max_capacity']?.toString() ?? '20';
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFF0D5E4)),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          b['name']!,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Icon(Icons.room_rounded, size: 16, color: LaasyaColors.primary),
-                            const SizedBox(width: 6),
-                            Text(b['room_or_hall']!, style: const TextStyle(fontSize: 12, color: Colors.black87)),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.schedule_rounded, size: 16, color: LaasyaColors.primary),
-                            const SizedBox(width: 6),
-                            Text('${b['start_time']} - ${b['end_time']} ($days)', style: const TextStyle(fontSize: 12, color: Colors.black87)),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Students: ${b['enrolled_count']} / ${b['max_capacity']}',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54),
-                            ),
-                            OutlinedButton(
-                              onPressed: () => _showBatchDetails(b),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: LaasyaColors.primary,
-                                side: const BorderSide(color: LaasyaColors.primary),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF3E8EE),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      courseTitle,
+                                      style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDEF7EC),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      status.toUpperCase(),
+                                      style: const TextStyle(color: Color(0xFF03543F), fontWeight: FontWeight.bold, fontSize: 11),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              child: const Text('View Class Details', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                            ),
-                          ],
+                              const SizedBox(height: 12),
+                              Text(
+                                name,
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(Icons.room_rounded, size: 16, color: LaasyaColors.primary),
+                                  const SizedBox(width: 6),
+                                  Text(room, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.schedule_rounded, size: 16, color: LaasyaColors.primary),
+                                  const SizedBox(width: 6),
+                                  Text('$startTime - $endTime ($days)', style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Students: $enrolled / $capacity',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54),
+                                  ),
+                                  OutlinedButton(
+                                    onPressed: () => _showBatchDetails(b),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: LaasyaColors.primary,
+                                      side: const BorderSide(color: LaasyaColors.primary),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    child: const Text('View Class Details', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
+                ),
     );
   }
 }

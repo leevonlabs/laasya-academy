@@ -30,6 +30,7 @@ import {
   Maximize2,
   ArrowLeft
 } from 'lucide-react';
+import AiEnhanceButton from '@/components/common/AiEnhanceButton';
 
 interface Props {
   initialTrainers: Trainer[];
@@ -549,15 +550,31 @@ export default function TrainersListClient({
 
               {/* Bio & Artistic Lineage */}
               <div>
-                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                  Bio & Artistic Lineage <span className="text-gray-400 font-normal lowercase">(optional)</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
+                    Bio & Artistic Lineage <span className="text-gray-400 font-normal lowercase">(optional)</span>
+                  </label>
+                  <AiEnhanceButton
+                    value={addBio}
+                    onEnhance={(val) => setAddBio(val)}
+                    context="classical fine arts guru faculty biography, performance lineage, and teaching credentials"
+                    size="xs"
+                  />
+                </div>
                 <textarea
                   rows={4}
                   placeholder="Qualifications, guru lineage, performance background, experience..."
                   value={addBio}
-                  onChange={(e) => setAddBio(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  onChange={(e) => {
+                    setAddBio(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white min-h-[100px] overflow-hidden resize-y transition-all"
                 />
               </div>
             </div>
@@ -913,15 +930,31 @@ export default function TrainersListClient({
 
               {/* Bio & Artistic Lineage */}
               <div>
-                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                  Bio / Profile Summary <span className="text-gray-400 font-normal lowercase">(optional)</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
+                    Bio / Profile Summary <span className="text-gray-400 font-normal lowercase">(optional)</span>
+                  </label>
+                  <AiEnhanceButton
+                    value={editBio}
+                    onEnhance={(val) => setEditBio(val)}
+                    context="classical fine arts guru faculty biography, performance lineage, and teaching credentials"
+                    size="xs"
+                  />
+                </div>
                 <textarea
                   rows={4}
                   placeholder="Qualifications, guru lineage, performance background, experience..."
                   value={editBio}
-                  onChange={(e) => setEditBio(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  onChange={(e) => {
+                    setEditBio(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white min-h-[100px] overflow-hidden resize-y transition-all"
                 />
               </div>
             </div>
@@ -1449,7 +1482,7 @@ export default function TrainersListClient({
       {/* =================================================================== */}
       {viewingGuru && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-7 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 my-8 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-5xl w-full p-6 sm:p-8 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150 my-8 max-h-[92vh] overflow-y-auto">
             
             {/* Modal Header & Hero Card */}
             <div className="flex flex-col sm:flex-row items-start gap-5 pb-6 border-b border-gray-100 mb-5 relative">
@@ -1536,7 +1569,7 @@ export default function TrainersListClient({
                     </span>
                     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${
                       viewingGuru.salary_payment_status === 'paid'
-                        ? 'bg-emerald-100 text-emerald-800'
+                        ? 'bg-emerald-100 text-emerald-800' 
                         : 'bg-rose-100 text-rose-800'
                     }`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${viewingGuru.salary_payment_status === 'paid' ? 'bg-emerald-600' : 'bg-rose-600'}`}></span>
@@ -1568,9 +1601,9 @@ export default function TrainersListClient({
                     </a>
                   )}
                   {viewingGuru.email && (
-                    <div className="flex items-center gap-1.5 font-medium text-gray-600 truncate max-w-[240px]">
-                      <Mail className="w-3.5 h-3.5 text-gray-400" />
-                      <span className="truncate">{viewingGuru.email}</span>
+                    <div className="flex items-center gap-1.5 font-medium text-gray-600">
+                      <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <span className="break-all">{viewingGuru.email}</span>
                     </div>
                   )}
                 </div>
@@ -1602,9 +1635,9 @@ export default function TrainersListClient({
                   </div>
                   <div className="bg-white p-2.5 rounded-xl border border-gray-200 col-span-2 sm:col-span-1">
                     <span className="text-[10px] text-[#590231] font-black uppercase tracking-wider block mb-1">Official Email</span>
-                    <span className="text-gray-900 font-bold flex items-center gap-1.5 truncate">
+                    <span className="text-gray-900 font-bold flex items-center gap-1.5 break-all">
                       <Mail className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
-                      <span className="truncate">{viewingGuru.email || `${viewingGuru.full_name.toLowerCase().replace(/[^a-z0-9]/g, '')}@laasyaacademy.com`}</span>
+                      <span>{viewingGuru.email || `${viewingGuru.full_name.toLowerCase().replace(/[^a-z0-9]/g, '')}@laasyaacademy.com`}</span>
                     </span>
                   </div>
                   <div className="bg-white p-2.5 rounded-xl border border-gray-200">
@@ -1627,7 +1660,7 @@ export default function TrainersListClient({
                 <span className="text-xs font-black text-[#590231] uppercase tracking-wide block mb-1.5">
                   Bio &amp; Artistic Lineage
                 </span>
-                <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-[#F0D5E4] text-xs text-gray-800 font-semibold leading-relaxed">
+                <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4] text-xs text-gray-800 font-semibold leading-relaxed whitespace-pre-wrap break-words">
                   {viewingGuru.bio || 'Revered faculty member dedicated to classical arts instruction, student mentoring, and performance coaching.'}
                 </div>
               </div>

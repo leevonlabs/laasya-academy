@@ -202,25 +202,15 @@ class TrainerDataStore {
     for (var course in courses) {
       for (var batch in (course['batches'] as List)) {
         final batchId = batch['id'] as String;
-        final students = batch['students'] as List;
 
         final key = '$todayKey:$batchId';
         if (!_dailyAttendanceRecords.containsKey(todayKey)) {
           _dailyAttendanceRecords[todayKey] = {};
         }
 
-        final Map<String, String> batchRecord = {};
-        for (int i = 0; i < students.length; i++) {
-          final sId = students[i]['id'] as String;
-          batchRecord[sId] = (i == 3) ? 'absent' : 'present';
-        }
-        _dailyAttendanceRecords[todayKey]![batchId] = batchRecord;
-
-        if (batchId == 'bn-b1') {
-          _sessionStatus[key] = 'submitted';
-        } else {
-          _sessionStatus[key] = 'not_started';
-        }
+        // Attendance starts UNMARKED! Do not prefill present or absent.
+        _dailyAttendanceRecords[todayKey]![batchId] = {};
+        _sessionStatus[key] = 'not_started';
       }
     }
   }
@@ -320,13 +310,14 @@ class TrainerDataStore {
     }
   }
 
+  /// Returns student attendance status ('present', 'absent', or '' for unmarked)
   String getStudentStatus(String batchId, String studentId) {
     final todayKey = _getTodayDateKey();
     final batchMap = _dailyAttendanceRecords[todayKey]?[batchId];
     if (batchMap != null && batchMap.containsKey(studentId)) {
       return batchMap[studentId]!;
     }
-    return 'present';
+    return ''; // Disciples start UNMARKED until Guru explicitly marks them!
   }
 
   void setStudentStatus(String batchId, String studentId, String status) {
@@ -367,6 +358,31 @@ class TrainerDataStore {
     _sessionStatus['$todayKey:$batchId'] = 'in_progress';
   }
 
+  // Notifier for broadcast attention ring alarm to student/parent app
+  static final ValueNotifier<Map<String, dynamic>?> classClosedAlertNotifier =
+      ValueNotifier<Map<String, dynamic>?>(null);
+
+  void closeClassSession({
+    required String batchId,
+    required String batchName,
+    required String courseTitle,
+  }) {
+    final todayKey = _getTodayDateKey();
+    _sessionStatus['$todayKey:$batchId'] = 'closed';
+    classClosedAlertNotifier.value = {
+      'batch_id': batchId,
+      'batch_name': batchName,
+      'course_title': courseTitle,
+      'timestamp': DateTime.now().toIso8601String(),
+      'message': 'Today\'s class for $courseTitle ($batchName) has concluded. Please come and take your child back from the academy hall.',
+    };
+  }
+
+  bool isClassClosed(String batchId) {
+    final todayKey = _getTodayDateKey();
+    return _sessionStatus['$todayKey:$batchId'] == 'closed';
+  }
+
   /// Returns UNIQUE enrolled students for this trainer, with all their registered courses and batches aggregated
   List<Map<String, dynamic>> getUniqueEnrolledStudents() {
     final Map<String, Map<String, dynamic>> studentMap = {};
@@ -400,6 +416,7 @@ class TrainerDataStore {
               'parent_name': stu['parent_name'],
               'parent_phone': stu['parent_phone'],
               'rate': stu['rate'],
+              'avatar_url': stu['avatar_url'] ?? getStudentPhoto(stu['roll']?.toString() ?? sId),
               // Primary enrollment details for calendar defaults
               'course_id': course['id'],
               'course_title': course['title'],
@@ -496,5 +513,20 @@ class TrainerDataStore {
     }
 
     return monthMap;
+  }
+
+  static String getStudentPhoto(String id) {
+    final photos = [
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&auto=format&fit=crop&q=80',
+    ];
+    final idx = id.hashCode.abs() % photos.length;
+    return photos[idx];
   }
 }

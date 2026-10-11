@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
 import 'trainer_create_announcement_screen.dart';
 
 class TrainerAnnouncementsScreen extends StatefulWidget {
@@ -52,7 +53,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
       final nameParam = Uri.encodeComponent(_trainerName);
       final phoneParam = Uri.encodeComponent(_trainerPhone);
       final uri = Uri.parse(
-        'http://localhost:3000/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam',
+        '${ApiConstants.baseUrl}/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam',
       );
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
@@ -69,7 +70,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
 
   Future<void> _loadAnnouncements() async {
     try {
-      final uri = Uri.parse('http://localhost:3000/api/announcements');
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);

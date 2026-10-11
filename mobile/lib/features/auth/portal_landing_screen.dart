@@ -47,7 +47,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
 
       if (id.isEmpty || pass.isEmpty) {
         throw Exception(
-          'Please enter your ${_isStudent ? "mobile number" : "credentials"} and password.',
+          'Please enter your ${_isStudent ? "mobile number / student roll no" : "registered phone number"} and password.',
         );
       }
 
@@ -324,9 +324,9 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                     const SizedBox(height: 16),
                   ],
 
-                  // 4. Input Field 1: Phone or Email
+                  // 4. Input Field 1: Phone
                   Text(
-                    _isStudent ? 'Mobile Number or Student ID' : 'Registered Email Address',
+                    _isStudent ? 'Mobile Number or Student Roll No' : 'Registered Phone Number',
                     style: const TextStyle(
                       color: LaasyaColors.textDark,
                       fontSize: 13,
@@ -336,17 +336,17 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                   const SizedBox(height: 6),
                   TextField(
                     controller: _identifierController,
-                    keyboardType: _isStudent ? TextInputType.phone : TextInputType.emailAddress,
+                    keyboardType: TextInputType.phone,
                     style: const TextStyle(fontSize: 14.5, color: LaasyaColors.textDark),
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: Colors.white,
-                      prefixIcon: Icon(
-                        _isStudent ? Icons.phone_android_rounded : Icons.alternate_email_rounded,
-                        color: Colors.grey.shade600,
+                      prefixIcon: const Icon(
+                        Icons.phone_android_rounded,
+                        color: LaasyaColors.primary,
                         size: 19,
                       ),
-                      hintText: _isStudent ? 'e.g. 9845012345 or LCA-6' : 'e.g. anusha@laasyaacademy.com',
+                      hintText: _isStudent ? 'Enter mobile number or roll number' : 'Enter registered phone number',
                       hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                       border: OutlineInputBorder(
@@ -396,7 +396,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                         ),
                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                       ),
-                      hintText: 'Enter your password',
+                      hintText: 'Enter password',
                       hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                       border: OutlineInputBorder(

@@ -412,3 +412,36 @@ export async function deleteVideoLibraryItem(id: string): Promise<boolean> {
     return false;
   }
 }
+
+// -----------------------------------------------------------------------------
+// UPDATE EVENT FOLDER ITEM
+// -----------------------------------------------------------------------------
+export async function updateVideoLibraryItem(id: string, data: Partial<VideoLibraryItem>): Promise<VideoLibraryItem | null> {
+  try {
+    const sql = `
+      UPDATE video_library
+      SET title = COALESCE($1, title),
+          drive_url = $2,
+          youtube_url = $3,
+          event_name = COALESCE($4, event_name),
+          event_date = COALESCE($5, event_date),
+          description = COALESCE($6, description),
+          updated_at = NOW()
+      WHERE id = $7
+      RETURNING *;
+    `;
+    const params = [
+      data.title || null,
+      data.drive_url !== undefined ? data.drive_url : null,
+      data.youtube_url !== undefined ? data.youtube_url : null,
+      data.event_name || data.title || null,
+      data.event_date || null,
+      data.description !== undefined ? data.description : null,
+      id
+    ];
+    return await queryOne<VideoLibraryItem>(sql, params);
+  } catch (error) {
+    console.error('Error in updateVideoLibraryItem:', error);
+    throw error;
+  }
+}

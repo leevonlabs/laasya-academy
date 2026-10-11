@@ -13,6 +13,7 @@ import {
   BookOpen,
   Calendar,
   Trash2,
+  Edit3,
   X,
   Globe,
   Layers,
@@ -28,6 +29,7 @@ import {
   RotateCcw,
   GraduationCap
 } from 'lucide-react';
+import AiEnhanceButton from '@/components/common/AiEnhanceButton';
 import { CourseWithDetails, VideoLibraryItem, EnrolledStudent } from '@/lib/videoLibrary';
 
 interface Props {
@@ -101,6 +103,81 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
   const [courseShareDesc, setCourseShareDesc] = useState('');
   const [targetBatchOption, setTargetBatchOption] = useState<'all' | string>('all');
   const [isSubmittingCourseShare, setIsSubmittingCourseShare] = useState(false);
+
+  // Edit Link State
+  const [editingItem, setEditingItem] = useState<VideoLibraryItem | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDriveUrl, setEditDriveUrl] = useState('');
+  const [editYoutubeUrl, setEditYoutubeUrl] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+
+  const handleOpenEditItem = (item: VideoLibraryItem) => {
+    setEditingItem(item);
+    setEditTitle(item.title || '');
+    setEditDriveUrl(item.drive_url || '');
+    setEditYoutubeUrl(item.youtube_url || '');
+    setEditDate(item.event_date ? item.event_date.substring(0, 10) : new Date().toISOString().split('T')[0]);
+    setEditDesc(item.description || '');
+  };
+
+  const handleSaveEditItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+    if (!editTitle.trim()) {
+      alert('Please enter an event title');
+      return;
+    }
+    if (!editDriveUrl.trim() && !editYoutubeUrl.trim()) {
+      alert('Please provide at least a Google Drive link or YouTube link');
+      return;
+    }
+
+    setIsSubmittingEdit(true);
+    try {
+      const res = await fetch(`/api/video-library/${editingItem.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          drive_url: editDriveUrl.trim() || null,
+          youtube_url: editYoutubeUrl.trim() || null,
+          event_name: editTitle.trim(),
+          event_date: editDate,
+          description: editDesc.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to update link details');
+      }
+
+      setItems(prev =>
+        prev.map(i =>
+          i.id === editingItem.id
+            ? {
+                ...i,
+                title: editTitle.trim(),
+                drive_url: editDriveUrl.trim() || null,
+                youtube_url: editYoutubeUrl.trim() || null,
+                event_name: editTitle.trim(),
+                event_date: editDate,
+                description: editDesc.trim(),
+              }
+            : i
+        )
+      );
+
+      setEditingItem(null);
+      showToast('Event link details updated successfully!');
+    } catch (err: any) {
+      alert(err.message || 'Error updating link details');
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
 
   // Toast / Feedback State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -876,9 +953,17 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
 
                 {/* 4. Instructions / Description */}
                 <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Event Description / Instructions <span className="text-[11px] font-normal text-gray-400 capitalize">(Optional)</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
+                      Event Description / Instructions <span className="text-[11px] font-normal text-gray-400 capitalize">(Optional)</span>
+                    </label>
+                    <AiEnhanceButton
+                      value={subpageShareDesc}
+                      onEnhance={(val) => setSubpageShareDesc(val)}
+                      context="classical arts choreography video description and practice instructions"
+                      size="xs"
+                    />
+                  </div>
                   <input
                     type="text"
                     placeholder="e.g. Masterclass choreography recordings, costume trial videos, high-res photos"
@@ -1405,6 +1490,13 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                               {formattedDate}
                             </span>
                             <button
+                              onClick={() => handleOpenEditItem(item)}
+                              title="Edit Link Info"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-[#8A064D] hover:bg-[#FFF2F8] transition cursor-pointer"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
                               onClick={() => handleDeleteItem(item.id)}
                               title="Delete Link"
                               className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
@@ -1669,13 +1761,22 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                             </div>
                           </div>
 
-                          <button
-                            onClick={() => handleDeleteItem(item.id)}
-                            title="Remove Guru Link (Admin Moderation)"
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleOpenEditItem(item)}
+                              title="Edit Link Info"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-[#8A064D] hover:bg-[#FFF2F8] transition cursor-pointer"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItem(item.id)}
+                              title="Remove Link (Admin Moderation)"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
 
                         {/* Badges Row: Course, Batch, Disciples */}
@@ -1788,7 +1889,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
       {/* ===================================================================== */}
       {isUniversalModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-[#F0D5E4] overflow-hidden">
+          <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-[#F0D5E4] overflow-hidden">
             {/* Modal Header */}
             <div className="px-6 py-4 bg-gradient-to-r from-[#590231] to-[#8A064D] text-white flex items-center justify-between">
               <div>
@@ -1893,15 +1994,31 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
 
               {/* Description / Instructions */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Description / Instructions for Disciples
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Description / Instructions for Disciples
+                  </label>
+                  <AiEnhanceButton
+                    value={universalDesc}
+                    onEnhance={(val) => setUniversalDesc(val)}
+                    context="classical arts choreography video description and practice instructions for students"
+                    size="xs"
+                  />
+                </div>
                 <textarea
-                  rows={2}
+                  rows={3}
                   placeholder="e.g. Contains multi-cam 4K stage recordings, individual solo clips, and high-res photo gallery."
                   value={universalDesc}
-                  onChange={e => setUniversalDesc(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
+                  onChange={e => {
+                    setUniversalDesc(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  onFocus={e => {
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 min-h-[90px] overflow-hidden resize-y transition-all"
                 />
               </div>
 
@@ -1980,6 +2097,158 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                     <>
                       <Share2 className="w-4 h-4" />
                       <span>Share with {selectedCourseIds.length} Courses</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 5.5. EDIT SHARED VIDEO / LINK MODAL */}
+      {/* ===================================================================== */}
+      {editingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-[#F0D5E4] overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-[#590231] to-[#8A064D] text-white flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-[#D4AF37]" />
+                  <span>Edit Shared Video / Drive Link</span>
+                </h3>
+                <p className="text-xs text-rose-100">
+                  Update link titles, URLs, shoot date, and disciple instructions
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingItem(null)}
+                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveEditItem} className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Event Title */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Event / Video Title <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Annual Natya Utsav 2026 Stage Shoot"
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 font-semibold"
+                />
+              </div>
+
+              {/* Links */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <span>Google Drive Folder Link</span>
+                    <span className="text-[10px] text-gray-400 font-normal lowercase">(Optional if YouTube provided)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="url"
+                      placeholder="https://drive.google.com/drive/folders/..."
+                      value={editDriveUrl}
+                      onChange={e => setEditDriveUrl(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-300 text-xs font-mono focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
+                    />
+                    <LinkIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <span>YouTube Link</span>
+                    <span className="text-[10px] text-gray-400 font-normal lowercase">(Optional if Drive provided)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="url"
+                      placeholder="https://youtube.com/watch?v=..."
+                      value={editYoutubeUrl}
+                      onChange={e => setEditYoutubeUrl(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-300 text-xs font-mono focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
+                    />
+                    <Video className="w-4 h-4 text-rose-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Shoot Date */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Event Shoot Date
+                </label>
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={e => setEditDate(e.target.value)}
+                  className="w-full max-w-xs px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
+                />
+              </div>
+
+              {/* Description with AI Enhance & auto expansion */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Description / Instructions for Disciples
+                  </label>
+                  <AiEnhanceButton
+                    value={editDesc}
+                    onEnhance={(val) => setEditDesc(val)}
+                    context="classical arts choreography video description and practice instructions for students"
+                    size="xs"
+                  />
+                </div>
+                <textarea
+                  rows={4}
+                  placeholder="e.g. Masterclass choreography notes, costume details, rehearsal guidelines."
+                  value={editDesc}
+                  onChange={e => {
+                    setEditDesc(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  onFocus={e => {
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 min-h-[100px] overflow-hidden resize-y transition-all"
+                />
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingItem(null)}
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-semibold text-xs hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingEdit || (!editDriveUrl.trim() && !editYoutubeUrl.trim()) || !editTitle.trim()}
+                  className="px-6 py-2.5 rounded-xl bg-[#590231] hover:bg-[#740340] text-white font-bold text-xs shadow-md disabled:opacity-50 transition-all flex items-center gap-2"
+                >
+                  {isSubmittingEdit ? (
+                    <span>Saving Changes...</span>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Save Changes</span>
                     </>
                   )}
                 </button>
@@ -2131,15 +2400,31 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
 
                       {/* Description */}
                       <div>
-                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                          Instructions / Description
-                        </label>
-                        <input
-                          type="text"
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            Instructions / Description
+                          </label>
+                          <AiEnhanceButton
+                            value={courseShareDesc}
+                            onEnhance={(val) => setCourseShareDesc(val)}
+                            context="classical arts choreography video description and practice instructions"
+                            size="xs"
+                          />
+                        </div>
+                        <textarea
+                          rows={2}
                           placeholder="e.g. Stage rehearsals, masterclass footages."
                           value={courseShareDesc}
-                          onChange={e => setCourseShareDesc(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
+                          onChange={e => {
+                            setCourseShareDesc(e.target.value);
+                            e.target.style.height = 'auto';
+                            e.target.style.height = `${e.target.scrollHeight}px`;
+                          }}
+                          onFocus={e => {
+                            e.target.style.height = 'auto';
+                            e.target.style.height = `${e.target.scrollHeight}px`;
+                          }}
+                          className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 min-h-[60px] overflow-hidden resize-y transition-all"
                         />
                       </div>
                     </div>
@@ -2194,13 +2479,22 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                               {item.title}
                             </h5>
                           </div>
-                          <button
-                            onClick={() => handleDeleteItem(item.id)}
-                            title="Delete link"
-                            className="text-gray-400 hover:text-rose-600 p-1"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleOpenEditItem(item)}
+                              title="Edit link details"
+                              className="text-gray-400 hover:text-[#8A064D] p-1"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItem(item.id)}
+                              title="Delete link"
+                              className="text-gray-400 hover:text-rose-600 p-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
 
                         {item.description && (

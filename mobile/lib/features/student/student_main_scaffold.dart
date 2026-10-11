@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
+import '../trainer/trainer_data_store.dart';
 import 'student_dashboard_tab.dart';
 import 'student_courses_tab.dart';
 import 'student_schedule_tab.dart';
@@ -16,6 +18,203 @@ class StudentMainScaffold extends StatefulWidget {
 
 class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    TrainerDataStore.classClosedAlertNotifier.addListener(_onClassClosedAlert);
+  }
+
+  @override
+  void dispose() {
+    TrainerDataStore.classClosedAlertNotifier.removeListener(_onClassClosedAlert);
+    super.dispose();
+  }
+
+  void _onClassClosedAlert() {
+    final alertData = TrainerDataStore.classClosedAlertNotifier.value;
+    if (alertData == null || !mounted) return;
+
+    // Reset notifier value so subsequent alarms trigger properly
+    TrainerDataStore.classClosedAlertNotifier.value = null;
+
+    _showClassClosedAttentionAlarm(alertData);
+  }
+
+  void _showClassClosedAttentionAlarm(Map<String, dynamic> alertData) {
+    final courseTitle = alertData['course_title'] ?? 'Classical Dance';
+    final batchName = alertData['batch_name'] ?? 'Class Session';
+
+    int secondsRemaining = 5;
+    Timer? ringTimer;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            ringTimer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
+              if (secondsRemaining > 1) {
+                if (ctx.mounted) {
+                  setDialogState(() {
+                    secondsRemaining--;
+                  });
+                }
+              } else {
+                timer.cancel();
+                if (ctx.mounted && Navigator.canPop(ctx)) {
+                  Navigator.pop(ctx);
+                }
+              }
+            });
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              elevation: 16,
+              child: Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFFF7ED), Colors.white],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  border: Border.all(color: const Color(0xFFF97316), width: 2),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Ringing Bell Icon with pulsing effect
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFED7AA),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFF97316).withOpacity(0.35),
+                            blurRadius: 16,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.notifications_active_rounded,
+                        color: Color(0xFFC2410C),
+                        size: 44,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Title
+                    const Text(
+                      'CLASS COMPLETED!',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF9A3412),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Countdown Ringing Notice
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEDD5),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFFDBA74)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.ring_volume_rounded, size: 14, color: Color(0xFFC2410C)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Attention Alarm Ringing: ${secondsRemaining}s',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF9A3412),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Detailed Message for Parents
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFFED7AA)),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'The $courseTitle ($batchName) session has concluded.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: LaasyaColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Please come and take your child back from the academy hall safely.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: Colors.black87,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Stop Ringing Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          ringTimer?.cancel();
+                          if (Navigator.canPop(ctx)) {
+                            Navigator.pop(ctx);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFC2410C),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          elevation: 3,
+                        ),
+                        icon: const Icon(Icons.volume_off_rounded, size: 20),
+                        label: const Text(
+                          'Stop Ringing',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).then((_) {
+      ringTimer?.cancel();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

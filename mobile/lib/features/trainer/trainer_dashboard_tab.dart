@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
 import '../student/student_messages_screen.dart';
 import '../student/student_video_library_screen.dart';
@@ -155,7 +156,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
     // 4. Remote or relative URL
     String fullUrl = cleanUrl;
     if (fullUrl.startsWith('/')) {
-      fullUrl = 'http://localhost:3000$fullUrl';
+      fullUrl = '${ApiConstants.baseUrl}$fullUrl';
     }
 
     return Image.network(

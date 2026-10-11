@@ -26,6 +26,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { Announcement } from '@/lib/announcements';
+import AiEnhanceButton from '@/components/common/AiEnhanceButton';
 
 interface Course {
   id: string;
@@ -1362,7 +1363,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
       {/* ===================================================================== */}
       {(isCreateModalOpen || editingAnnouncement) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full border border-[#F0D5E4] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl max-w-4xl w-full border border-[#F0D5E4] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             
             {/* Modal Header */}
             <div className={`px-6 py-4 text-white flex items-center justify-between border-b ${
@@ -1435,9 +1436,17 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                 
                 {/* 1. Title / Subject */}
                 <div>
-                  <label className="text-xs font-black text-gray-800 uppercase tracking-wider block mb-1">
-                    {formAnnouncementType === 'banner' ? 'Banner Promotional Headline *' : 'Notice Subject / Title *'}
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-black text-gray-800 uppercase tracking-wider block">
+                      {formAnnouncementType === 'banner' ? 'Banner Promotional Headline *' : 'Notice Subject / Title *'}
+                    </label>
+                    <AiEnhanceButton
+                      value={formData.title}
+                      onEnhance={(newTitle) => setFormData(prev => ({ ...prev, title: newTitle }))}
+                      context={formAnnouncementType === 'banner' ? 'promotional academy app banner headline' : 'official student broadcast notice subject'}
+                      size="xs"
+                    />
+                  </div>
                   <input
                     type="text"
                     value={formData.title}
@@ -1569,17 +1578,33 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
 
                 {/* 3. Description / Message Body */}
                 <div>
-                  <label className="text-xs font-black text-gray-800 uppercase tracking-wider block mb-1">
-                    {formAnnouncementType === 'banner' ? 'Promotional Details' : 'Broadcast Message Content *'}
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-black text-gray-800 uppercase tracking-wider block">
+                      {formAnnouncementType === 'banner' ? 'Promotional Details' : 'Broadcast Message Content *'}
+                    </label>
+                    <AiEnhanceButton
+                      value={formData.message}
+                      onEnhance={(newMessage) => setFormData(prev => ({ ...prev, message: newMessage }))}
+                      context={formAnnouncementType === 'banner' ? 'promotional app banner copy for classical dance and arts academy' : 'official student broadcast message body for classical dance and arts academy'}
+                      size="xs"
+                    />
+                  </div>
                   <textarea
-                    rows={formAnnouncementType === 'banner' ? 2 : 5}
+                    rows={formAnnouncementType === 'banner' ? 3 : 6}
                     value={formData.message}
-                    onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
+                    onChange={(e) => {
+                      setFormData(prev => ({ ...prev, message: e.target.value }));
+                      e.target.style.height = 'auto';
+                      e.target.style.height = `${e.target.scrollHeight}px`;
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.height = 'auto';
+                      e.target.style.height = `${e.target.scrollHeight}px`;
+                    }}
                     placeholder={formAnnouncementType === 'banner' 
                       ? 'Brief 1-2 line catchphrase...' 
                       : 'Type official circular message content here...'}
-                    className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-semibold text-gray-900 focus:outline-none focus:border-[#8A064D]"
+                    className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-sm font-semibold text-gray-900 focus:outline-none focus:border-[#8A064D] min-h-[100px] overflow-hidden resize-y transition-all"
                   />
                   {formErrors.message && (
                     <p className="text-xs font-bold text-red-600 mt-1">{formErrors.message}</p>

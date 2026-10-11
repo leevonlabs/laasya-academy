@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
+import '../../core/widgets/ai_enhance_bar.dart';
 
 class TrainerCreateAnnouncementScreen extends StatefulWidget {
   final Map<String, dynamic>? trainerProfile;
@@ -93,7 +95,7 @@ class _TrainerCreateAnnouncementScreenState
       final nameParam = Uri.encodeComponent(_trainerName);
       final phoneParam = Uri.encodeComponent(_trainerPhone);
       final uri = Uri.parse(
-        'http://localhost:3000/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam',
+        '${ApiConstants.baseUrl}/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam',
       );
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
@@ -245,7 +247,7 @@ class _TrainerCreateAnnouncementScreenState
       };
 
       final res = await http.post(
-        Uri.parse('http://localhost:3000/api/announcements'),
+        Uri.parse('${ApiConstants.baseUrl}/api/announcements'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
       );
@@ -785,14 +787,24 @@ class _TrainerCreateAnnouncementScreenState
                   const SizedBox(height: 18),
 
                   // 5. ANNOUNCEMENT TITLE
-                  const Text(
-                    'ANNOUNCEMENT TITLE *',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.6,
-                      color: Color(0xFF8A064D),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'ANNOUNCEMENT TITLE *',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.6,
+                          color: Color(0xFF8A064D),
+                        ),
+                      ),
+                      AiEnhanceBar(
+                        controller: _titleController,
+                        contextDescription: 'classical arts academy broadcast circular subject title',
+                        compact: true,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   TextField(
@@ -824,14 +836,24 @@ class _TrainerCreateAnnouncementScreenState
                   const SizedBox(height: 18),
 
                   // 6. MESSAGE CONTENT
-                  const Text(
-                    'BROADCAST MESSAGE BODY *',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.6,
-                      color: Color(0xFF8A064D),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'BROADCAST MESSAGE BODY *',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.6,
+                          color: Color(0xFF8A064D),
+                        ),
+                      ),
+                      AiEnhanceBar(
+                        controller: _messageController,
+                        contextDescription: 'classical dance, music, arts academy circular message body to students',
+                        compact: true,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   TextField(

@@ -172,6 +172,9 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     }));
   };
 
+  // Report generation trigger state: false until user clicks "View Report (F2)"
+  const [hasGenerated, setHasGenerated] = useState(false);
+
   // Keyboard Shortcuts: F2 (View Report), F3 (Filter Columns), F4 (Export Now)
   useEffect(() => {
     if (reportView !== 'subpage') return;
@@ -179,6 +182,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F2') {
         e.preventDefault();
+        setHasGenerated(true);
         setRefreshKey(k => k + 1);
       } else if (e.key === 'F3') {
         e.preventDefault();
@@ -321,6 +325,13 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     }
     setAbsenceSelectedStudent(null);
     setAbsenceSelectedBatch(null);
+    setHasGenerated(false);
+    setAttendanceData(null);
+    setFeesData(null);
+    setSalariesData(null);
+    setIncomeExpensesData(null);
+    setBatchAttendanceData(null);
+    setAbsenceData(null);
     setReportView('subpage');
   };
 
@@ -395,6 +406,11 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
 
   // Fetch Report Data safely with isMounted guard and AbortController
   useEffect(() => {
+    // Only generate when user explicitly requests via View Report (F2)
+    if (!hasGenerated) {
+      return;
+    }
+
     // If viewing absence report under attendance, skip general fetch
     if (activeType === 'attendance' && attendanceSubView === 'absence') {
       return;
@@ -500,6 +516,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
 
   // Fetch Absence Report Data safely with AbortController
   useEffect(() => {
+    if (!hasGenerated) return;
     if (activeType !== 'attendance' || attendanceSubView !== 'absence') return;
 
     let isMounted = true;
@@ -643,6 +660,13 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     setAbsenceSelectedStudentIds([]);
     setAbsenceSelectedStudent(null);
     setAbsenceSelectedBatch(null);
+    setHasGenerated(false);
+    setAttendanceData(null);
+    setFeesData(null);
+    setSalariesData(null);
+    setIncomeExpensesData(null);
+    setBatchAttendanceData(null);
+    setAbsenceData(null);
   };
 
   const hasActiveFilters = Boolean(
@@ -1384,7 +1408,10 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
           {/* View Report (F2) */}
           <button
             type="button"
-            onClick={() => setRefreshKey(k => k + 1)}
+            onClick={() => {
+              setHasGenerated(true);
+              setRefreshKey(k => k + 1);
+            }}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2D041A] hover:bg-[#1E0211] text-white text-xs font-black shadow-md transition cursor-pointer active:scale-95"
             title="Collect and refresh report data (F2)"
           >
@@ -1659,7 +1686,11 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
         <div className="flex items-center justify-between pt-2 border-t border-[#F0D5E4]/60">
           <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
             <Clock className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Generated: {currentGeneratedAt ? new Date(currentGeneratedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'Live'}</span>
+            {hasGenerated && currentGeneratedAt ? (
+              <span>Generated: {new Date(currentGeneratedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+            ) : (
+              <span className="text-gray-400">Filters configured • Click &apos;View Report (F2)&apos; to load</span>
+            )}
           </div>
           {hasActiveFilters && (
             <button
@@ -1687,6 +1718,34 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
         </div>
       )}
 
+      {/* Initial Standby Prompt before user clicks View Report */}
+      {!isLoading && !errorMessage && !hasGenerated && (
+        <div className="bg-white rounded-3xl p-12 border border-[#F0D5E4] shadow-xs text-center flex flex-col items-center justify-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D]">
+            <FileSpreadsheet className="w-8 h-8" />
+          </div>
+          <div className="max-w-md space-y-1">
+            <h3 className="text-base font-black text-[#590231]">
+              Report Ready to Generate
+            </h3>
+            <p className="text-xs text-gray-500 font-medium">
+              Adjust any filters above and click <span className="font-bold text-[#8A064D]">View Report (F2)</span> to load the live records.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setHasGenerated(true);
+              setRefreshKey(k => k + 1);
+            }}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#2D041A] hover:bg-[#1E0211] text-white text-xs font-black shadow-md transition cursor-pointer active:scale-95 ring-2 ring-[#F9E33A]/60"
+          >
+            <TrendingUp className="w-4 h-4 text-[#F9E33A]" />
+            <span>View Report (F2)</span>
+          </button>
+        </div>
+      )}
+
       {/* Error State with Plain-Language Message & Retry */}
       {!isLoading && errorMessage && (
         <div className="bg-white rounded-3xl p-10 border border-red-200 shadow-xs text-center flex flex-col items-center justify-center space-y-3">
@@ -1700,7 +1759,10 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
             {errorMessage}
           </p>
           <button
-            onClick={() => setRefreshKey(k => k + 1)}
+            onClick={() => {
+              setHasGenerated(true);
+              setRefreshKey(k => k + 1);
+            }}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#8A064D] text-white text-xs font-black shadow-md hover:bg-[#590231] transition"
           >
             <RefreshCw className="w-4 h-4" />
@@ -1709,8 +1771,8 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
         </div>
       )}
 
-      {/* Empty State: Rule: "No records match these filters. Clear filters or change the date range." */}
-      {!isLoading && !errorMessage && currentRecordCount === 0 && (
+      {/* Empty State: Only when report has been generated and count is 0 */}
+      {!isLoading && !errorMessage && hasGenerated && currentRecordCount === 0 && (
         <div className="bg-white rounded-3xl p-12 border border-[#F0D5E4] shadow-xs text-center flex flex-col items-center justify-center space-y-4">
           <div className="w-16 h-16 rounded-full bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D]">
             <FileText className="w-8 h-8" />
@@ -1762,7 +1824,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
       )}
 
       {/* REPORT CONTENT VIEWPORT */}
-      {!isLoading && !errorMessage && currentRecordCount > 0 && (
+      {!isLoading && !errorMessage && hasGenerated && currentRecordCount > 0 && (
         <div className="space-y-6">
           
           {/* ========================================================= */}

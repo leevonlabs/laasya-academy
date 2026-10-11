@@ -146,18 +146,120 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
             SizedBox(
               width: double.infinity,
               height: 44,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _showCloseClassConfirmation();
+                },
+                icon: const Icon(Icons.notifications_active_rounded, size: 18),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: LaasyaColors.primary,
+                  backgroundColor: const Color(0xFF590231),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('OK & Close', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: const Text('Close Class & Alert Parents', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: LaasyaColors.primary,
+                  side: const BorderSide(color: Color(0xFFF0D5E4)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Done for Now', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showCloseClassConfirmation() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.notifications_active_rounded, color: Color(0xFF8A064D), size: 24),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Close Class Session?',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Closing the session for ${widget.classInfo['course_short_title']} (${widget.classInfo['batch_name']}) will trigger an attention alarm ring for 5 seconds on student and parent mobile devices notifying them that class is complete and to take their child back.',
+              style: const TextStyle(fontSize: 13, height: 1.45, color: Colors.black87),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF2F8),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF0D5E4)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.ring_volume_rounded, size: 16, color: Color(0xFF8A064D)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '5-second attention ring with "Stop Ringing" button will play on parents\' phones.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF8A064D), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() {
+                _store.closeClassSession(
+                  batchId: _batchId,
+                  batchName: widget.classInfo['batch_name'] ?? 'Batch Session',
+                  courseTitle: widget.classInfo['course_short_title'] ?? 'Classical Dance',
+                );
+                _currentStatus = 'closed';
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Class session closed! Attention chime sent to all parents.'),
+                  backgroundColor: Color(0xFF03543F),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF590231),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Confirm & Close Class', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -397,32 +499,51 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
             ]
 
             // =================================================================
-            // 3. STATE: SUBMITTED (Editable till end of day)
+            // 3. STATE: SUBMITTED or CLOSED (Editable till end of day)
             // =================================================================
-            else if (_currentStatus == 'submitted') ...[
+            else if (_currentStatus == 'submitted' || _currentStatus == 'closed') ...[
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDEF7EC),
+                  color: _currentStatus == 'closed' ? const Color(0xFFFFF2F8) : const Color(0xFFDEF7EC),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF31C48D).withOpacity(0.6)),
+                  border: Border.all(
+                    color: _currentStatus == 'closed'
+                        ? const Color(0xFFF0D5E4)
+                        : const Color(0xFF31C48D).withOpacity(0.6),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.verified_rounded, color: Color(0xFF03543F), size: 24),
+                    Icon(
+                      _currentStatus == 'closed' ? Icons.notifications_off_rounded : Icons.verified_rounded,
+                      color: _currentStatus == 'closed' ? const Color(0xFF8A064D) : const Color(0xFF03543F),
+                      size: 24,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Attendance Recorded & Saved for Today',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF03543F)),
+                          Text(
+                            _currentStatus == 'closed'
+                                ? 'Class Session Closed & Parents Notified'
+                                : 'Attendance Recorded & Saved for Today',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: _currentStatus == 'closed' ? const Color(0xFF8A064D) : const Color(0xFF03543F),
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Editable till 11:59 PM today ($todayFormatted). Tomorrow\'s schedule will appear automatically.',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF03543F)),
+                            _currentStatus == 'closed'
+                                ? 'Attention chime was broadcast to student/parent devices. Editable till 11:59 PM today.'
+                                : 'Editable till 11:59 PM today ($todayFormatted). You can now close the class when completed.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _currentStatus == 'closed' ? const Color(0xFF590231) : const Color(0xFF03543F),
+                            ),
                           ),
                         ],
                       ),
@@ -431,7 +552,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                     ElevatedButton(
                       onPressed: _enableEditing,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF03543F),
+                        backgroundColor: _currentStatus == 'closed' ? const Color(0xFF8A064D) : const Color(0xFF03543F),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -468,6 +589,8 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                 final sId = stu['id'];
                 final status = _store.getStudentStatus(_batchId, sId);
                 final isPresent = status == 'present';
+                final isAbsent = status == 'absent';
+                final isUnmarked = status.isEmpty;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
@@ -476,18 +599,30 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isPresent ? const Color(0xFF31C48D).withOpacity(0.4) : const Color(0xFFF98080).withOpacity(0.5),
+                      color: isPresent
+                          ? const Color(0xFF31C48D).withOpacity(0.5)
+                          : isAbsent
+                              ? const Color(0xFFF98080).withOpacity(0.5)
+                              : Colors.grey.shade300,
                     ),
                   ),
                   child: Row(
                     children: [
                       CircleAvatar(
                         radius: 18,
-                        backgroundColor: isPresent ? const Color(0xFFDEF7EC) : const Color(0xFFFDE8E8),
+                        backgroundColor: isPresent
+                            ? const Color(0xFFDEF7EC)
+                            : isAbsent
+                                ? const Color(0xFFFDE8E8)
+                                : Colors.grey.shade100,
                         child: Text(
                           stu['name'].toString().substring(0, 1),
                           style: TextStyle(
-                            color: isPresent ? const Color(0xFF03543F) : const Color(0xFF991B1B),
+                            color: isPresent
+                                ? const Color(0xFF03543F)
+                                : isAbsent
+                                    ? const Color(0xFF991B1B)
+                                    : Colors.grey.shade700,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -505,15 +640,23 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isPresent ? const Color(0xFFDEF7EC) : const Color(0xFFFDE8E8),
+                          color: isPresent
+                              ? const Color(0xFFDEF7EC)
+                              : isAbsent
+                                  ? const Color(0xFFFDE8E8)
+                                  : Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          isPresent ? 'PRESENT' : 'ABSENT',
+                          isUnmarked ? 'NOT MARKED' : (isPresent ? 'PRESENT' : 'ABSENT'),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: isPresent ? const Color(0xFF03543F) : const Color(0xFF991B1B),
+                            color: isPresent
+                                ? const Color(0xFF03543F)
+                                : isAbsent
+                                    ? const Color(0xFF991B1B)
+                                    : Colors.grey.shade700,
                           ),
                         ),
                       ),
@@ -523,9 +666,52 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
               }),
 
               const SizedBox(height: 16),
+              if (_currentStatus != 'closed') ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _showCloseClassConfirmation,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF590231),
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.notifications_active_rounded, size: 20),
+                    label: const Text(
+                      'Close Class & Alert Parents',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ] else ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF2F8),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFF0D5E4)),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle_rounded, color: Color(0xFF8A064D), size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Class Session Concluded • Parents Alerted',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8A064D), fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               SizedBox(
                 width: double.infinity,
-                height: 48,
+                height: 46,
                 child: OutlinedButton.icon(
                   onPressed: _enableEditing,
                   style: OutlinedButton.styleFrom(
@@ -662,6 +848,8 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                 final sId = stu['id'];
                 final status = _store.getStudentStatus(_batchId, sId);
                 final isPresent = status == 'present';
+                final isAbsent = status == 'absent';
+                final isUnmarked = status.isEmpty;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 9),
@@ -671,9 +859,11 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: isPresent
-                          ? const Color(0xFF31C48D).withOpacity(0.5)
-                          : const Color(0xFFF98080).withOpacity(0.6),
-                      width: 1.4,
+                          ? const Color(0xFF31C48D).withOpacity(0.6)
+                          : isAbsent
+                              ? const Color(0xFFF98080).withOpacity(0.6)
+                              : const Color(0xFFE5E7EB),
+                      width: isUnmarked ? 1.0 : 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
@@ -727,7 +917,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                         ),
                       ),
 
-                      // 2-Way Toggle: P (Present) & A (Absent) ONLY
+                      // 2-Way Toggle: P (Present) & A (Absent) ONLY. Unmarked disciples have neither selected.
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -748,7 +938,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                           _statusToggleButton(
                             label: 'A',
                             fullLabel: 'Absent',
-                            isSelected: !isPresent,
+                            isSelected: isAbsent,
                             selectedBg: const Color(0xFFFDE8E8),
                             selectedFg: const Color(0xFF991B1B),
                             borderColor: const Color(0xFFF98080),

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/supabase_constants.dart';
+import '../constants/api_constants.dart';
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -180,7 +181,7 @@ class SupabaseService {
 
     // 1. Authenticate against central Academy API (authenticates all 300 students and 14 Gurus)
     try {
-      final uri = Uri.parse('http://localhost:3000/api/auth/mobile-login');
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/auth/mobile-login');
       final res = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
@@ -642,7 +643,7 @@ class SupabaseService {
       final tPhone = prof?['phone'] ?? '';
       final nameParam = Uri.encodeComponent(tName);
       final phoneParam = Uri.encodeComponent(tPhone);
-      final uri = Uri.parse('http://localhost:3000/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam');
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -869,14 +870,14 @@ class SupabaseService {
     return [
       {
         'id': 'sch-1',
-        'course': 'Bharathanatyam',
+        'course': 'Bharathanatyam Foundation',
         'category': 'Classical Dance',
         'batch': 'Batch A (Beginners)',
         'batch_id': 'batch-201',
         'trainer': 'Guru Smt. Radhika Sharma',
-        'time': '17:00 - 18:30',
+        'time': '05:00 PM - 06:30 PM',
         'room': 'Natya Mandapam (Room 101)',
-        'day': 'Today',
+        'day': 'Monday',
         'date': '05-October-2026',
         'status': 'Scheduled',
         'is_today': true,
@@ -889,28 +890,73 @@ class SupabaseService {
         'batch': 'Morning Ragas',
         'batch_id': 'batch-203',
         'trainer': 'Vidwan Sri K. Venkatesh',
-        'time': '07:30 - 08:45',
+        'time': '07:30 AM - 08:45 AM',
         'room': 'Sangeetha Shala (Room 202)',
-        'day': 'Tomorrow',
+        'day': 'Tuesday',
         'date': '06-October-2026',
         'status': 'Scheduled',
         'is_today': false,
-        'is_tomorrow': true,
+        'is_tomorrow': false,
       },
       {
         'id': 'sch-3',
-        'course': 'Bharathanatyam Rehearsal',
+        'course': 'Bharathanatyam Abhinaya',
         'category': 'Classical Dance',
         'batch': 'Batch A (Beginners)',
         'batch_id': 'batch-201',
         'trainer': 'Guru Smt. Radhika Sharma',
-        'time': '18:30 - 19:30',
+        'time': '05:00 PM - 06:30 PM',
         'room': 'Natya Mandapam (Room 101)',
-        'day': 'Tomorrow',
-        'date': '06-October-2026',
+        'day': 'Wednesday',
+        'date': '07-October-2026',
         'status': 'Scheduled',
         'is_today': false,
-        'is_tomorrow': true,
+        'is_tomorrow': false,
+      },
+      {
+        'id': 'sch-4',
+        'course': 'Carnatic Vocal Ragas & Sarali',
+        'category': 'Vocal & Music',
+        'batch': 'Morning Ragas',
+        'batch_id': 'batch-203',
+        'trainer': 'Vidwan Sri K. Venkatesh',
+        'time': '07:30 AM - 08:45 AM',
+        'room': 'Sangeetha Shala (Room 202)',
+        'day': 'Thursday',
+        'date': '08-October-2026',
+        'status': 'Scheduled',
+        'is_today': false,
+        'is_tomorrow': false,
+      },
+      {
+        'id': 'sch-5',
+        'course': 'Bharathanatyam Adavu & Jathi',
+        'category': 'Classical Dance',
+        'batch': 'Batch A (Beginners)',
+        'batch_id': 'batch-201',
+        'trainer': 'Guru Smt. Radhika Sharma',
+        'time': '05:00 PM - 06:30 PM',
+        'room': 'Natya Mandapam (Room 101)',
+        'day': 'Friday',
+        'date': '09-October-2026',
+        'status': 'Scheduled',
+        'is_today': false,
+        'is_tomorrow': false,
+      },
+      {
+        'id': 'sch-6',
+        'course': 'Stage Rehearsal & Nattuvangam',
+        'category': 'Classical Dance',
+        'batch': 'Weekend Masterclass',
+        'batch_id': 'batch-205',
+        'trainer': 'Guru Smt. Radhika Sharma',
+        'time': '09:00 AM - 11:00 AM',
+        'room': 'Main Auditorium Stage',
+        'day': 'Saturday',
+        'date': '10-October-2026',
+        'status': 'Scheduled',
+        'is_today': false,
+        'is_tomorrow': false,
       },
     ];
   }
@@ -1082,7 +1128,7 @@ class SupabaseService {
     }
 
     if (url.startsWith('/')) {
-      return 'http://localhost:3000$url';
+      return '${ApiConstants.baseUrl}$url';
     }
 
     return url;
@@ -1114,7 +1160,7 @@ class SupabaseService {
 
     // 2. HTTP API fallback
     try {
-      final uri = Uri.parse('http://localhost:3000/api/announcements?announcementType=banner');
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements?announcementType=banner');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -1172,7 +1218,7 @@ class SupabaseService {
 
     // 2. HTTP API fallback
     try {
-      final uri = Uri.parse('http://localhost:3000/api/announcements?announcementType=message');
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements?announcementType=message');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -1242,9 +1288,9 @@ class SupabaseService {
   List<Map<String, dynamic>> _cachedEventFolders = [];
 
   Future<List<Map<String, dynamic>>> getStudentEventFolders({String? courseTitle, String? batchName}) async {
-    // 1. Live fetch from local / web backend API (http://localhost:3000/api/video-library)
+    // 1. Live fetch from web backend API
     try {
-      final uri = Uri.parse('http://localhost:3000/api/video-library');
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/video-library');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -1362,7 +1408,7 @@ class SupabaseService {
   Future<List<Map<String, dynamic>>> getStudentPayments({String? studentId, String? rollNumber}) async {
     // 1. Live fetch from local / web backend API
     try {
-      final uri = Uri.parse('http://localhost:3000/api/finance/student-payments');
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/student-payments');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -1503,7 +1549,7 @@ class SupabaseService {
   Future<List<Map<String, dynamic>>> getTrainerSalaryPayouts({String? trainerId}) async {
     // 1. Live fetch from local / web backend API
     try {
-      final uri = Uri.parse('http://localhost:3000/api/finance/trainer-salaries');
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/trainer-salaries');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);

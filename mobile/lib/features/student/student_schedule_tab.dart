@@ -12,7 +12,8 @@ class StudentScheduleTab extends StatefulWidget {
 class _StudentScheduleTabState extends State<StudentScheduleTab> {
   List<Map<String, dynamic>> _schedule = [];
   bool _isLoading = true;
-  String _selectedDay = 'today'; // 'today' or 'tomorrow'
+  String _selectedDay = 'today'; // 'today' or 'week'
+  String _selectedWeekFilter = 'all'; // 'all', 'Monday', 'Tuesday', etc.
   final Set<String> _enabledReminders = {'sch-1', 'sch-2'};
 
   @override
@@ -59,16 +60,16 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
     final todayClasses = _schedule.where((item) {
       final isToday = item['is_today'] == true;
       final day = (item['day'] ?? '').toString().toLowerCase();
-      return isToday || day == 'today';
+      return isToday || day == 'today' || day == 'monday';
     }).toList();
 
-    final tomorrowClasses = _schedule.where((item) {
-      final isTomorrow = item['is_tomorrow'] == true;
+    final weekClasses = _schedule.where((item) {
+      if (_selectedWeekFilter == 'all') return true;
       final day = (item['day'] ?? '').toString().toLowerCase();
-      return isTomorrow || day == 'tomorrow';
+      return day == _selectedWeekFilter.toLowerCase();
     }).toList();
 
-    final displayedClasses = _selectedDay == 'today' ? todayClasses : tomorrowClasses;
+    final displayedClasses = _selectedDay == 'today' ? todayClasses : weekClasses;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8FA),
@@ -77,10 +78,10 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
           : Column(
               children: [
                 // =============================================================
-                // 2-PART SIDE-BY-SIDE SCHEDULE FILTER (TODAY vs TOMORROW)
+                // 2-PART SIDE-BY-SIDE SCHEDULE FILTER (TODAY vs WEEK SCHEDULE)
                 // =============================================================
                 Container(
-                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -108,11 +109,11 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: _scheduleTabButton(
-                          title: "Tomorrow's Schedule",
-                          subtitle: '06 Oct 2026',
-                          count: tomorrowClasses.length,
-                          isSelected: _selectedDay == 'tomorrow',
-                          onTap: () => setState(() => _selectedDay = 'tomorrow'),
+                          title: "Week Schedule",
+                          subtitle: 'Complete Timetable',
+                          count: _schedule.length,
+                          isSelected: _selectedDay == 'week',
+                          onTap: () => setState(() => _selectedDay = 'week'),
                         ),
                       ),
                     ],
@@ -120,7 +121,29 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                 ),
 
                 // =============================================================
-                // SCHEDULE LIST FOR SELECTED DAY
+                // OPTIONAL DAY CHIPS (VISIBLE WHEN WEEK SCHEDULE IS SELECTED)
+                // =============================================================
+                if (_selectedDay == 'week')
+                  Container(
+                    height: 38,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        _weekDayChip('all', 'All Week (${_schedule.length})'),
+                        _weekDayChip('Monday', 'Mon'),
+                        _weekDayChip('Tuesday', 'Tue'),
+                        _weekDayChip('Wednesday', 'Wed'),
+                        _weekDayChip('Thursday', 'Thu'),
+                        _weekDayChip('Friday', 'Fri'),
+                        _weekDayChip('Saturday', 'Sat'),
+                      ],
+                    ),
+                  ),
+
+                // =============================================================
+                // SCHEDULE LIST FOR SELECTED DAY / WEEK
                 // =============================================================
                 Expanded(
                   child: RefreshIndicator(
@@ -148,7 +171,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                                     Text(
                                       _selectedDay == 'today'
                                           ? 'No Classes Scheduled for Today'
-                                          : 'No Classes Scheduled for Tomorrow',
+                                          : 'No Classes for Selected Day',
                                       style: const TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
@@ -174,6 +197,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                               final status = item['status'] ?? 'Scheduled';
                               final isHoliday = status.toString().toLowerCase().contains('holiday');
                               final reminderOn = _enabledReminders.contains(item['id']);
+                              final dayName = item['day'] ?? 'Scheduled Day';
 
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 12),
@@ -202,27 +226,49 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFF3E8EE),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(Icons.access_time_rounded, size: 13, color: LaasyaColors.primary),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  item['time'] ?? 'Regular Hours',
-                                                  style: const TextStyle(
-                                                    color: LaasyaColors.primary,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 11.5,
+                                          Row(
+                                            children: [
+                                              if (_selectedDay == 'week') ...[
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  margin: const EdgeInsets.only(right: 6),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF590231),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: Text(
+                                                    dayName.toUpperCase(),
+                                                    style: const TextStyle(
+                                                      color: Color(0xFFF9E33A),
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 10.5,
+                                                    ),
                                                   ),
                                                 ),
                                               ],
-                                            ),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFF3E8EE),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(Icons.access_time_rounded, size: 13, color: LaasyaColors.primary),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      item['time'] ?? 'Regular Hours',
+                                                      style: const TextStyle(
+                                                        color: LaasyaColors.primary,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 11.5,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -382,6 +428,43 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _weekDayChip(String filterKey, String label) {
+    final isSelected = _selectedWeekFilter == filterKey;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedWeekFilter = filterKey),
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF590231) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF590231) : const Color(0xFFF0D5E4),
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF590231).withOpacity(0.2),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? Colors.white : Colors.black87,
+            ),
+          ),
         ),
       ),
     );

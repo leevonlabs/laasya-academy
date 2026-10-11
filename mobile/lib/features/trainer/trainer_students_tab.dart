@@ -286,11 +286,132 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
     );
   }
 
+  void _showFullLengthPhoto(BuildContext context, Map<String, dynamic> stu) {
+    final avatarUrl = stu['avatar_url'] as String? ?? TrainerDataStore.getStudentPhoto(stu['roll']?.toString() ?? stu['id']);
+    final name = stu['name']?.toString() ?? 'Disciple';
+    final roll = stu['roll']?.toString() ?? '';
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.92),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.4), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.5),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header with Title & Close
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (roll.isNotEmpty)
+                          Text(
+                            'Disciple ID: $roll',
+                            style: const TextStyle(
+                              color: LaasyaColors.accentGold,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 24),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Colors.white12, height: 1),
+              // Full length portrait photo
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.65,
+                    minHeight: 280,
+                  ),
+                  width: double.infinity,
+                  color: Colors.black,
+                  child: InteractiveViewer(
+                    minScale: 1.0,
+                    maxScale: 3.5,
+                    child: Image.network(
+                      avatarUrl,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(
+                          child: CircularProgressIndicator(color: LaasyaColors.accentGold),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          padding: const EdgeInsets.all(32),
+                          color: const Color(0xFF590231),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 48,
+                                backgroundColor: Colors.white24,
+                                child: Text(
+                                  name.substring(0, 1),
+                                  style: const TextStyle(fontSize: 48, color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                name,
+                                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showStudentProfileModal(Map<String, dynamic> stu) {
     final enrollments = List<Map<String, dynamic>>.from(stu['enrollments'] ?? []);
     final primaryColor = enrollments.isNotEmpty
         ? (enrollments.first['course_color'] as Color? ?? LaasyaColors.primary)
         : LaasyaColors.primary;
+    final avatarUrl = stu['avatar_url'] as String? ?? TrainerDataStore.getStudentPhoto(stu['roll']?.toString() ?? stu['id']);
 
     showModalBottomSheet(
       context: context,
@@ -319,12 +440,31 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
             const SizedBox(height: 18),
             Row(
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: primaryColor,
-                  child: Text(
-                    stu['name'].toString().substring(0, 1),
-                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                GestureDetector(
+                  onTap: () => _showFullLengthPhoto(context, stu),
+                  child: Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      CircleAvatar(
+                        radius: 32,
+                        backgroundColor: primaryColor.withOpacity(0.12),
+                        backgroundImage: NetworkImage(avatarUrl),
+                        onBackgroundImageError: (_, __) {},
+                        child: Text(
+                          stu['name'].toString().substring(0, 1),
+                          style: TextStyle(color: primaryColor, fontSize: 24, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                        ),
+                        child: const Icon(Icons.fullscreen_rounded, size: 14, color: LaasyaColors.primary),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -345,7 +485,7 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${enrollments.length} Active Courses with this Guru',
+                        '${enrollments.length} Active Courses • Tap photo to view full length',
                         style: const TextStyle(fontSize: 11.5, color: Colors.black54, fontWeight: FontWeight.w500),
                       ),
                     ],
@@ -635,153 +775,127 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                       final primaryColor = enrollments.isNotEmpty
                           ? (enrollments.first['course_color'] as Color? ?? LaasyaColors.primary)
                           : LaasyaColors.primary;
+                      final avatarUrl = stu['avatar_url'] as String? ?? TrainerDataStore.getStudentPhoto(stu['roll']?.toString() ?? stu['id']);
+                      final courseNames = enrollments.map((e) => e['course_short_title'] as String? ?? '').toSet().where((c) => c.isNotEmpty).join(', ');
+                      final displayCourse = courseNames.isNotEmpty ? courseNames : 'Classical Dance';
 
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
+                        margin: const EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: const Color(0xFFF0D5E4)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 8,
+                              color: Colors.black.withOpacity(0.02),
+                              blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
                           ],
                         ),
                         child: InkWell(
                           onTap: () => _showStudentProfileModal(stu),
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(16),
                           child: Padding(
-                            padding: const EdgeInsets.all(14),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Student Avatar
-                                CircleAvatar(
-                                  radius: 22,
-                                  backgroundColor: primaryColor.withOpacity(0.12),
-                                  child: Text(
-                                    stu['name'].toString().substring(0, 1),
-                                    style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 16),
+                                // Student Image Avatar (Tappable to view full length photo)
+                                GestureDetector(
+                                  onTap: () => _showFullLengthPhoto(context, stu),
+                                  child: CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: primaryColor.withOpacity(0.14),
+                                    backgroundImage: NetworkImage(avatarUrl),
+                                    onBackgroundImageError: (_, __) {},
+                                    child: Text(
+                                      stu['name'].toString().substring(0, 1),
+                                      style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
 
-                                // Center Content: Student ID on top, Name below, Courses & Batches below
+                                // Main Info: Roll No, Name, Course (Uniform compact layout)
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      // 1. STUDENT ID ON TOP (Exact Admin ID, no course prefix)
-                                      Text(
-                                        stu['roll']!, // e.g. LCA-1
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: primaryColor,
-                                          letterSpacing: 0.6,
-                                        ),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            stu['roll']!,
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: primaryColor,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: primaryColor.withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                displayCourse,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: primaryColor,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 2),
-
-                                      // 2. STUDENT NAME BELOW STUDENT ID
+                                      const SizedBox(height: 3),
                                       Text(
                                         stu['name']!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 15,
+                                          fontSize: 14,
                                           color: LaasyaColors.textDark,
                                         ),
                                       ),
-                                      const SizedBox(height: 6),
-
-                                      // 3. COURSE NAME & BATCH NAME SIDE BY SIDE WITH DIFFERENT COLOURS
-                                      // Continuing with next row if registered for another course
-                                      ...enrollments.map((enr) {
-                                        final cColor = enr['course_color'] as Color;
-
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: 4),
-                                          child: Wrap(
-                                            spacing: 6,
-                                            runSpacing: 4,
-                                            crossAxisAlignment: WrapCrossAlignment.center,
-                                            children: [
-                                              // Course Name Chip (Color 1)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                                                decoration: BoxDecoration(
-                                                  color: cColor.withOpacity(0.12),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: cColor.withOpacity(0.4)),
-                                                ),
-                                                child: Text(
-                                                  enr['course_short_title'],
-                                                  style: TextStyle(
-                                                    fontSize: 10.5,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: cColor,
-                                                  ),
-                                                ),
-                                              ),
-
-                                              // Batch Name Chip (Color 2 - Distinctive)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFF3E8EE),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: const Color(0xFFE5D0DD)),
-                                                ),
-                                                child: Text(
-                                                  enr['batch_name'],
-                                                  style: const TextStyle(
-                                                    fontSize: 10.5,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Color(0xFF590231),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }),
                                     ],
                                   ),
                                 ),
 
                                 const SizedBox(width: 8),
 
-                                // Right Side: Attendance Rate Badge & ARROW ONLY (No View Attendance button)
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                                      decoration: BoxDecoration(
-                                        color: rate >= 90 ? const Color(0xFFDEF7EC) : const Color(0xFFFEF08A),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        '$rate% Attended',
-                                        style: TextStyle(
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: rate >= 90 ? const Color(0xFF03543F) : const Color(0xFF854D0E),
-                                        ),
-                                      ),
+                                // Attendance Percent Pill
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: rate >= 90 ? const Color(0xFFDEF7EC) : const Color(0xFFFEF08A),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '$rate% Attended',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: rate >= 90 ? const Color(0xFF03543F) : const Color(0xFF854D0E),
                                     ),
-                                    const SizedBox(height: 12),
-                                    // Sleek Arrow icon to check details
-                                    const Icon(
-                                      Icons.arrow_forward_ios_rounded,
-                                      size: 14,
-                                      color: Colors.grey,
-                                    ),
-                                  ],
+                                  ),
+                                ),
+
+                                const SizedBox(width: 6),
+
+                                // Sleek Right Arrow (Tapping opens complete details)
+                                const Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 13,
+                                  color: Colors.grey,
                                 ),
                               ],
                             ),

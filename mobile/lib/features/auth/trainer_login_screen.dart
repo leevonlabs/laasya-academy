@@ -37,7 +37,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
       final password = _passwordController.text.trim();
 
       if (input.isEmpty || password.isEmpty) {
-        throw Exception('Please enter your faculty email/mobile and password.');
+        throw Exception('Please enter your registered phone number and password.');
       }
 
       final profile = await SupabaseService().signInWithPassword(
@@ -222,18 +222,18 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                         ),
                       ),
 
-                    // Guru Email / Phone Field
+                    // Guru Phone Number Field
                     const Text(
-                      'Guru Email or Phone Number',
+                      'Registered Phone Number',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
                     ),
                     const SizedBox(height: 6),
                     TextField(
                       controller: _identifierController,
-                      keyboardType: TextInputType.emailAddress,
+                      keyboardType: TextInputType.phone,
                       decoration: const InputDecoration(
-                        hintText: 'e.g. anusha@laasyaacademy.com',
-                        prefixIcon: Icon(Icons.badge_outlined, color: LaasyaColors.primary, size: 20),
+                        hintText: 'Enter registered phone number',
+                        prefixIcon: Icon(Icons.phone_android_rounded, color: LaasyaColors.primary, size: 20),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -264,7 +264,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       decoration: InputDecoration(
-                        hintText: 'Enter Guru password',
+                        hintText: 'Enter password',
                         prefixIcon: const Icon(Icons.lock_outline_rounded, color: LaasyaColors.primary, size: 20),
                         suffixIcon: IconButton(
                           icon: Icon(
