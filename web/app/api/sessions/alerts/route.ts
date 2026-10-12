@@ -103,8 +103,8 @@ export async function GET(request: NextRequest) {
           FROM public.students s
           JOIN public.profiles p ON s.profile_id = p.id
           LEFT JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
-          WHERE s.id = ANY($1) 
-             OR s.profile_id = ANY($1) 
+          WHERE s.id::text = ANY($1::text[]) 
+             OR s.profile_id::text = ANY($1::text[]) 
              OR LOWER(s.roll_number) = ANY(SELECT LOWER(x) FROM unnest($1::text[]) x)
              OR (LENGTH($2) >= 8 AND regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $2 || '%');
         `, [matchCriteria, cleanPhone]);

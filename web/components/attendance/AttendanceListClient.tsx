@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Course, Batch, AttendanceAuditRecord, Student } from '@/lib/academy';
 import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
 import StudentSearchSelect, { StudentOption } from '@/components/common/StudentSearchSelect';
@@ -62,8 +62,32 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
   // -------------------------------------------------------------
   const [activeTab, setActiveTab] = useState<'course_wise' | 'complete'>('course_wise');
 
-  // Base Records from database
-  const [allRecords] = useState<AttendanceAuditRecord[]>(initialAuditRecords);
+  // Base Records from database with Live Realtime Sync
+  const [allRecords, setAllRecords] = useState<AttendanceAuditRecord[]>(initialAuditRecords);
+  const [isLiveSyncing, setIsLiveSyncing] = useState<boolean>(false);
+
+  const fetchLatestAuditRecords = useCallback(async () => {
+    try {
+      setIsLiveSyncing(true);
+      const res = await fetch('/api/attendance');
+      if (res.ok) {
+        const fresh = await res.json();
+        if (Array.isArray(fresh)) {
+          setAllRecords(fresh);
+        }
+      }
+    } catch (err) {
+      console.warn('Realtime sync notice:', err);
+    } finally {
+      setIsLiveSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Sync every 4 seconds so Admin dashboard immediately reflects roll-calls marked by Gurus
+    const timer = setInterval(fetchLatestAuditRecords, 4000);
+    return () => clearInterval(timer);
+  }, [fetchLatestAuditRecords]);
 
   // -------------------------------------------------------------
   // TAB 1: COURSE-WISE DRILL-DOWN STATE
@@ -76,17 +100,21 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
   const [gridSearchQuery, setGridSearchQuery] = useState('');
   const [gridSelectedCategory, setGridSelectedCategory] = useState('All');
 
+  // Dates dynamically default to current month / today
+  const now = new Date();
+  const TODAY_STR = now.toISOString().split('T')[0];
+  const FIRST_DAY_OF_MONTH = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+
   // Batch Attendance Sheet Filters
   const [batchSearchQuery, setBatchSearchQuery] = useState('');
-  const [batchStartDate, setBatchStartDate] = useState<string>('2026-09-01');
-  const [batchEndDate, setBatchEndDate] = useState<string>('2026-09-30');
+  const [batchStartDate, setBatchStartDate] = useState<string>(FIRST_DAY_OF_MONTH);
+  const [batchEndDate, setBatchEndDate] = useState<string>(TODAY_STR);
   const [batchStatusFilter, setBatchStatusFilter] = useState<string>('All');
-  const [batchPreset, setBatchPreset] = useState<string>('Last 30 Days');
+  const [batchPreset, setBatchPreset] = useState<string>('This Month');
 
   // -------------------------------------------------------------
-  // TAB 2: COMPLETE ATTENDANCE STATE (Default to today '2026-09-30')
+  // TAB 2: COMPLETE ATTENDANCE STATE (Default to today)
   // -------------------------------------------------------------
-  const TODAY_STR = '2026-09-30';
   const [completeStartDate, setCompleteStartDate] = useState<string>(TODAY_STR);
   const [completeEndDate, setCompleteEndDate] = useState<string>(TODAY_STR);
   const [completeSearchQuery, setCompleteSearchQuery] = useState<string>('');

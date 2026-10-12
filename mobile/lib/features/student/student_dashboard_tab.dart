@@ -50,10 +50,18 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
       _isLoading = false;
     }
     _loadData();
+    SupabaseService().attendanceUpdateNotifier.addListener(_onAttendanceUpdated);
+  }
+
+  void _onAttendanceUpdated() {
+    if (mounted) {
+      _loadData();
+    }
   }
 
   @override
   void dispose() {
+    SupabaseService().attendanceUpdateNotifier.removeListener(_onAttendanceUpdated);
     _bannerTimer?.cancel();
     _bannerController.dispose();
     super.dispose();

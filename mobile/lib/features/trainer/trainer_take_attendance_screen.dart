@@ -87,7 +87,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
       }).toList();
 
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/attendance');
-      await http.post(
+      final resp = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -99,9 +99,16 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
           'records': records,
         }),
       ).timeout(const Duration(seconds: 15));
+      if (resp.statusCode == 200) {
+        debugPrint('Attendance successfully synced to database: ${resp.body}');
+      } else {
+        debugPrint('Attendance sync warning (${resp.statusCode}): ${resp.body}');
+      }
     } catch (e) {
       debugPrint('Error syncing attendance to backend API: $e');
     }
+
+    SupabaseService().notifyAttendanceUpdated();
 
     if (!mounted) return;
     setState(() {

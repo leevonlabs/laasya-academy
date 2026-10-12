@@ -168,10 +168,13 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
             );
 
             if (attendanceAlert != null) {
+              SupabaseService().refreshNotifications();
+              SupabaseService().notifyAttendanceUpdated();
               _showAttendanceStatusNotification(attendanceAlert);
             }
 
             if (messageAlert != null) {
+              SupabaseService().refreshNotifications();
               _showMessageNotification(messageAlert);
             }
 

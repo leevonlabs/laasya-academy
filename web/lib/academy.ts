@@ -1318,8 +1318,8 @@ export async function getAttendanceAuditRecords(options?: {
     JOIN public.class_sessions s ON s.id = a.session_id
     JOIN public.batches b ON b.id = s.batch_id
     JOIN public.courses c ON c.id = b.course_id
-    JOIN public.trainers t ON t.id = s.trainer_id
-    JOIN public.profiles tp ON tp.id = t.profile_id
+    LEFT JOIN public.trainers t ON t.id = COALESCE(s.trainer_id, b.trainer_id)
+    LEFT JOIN public.profiles tp ON tp.id = t.profile_id
     JOIN public.students st ON st.id = a.student_id
     JOIN public.profiles p ON p.id = st.profile_id
     WHERE 1=1

@@ -131,12 +131,22 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 18, color: LaasyaColors.primary),
           const SizedBox(width: 10),
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54)),
-          const Spacer(),
-          Text(val, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+          SizedBox(
+            width: 100,
+            child: Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              val,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+            ),
+          ),
         ],
       ),
     );
@@ -211,17 +221,25 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF3E8EE),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      courseTitle,
-                                      style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                                  Expanded(
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF3E8EE),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          courseTitle,
+                                          style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
                                     ),
                                   ),
+                                  const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
@@ -239,37 +257,59 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
                               Text(
                                 name,
                                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 6),
                               Row(
                                 children: [
                                   const Icon(Icons.room_rounded, size: 16, color: LaasyaColors.primary),
                                   const SizedBox(width: 6),
-                                  Text(room, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                                  Expanded(
+                                    child: Text(
+                                      room,
+                                      style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ],
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 6),
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.schedule_rounded, size: 16, color: LaasyaColors.primary),
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 2),
+                                    child: Icon(Icons.schedule_rounded, size: 16, color: LaasyaColors.primary),
+                                  ),
                                   const SizedBox(width: 6),
-                                  Text('$startTime - $endTime ($days)', style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                                  Expanded(
+                                    child: Text(
+                                      '$startTime - $endTime ($days)',
+                                      style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                    ),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 14),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    'Students: $enrolled / $capacity',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54),
+                                  Expanded(
+                                    child: Text(
+                                      'Students: $enrolled / $capacity',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
+                                  const SizedBox(width: 8),
                                   OutlinedButton(
                                     onPressed: () => _showBatchDetails(b),
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: LaasyaColors.primary,
                                       side: const BorderSide(color: LaasyaColors.primary),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                     ),
                                     child: const Text('View Class Details', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                                   ),

@@ -23,6 +23,12 @@ class SupabaseService {
   List<Map<String, dynamic>> _cachedBannerAnnouncements = [];
   List<Map<String, dynamic>> _cachedMessageAnnouncements = [];
 
+  final ValueNotifier<int> attendanceUpdateNotifier = ValueNotifier<int>(0);
+
+  void notifyAttendanceUpdated() {
+    attendanceUpdateNotifier.value++;
+  }
+
   Future<void> _saveProfileToPrefs(Map<String, dynamic> profile) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1109,9 +1115,11 @@ class SupabaseService {
     try {
       final prof = _cachedProfile;
       final studentId = (prof?['id'] ?? prof?['profile_id'] ?? '').toString();
-      if (studentId.isNotEmpty) {
-        final uri = Uri.parse('${ApiConstants.baseUrl}/api/attendance?studentId=$studentId');
-        final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      final roll = (prof?['roll_number'] ?? '').toString();
+      final idParam = studentId.isNotEmpty ? studentId : roll;
+      if (idParam.isNotEmpty) {
+        final uri = Uri.parse('${ApiConstants.baseUrl}/api/attendance?studentId=${Uri.encodeComponent(idParam)}');
+        final res = await http.get(uri).timeout(const Duration(seconds: 10));
         if (res.statusCode == 200) {
           final decoded = jsonDecode(res.body);
           if (decoded is Map && decoded['success'] == true && decoded['history'] is List) {
@@ -1449,6 +1457,10 @@ class SupabaseService {
       return List<Map<String, dynamic>>.from(_cachedNotifications);
     }
 
+    return await _refreshNotificationsInternal();
+  }
+
+  Future<List<Map<String, dynamic>>> refreshNotifications() async {
     return await _refreshNotificationsInternal();
   }
 

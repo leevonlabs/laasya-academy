@@ -63,17 +63,25 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3E8EE),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      course['category']!,
-                      style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3E8EE),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          course['category'] ?? 'Classical Arts',
+                          style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
@@ -81,7 +89,7 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      'STATUS: ${course['status']!.toUpperCase()}',
+                      'STATUS: ${(course['status'] ?? 'Active').toUpperCase()}',
                       style: const TextStyle(color: Color(0xFF03543F), fontWeight: FontWeight.bold, fontSize: 11),
                     ),
                   ),
@@ -89,13 +97,20 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
               ),
               const SizedBox(height: 12),
               Text(
-                course['title']!,
+                course['title'] ?? 'Course',
                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              Text(
-                course['telugu_name']!,
-                style: const TextStyle(fontSize: 16, color: LaasyaColors.primary, fontWeight: FontWeight.w600),
-              ),
+              if (course['telugu_name'] != null && course['telugu_name'].toString().isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  course['telugu_name']!,
+                  style: const TextStyle(fontSize: 16, color: LaasyaColors.primary, fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
               const SizedBox(height: 16),
               const Divider(),
               const SizedBox(height: 12),
@@ -199,21 +214,29 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF3E8EE),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    course['category']!,
-                                    style: const TextStyle(
-                                      color: LaasyaColors.primary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 11,
+                                Expanded(
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF3E8EE),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        course['category'] ?? 'Classical Arts',
+                                        style: const TextStyle(
+                                          color: LaasyaColors.primary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
                                   ),
                                 ),
+                                const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
@@ -221,7 +244,7 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    course['status']!,
+                                    (course['status'] ?? 'Active').toUpperCase(),
                                     style: const TextStyle(
                                       color: Color(0xFF03543F),
                                       fontWeight: FontWeight.bold,
@@ -233,21 +256,28 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              course['title']!,
+                              course['title'] ?? 'Course',
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: LaasyaColors.textDark,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            Text(
-                              course['telugu_name']!,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: LaasyaColors.primary,
-                                fontWeight: FontWeight.w600,
+                            if (course['telugu_name'] != null && course['telugu_name'].toString().isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                course['telugu_name']!,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: LaasyaColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
+                            ],
                             const SizedBox(height: 12),
                             Container(
                               padding: const EdgeInsets.all(12),
@@ -262,20 +292,30 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
                                     children: [
                                       const Icon(Icons.person_rounded, size: 16, color: LaasyaColors.primary),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        'Guru: ${course['trainer_name']}',
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
+                                      Expanded(
+                                        child: Text(
+                                          'Guru: ${course['trainer_name'] ?? 'Assigned Guru'}',
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 6),
                                   Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Icon(Icons.schedule_rounded, size: 16, color: LaasyaColors.primary),
+                                      const Padding(
+                                        padding: EdgeInsets.only(top: 2),
+                                        child: Icon(Icons.schedule_rounded, size: 16, color: LaasyaColors.primary),
+                                      ),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        course['timings']!,
-                                        style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                      Expanded(
+                                        child: Text(
+                                          course['timings'] ?? 'Regular Schedule',
+                                          style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -284,9 +324,13 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
                                     children: [
                                       const Icon(Icons.room_rounded, size: 16, color: LaasyaColors.primary),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        course['room']!,
-                                        style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                      Expanded(
+                                        child: Text(
+                                          course['room'] ?? 'Academy Hall',
+                                          style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -297,10 +341,15 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  'Batch: ${course['batch_name'] ?? 'Assigned Batch'}',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: LaasyaColors.primaryDark),
+                                Expanded(
+                                  child: Text(
+                                    'Batch: ${course['batch_name'] ?? 'Assigned Batch'}',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: LaasyaColors.primaryDark),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
+                                const SizedBox(width: 8),
                                 OutlinedButton(
                                   onPressed: () => _showCourseDetails(course),
                                   style: OutlinedButton.styleFrom(

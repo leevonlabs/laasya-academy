@@ -27,6 +27,19 @@ class _StudentAttendanceTabState extends State<StudentAttendanceTab> {
   void initState() {
     super.initState();
     _loadHistory();
+    SupabaseService().attendanceUpdateNotifier.addListener(_onAttendanceUpdated);
+  }
+
+  void _onAttendanceUpdated() {
+    if (mounted) {
+      _loadHistory();
+    }
+  }
+
+  @override
+  void dispose() {
+    SupabaseService().attendanceUpdateNotifier.removeListener(_onAttendanceUpdated);
+    super.dispose();
   }
 
   Future<void> _loadHistory() async {
