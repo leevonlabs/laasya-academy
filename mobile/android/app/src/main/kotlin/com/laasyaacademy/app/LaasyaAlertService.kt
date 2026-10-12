@@ -239,15 +239,18 @@ class LaasyaAlertService : Service() {
         val encPhone = URLEncoder.encode(phone, "UTF-8")
         val encBatch = URLEncoder.encode(batchIds, "UTF-8")
 
-        val urlString = "https://laasyaacademy.com/api/sessions/alerts?batchIds=$encBatch&studentId=$encSId&rollNumber=$encRoll&name=$encName&phone=$encPhone&sinceSeconds=180"
+        val urlString = "https://laasya-academy.vercel.app/api/sessions/alerts?batchIds=$encBatch&studentId=$encSId&rollNumber=$encRoll&name=$encName&phone=$encPhone&sinceSeconds=180"
 
         var connection: HttpURLConnection? = null
         try {
             val url = URL(urlString)
             connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
-            connection.connectTimeout = 4000
-            connection.readTimeout = 4000
+            connection.instanceFollowRedirects = true
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("User-Agent", "LaasyaAcademyApp/1.0")
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
 
             if (connection.responseCode == 200) {
                 val reader = BufferedReader(InputStreamReader(connection.inputStream))
@@ -297,6 +300,12 @@ class LaasyaAlertService : Service() {
                                             "$courseTitle ($batchName) • Recorded by Guru $trainerName",
                                             isPresent
                                         )
+                                    }
+                                } else if (alertType == "message" || alertType == "announcement") {
+                                    val title = alert.optString("course_title", "Academy Notice")
+                                    val msg = alert.optString("message", "New notification received.")
+                                    mainHandler.post {
+                                        showAnnouncementNotification(title, msg)
                                     }
                                 }
                             }
@@ -484,6 +493,38 @@ class LaasyaAlertService : Service() {
                 .setContentIntent(pendingIntent)
 
             val notifId = (System.currentTimeMillis() % 10000).toInt() + 2000
+            nm.notify(notifId, builder.build())
+        } catch (_: Exception) {}
+    }
+
+    private fun showAnnouncementNotification(title: String, message: String) {
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                this, 0, intent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
+            val logo = try {
+                BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+            } catch (_: Exception) { null }
+
+            val builder = NotificationCompat.Builder(this, CHANNEL_ATTENDANCE)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setLargeIcon(logo)
+                .setColor(0xFF800020.toInt())
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+
+            val notifId = (System.currentTimeMillis() % 10000).toInt() + 3000
             nm.notify(notifId, builder.build())
         } catch (_: Exception) {}
     }

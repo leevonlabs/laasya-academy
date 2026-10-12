@@ -17,9 +17,11 @@ class SupabaseService {
   SupabaseClient get client => _client ?? Supabase.instance.client;
   bool _isInitialized = false;
 
-  // Local persistent session cache
   Map<String, dynamic>? _cachedProfile;
   Map<String, dynamic>? get currentUserProfile => _cachedProfile;
+  List<Map<String, dynamic>> _cachedTrainerBatches = [];
+  List<Map<String, dynamic>> _cachedBannerAnnouncements = [];
+  List<Map<String, dynamic>> _cachedMessageAnnouncements = [];
 
   Future<void> _saveProfileToPrefs(Map<String, dynamic> profile) async {
     try {
@@ -685,7 +687,11 @@ class SupabaseService {
     return todaySessions;
   }
 
-  Future<List<Map<String, dynamic>>> getTrainerBatches() async {
+  Future<List<Map<String, dynamic>>> getTrainerBatches({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedTrainerBatches.isNotEmpty) {
+      return List<Map<String, dynamic>>.from(_cachedTrainerBatches);
+    }
+
     // 1. Live fetch from local / web backend API
     try {
       final prof = _cachedProfile;
@@ -696,18 +702,23 @@ class SupabaseService {
       final phoneParam = Uri.encodeComponent(tPhone);
       final idParam = Uri.encodeComponent(tId);
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/trainer/batches?trainerId=$idParam&trainerName=$nameParam&phone=$phoneParam');
-      final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['batches'] is List) {
           final liveBatches = List<Map<String, dynamic>>.from(decoded['batches']);
           if (liveBatches.isNotEmpty) {
+            _cachedTrainerBatches = liveBatches;
             return liveBatches;
           }
         }
       }
     } catch (e) {
-      debugPrint('Live API fetch error for trainer batches: $e');
+      debugPrint('Live API fetch notice for trainer batches: $e');
+    }
+
+    if (_cachedTrainerBatches.isNotEmpty) {
+      return List<Map<String, dynamic>>.from(_cachedTrainerBatches);
     }
 
     return [
@@ -1287,7 +1298,11 @@ class SupabaseService {
     return url;
   }
 
-  Future<List<Map<String, dynamic>>> getBannerAnnouncements() async {
+  Future<List<Map<String, dynamic>>> getBannerAnnouncements({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedBannerAnnouncements.isNotEmpty) {
+      return List<Map<String, dynamic>>.from(_cachedBannerAnnouncements);
+    }
+
     // 1. Direct Supabase query if initialized
     if (_isInitialized && _client != null) {
       try {
@@ -1304,17 +1319,18 @@ class SupabaseService {
             item['date'] = item['publish_date'] ?? 'Today';
             item['is_read'] = false;
           }
+          _cachedBannerAnnouncements = live;
           return live;
         }
       } catch (e) {
-        debugPrint('Supabase direct query banner error: $e');
+        debugPrint('Supabase direct query banner notice: $e');
       }
     }
 
     // 2. HTTP API fallback
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements?announcementType=banner');
-      final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      final res = await http.get(uri).timeout(const Duration(seconds: 3));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['announcements'] is List) {
@@ -1323,17 +1339,26 @@ class SupabaseService {
             for (var item in live) {
               item['image_url'] = _normalizeImageUrl(item['image_url']);
             }
+            _cachedBannerAnnouncements = live;
             return live;
           }
         }
       }
     } catch (e) {
-      debugPrint('Live API fetch error for banner announcements: $e');
+      debugPrint('Live API fetch notice for banner announcements: $e');
+    }
+
+    if (_cachedBannerAnnouncements.isNotEmpty) {
+      return List<Map<String, dynamic>>.from(_cachedBannerAnnouncements);
     }
     return List<Map<String, dynamic>>.from(_mockBannerAnnouncements);
   }
 
-  Future<List<Map<String, dynamic>>> getMessageAnnouncements() async {
+  Future<List<Map<String, dynamic>>> getMessageAnnouncements({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedMessageAnnouncements.isNotEmpty) {
+      return List<Map<String, dynamic>>.from(_cachedMessageAnnouncements);
+    }
+
     // 1. Direct Supabase query if initialized
     if (_isInitialized && _client != null) {
       try {
@@ -1362,17 +1387,20 @@ class SupabaseService {
             mapItem['is_read'] = false;
             valid.add(mapItem);
           }
-          if (valid.isNotEmpty) return valid;
+          if (valid.isNotEmpty) {
+            _cachedMessageAnnouncements = valid;
+            return valid;
+          }
         }
       } catch (e) {
-        debugPrint('Supabase direct query message error: $e');
+        debugPrint('Supabase direct query message notice: $e');
       }
     }
 
     // 2. HTTP API fallback
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements?announcementType=message');
-      final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      final res = await http.get(uri).timeout(const Duration(seconds: 3));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['announcements'] is List) {
@@ -1394,12 +1422,19 @@ class SupabaseService {
               item['image_url'] = _normalizeImageUrl(item['image_url']);
               valid.add(item);
             }
-            if (valid.isNotEmpty) return valid;
+            if (valid.isNotEmpty) {
+              _cachedMessageAnnouncements = valid;
+              return valid;
+            }
           }
         }
       }
     } catch (e) {
-      debugPrint('Live API fetch error for message announcements: $e');
+      debugPrint('Live API fetch notice for message announcements: $e');
+    }
+
+    if (_cachedMessageAnnouncements.isNotEmpty) {
+      return List<Map<String, dynamic>>.from(_cachedMessageAnnouncements);
     }
     return List<Map<String, dynamic>>.from(_mockMessageAnnouncements);
   }
@@ -1507,19 +1542,21 @@ class SupabaseService {
     final notifs = <Map<String, dynamic>>[];
 
     try {
-      // Execute alerts, message announcements, and banners concurrently in parallel
+      // Execute alerts, message announcements, banners, and payments concurrently in parallel
       final results = await Future.wait([
         _fetchLiveSessionAlerts(),
         getMessageAnnouncements(),
         getBannerAnnouncements(),
+        getStudentPayments(),
       ]).timeout(
         const Duration(seconds: 3),
-        onTimeout: () => [[], _mockMessageAnnouncements, _mockBannerAnnouncements],
+        onTimeout: () => [[], _mockMessageAnnouncements, _mockBannerAnnouncements, _cachedPayments],
       );
 
       final alerts = results[0];
       final messages = results[1];
       final banners = results[2];
+      final payments = results[3];
 
       notifs.addAll(alerts);
 
@@ -1540,6 +1577,28 @@ class SupabaseService {
         item['date'] = item['date'] ?? 'Today';
         item['is_read'] = _readNotifIds.contains(id) || (item['is_read'] == true);
         notifs.add(item);
+      }
+
+      for (var p in payments) {
+        final item = Map<String, dynamic>.from(p);
+        final id = (item['id'] ?? '').toString();
+        final amount = item['amount_paid'] ?? 2000;
+        final receiptNo = item['receipt_number'] ?? item['invoice_number'] ?? 'REC';
+        final course = item['course_title'] ?? 'Classical Arts';
+        final period = item['fee_period'] ?? 'Monthly Fee';
+        final payDate = item['payment_date'] ?? 'Recent';
+
+        notifs.add({
+          'id': 'notif-$id',
+          'title': 'Fee Receipt: $receiptNo (₹$amount)',
+          'message': 'Payment of ₹$amount for $course ($period) recorded. Paid on $payDate via ${item['payment_method'] ?? 'UPI'}.',
+          'type': 'payment',
+          'date': payDate,
+          'is_read': _readNotifIds.contains('notif-$id'),
+          'amount': amount,
+          'course_title': course,
+          'receipt_number': receiptNo,
+        });
       }
 
       _cachedNotifications = notifs;

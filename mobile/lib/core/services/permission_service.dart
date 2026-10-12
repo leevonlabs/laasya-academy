@@ -5,7 +5,7 @@ import '../constants/colors.dart';
 import 'alarm_service.dart';
 
 class PermissionService {
-  static const String _prefKey = 'laasya_permissions_prompted_v2';
+  static const String _prefKey = 'laasya_permissions_prompted_v3';
   static bool _dialogShowing = false;
 
   /// Requests all necessary permissions once after install / first launch.
@@ -19,7 +19,7 @@ class PermissionService {
       if (!context.mounted || _dialogShowing) return;
       _dialogShowing = true;
 
-      // Show comprehensive permissions dialog
+      // Show clean, essential permissions dialog
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -45,30 +45,22 @@ class PermissionService {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'To give you real-time class completion alarms, attendance alerts, and media features, Laasya Academy requires the following permissions:',
+                'To receive real-time class completion alarms, attendance updates, and media features, please grant the following permissions:',
                 style: TextStyle(fontSize: 12.5, color: Colors.black87, height: 1.4),
               ),
               const SizedBox(height: 16),
               _permRow(
                 Icons.notifications_active_rounded,
-                'Notifications & Attention Alarms',
-                'Sounds 10-second alarm and vibrates when class concludes to notify parents for pickup.',
+                'Notifications & Attention Alerts',
+                'Sounds 10-second alert and vibrates when class concludes to notify parents for pickup.',
                 const Color(0xFFC2410C),
                 const Color(0xFFFFEDD5),
               ),
               const SizedBox(height: 12),
               _permRow(
-                Icons.battery_saver_rounded,
-                'Background Activity & Battery Exemption',
-                'Allows alarm to ring even when the app is closed, removed from history, or phone is locked.',
-                const Color(0xFF03543F),
-                const Color(0xFFDEF7EC),
-              ),
-              const SizedBox(height: 12),
-              _permRow(
                 Icons.camera_alt_rounded,
-                'Camera & Media Storage',
-                'Captures and uploads profile photos and academy event files.',
+                'Camera & Photos',
+                'To capture and upload profile pictures and academy media.',
                 const Color(0xFF1E429F),
                 const Color(0xFFE1EFFE),
               ),
@@ -104,7 +96,7 @@ class PermissionService {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 2,
                     ),
-                    child: const Text('Grant All', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                    child: const Text('Grant Permissions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
                   ),
                 ),
               ],
@@ -119,16 +111,13 @@ class PermissionService {
     }
   }
 
-  /// Internal handler that requests all permissions natively and via permission_handler
+  /// Internal handler that requests clean system permissions natively and via permission_handler
   static Future<void> _grantAllPermissionsInternal() async {
     try {
       // 1. Native Android batch request (POST_NOTIFICATIONS, CAMERA, READ_MEDIA_IMAGES / STORAGE)
       await AlarmService.requestAllPermissions();
 
-      // 2. Request battery optimization exemption (so background service is not killed)
-      await AlarmService.requestBatteryOptimization();
-
-      // 3. Fallback request via permission_handler
+      // 2. Fallback request via permission_handler
       await [
         Permission.notification,
         Permission.camera,
@@ -170,16 +159,8 @@ class PermissionService {
             ),
             const SizedBox(height: 10),
             _permRow(
-              Icons.battery_saver_rounded,
-              'Background Alert Monitoring',
-              'Ensures alerts ring even when app is swiped away from recent apps.',
-              const Color(0xFF03543F),
-              const Color(0xFFDEF7EC),
-            ),
-            const SizedBox(height: 10),
-            _permRow(
               Icons.camera_alt_rounded,
-              'Camera & Media',
+              'Camera & Photos',
               'To capture and upload profile pictures.',
               const Color(0xFF1E429F),
               const Color(0xFFE1EFFE),

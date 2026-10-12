@@ -88,6 +88,10 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
       themeColor = const Color(0xFF4F46E5);
       headerIcon = Icons.alarm_rounded;
       typeLabel = 'Fee / Schedule Reminder';
+    } else if (type == 'payment') {
+      themeColor = const Color(0xFF0D9488);
+      headerIcon = Icons.receipt_long_rounded;
+      typeLabel = 'Fee Payment Receipt';
     }
 
     final rawAlert = item['raw_alert'];
@@ -253,11 +257,13 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
     final unreadCount = _notifications.where((n) => n['is_read'] == false).length;
     final attendanceCount = _notifications.where((n) => n['type'] == 'attendance').length;
     final alertsCount = _notifications.where((n) => n['type'] == 'class_alert').length;
+    final paymentsCount = _notifications.where((n) => n['type'] == 'payment').length;
 
     final filtered = _notifications.where((n) {
       if (_selectedFilter == 'Unread') return n['is_read'] == false;
       if (_selectedFilter == 'Attendance') return n['type'] == 'attendance';
       if (_selectedFilter == 'Class Alerts') return n['type'] == 'class_alert';
+      if (_selectedFilter == 'Fee Receipts') return n['type'] == 'payment';
       if (_selectedFilter == 'Announcements') return n['type'] == 'announcement';
       if (_selectedFilter == 'Reminders') return n['type'] == 'reminder' || n['type'] == 'schedule_change';
       return true;
@@ -344,11 +350,13 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
               child: Row(
                 children: [
                   _buildMetricPill('Total', '${_notifications.length}', const Color(0xFF475569)),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   _buildMetricPill('Attendance', '$attendanceCount', const Color(0xFF059669)),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   _buildMetricPill('Alerts', '$alertsCount', const Color(0xFFEA580C)),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
+                  _buildMetricPill('Fees', '$paymentsCount', const Color(0xFF0D9488)),
+                  const SizedBox(width: 6),
                   _buildMetricPill('Unread', '$unreadCount', LaasyaColors.primary),
                 ],
               ),
@@ -364,6 +372,7 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
                     'All',
                     'Attendance',
                     'Class Alerts',
+                    'Fee Receipts',
                     'Announcements',
                     'Reminders',
                     'Unread',
@@ -450,6 +459,10 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
                               accentColor = const Color(0xFF4F46E5);
                               iconData = Icons.alarm_rounded;
                               badgeLabel = 'REMINDER';
+                            } else if (type == 'payment') {
+                              accentColor = const Color(0xFF0D9488);
+                              iconData = Icons.receipt_long_rounded;
+                              badgeLabel = 'FEE RECEIPT';
                             }
 
                             return Material(

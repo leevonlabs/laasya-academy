@@ -152,6 +152,12 @@ export async function GET(request: NextRequest) {
         return false;
       }
 
+      if (a.alert_type === 'message' || a.alert_type === 'announcement') {
+        if (!bId || bId === 'all') return true;
+        if (allowedBatchIds.includes(bId) || studentBatchIds.includes(bId)) return true;
+        return false;
+      }
+
       // Class closed alert: matches if disciple is enrolled in this batch or all batches allowed
       if (allowedBatchIds.length === 0 && studentBatchIds.length === 0) return true; // 'all'
       if (allowedBatchIds.length > 0 && allowedBatchIds.includes(bId)) return true;
@@ -167,7 +173,9 @@ export async function GET(request: NextRequest) {
     for (const a of filtered) {
       const key = a.alert_type === 'attendance_marked'
         ? `att:${a.batch_id}:${a.target_student_id || a.target_roll_number || 'stu'}`
-        : `closed:${a.batch_id}`;
+        : (a.alert_type === 'message' || a.alert_type === 'announcement'
+            ? `msg:${a.id}`
+            : `closed:${a.batch_id}`);
 
       if (!seen.has(key)) {
         seen.add(key);

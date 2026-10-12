@@ -305,8 +305,23 @@ export async function createAnnouncement(data: {
     data.trainer_name || null,
     JSON.stringify(data.action_links || []),
     JSON.stringify(data.target_students || []),
-    data.target_student_names || null
   ]);
+
+  try {
+    await query(`
+      INSERT INTO public.session_alerts (
+        batch_id, batch_name, course_title, trainer_name, message, alert_type, created_at
+      ) VALUES ($1, $2, $3, $4, $5, 'message', NOW());
+    `, [
+      validBatchId || 'all',
+      data.target_batch_name || 'All Batches',
+      data.title.trim(),
+      data.trainer_name || data.created_by || 'Academy Administration',
+      data.message.trim()
+    ]);
+  } catch (alertErr) {
+    console.warn('Could not insert session_alert copy for announcement:', alertErr);
+  }
 
   return row;
 }

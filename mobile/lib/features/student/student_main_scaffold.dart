@@ -161,8 +161,18 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
               orElse: () => null,
             );
 
+            // Find if there is any message announcement alert
+            final messageAlert = freshAlerts.cast<Map<String, dynamic>?>().firstWhere(
+              (a) => a?['alert_type'] == 'message' || a?['alert_type'] == 'announcement',
+              orElse: () => null,
+            );
+
             if (attendanceAlert != null) {
               _showAttendanceStatusNotification(attendanceAlert);
+            }
+
+            if (messageAlert != null) {
+              _showMessageNotification(messageAlert);
             }
 
             if (classClosedAlert != null) {
@@ -299,6 +309,90 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
                       'Recorded by Guru $trainerName',
                       style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.75)),
                       maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMessageNotification(Map<String, dynamic> alertData) {
+    final title = (alertData['course_title'] ?? 'Academy Notice').toString();
+    final msg = (alertData['message'] ?? 'New circular announcement received.').toString();
+
+    // 1. Fire native Android System Notification
+    AlarmService.showAttendanceNotification(
+      title: title,
+      message: msg,
+      isPresent: true,
+    );
+
+    // 2. Sound & Haptic
+    SystemSound.play(SystemSoundType.alert);
+    HapticFeedback.lightImpact();
+
+    // 3. Floating notice card
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        elevation: 10,
+        backgroundColor: Colors.transparent,
+        padding: EdgeInsets.zero,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        duration: const Duration(seconds: 5),
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF800020), Color(0xFF4A0E17)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFFBBF24), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF800020).withOpacity(0.35),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFFBBF24), width: 1.5),
+                ),
+                child: const Icon(Icons.campaign_rounded, color: Color(0xFFFBBF24), size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      msg,
+                      style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.85), height: 1.3),
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],

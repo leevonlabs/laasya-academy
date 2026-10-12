@@ -192,29 +192,10 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun requestBatteryOptimization() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
-                if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(packageName)) {
-                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = Uri.parse("package:$packageName")
-                    }
-                    startActivity(intent)
-                }
-            } catch (e: Exception) {
-                try {
-                    val fallbackIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                    startActivity(fallbackIntent)
-                } catch (_: Exception) {}
-            }
-        }
+        // No-op: Do not prompt user for battery optimization exemption to avoid battery drain warnings
     }
 
     private fun isIgnoringBatteryOptimizations(): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
-            return powerManager?.isIgnoringBatteryOptimizations(packageName) ?: true
-        }
         return true
     }
 
