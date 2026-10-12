@@ -498,6 +498,20 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
       isMounted = false;
       abortController.abort();
     };
+  }, [refreshKey]);
+
+  // Whenever filters or report types change, reset hasGenerated to false and clear previous report tables
+  // so the page stays plain until the user clicks "View Report"
+  useEffect(() => {
+    setHasGenerated(false);
+    setAttendanceData(null);
+    setFeesData(null);
+    setSalariesData(null);
+    setIncomeExpensesData(null);
+    setBatchAttendanceData(null);
+    setAbsenceData(null);
+    setStudentCoursesData(null);
+    setSessionAuditData(null);
   }, [
     activeType,
     attendanceSubView,
@@ -509,9 +523,10 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     selectedStudentId,
     selectedTrainerId,
     selectedStatus,
+    absenceSort,
+    absenceSelectedStudentIds,
     startDate,
-    endDate,
-    refreshKey
+    endDate
   ]);
 
   // Fetch Absence Report Data safely with AbortController
@@ -608,17 +623,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
       isMounted = false;
       abortController.abort();
     };
-  }, [
-    activeType,
-    attendanceSubView,
-    absenceSelectedStudent,
-    absenceSelectedBatch,
-    absenceSort,
-    absenceSelectedStudentIds,
-    startDate,
-    endDate,
-    refreshKey
-  ]);
+  }, [refreshKey, absenceSelectedStudent, absenceSelectedBatch]);
 
   // Searchable Student & Trainer options
   const studentOptions: StudentOption[] = useMemo(() => {
@@ -1318,61 +1323,6 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
             </div>
           </button>
         </div>
-
-        {/* All Available Reports Section */}
-        <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
-          <div className="px-6 md:px-8 py-5 bg-[#FFF9FB] border-b border-[#F0D5E4] flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-black text-[#590231]">All Available Reports</h2>
-              <p className="text-xs font-semibold text-gray-500 mt-0.5">
-                Detailed breakdown and direct access to institutional records and audit statements
-              </p>
-            </div>
-            <span className="text-xs font-black text-[#8A064D] bg-[#FFF2F8] px-3 py-1 rounded-xl border border-[#F0D5E4]">
-              {allReportsList.length} Reports
-            </span>
-          </div>
-
-          <div className="divide-y divide-[#F0D5E4]/60">
-            {allReportsList.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => openReport(item.type, item.subView)}
-                className="p-6 hover:bg-[#FFF9FB] transition flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer group"
-              >
-                <div className="flex items-start md:items-center gap-4 flex-1">
-                  <div className="w-10 h-10 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D] shrink-0 group-hover:scale-105 group-hover:bg-[#590231] group-hover:text-[#F9E33A] transition">
-                    {item.icon}
-                  </div>
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-6 items-center">
-                    <div className="md:col-span-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-black text-[#590231] group-hover:text-[#8A064D] transition">
-                          {item.name}
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4]/60">
-                          {item.category}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="md:col-span-8">
-                      <p className="text-xs font-semibold text-gray-600 leading-relaxed">
-                        {item.description}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-                  <span className="text-xs font-black text-[#8A064D] group-hover:text-[#590231] transition">
-                    View Report
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-[#8A064D] group-hover:translate-x-1 transition" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     );
   }
@@ -1405,7 +1355,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
 
         {/* 3 Permanent Top Buttons */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* View Report (F2) */}
+          {/* View Report */}
           <button
             type="button"
             onClick={() => {
@@ -1413,32 +1363,32 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
               setRefreshKey(k => k + 1);
             }}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2D041A] hover:bg-[#1E0211] text-white text-xs font-black shadow-md transition cursor-pointer active:scale-95"
-            title="Collect and refresh report data (F2)"
+            title="Collect and compile live report data"
           >
             <TrendingUp className="w-4 h-4 text-[#F9E33A]" />
-            <span>View Report (F2)</span>
+            <span>View Report</span>
           </button>
 
-          {/* Filter Columns (F3) */}
+          {/* Filter Columns */}
           <button
             type="button"
             onClick={() => setIsFilterColumnsOpen(true)}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#374151] hover:bg-[#1F2937] text-white text-xs font-black shadow-md transition cursor-pointer active:scale-95"
-            title="Choose which columns appear in the report table (F3)"
+            title="Choose which columns appear in the report table"
           >
             <SlidersHorizontal className="w-4 h-4 text-gray-300" />
-            <span>Filter Columns (F3)</span>
+            <span>Filter Columns</span>
           </button>
 
-          {/* Export Now (F4) */}
+          {/* Export Now */}
           <button
             type="button"
             onClick={() => setIsExportModalOpen(true)}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white hover:bg-[#FFF2F8] border border-[#F0D5E4] text-[#590231] text-xs font-black shadow-xs transition cursor-pointer active:scale-95"
-            title="Export filtered records in Excel, CSV, PDF, or Print (F4)"
+            title="Export filtered records in Excel, CSV, PDF, or Print"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>Export Now (F4)</span>
+            <span>Export Now</span>
           </button>
         </div>
       </div>

@@ -32,6 +32,7 @@ export interface TrainerBatchInfo {
   room_or_hall: string;
   max_capacity?: number;
   enrolled_count?: number;
+  schedules?: BatchScheduleSlot[];
 }
 
 export interface Trainer {
@@ -69,6 +70,7 @@ export interface StudentEnrolledBatch {
   end_time: string;
   room_or_hall: string;
   enrollment_status: string;
+  schedules?: BatchScheduleSlot[];
 }
 
 export interface Student {
@@ -390,6 +392,7 @@ export async function getTrainers(): Promise<Trainer[]> {
             'end_time', b.end_time,
             'room_or_hall', b.room_or_hall,
             'max_capacity', b.max_capacity,
+            'schedules', b.schedules,
             'enrolled_count', (SELECT COUNT(*)::int FROM public.batch_enrollments be WHERE be.batch_id = b.id AND be.status = 'active')
           )
         ) FILTER (WHERE b.id IS NOT NULL),
@@ -654,6 +657,7 @@ export async function getStudents(): Promise<Student[]> {
       end_time: string;
       room_or_hall: string;
       enrollment_status: string;
+      schedules?: BatchScheduleSlot[];
     }>(`
       SELECT 
         be.student_id,
@@ -669,6 +673,7 @@ export async function getStudents(): Promise<Student[]> {
         b.start_time,
         b.end_time,
         b.room_or_hall,
+        b.schedules,
         be.status as enrollment_status
       FROM public.batch_enrollments be
       JOIN public.batches b ON b.id = be.batch_id
@@ -748,7 +753,8 @@ export async function getStudents(): Promise<Student[]> {
       start_time: row.start_time,
       end_time: row.end_time,
       room_or_hall: row.room_or_hall,
-      enrollment_status: row.enrollment_status
+      enrollment_status: row.enrollment_status,
+      schedules: row.schedules || []
     });
   }
 

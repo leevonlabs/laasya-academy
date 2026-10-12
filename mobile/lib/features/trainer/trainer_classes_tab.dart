@@ -68,7 +68,21 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
     final enrolled = b['enrolled_count']?.toString() ?? '0';
     final capacity = b['max_capacity']?.toString() ?? '20';
     final startDate = b['start_date']?.toString() ?? 'Active Session';
-    final duration = b['duration']?.toString() ?? '12 Months';
+
+    final rawSchedules = b['schedules'];
+    List<Map<String, dynamic>> scheduleSlots = [];
+    if (rawSchedules is List) {
+      for (var s in rawSchedules) {
+        if (s is Map) {
+          scheduleSlots.add({
+            'day': s['day']?.toString() ?? '',
+            'startTime': s['startTime']?.toString() ?? '',
+            'endTime': s['endTime']?.toString() ?? '',
+            'room': s['room']?.toString() ?? room,
+          });
+        }
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -105,12 +119,63 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
               style: const TextStyle(fontSize: 13, color: LaasyaColors.primary, fontWeight: FontWeight.w600),
             ),
             const Divider(height: 24),
-            _infoRow(Icons.room_rounded, 'Classroom Hall', room),
-            _infoRow(Icons.calendar_month_rounded, 'Days of Week', days),
-            _infoRow(Icons.access_time_rounded, 'Timings', '$startTime - $endTime'),
+            const Text(
+              'Batch Schedule & Venue:',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            if (scheduleSlots.isNotEmpty)
+              ...scheduleSlots.map((slot) => Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFBF8FA),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFF0D5E4)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF590231),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            slot['day'] ?? 'Day',
+                            style: const TextStyle(color: Color(0xFFF9E33A), fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${slot['startTime']} - ${slot['endTime']}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: LaasyaColors.textDark),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.room_rounded, size: 13, color: LaasyaColors.primary),
+                            const SizedBox(width: 2),
+                            Text(
+                              slot['room'] ?? 'Hall',
+                              style: const TextStyle(fontSize: 11, color: Colors.black87),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ))
+            else ...[
+              _infoRow(Icons.calendar_month_rounded, 'Days of Week', days),
+              _infoRow(Icons.access_time_rounded, 'Timings', '$startTime - $endTime'),
+              _infoRow(Icons.room_rounded, 'Classroom Hall', room),
+            ],
+            const SizedBox(height: 10),
             _infoRow(Icons.groups_rounded, 'Capacity', '$enrolled Enrolled / $capacity Capacity'),
             _infoRow(Icons.date_range_rounded, 'Batch Start Date', startDate),
-            _infoRow(Icons.timer_outlined, 'Program Duration', duration),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -203,6 +268,21 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
                       final enrolled = b['enrolled_count']?.toString() ?? '0';
                       final capacity = b['max_capacity']?.toString() ?? '20';
 
+                      final rawSchedules = b['schedules'];
+                      List<Map<String, dynamic>> cardSlots = [];
+                      if (rawSchedules is List) {
+                        for (var s in rawSchedules) {
+                          if (s is Map) {
+                            cardSlots.add({
+                              'day': s['day']?.toString() ?? '',
+                              'startTime': s['startTime']?.toString() ?? '',
+                              'endTime': s['endTime']?.toString() ?? '',
+                              'room': s['room']?.toString() ?? room,
+                            });
+                          }
+                        }
+                      }
+
                       return Container(
                         margin: const EdgeInsets.only(bottom: 14),
                         decoration: BoxDecoration(
@@ -260,37 +340,80 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  const Icon(Icons.room_rounded, size: 16, color: LaasyaColors.primary),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      room,
-                                      style: const TextStyle(fontSize: 12, color: Colors.black87),
-                                      overflow: TextOverflow.ellipsis,
+                              const SizedBox(height: 8),
+                              if (cardSlots.isNotEmpty)
+                                ...cardSlots.map((slot) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 6),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF590231),
+                                              borderRadius: BorderRadius.circular(5),
+                                            ),
+                                            child: Text(
+                                              slot['day'] ?? 'Day',
+                                              style: const TextStyle(color: Color(0xFFF9E33A), fontWeight: FontWeight.bold, fontSize: 10.5),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${slot['startTime']} - ${slot['endTime']}',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.room_rounded, size: 13, color: LaasyaColors.primary),
+                                                const SizedBox(width: 2),
+                                                Expanded(
+                                                  child: Text(
+                                                    slot['room'] ?? 'Hall',
+                                                    style: const TextStyle(fontSize: 11.5, color: Colors.black54),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ))
+                              else ...[
+                                Row(
+                                  children: [
+                                    const Icon(Icons.room_rounded, size: 16, color: LaasyaColors.primary),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        room,
+                                        style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Padding(
-                                    padding: EdgeInsets.only(top: 2),
-                                    child: Icon(Icons.schedule_rounded, size: 16, color: LaasyaColors.primary),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      '$startTime - $endTime ($days)',
-                                      style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 2),
+                                      child: Icon(Icons.schedule_rounded, size: 16, color: LaasyaColors.primary),
                                     ),
-                                  ),
-                                ],
-                              ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        '$startTime - $endTime ($days)',
+                                        style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                               const SizedBox(height: 14),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

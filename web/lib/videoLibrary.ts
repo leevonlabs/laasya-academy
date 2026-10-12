@@ -323,7 +323,26 @@ export async function createEventFolder(data: {
       JSON.stringify(data.target_students || []),
       data.target_student_names || null,
     ];
-    return await queryOne<VideoLibraryItem>(sql, params);
+    const item = await queryOne<VideoLibraryItem>(sql, params);
+
+    try {
+      const urlText = data.drive_url || data.youtube_url || '';
+      await query(`
+        INSERT INTO public.session_alerts (
+          batch_id, batch_name, course_title, trainer_name, message, alert_type, created_at
+        ) VALUES ($1, $2, $3, $4, $5, 'video_shared', NOW());
+      `, [
+        validBatchId || 'all',
+        data.target_batch_name || 'All Batches',
+        data.target_course_title || data.title,
+        data.trainer_name || data.created_by || 'Academy Video Library',
+        `New practice material shared: "${data.title}"${urlText ? ` - ${urlText}` : ''}`
+      ]);
+    } catch (alertErr) {
+      console.warn('Could not insert session_alert for video link:', alertErr);
+    }
+
+    return item;
   } catch (error) {
     console.error('Error in createEventFolder:', error);
     throw error;
@@ -392,6 +411,22 @@ export async function createUniversalEventFolders(data: {
     ];
 
     const inserted = await query<VideoLibraryItem>(sql, params);
+
+    try {
+      const urlText = data.drive_url || data.youtube_url || '';
+      await query(`
+        INSERT INTO public.session_alerts (
+          batch_id, batch_name, course_title, trainer_name, message, alert_type, created_at
+        ) VALUES ('all', 'All Batches', $1, $2, $3, 'video_shared', NOW());
+      `, [
+        data.title,
+        data.trainer_name || data.created_by || 'Academy Video Library',
+        `New practice material shared: "${data.title}"${urlText ? ` - ${urlText}` : ''}`
+      ]);
+    } catch (alertErr) {
+      console.warn('Could not insert session_alert for universal video link:', alertErr);
+    }
+
     return inserted;
   } catch (error) {
     console.error('Error in createUniversalEventFolders:', error);

@@ -316,8 +316,11 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
                     iconColor: const Color(0xFF92400E),
                     title: 'Video Library',
                     subtitle: 'Official event shoot Google Drive vaults & footage',
-                    onTap: () {
-                      Navigator.push(
+                    badgeText: SupabaseService().getUnreadVideosCount() > 0
+                        ? '${SupabaseService().getUnreadVideosCount()} NEW'
+                        : null,
+                    onTap: () async {
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => StudentVideoLibraryScreen(
@@ -326,6 +329,7 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
                           ),
                         ),
                       );
+                      setState(() {});
                     },
                   ),
                   const Divider(height: 1, indent: 64),
@@ -337,14 +341,17 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
                     iconColor: const Color(0xFF075E54),
                     title: 'Messages',
                     subtitle: 'Official academy notices, circulars & announcements',
-                    badgeText: 'NOTICE BOARD',
-                    onTap: () {
-                      Navigator.push(
+                    badgeText: SupabaseService().getUnreadMessagesCount() > 0
+                        ? '${SupabaseService().getUnreadMessagesCount()} UNREAD'
+                        : 'NOTICE BOARD',
+                    onTap: () async {
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => const StudentMessagesScreen(),
                         ),
                       );
+                      setState(() {});
                     },
                   ),
                   const Divider(height: 1, indent: 64),

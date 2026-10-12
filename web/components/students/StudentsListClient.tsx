@@ -46,6 +46,10 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   // Status Filter: 'active' by default as required
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
 
+  // Course & Batch Filters (group up all students in selected course or batch)
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('all');
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
+
   // View mode: 'grid' as first preference
   const [viewMode, setViewMode] = useState<'grid' | 'row'>('grid');
 
@@ -221,14 +225,38 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     return currentMonthDueDate;
   };
 
-  // Filter students based on status and search query
+  // Dynamic available batches for the filter dropdown
+  const availableBatchesForFilter = useMemo(() => {
+    if (selectedCourseFilter === 'all') return batches;
+    return batches.filter(
+      b => b.course_id === selectedCourseFilter || b.course_title?.toLowerCase() === selectedCourseFilter.toLowerCase()
+    );
+  }, [batches, selectedCourseFilter]);
+
+  // Filter students based on status, search query, course, and batch
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
       // 1. Status Filter
       if (statusFilter === 'active' && s.status !== 'active') return false;
       if (statusFilter === 'inactive' && s.status !== 'inactive' && s.status !== 'suspended') return false;
 
-      // 2. Search Query
+      // 2. Course Filter
+      if (selectedCourseFilter !== 'all') {
+        const matchesCourse = (s.enrolled_batches || []).some(
+          b => b.course_id === selectedCourseFilter || b.course_title?.toLowerCase() === selectedCourseFilter.toLowerCase()
+        );
+        if (!matchesCourse) return false;
+      }
+
+      // 3. Batch Filter
+      if (selectedBatchFilter !== 'all') {
+        const matchesBatch = (s.enrolled_batches || []).some(
+          b => b.batch_id === selectedBatchFilter || b.batch_name?.toLowerCase() === selectedBatchFilter.toLowerCase()
+        );
+        if (!matchesBatch) return false;
+      }
+
+      // 4. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesName = s.full_name.toLowerCase().includes(q);
@@ -243,7 +271,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
       return true;
     });
-  }, [students, statusFilter, searchQuery]);
+  }, [students, statusFilter, selectedCourseFilter, selectedBatchFilter, searchQuery]);
 
   // Counts for tabs
   const activeCount = useMemo(() => students.filter(s => s.status === 'active').length, [students]);
@@ -1841,58 +1869,113 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       </div>
 
       {/* ===================================================================== */}
-      {/* 2. ACTIVE / INACTIVE FILTERS (Active by default) */}
+      {/* 2. ACTIVE / INACTIVE FILTERS & COURSE / BATCH GROUPING */}
       {/* ===================================================================== */}
-      <div className="flex items-center gap-2.5">
-        <button
-          onClick={() => setStatusFilter('active')}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-            statusFilter === 'active'
-              ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
-              : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-emerald-400" />
-          <span>Active Students</span>
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
-            statusFilter === 'active' ? 'bg-white/20 text-white' : 'bg-[#FFF2F8] text-[#8A064D]'
-          }`}>
-            {activeCount}
-          </span>
-        </button>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Status Filter Buttons */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => setStatusFilter('active')}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              statusFilter === 'active'
+                ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
+                : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>Active Students</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
+              statusFilter === 'active' ? 'bg-white/20 text-white' : 'bg-[#FFF2F8] text-[#8A064D]'
+            }`}>
+              {activeCount}
+            </span>
+          </button>
 
-        <button
-          onClick={() => setStatusFilter('inactive')}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-            statusFilter === 'inactive'
-              ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
-              : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-gray-400" />
-          <span>Inactive Students</span>
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
-            statusFilter === 'inactive' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-          }`}>
-            {inactiveCount}
-          </span>
-        </button>
+          <button
+            onClick={() => setStatusFilter('inactive')}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              statusFilter === 'inactive'
+                ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
+                : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-gray-400" />
+            <span>Inactive Students</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
+              statusFilter === 'inactive' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+            }`}>
+              {inactiveCount}
+            </span>
+          </button>
 
-        <button
-          onClick={() => setStatusFilter('all')}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-            statusFilter === 'all'
-              ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
-              : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
-          }`}
-        >
-          <span>All Students</span>
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
-            statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-          }`}>
-            {students.length}
-          </span>
-        </button>
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              statusFilter === 'all'
+                ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
+                : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
+            }`}
+          >
+            <span>All Students</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
+              statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+            }`}>
+              {students.length}
+            </span>
+          </button>
+        </div>
+
+        {/* Course and Batch Grouping Filters */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Course Filter Dropdown */}
+          <div className="flex items-center gap-1.5 bg-white px-3 py-2 rounded-2xl border border-[#F0D5E4] shadow-xs">
+            <span className="text-[11px] font-bold text-[#8A064D] uppercase tracking-wider">Course:</span>
+            <select
+              value={selectedCourseFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedCourseFilter(val);
+                setSelectedBatchFilter('all');
+              }}
+              className="bg-transparent text-xs font-bold text-[#2D041A] focus:outline-none cursor-pointer"
+            >
+              <option value="all">All Courses ({courses.length})</option>
+              {courses.map(c => (
+                <option key={c.id} value={c.id}>{c.title}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Batch Filter Dropdown */}
+          <div className="flex items-center gap-1.5 bg-white px-3 py-2 rounded-2xl border border-[#F0D5E4] shadow-xs">
+            <span className="text-[11px] font-bold text-[#8A064D] uppercase tracking-wider">Batch:</span>
+            <select
+              value={selectedBatchFilter}
+              onChange={(e) => setSelectedBatchFilter(e.target.value)}
+              className="bg-transparent text-xs font-bold text-[#2D041A] focus:outline-none cursor-pointer max-w-[200px] truncate"
+            >
+              <option value="all">All Batches ({availableBatchesForFilter.length})</option>
+              {availableBatchesForFilter.map(b => (
+                <option key={b.id} value={b.id}>{b.name} ({b.course_title})</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Reset Filters */}
+          {(selectedCourseFilter !== 'all' || selectedBatchFilter !== 'all') && (
+            <button
+              onClick={() => {
+                setSelectedCourseFilter('all');
+                setSelectedBatchFilter('all');
+              }}
+              className="px-3 py-2 rounded-2xl text-xs font-bold bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] hover:bg-rose-100 transition flex items-center gap-1 cursor-pointer"
+              title="Reset course and batch filters"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Reset</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ===================================================================== */}
@@ -2472,9 +2555,27 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                           <div className="text-[11px] text-gray-500 mt-0.5">
                             Batch: <strong className="text-gray-800">{eb.batch_name}</strong> • Guru: {eb.trainer_name}
                           </div>
-                          <div className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-gray-400" />
-                            <span>Timings: {eb.start_time?.substring(0, 5)} - {eb.end_time?.substring(0, 5)} ({eb.days_of_week?.join(', ')})</span>
+                          {/* Day Time Room Row by Row */}
+                          <div className="mt-2 space-y-1">
+                            {eb.schedules && eb.schedules.length > 0 ? (
+                              eb.schedules.map((slot, sIdx) => (
+                                <div key={sIdx} className="text-[11px] text-gray-700 flex items-center gap-2 py-0.5 bg-gray-50/70 px-2 rounded-md">
+                                  <span className="font-bold text-[#8A064D] min-w-[75px]">{slot.day}</span>
+                                  <span className="font-medium text-gray-800">{slot.startTime || eb.start_time?.substring(0, 5)} - {slot.endTime || eb.end_time?.substring(0, 5)}</span>
+                                  <span className="text-gray-300">•</span>
+                                  <span className="text-gray-600 font-medium">{slot.room || eb.room_or_hall}</span>
+                                </div>
+                              ))
+                            ) : (
+                              (eb.days_of_week && eb.days_of_week.length > 0 ? eb.days_of_week : ['Class Day']).map((day, sIdx) => (
+                                <div key={sIdx} className="text-[11px] text-gray-700 flex items-center gap-2 py-0.5 bg-gray-50/70 px-2 rounded-md">
+                                  <span className="font-bold text-[#8A064D] min-w-[75px]">{day}</span>
+                                  <span className="font-medium text-gray-800">{eb.start_time?.substring(0, 5)} - {eb.end_time?.substring(0, 5)}</span>
+                                  <span className="text-gray-300">•</span>
+                                  <span className="text-gray-600 font-medium">{eb.room_or_hall}</span>
+                                </div>
+                              ))
+                            )}
                           </div>
                         </div>
 

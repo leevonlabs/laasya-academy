@@ -313,16 +313,23 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                                         child: Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Row(
-                                              children: [
-                                                const Icon(Icons.meeting_room_rounded, size: 16, color: LaasyaColors.primary),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  item['room'] ?? 'Hall',
-                                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
-                                                ),
-                                              ],
+                                            Expanded(
+                                              child: Row(
+                                                children: [
+                                                  const Icon(Icons.meeting_room_rounded, size: 16, color: LaasyaColors.primary),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      item['room'] ?? 'Hall',
+                                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
+                                                      overflow: TextOverflow.ellipsis,
+                                                      maxLines: 1,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
+                                            const SizedBox(width: 8),
                                             InkWell(
                                               onTap: () => _toggleReminder(item['id']),
                                               borderRadius: BorderRadius.circular(8),

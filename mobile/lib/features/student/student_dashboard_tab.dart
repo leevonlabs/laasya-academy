@@ -658,8 +658,9 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                   label: 'Drive Vault',
                   bgColor: const Color(0xFFFEF3C7),
                   iconColor: const Color(0xFF92400E),
-                  onTap: () {
-                    Navigator.push(
+                  unreadCount: SupabaseService().getUnreadVideosCount(),
+                  onTap: () async {
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => StudentVideoLibraryScreen(
@@ -668,6 +669,7 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                         ),
                       ),
                     );
+                    setState(() {});
                   },
                 ),
                 const SizedBox(width: 8),
@@ -676,13 +678,15 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                   label: 'Messages',
                   bgColor: const Color(0xFFDEF7EC),
                   iconColor: const Color(0xFF075E54),
-                  onTap: () {
-                    Navigator.push(
+                  unreadCount: SupabaseService().getUnreadMessagesCount(),
+                  onTap: () async {
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => const StudentMessagesScreen(),
                       ),
                     );
+                    setState(() {});
                   },
                 ),
                 const SizedBox(width: 8),
@@ -1336,13 +1340,14 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
     required Color bgColor,
     required Color iconColor,
     required VoidCallback onTap,
+    int? unreadCount,
   }) {
     return Expanded(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
@@ -1356,16 +1361,61 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
             ],
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: iconColor, size: 18),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 18),
+                  ),
+                  if (unreadCount != null && unreadCount > 0)
+                    Positioned(
+                      top: -4,
+                      right: -6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE53E3E),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white, width: 1.2),
+                        ),
+                        child: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
+              if (unreadCount != null && unreadCount > 0) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  margin: const EdgeInsets.only(bottom: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFDE8E8),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '$unreadCount UNREAD',
+                    style: const TextStyle(
+                      fontSize: 7.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF9B1C1C),
+                    ),
+                  ),
+                ),
+              ],
               Text(
                 label,
                 style: const TextStyle(

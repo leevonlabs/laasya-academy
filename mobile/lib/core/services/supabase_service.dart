@@ -1448,7 +1448,53 @@ class SupabaseService {
   }
 
   final Set<String> _readNotifIds = {};
+  final Set<String> _readMessageIds = {};
+  final Set<String> _readVideoIds = {};
   List<Map<String, dynamic>> _cachedNotifications = [];
+
+  int getUnreadMessagesCount() {
+    final list = _cachedMessageAnnouncements.isNotEmpty ? _cachedMessageAnnouncements : _mockMessageAnnouncements;
+    return list.where((m) => !_readMessageIds.contains(m['id']?.toString())).length;
+  }
+
+  int getUnreadVideosCount() {
+    final videoAlerts = _cachedNotifications.where((n) {
+      final t = (n['type'] ?? '').toString();
+      return t == 'video' || t == 'video_shared';
+    });
+    return videoAlerts.where((n) => !_readVideoIds.contains(n['id']?.toString())).length;
+  }
+
+  void markMessageAsRead(String id) {
+    _readMessageIds.add(id);
+    _readNotifIds.add(id);
+  }
+
+  void markAllMessagesAsRead() {
+    final list = _cachedMessageAnnouncements.isNotEmpty ? _cachedMessageAnnouncements : _mockMessageAnnouncements;
+    for (var m in list) {
+      final id = m['id']?.toString();
+      if (id != null) {
+        _readMessageIds.add(id);
+        _readNotifIds.add(id);
+      }
+    }
+  }
+
+  void markVideoAsRead(String id) {
+    _readVideoIds.add(id);
+    _readNotifIds.add(id);
+  }
+
+  void markAllVideosAsRead() {
+    for (var n in _cachedNotifications) {
+      final id = n['id']?.toString();
+      if (id != null) {
+        _readVideoIds.add(id);
+        _readNotifIds.add(id);
+      }
+    }
+  }
 
   Future<List<Map<String, dynamic>>> getNotifications() async {
     // 1. If cached notifications exist, return immediately (<1ms) to eliminate loading spinners and lag
@@ -1508,7 +1554,10 @@ class SupabaseService {
             final alerts = List<Map<String, dynamic>>.from(decoded['alerts']);
             for (var a in alerts) {
               final id = (a['id'] ?? '').toString();
-              final isAttendance = a['alert_type'] == 'attendance_marked';
+              final alertType = (a['alert_type'] ?? '').toString();
+              final isAttendance = alertType == 'attendance_marked';
+              final isVideo = alertType == 'video_shared';
+              final isMessage = alertType == 'message';
               final status = (a['student_status'] ?? 'present').toString().toUpperCase();
               final courseTitle = a['course_title'] ?? 'Classical Dance';
               final batchName = a['batch_name'] ?? 'Session';
@@ -1516,7 +1565,11 @@ class SupabaseService {
 
               final title = isAttendance
                   ? 'Attendance Confirmed: $status'
-                  : (a['title'] ?? 'Class Session Concluded');
+                  : isVideo
+                      ? 'New Practice Video Shared'
+                      : isMessage
+                          ? 'Academy Message: $courseTitle'
+                          : (a['title'] ?? 'Class Session Concluded');
               final message = isAttendance
                   ? '$courseTitle ($batchName) • Recorded by Guru $trainerName'
                   : (a['message'] ?? 'Class concluded. Parents are requested to pick up student.');
@@ -1532,7 +1585,7 @@ class SupabaseService {
                 'id': id.isNotEmpty ? id : UniqueKey().toString(),
                 'title': title,
                 'message': message,
-                'type': isAttendance ? 'attendance' : 'class_alert',
+                'type': isAttendance ? 'attendance' : isVideo ? 'video' : isMessage ? 'message' : 'class_alert',
                 'status': status,
                 'course_title': courseTitle,
                 'batch_name': batchName,

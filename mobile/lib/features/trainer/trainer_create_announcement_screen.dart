@@ -256,7 +256,7 @@ class _TrainerCreateAnnouncementScreenState
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Announcement successfully broadcast to disciples!'),
+            content: Text('Message successfully shared with disciples!'),
             backgroundColor: Color(0xFF03543F),
             duration: Duration(seconds: 3),
           ),
@@ -271,7 +271,7 @@ class _TrainerCreateAnnouncementScreenState
         setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Broadcast failed: $e'),
+            content: Text('Failed to share message: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -913,8 +913,8 @@ class _TrainerCreateAnnouncementScreenState
                           : const Icon(Icons.send_rounded, size: 20),
                       label: Text(
                         _isSubmitting
-                            ? 'Broadcasting to Disciples...'
-                            : 'Broadcast to Disciples',
+                            ? 'Sharing Message...'
+                            : 'Share Message',
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,

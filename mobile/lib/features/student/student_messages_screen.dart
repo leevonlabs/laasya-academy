@@ -15,10 +15,12 @@ class StudentMessagesScreen extends StatefulWidget {
 class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
+  int _unreadCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _unreadCount = SupabaseService().getUnreadMessagesCount();
     _loadMessages();
   }
 
@@ -45,6 +47,8 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
         _messages = validMsgs;
         _isLoading = false;
       });
+      // Mark as read after user has seen the messages
+      SupabaseService().markAllMessagesAsRead();
     }
   }
 
@@ -240,16 +244,36 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        margin: const EdgeInsets.only(bottom: 2),
+                        decoration: BoxDecoration(
+                          color: _unreadCount > 0 ? const Color(0xFFF9E33A) : Colors.white24,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          _unreadCount > 0 ? '$_unreadCount UNREAD MESSAGES' : 'MESSAGES (ALL READ)',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: _unreadCount > 0 ? const Color(0xFF590231) : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Row(
+                    children: [
                       Flexible(
                         child: Text(
-                          'Laasya Academy Notice Board',
+                          'Notice Board',
                           style: TextStyle(
                             fontSize: 14.5,
                             fontWeight: FontWeight.bold,
@@ -262,10 +286,10 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                       Icon(Icons.verified_rounded, size: 14, color: LaasyaColors.accentGold),
                     ],
                   ),
-                  Text(
+                  const Text(
                     'Official Broadcast • 30-Day Retention',
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 10,
                       color: Color(0xFFE5D5DF),
                       fontWeight: FontWeight.w400,
                     ),

@@ -350,8 +350,11 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                     iconColor: const Color(0xFF92400E),
                     title: 'Video Library',
                     subtitle: 'Academy event shoot Google Drive vaults & footage',
-                    onTap: () {
-                      Navigator.push(
+                    badgeText: SupabaseService().getUnreadVideosCount() > 0
+                        ? '${SupabaseService().getUnreadVideosCount()} NEW'
+                        : null,
+                    onTap: () async {
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => StudentVideoLibraryScreen(
@@ -360,6 +363,7 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                           ),
                         ),
                       );
+                      setState(() {});
                     },
                   ),
                   const Divider(height: 1, indent: 64),
@@ -390,14 +394,17 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                     iconColor: const Color(0xFF0284C7),
                     title: 'Academy Messages',
                     subtitle: 'Official broadcasts, parent circulars & academy notices',
-                    badgeText: 'MESSAGES',
-                    onTap: () {
-                      Navigator.push(
+                    badgeText: SupabaseService().getUnreadMessagesCount() > 0
+                        ? '${SupabaseService().getUnreadMessagesCount()} UNREAD'
+                        : 'MESSAGES',
+                    onTap: () async {
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => const StudentMessagesScreen(),
                         ),
                       );
+                      setState(() {});
                     },
                   ),
                 ],

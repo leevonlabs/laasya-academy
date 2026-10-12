@@ -305,6 +305,7 @@ export async function createAnnouncement(data: {
     data.trainer_name || null,
     JSON.stringify(data.action_links || []),
     JSON.stringify(data.target_students || []),
+    data.target_student_names || null,
   ]);
 
   try {

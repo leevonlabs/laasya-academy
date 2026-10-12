@@ -1,7 +1,13 @@
 import { query, queryOne } from './db';
 
 const DEFAULT_GEMINI_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_MODEL = 'gemini-3.8-flash';
+const GEMINI_MODELS = [
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash-lite',
+  'gemini-3.8-flash',
+  'gemini-3.1-flash-lite',
+];
+const GEMINI_MODEL = GEMINI_MODELS[0];
 
 export async function getAiApiKey(): Promise<string> {
   try {
@@ -39,43 +45,42 @@ export async function setAiApiKey(newKey: string): Promise<void> {
 
 export async function testAiConnection(keyToTest?: string): Promise<{ success: boolean; message: string; model: string }> {
   const activeKey = keyToTest?.trim() || (await getAiApiKey());
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(activeKey)}`;
+  
+  let lastError = '';
+  for (const model of GEMINI_MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`;
+    const body = {
+      contents: [
+        {
+          parts: [{ text: 'Ping test for Laasya Classical Academy. Reply only with OK.' }]
+        }
+      ]
+    };
 
-  const body = {
-    contents: [
-      {
-        parts: [{ text: 'Ping test for Laasya Classical Academy. Reply only with OK.' }]
-      }
-    ]
-  };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    let detail = `HTTP ${response.status}`;
     try {
-      const parsed = JSON.parse(errText);
-      if (parsed?.error?.message) {
-        detail = parsed.error.message;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (response.ok) {
+        const json = await response.json();
+        const reply = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        return {
+          success: true,
+          message: reply.trim() || 'Connection verified successfully',
+          model: model,
+        };
       }
-    } catch {
-      detail = errText.slice(0, 200);
+      lastError = `HTTP ${response.status}`;
+    } catch (err: any) {
+      lastError = err?.message || String(err);
     }
-    throw new Error(`Google Gemini connection failed: ${detail}`);
   }
 
-  const json = await response.json();
-  const reply = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  return {
-    success: true,
-    message: reply.trim() || 'Connection verified successfully',
-    model: GEMINI_MODEL
-  };
+  throw new Error(`Google Gemini connection failed across models: ${lastError}`);
 }
 
 export async function enhanceTextWithAi(
@@ -88,7 +93,6 @@ export async function enhanceTextWithAi(
   }
 
   const apiKey = await getAiApiKey();
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   let contextGuidance = '';
   if (context.includes('headline')) {
@@ -137,37 +141,42 @@ ${trimmed}`;
     }
   };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody)
-  });
+  let lastError = '';
+  for (const model of GEMINI_MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-  if (!response.ok) {
-    const errText = await response.text();
-    let detail = `HTTP ${response.status}`;
     try {
-      const parsed = JSON.parse(errText);
-      if (parsed?.error?.message) {
-        detail = parsed.error.message;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        let candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        candidateText = candidateText.trim();
+
+        // Strip accidental outer quotes if Gemini wraps them
+        if (
+          (candidateText.startsWith('"') && candidateText.endsWith('"')) ||
+          (candidateText.startsWith("'") && candidateText.endsWith("'"))
+        ) {
+          candidateText = candidateText.slice(1, -1).trim();
+        }
+
+        if (candidateText.length > 0) {
+          return candidateText;
+        }
+      } else {
+        const errText = await response.text();
+        lastError = `HTTP ${response.status}: ${errText.slice(0, 100)}`;
       }
-    } catch {
-      detail = errText.slice(0, 150);
+    } catch (err: any) {
+      lastError = err?.message || String(err);
     }
-    throw new Error(`AI enhancement failed: ${detail}`);
   }
 
-  const data = await response.json();
-  let candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  candidateText = candidateText.trim();
-
-  // Strip accidental outer quotes if Gemini wraps them
-  if (
-    (candidateText.startsWith('"') && candidateText.endsWith('"')) ||
-    (candidateText.startsWith("'") && candidateText.endsWith("'"))
-  ) {
-    candidateText = candidateText.slice(1, -1).trim();
-  }
-
-  return candidateText || trimmed;
+  throw new Error(`AI enhancement failed across models: ${lastError}`);
 }

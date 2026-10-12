@@ -102,10 +102,46 @@ export async function GET(request: NextRequest) {
           s.id as student_id,
           s.roll_number,
           p.full_name as student_name,
-          p.phone as student_phone,
           COALESCE(s.avatar_url, p.avatar_url) as avatar_url,
-          s.parent_name,
-          COALESCE(s.parent_contact, s.emergency_contact) as parent_phone,
+          COALESCE(s.parent_name, 'Parent / Guardian') as parent_name,
+          COALESCE(s.age, CASE WHEN s.date_of_birth IS NOT NULL THEN EXTRACT(YEAR FROM age(CURRENT_DATE, s.date_of_birth))::int ELSE 16 END) as age,
+          COALESCE(s.gender, 'Not Specified') as gender,
+          COALESCE(
+            (SELECT COUNT(a_sub.id) 
+             FROM public.attendance a_sub 
+             JOIN public.class_sessions cs_sub ON a_sub.session_id = cs_sub.id 
+             WHERE a_sub.student_id = s.id 
+               AND cs_sub.batch_id = be.batch_id
+               AND cs_sub.session_date >= date_trunc('month', CURRENT_DATE) 
+               AND cs_sub.session_date < (date_trunc('month', CURRENT_DATE) + interval '1 month')
+            ), 0
+          )::int as this_month_held,
+          COALESCE(
+            (SELECT COUNT(a_sub.id) 
+             FROM public.attendance a_sub 
+             JOIN public.class_sessions cs_sub ON a_sub.session_id = cs_sub.id 
+             WHERE a_sub.student_id = s.id 
+               AND cs_sub.batch_id = be.batch_id
+               AND a_sub.status = 'absent'
+               AND cs_sub.session_date >= date_trunc('month', CURRENT_DATE) 
+               AND cs_sub.session_date < (date_trunc('month', CURRENT_DATE) + interval '1 month')
+            ), 0
+          )::int as this_month_absent,
+          COALESCE(
+            (SELECT 
+               CASE 
+                 WHEN inv.status = 'paid' THEN 'Paid'
+                 WHEN inv.status = 'partial' THEN 'Partial'
+                 WHEN inv.status = 'overdue' THEN 'Overdue'
+                 WHEN inv.due_date < CURRENT_DATE AND inv.status != 'paid' THEN 'Overdue'
+                 ELSE 'Pending'
+               END
+             FROM public.student_fee_invoices inv 
+             WHERE inv.student_id = s.id 
+             ORDER BY inv.created_at DESC 
+             LIMIT 1
+            ), 'Paid'
+          ) as fee_status,
           ROUND(
             COALESCE(
               (COUNT(CASE WHEN a.status IN ('present', 'late') THEN 1 END)::numeric / 
@@ -118,12 +154,12 @@ export async function GET(request: NextRequest) {
         JOIN public.profiles p ON s.profile_id = p.id
         LEFT JOIN public.attendance a ON a.student_id = s.id
         WHERE be.batch_id = ANY($1) AND be.status = 'active'
-        GROUP BY be.batch_id, s.id, s.roll_number, p.full_name, p.phone, s.avatar_url, p.avatar_url, s.parent_name, s.parent_contact, s.emergency_contact
+        GROUP BY be.batch_id, s.id, s.roll_number, p.full_name, s.avatar_url, p.avatar_url, s.parent_name, s.age, s.date_of_birth, s.gender
         ORDER BY p.full_name ASC
       `, [batchIds]);
     }
 
-    // Attach students array to each batch
+    // Attach students array to each batch (contact numbers strictly omitted for Guru login)
     const batchesWithStudents = batches.map(b => ({
       ...b,
       students: enrollments
@@ -133,9 +169,12 @@ export async function GET(request: NextRequest) {
           roll: e.roll_number || 'LCA',
           roll_number: e.roll_number || 'LCA',
           name: e.student_name,
-          phone: e.student_phone || '',
+          age: e.age ?? 16,
+          gender: e.gender ?? 'Not Specified',
           parent_name: e.parent_name || 'Parent / Guardian',
-          parent_phone: e.parent_phone || '',
+          this_month_held: e.this_month_held ?? 0,
+          this_month_absent: e.this_month_absent ?? 0,
+          fee_status: e.fee_status || 'Paid',
           avatar_url: e.avatar_url && e.avatar_url.trim().length > 0 ? e.avatar_url.trim() : null,
           rate: e.rate ?? 92
         }))

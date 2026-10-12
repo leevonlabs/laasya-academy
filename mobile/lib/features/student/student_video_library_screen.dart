@@ -60,9 +60,12 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
     return '${_monthNames[_selectedMonth! - 1]} ($yearPart)';
   }
 
+  int _unreadCount = 0;
+
   @override
   void initState() {
     super.initState();
+    _unreadCount = SupabaseService().getUnreadVideosCount();
     _loadEventFolders();
   }
 
@@ -77,6 +80,7 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
         _folders = data;
         _isLoading = false;
       });
+      SupabaseService().markAllVideosAsRead();
     }
   }
 
@@ -797,13 +801,33 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  margin: const EdgeInsets.only(bottom: 2),
+                  decoration: BoxDecoration(
+                    color: _unreadCount > 0 ? const Color(0xFFF9E33A) : Colors.white24,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    _unreadCount > 0 ? '$_unreadCount NEW MATERIALS' : 'VAULT UP TO DATE',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: _unreadCount > 0 ? const Color(0xFF590231) : Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const Text(
               'Event Video Library',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             Text(
               'Enrolled: $currentCourseName',
-              style: const TextStyle(fontSize: 11, color: LaasyaColors.accentGold),
+              style: const TextStyle(fontSize: 10.5, color: LaasyaColors.accentGold),
             ),
           ],
         ),

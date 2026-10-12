@@ -518,14 +518,16 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
             ),
             const Divider(height: 24),
 
-            _infoRow(Icons.phone_rounded, 'Disciple Phone', stu['phone']!),
-            _infoRow(Icons.family_restroom_rounded, 'Parent / Guardian', stu['parent_name']!),
-            _infoRow(Icons.contact_phone_rounded, 'Emergency Contact', stu['parent_phone']!),
-            _infoRow(Icons.percent_rounded, 'Attendance Record', '${stu['rate']}% Present'),
+            _infoRow(Icons.person_outline_rounded, 'Student Name', stu['name']?.toString() ?? 'Disciple'),
+            _infoRow(Icons.cake_outlined, 'Age', '${stu['age'] ?? 16} Years'),
+            _infoRow(Icons.face_retouching_natural_rounded, 'Gender', (stu['gender']?.toString() ?? 'Not Specified').toUpperCase()),
+            _infoRow(Icons.family_restroom_rounded, 'Parent Name', stu['parent_name']?.toString() ?? 'Parent / Guardian'),
+            _infoRow(Icons.event_available_rounded, 'Current Month Attendance', '${stu['this_month_held'] ?? 0} Held / ${stu['this_month_absent'] ?? 0} Absent'),
+            _infoRow(Icons.payments_outlined, 'Fee Payment Status', stu['fee_status']?.toString() ?? 'Paid'),
 
             const SizedBox(height: 14),
             const Text(
-              'Enrolled Courses & Batches:',
+              'Enrolled Courses & Batches (Assigned to You):',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
             ),
             const SizedBox(height: 8),
@@ -628,8 +630,15 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
           Icon(icon, size: 18, color: LaasyaColors.primary),
           const SizedBox(width: 10),
           Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54)),
-          const Spacer(),
-          Text(val, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              val,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+            ),
+          ),
         ],
       ),
     );
@@ -656,8 +665,7 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
       final q = _searchQuery.toLowerCase();
       final name = s['name'].toString().toLowerCase();
       final roll = s['roll'].toString().toLowerCase();
-      final phone = s['phone'].toString().toLowerCase();
-      return name.contains(q) || roll.contains(q) || phone.contains(q);
+      return name.contains(q) || roll.contains(q);
     }).toList();
 
     return Scaffold(

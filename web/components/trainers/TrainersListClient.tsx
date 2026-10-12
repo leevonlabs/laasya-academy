@@ -116,7 +116,8 @@ export default function TrainersListClient({
         room_or_hall: ab.room_or_hall,
         max_capacity: ab.max_capacity || 25,
         is_active: true,
-        enrolled_count: ab.enrolled_count || 0
+        enrolled_count: ab.enrolled_count || 0,
+        schedules: ab.schedules || []
       }));
     }
 
@@ -126,6 +127,18 @@ export default function TrainersListClient({
        (b.trainer_name.toLowerCase().includes(trainer.full_name.toLowerCase()) || 
         trainer.full_name.toLowerCase().includes(b.trainer_name.toLowerCase())))
     );
+  };
+
+  // Helper to ensure Guru displays ONLY courses present in actual Courses catalog
+  const getGuruCourses = (trainer: Trainer): string[] => {
+    const validCourseTitles = new Set(courses.map(c => c.title.toLowerCase().trim()));
+    const fromSpecs = (trainer.specializations || []).filter(s => validCourseTitles.has(s.toLowerCase().trim()));
+    const fromBatches = getGuruBatches(trainer).map(b => b.course_title).filter(Boolean);
+    const combined = Array.from(new Set([...fromSpecs, ...fromBatches]));
+    return combined.map(t => {
+      const match = courses.find(c => c.title.toLowerCase().trim() === t.toLowerCase().trim());
+      return match ? match.title : t;
+    });
   };
 
   // Filter Trainers by Search and Status
@@ -1402,31 +1415,36 @@ export default function TrainersListClient({
                   </div>
 
                   {/* 3. ASSIGNED COURSES BELOW CONTACT */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-black uppercase tracking-wider text-[#590231] flex items-center gap-1.5">
-                        <BookOpen className="w-3.5 h-3.5 text-[#8A064D]" />
-                        <span>Assigned Courses ({t.specializations?.length || 0})</span>
-                      </span>
-                      <span className="text-[11px] font-bold text-gray-500">
-                        {t.batches_assigned || getGuruBatches(t).length} Batches
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 min-h-[32px]">
-                      {t.specializations && t.specializations.length > 0 ? (
-                        t.specializations.map((spec, i) => (
-                          <span
-                            key={i}
-                            className="text-xs font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-200/80 px-2.5 py-1 rounded-xl flex items-center gap-1.5 shadow-2xs"
-                          >
-                            <span>{spec}</span>
+                  {(() => {
+                    const guruCourses = getGuruCourses(t);
+                    return (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-black uppercase tracking-wider text-[#590231] flex items-center gap-1.5">
+                            <BookOpen className="w-3.5 h-3.5 text-[#8A064D]" />
+                            <span>Assigned Courses ({guruCourses.length})</span>
                           </span>
-                        ))
-                      ) : (
-                        <span className="text-xs text-gray-400 italic">No courses assigned yet</span>
-                      )}
-                    </div>
-                  </div>
+                          <span className="text-[11px] font-bold text-gray-500">
+                            {t.batches_assigned || getGuruBatches(t).length} Batches
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 min-h-[32px]">
+                          {guruCourses.length > 0 ? (
+                            guruCourses.map((spec, i) => (
+                              <span
+                                key={i}
+                                className="text-xs font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-200/80 px-2.5 py-1 rounded-xl flex items-center gap-1.5 shadow-2xs"
+                              >
+                                <span>{spec}</span>
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">No courses assigned yet</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1666,28 +1684,33 @@ export default function TrainersListClient({
               </div>
 
               {/* SECTION 3: ASSIGNED DISCIPLINES */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-black text-[#590231] uppercase tracking-wide">
-                    Assigned Courses &amp; Disciplines ({viewingGuru.specializations?.length || 0})
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 p-3 bg-white border border-[#F0D5E4] rounded-2xl">
-                  {viewingGuru.specializations && viewingGuru.specializations.length > 0 ? (
-                    viewingGuru.specializations.map((spec, i) => (
-                      <span
-                        key={i}
-                        className="text-xs font-semibold bg-[#FFF2F8] text-[#8A064D] border border-rose-200 px-3 py-1 rounded-xl flex items-center gap-1.5 shadow-2xs"
-                      >
-                        <BookOpen className="w-3.5 h-3.5 text-[#8A064D]" />
-                        <span>{spec}</span>
+              {(() => {
+                const guruCourses = getGuruCourses(viewingGuru);
+                return (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-black text-[#590231] uppercase tracking-wide">
+                        Assigned Courses &amp; Disciplines ({guruCourses.length})
                       </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-gray-400 italic">No courses currently tagged</span>
-                  )}
-                </div>
-              </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 p-3 bg-white border border-[#F0D5E4] rounded-2xl">
+                      {guruCourses.length > 0 ? (
+                        guruCourses.map((spec, i) => (
+                          <span
+                            key={i}
+                            className="text-xs font-semibold bg-[#FFF2F8] text-[#8A064D] border border-rose-200 px-3 py-1 rounded-xl flex items-center gap-1.5 shadow-2xs"
+                          >
+                            <BookOpen className="w-3.5 h-3.5 text-[#8A064D]" />
+                            <span>{spec}</span>
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">No courses currently tagged</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* SECTION 4: BATCH DETAILS */}
               <div>
@@ -1723,19 +1746,27 @@ export default function TrainersListClient({
                                 {b.course_title}
                               </span>
                             </div>
-                            <div className="text-gray-500 text-[11px] flex items-center gap-3 mt-1">
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3 text-[#8A064D]" />
-                                {Array.isArray(b.days_of_week) ? b.days_of_week.join(', ') : b.days_of_week}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-gray-400" />
-                                {b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <DoorOpen className="w-3 h-3 text-gray-400" />
-                                {b.room_or_hall}
-                              </span>
+                            {/* Day Time Room Row by Row */}
+                            <div className="mt-2 space-y-1">
+                              {b.schedules && b.schedules.length > 0 ? (
+                                b.schedules.map((slot: any, sIdx: number) => (
+                                  <div key={sIdx} className="text-[11px] text-gray-700 flex items-center gap-2 py-0.5 bg-gray-50/70 px-2 rounded-md">
+                                    <span className="font-bold text-[#8A064D] min-w-[75px]">{slot.day}</span>
+                                    <span className="font-medium text-gray-800">{slot.startTime || b.start_time?.substring(0, 5)} - {slot.endTime || b.end_time?.substring(0, 5)}</span>
+                                    <span className="text-gray-300">•</span>
+                                    <span className="text-gray-600 font-medium">{slot.room || b.room_or_hall}</span>
+                                  </div>
+                                ))
+                              ) : (
+                                (Array.isArray(b.days_of_week) && b.days_of_week.length > 0 ? b.days_of_week : ['Class Day']).map((day: string, sIdx: number) => (
+                                  <div key={sIdx} className="text-[11px] text-gray-700 flex items-center gap-2 py-0.5 bg-gray-50/70 px-2 rounded-md">
+                                    <span className="font-bold text-[#8A064D] min-w-[75px]">{day}</span>
+                                    <span className="font-medium text-gray-800">{b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}</span>
+                                    <span className="text-gray-300">•</span>
+                                    <span className="text-gray-600 font-medium">{b.room_or_hall}</span>
+                                  </div>
+                                ))
+                              )}
                             </div>
                           </div>
                           <span className="text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg shrink-0">

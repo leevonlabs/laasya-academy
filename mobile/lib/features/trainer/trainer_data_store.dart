@@ -283,9 +283,12 @@ class TrainerDataStore {
             'id': s['id']?.toString() ?? '',
             'roll': s['roll']?.toString() ?? s['roll_number']?.toString() ?? 'LCA',
             'name': s['name']?.toString() ?? 'Disciple',
-            'phone': s['phone']?.toString() ?? '',
+            'age': s['age'] ?? 16,
+            'gender': s['gender']?.toString() ?? 'Not Specified',
             'parent_name': s['parent_name']?.toString() ?? 'Parent / Guardian',
-            'parent_phone': s['parent_phone']?.toString() ?? '',
+            'this_month_held': (s['this_month_held'] as num?)?.toInt() ?? 0,
+            'this_month_absent': (s['this_month_absent'] as num?)?.toInt() ?? 0,
+            'fee_status': s['fee_status']?.toString() ?? 'Paid',
             'rate': (s['rate'] as num?)?.toInt() ?? 92,
             'avatar_url': validAvatar,
           });
@@ -320,6 +323,7 @@ class TrainerDataStore {
         'room': b['room_or_hall']?.toString() ?? 'Natya Mandapam (Room 101)',
         'days': daysList,
         'schedule_days_display': daysDisplay,
+        'schedules': b['schedules'],
         'students': studentList,
       };
 
@@ -603,9 +607,12 @@ class TrainerDataStore {
               'id': stu['id'],
               'roll': stu['roll'], // Exact Admin roll number (e.g. LCA-1)
               'name': stu['name'],
-              'phone': stu['phone'],
-              'parent_name': stu['parent_name'],
-              'parent_phone': stu['parent_phone'],
+              'age': stu['age'] ?? 16,
+              'gender': stu['gender'] ?? 'Not Specified',
+              'parent_name': stu['parent_name'] ?? 'Parent / Guardian',
+              'this_month_held': stu['this_month_held'] ?? 0,
+              'this_month_absent': stu['this_month_absent'] ?? 0,
+              'fee_status': stu['fee_status'] ?? 'Paid',
               'rate': stu['rate'],
               'avatar_url': (stu['avatar_url'] != null && stu['avatar_url'].toString().trim().isNotEmpty && !stu['avatar_url'].toString().contains('unsplash.com'))
                   ? stu['avatar_url'].toString().trim()
@@ -630,6 +637,8 @@ class TrainerDataStore {
             final alreadyAdded = existingList.any((e) => e['batch_id'] == batch['id']);
             if (!alreadyAdded) {
               existingList.add(enrollmentInfo);
+              studentMap[sId]!['this_month_held'] = (studentMap[sId]!['this_month_held'] as int? ?? 0) + (stu['this_month_held'] as int? ?? 0);
+              studentMap[sId]!['this_month_absent'] = (studentMap[sId]!['this_month_absent'] as int? ?? 0) + (stu['this_month_absent'] as int? ?? 0);
             }
           }
         }

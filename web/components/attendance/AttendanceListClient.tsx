@@ -391,7 +391,7 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
           }`}
         >
           <BookOpen className="w-4.5 h-4.5" />
-          <span>Tab 1: Course-Wise Attendance</span>
+          <span>Course-Wise Attendance</span>
           <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
             activeTab === 'course_wise' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
           }`}>
@@ -408,7 +408,7 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
           }`}
         >
           <Layers className="w-4.5 h-4.5" />
-          <span>Tab 2: Complete Attendance</span>
+          <span>Complete Attendance Audit</span>
           <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
             activeTab === 'complete' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
           }`}>
@@ -508,10 +508,9 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
                           </span>
                         </div>
 
-                        {/* Fee & Duration */}
+                        {/* Monthly Fee */}
                         <div className="mt-3.5 flex items-center justify-between text-xs text-gray-600">
-                          <span>Monthly Fee: <strong className="text-[#8A064D] text-sm tabular-nums font-black">₹{Number(crs.monthly_fee).toLocaleString('en-IN')}</strong></span>
-                          <span className="tabular-nums font-semibold">{crs.duration_months} Months</span>
+                          <span>Monthly Tuition: <strong className="text-[#8A064D] text-sm tabular-nums font-black">₹{Number(crs.monthly_fee).toLocaleString('en-IN')}</strong></span>
                         </div>
                       </div>
 
