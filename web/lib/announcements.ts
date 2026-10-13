@@ -24,6 +24,8 @@ export interface Announcement {
   sender_role?: 'admin' | 'trainer' | string;
   trainer_id?: string | null;
   trainer_name?: string | null;
+  target_students?: string[] | string | null;
+  target_student_names?: string[] | string | null;
   created_at: string;
   updated_at: string;
 }
@@ -88,8 +90,6 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
         a.sender_role,
         a.trainer_id,
         a.trainer_name,
-        a.target_students,
-        a.target_student_names,
         a.created_at::text as created_at, 
         a.updated_at::text as updated_at
       FROM public.announcements a

@@ -413,8 +413,21 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: LaasyaColors.textDark)),
+          Expanded(
+            flex: 4,
+            child: Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 5,
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: LaasyaColors.textDark),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -507,14 +520,9 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  spec,
-                                  style: const TextStyle(color: LaasyaColors.accentGold, fontSize: 11, fontWeight: FontWeight.bold),
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.end,
-                                ),
+                              Text(
+                                spec,
+                                style: const TextStyle(color: LaasyaColors.accentGold, fontSize: 11, fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
@@ -616,7 +624,7 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                   Flexible(
+                                  Flexible(
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
@@ -626,12 +634,12 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
                                       ),
                                       child: Text(
                                         '$vNo • $recNo',
-                                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: LaasyaColors.primary),
+                                        maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: LaasyaColors.primary),
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
@@ -695,7 +703,7 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
                                   ),
                                   onPressed: () => _showSalarySlipModal(item),
                                   icon: const Icon(Icons.download_rounded, size: 16, color: LaasyaColors.primary),
-                                  label: const Text('View & Download Pay Slip', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  label: const Text('Download Pay Slip (PDF)', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                 ),
                               ),
                             ],

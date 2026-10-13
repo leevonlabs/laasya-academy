@@ -18,6 +18,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
 
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _agreeToTerms = false;
   String? _errorMessage;
 
   @override
@@ -48,6 +49,12 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
       if (id.isEmpty || pass.isEmpty) {
         throw Exception(
           'Please enter your ${_isStudent ? "mobile number / student roll no" : "registered phone number"} and password.',
+        );
+      }
+
+      if (!_agreeToTerms) {
+        throw Exception(
+          'Please agree to the Terms & Conditions and Privacy Policy to continue.',
         );
       }
 
@@ -199,7 +206,33 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                       color: LaasyaColors.textMuted,
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 14),
+
+                  // Academy Cultural Heritage Artwork Banner (Classical Dance, Music & Arts)
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.55), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: LaasyaColors.primaryDark.withOpacity(0.12),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.asset(
+                        'assets/images/cultural_arts_hero.jpg',
+                        height: 125,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
 
                   // 2. Clean Segmented Role Selector
                   Container(
@@ -435,7 +468,69 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 12),
+
+                  // Terms & Conditions and Privacy Policy Tickmark
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: _agreeToTerms,
+                          activeColor: LaasyaColors.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          onChanged: (val) => setState(() => _agreeToTerms = val ?? false),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _agreeToTerms = !_agreeToTerms),
+                          child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              const Text(
+                                'I agree to the ',
+                                style: TextStyle(fontSize: 12, color: LaasyaColors.textDark),
+                              ),
+                              GestureDetector(
+                                onTap: () => _showPrivacyPolicyBottomSheet(context),
+                                child: const Text(
+                                  'Terms & Conditions',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: LaasyaColors.primary,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                              const Text(
+                                ' and ',
+                                style: TextStyle(fontSize: 12, color: LaasyaColors.textDark),
+                              ),
+                              GestureDetector(
+                                onTap: () => _showPrivacyPolicyBottomSheet(context),
+                                child: const Text(
+                                  'Privacy Policy',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: LaasyaColors.primary,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
 
                   // 7. Primary Sign In Button
                   SizedBox(

@@ -784,7 +784,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                 const SizedBox(width: 8),
                 _quickActionButton(
                   icon: Icons.chat_bubble_rounded,
-                  label: 'Messages',
+                  label: 'Academy Messages',
                   bgColor: const Color(0xFFE8F4FD),
                   iconColor: const Color(0xFF0284C7),
                   unreadCount: SupabaseService().getUnreadMessagesCount(),
@@ -1575,6 +1575,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                 ],
               ),
               const SizedBox(height: 4),
+
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(

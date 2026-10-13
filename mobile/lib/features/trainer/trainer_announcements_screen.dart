@@ -217,7 +217,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Direct Faculty Messages',
+                                      'Direct Faculty Announcements',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 15,
@@ -248,7 +248,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                               ),
                               icon: const Icon(Icons.add_comment_rounded, size: 18),
                               label: const Text(
-                                'Share Message / Broadcast',
+                                'Create New Announcement',
                                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                               ),
                             ),

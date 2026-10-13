@@ -14,7 +14,7 @@ export default async function AnnouncementsPage() {
   }
 
   const [announcements, courses, batches, trainers] = await Promise.all([
-    getAnnouncements(),
+    getAnnouncements({ announcementType: 'message' }),
     getCourses(),
     getBatches(),
     getTrainers()

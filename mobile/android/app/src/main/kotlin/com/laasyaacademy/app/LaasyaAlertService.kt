@@ -178,14 +178,16 @@ class LaasyaAlertService : Service() {
             .setLargeIcon(logo)
             .setColor(0xFF800020.toInt())
             .setContentTitle("Laasya Cultural Academy")
-            .setContentText("Alert Sync Ready")
+            .setContentText("Live Attention & Alert Sync Active")
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
             .setSilent(true)
             .setContentIntent(pendingIntent)
             .build()
 
         startForeground(NOTIF_ID_FOREGROUND, notif)
-        // Immediately dismiss ongoing notification so no persistent notification remains in status bar
+
+        // Immediately dismiss the persistent status bar notification so users never see an unremovable sticky notification
         mainHandler.postDelayed({
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -194,10 +196,8 @@ class LaasyaAlertService : Service() {
                     @Suppress("DEPRECATION")
                     stopForeground(true)
                 }
-                val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-                nm?.cancel(NOTIF_ID_FOREGROUND)
             } catch (_: Exception) {}
-        }, 300L)
+        }, 350L)
     }
 
     private fun saveMonitoringConfig(studentId: String, rollNumber: String, name: String, phone: String, batchIds: String) {

@@ -1548,6 +1548,7 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                 ],
               ),
               const SizedBox(height: 4),
+
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(

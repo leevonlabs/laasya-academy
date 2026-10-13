@@ -206,12 +206,12 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
             }
 
             if (classClosedAlert != null) {
-              final cTitle = classClosedAlert['course_title'] ?? 'Classical Class';
-              final bName = classClosedAlert['batch_name'] ?? 'Session';
+              final courseTitle = classClosedAlert['course_title'] ?? 'Class Session';
+              final batchName = classClosedAlert['batch_name'] ?? 'Batch';
               AlarmService.startAlarmRing(
                 durationSeconds: 10,
-                title: 'CLASS COMPLETED: $cTitle',
-                message: 'The $cTitle ($bName) session has concluded. Please come to collect your child.',
+                title: 'CLASS COMPLETED: $courseTitle',
+                message: 'The $courseTitle ($batchName) session has concluded. Please come and pick up your child safely.',
               );
               _showClassClosedBannerNotification(classClosedAlert);
             }
@@ -454,13 +454,16 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   void _onClassClosedAlert() {
     final alertData = TrainerDataStore.classClosedAlertNotifier.value;
     if (alertData == null || !mounted) return;
+
+    // Reset notifier value so subsequent alarms trigger properly
     TrainerDataStore.classClosedAlertNotifier.value = null;
-    _showClassClosedBannerNotification(alertData);
+
+    _showClassClosedAttentionAlarm(alertData);
   }
 
   void _showClassClosedBannerNotification(Map<String, dynamic> alertData) {
-    final courseTitle = alertData['course_title'] ?? 'Classical Class';
-    final batchName = alertData['batch_name'] ?? 'Session';
+    final courseTitle = alertData['course_title'] ?? 'Class Session';
+    final batchName = alertData['batch_name'] ?? 'Batch';
 
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -474,21 +477,22 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
         content: GestureDetector(
           onTap: () {
             ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            AlarmService.stopAlarmRing();
             _showClassClosedAttentionAlarm(alertData);
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF9A3412), Color(0xFFC2410C)],
+                colors: [Color(0xFF7C2D12), Color(0xFF431407)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFFDE047), width: 1.5),
+              border: Border.all(color: const Color(0xFFFB923C), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF9A3412).withOpacity(0.4),
+                  color: const Color(0xFFEA580C).withOpacity(0.35),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
                 ),
@@ -500,11 +504,11 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
+                    color: Colors.white.withOpacity(0.15),
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFFDE047), width: 1.5),
+                    border: Border.all(color: const Color(0xFFFDBA74), width: 1.5),
                   ),
-                  child: const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 24),
+                  child: const Icon(Icons.notifications_active_rounded, color: Color(0xFFFDBA74), size: 24),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -514,29 +518,23 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
                     children: [
                       const Text(
                         'CLASS COMPLETED • PICKUP ALERT',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.8,
-                          color: Color(0xFFFEF08A),
-                        ),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFFFED7AA), letterSpacing: 0.5),
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        '$courseTitle ($batchName)',
+                        '$courseTitle • $batchName',
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       const Text(
-                        'Tap here to view pickup confirmation',
+                        'Tap to view pickup details',
                         style: TextStyle(fontSize: 11, color: Colors.white70),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 22),
               ],
             ),
           ),

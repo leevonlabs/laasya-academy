@@ -115,47 +115,25 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
   }
 
   String _formatMessageTime(Map<String, dynamic> msg) {
-    final createdAtStr = msg['created_at']?.toString();
-    if (createdAtStr != null && createdAtStr.contains('T')) {
-      try {
-        final dt = DateTime.parse(createdAtStr).toLocal();
-        int hour = dt.hour;
+    try {
+      final rawCreated = msg['created_at'];
+      if (rawCreated != null && rawCreated.toString().trim().isNotEmpty) {
+        final dt = DateTime.parse(rawCreated.toString()).toLocal();
+        final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+        final amPm = dt.hour >= 12 ? 'PM' : 'AM';
         final minute = dt.minute.toString().padLeft(2, '0');
-        final period = hour >= 12 ? 'PM' : 'AM';
-        hour = hour % 12;
-        if (hour == 0) hour = 12;
-        return '${hour.toString().padLeft(2, '0')}:$minute $period';
-      } catch (_) {}
-    }
-    final pubTime = msg['publish_time']?.toString();
-    if (pubTime != null && pubTime.contains(':')) {
-      final parts = pubTime.split(':');
-      if (parts.length >= 2) {
-        int h = int.tryParse(parts[0]) ?? 10;
-        final m = parts[1].padLeft(2, '0');
-        final period = h >= 12 ? 'PM' : 'AM';
-        h = h % 12;
-        if (h == 0) h = 12;
-        return '${h.toString().padLeft(2, '0')}:$m $period';
+        return '$hour:$minute $amPm';
       }
-    }
-    final tField = msg['time']?.toString();
-    if (tField != null && tField.isNotEmpty && tField != '10:00 AM') {
-      return tField;
-    }
-    final pDateStr = msg['publish_date']?.toString();
-    if (pDateStr != null && pDateStr.contains('T')) {
-      try {
-        final dt = DateTime.parse(pDateStr).toLocal();
-        int hour = dt.hour;
+      final rawPub = msg['publish_date'] ?? msg['date'];
+      if (rawPub != null && rawPub.toString().trim().isNotEmpty) {
+        final dt = DateTime.parse(rawPub.toString()).toLocal();
+        final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+        final amPm = dt.hour >= 12 ? 'PM' : 'AM';
         final minute = dt.minute.toString().padLeft(2, '0');
-        final period = hour >= 12 ? 'PM' : 'AM';
-        hour = hour % 12;
-        if (hour == 0) hour = 12;
-        return '${hour.toString().padLeft(2, '0')}:$minute $period';
-      } catch (_) {}
-    }
-    return '10:00 AM';
+        return '$hour:$minute $amPm';
+      }
+    } catch (_) {}
+    return (msg['time'] ?? '10:00 AM').toString();
   }
 
   List<Map<String, dynamic>> _parseActionLinks(dynamic rawLinks) {
@@ -318,37 +296,39 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                 children: [
                   Row(
                     children: [
-                      const Flexible(
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        margin: const EdgeInsets.only(bottom: 2),
+                        decoration: BoxDecoration(
+                          color: _unreadCount > 0 ? const Color(0xFFF9E33A) : Colors.white24,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                         child: Text(
-                          'Academy Messages',
+                          _unreadCount > 0 ? '$_unreadCount UNREAD MESSAGES' : 'MESSAGES (ALL READ)',
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: _unreadCount > 0 ? const Color(0xFF590231) : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Notice Board',
+                          style: TextStyle(
+                            fontSize: 14.5,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 5),
-                      const Icon(Icons.verified_rounded, size: 14, color: LaasyaColors.accentGold),
-                      if (_unreadCount > 0) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF9E33A),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '$_unreadCount',
-                            style: const TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF590231),
-                            ),
-                          ),
-                        ),
-                      ],
+                      SizedBox(width: 4),
+                      Icon(Icons.verified_rounded, size: 14, color: LaasyaColors.accentGold),
                     ],
                   ),
                   const Text(

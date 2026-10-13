@@ -154,6 +154,13 @@ export async function GET(request: NextRequest) {
       }
 
       if (a.alert_type === 'message' || a.alert_type === 'announcement') {
+        const isGuruSender = a.trainer_name && !a.trainer_name.toLowerCase().includes('director') && !a.trainer_name.toLowerCase().includes('admin');
+        if (isGuruSender) {
+          if (bId && bId !== 'all') {
+            return allowedBatchIds.includes(bId) || studentBatchIds.includes(bId);
+          }
+          return allowedBatchIds.includes(bId) || studentBatchIds.includes(bId);
+        }
         if (!bId || bId === 'all') return true;
         if (allowedBatchIds.includes(bId) || studentBatchIds.includes(bId)) return true;
         return false;

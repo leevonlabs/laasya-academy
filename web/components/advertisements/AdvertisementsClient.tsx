@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  Sparkles, 
   Plus, 
   Search, 
   X, 
@@ -11,25 +10,43 @@ import {
   Trash2, 
   CheckCircle2, 
   Clock, 
-  Send, 
+  Users, 
   Image as ImageIcon, 
   Upload,
-  Smartphone,
   ExternalLink,
-  Calendar
+  Smartphone,
+  Sparkles,
+  Calendar,
+  AlertCircle
 } from 'lucide-react';
 import { Announcement } from '@/lib/announcements';
+import AiEnhanceButton from '@/components/common/AiEnhanceButton';
+
+interface Course {
+  id: string;
+  title: string;
+}
+
+interface Batch {
+  id: string;
+  name: string;
+  course_id: string;
+}
 
 interface Props {
   initialAnnouncements: Announcement[];
+  courses: Course[];
+  batches: Batch[];
 }
 
-export default function AdvertisementsClient({ initialAnnouncements }: Props) {
+export default function AdvertisementsClient({ initialAnnouncements, courses, batches }: Props) {
   const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements);
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [audienceFilter, setAudienceFilter] = useState('all');
+  const [typeTagFilter, setTypeTagFilter] = useState('all');
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -37,12 +54,23 @@ export default function AdvertisementsClient({ initialAnnouncements }: Props) {
   const [previewAnnouncement, setPreviewAnnouncement] = useState<Announcement | null>(null);
   const [deletingAnnouncement, setDeletingAnnouncement] = useState<Announcement | null>(null);
 
+  // Multi-select Course & Batch state for form
+  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+
   // Form State
   const [formData, setFormData] = useState({
     title: '',
     message: '',
     image_url: '',
+    audience: 'All students' as 'All students' | 'Students and Gurus' | 'Selected course or batch' | 'Trainers' | 'Chosen recipients',
+    target_course_id: '',
+    target_course_title: '',
+    target_batch_id: '',
+    target_batch_name: '',
+    type_tag: 'General' as 'Holiday' | 'Schedule change' | 'Cancellation' | 'Fee reminder' | 'General',
     publish_date: new Date().toISOString().split('T')[0],
+    publish_time: '10:00',
     expiry_date: '',
     status: 'Published' as 'Draft' | 'Scheduled' | 'Published' | 'Expired',
     action_links: [] as Array<{ title: string; url: string }>
@@ -58,33 +86,57 @@ export default function AdvertisementsClient({ initialAnnouncements }: Props) {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  // Helper to distinguish banner
   const isBanner = (ann: Announcement) => {
     return ann.announcement_type === 'banner' || (Boolean(ann.image_url) && ann.announcement_type !== 'message');
   };
 
-  const bannerAds = useMemo(() => {
-    return announcements.filter(a => !a.is_deleted && isBanner(a));
+  // Filter banner items
+  const bannerList = useMemo(() => {
+    return announcements.filter(isBanner);
   }, [announcements]);
 
+  // Status computation and filtering
   const filteredBanners = useMemo(() => {
-    return bannerAds.filter(ann => {
+    return bannerList.filter(ann => {
+      // Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesTitle = ann.title?.toLowerCase().includes(q);
-        const matchesMessage = ann.message?.toLowerCase().includes(q);
-        if (!matchesTitle && !matchesMessage) return false;
+        const matchesMsg = ann.message?.toLowerCase().includes(q);
+        if (!matchesTitle && !matchesMsg) return false;
       }
-      if (statusFilter !== 'all') {
-        if (ann.status.toLowerCase() !== statusFilter.toLowerCase()) return false;
+
+      // Status
+      if (statusFilter !== 'all' && ann.status !== statusFilter) {
+        return false;
       }
+
+      // Audience
+      if (audienceFilter !== 'all' && ann.audience !== audienceFilter) {
+        return false;
+      }
+
+      // Type Tag
+      if (typeTagFilter !== 'all' && ann.type_tag !== typeTagFilter) {
+        return false;
+      }
+
       return true;
     });
-  }, [bannerAds, searchQuery, statusFilter]);
+  }, [bannerList, searchQuery, statusFilter, audienceFilter, typeTagFilter]);
 
-  const activeCount = useMemo(() => bannerAds.filter(a => a.status === 'Published').length, [bannerAds]);
-  const scheduledCount = useMemo(() => bannerAds.filter(a => a.status === 'Scheduled').length, [bannerAds]);
-  const expiredCount = useMemo(() => bannerAds.filter(a => a.status === 'Expired').length, [bannerAds]);
+  // Statistics
+  const stats = useMemo(() => {
+    const total = bannerList.length;
+    const active = bannerList.filter(a => a.status === 'Published').length;
+    const scheduled = bannerList.filter(a => a.status === 'Scheduled').length;
+    const draft = bannerList.filter(a => a.status === 'Draft').length;
+    const expired = bannerList.filter(a => a.status === 'Expired').length;
+    return { total, active, scheduled, draft, expired };
+  }, [bannerList]);
 
+  // File Upload Helper (3:4 aspect ratio compression)
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -108,8 +160,8 @@ export default function AdvertisementsClient({ initialAnnouncements }: Props) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, w, h);
-          const compressed = canvas.toDataURL('image/jpeg', 0.85);
-          setFormData(prev => ({ ...prev, image_url: compressed }));
+          const dataUrl = canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.88);
+          setFormData(prev => ({ ...prev, image_url: dataUrl }));
         }
       };
       img.src = event.target?.result as string;
@@ -117,13 +169,22 @@ export default function AdvertisementsClient({ initialAnnouncements }: Props) {
     reader.readAsDataURL(file);
   };
 
+  // Open Create Modal
   const openCreateModal = () => {
-    setEditingAnnouncement(null);
+    setSelectedCourseIds([]);
+    setSelectedBatchIds([]);
     setFormData({
       title: '',
       message: '',
       image_url: '',
+      audience: 'All students',
+      target_course_id: '',
+      target_course_title: '',
+      target_batch_id: '',
+      target_batch_name: '',
+      type_tag: 'General',
       publish_date: new Date().toISOString().split('T')[0],
+      publish_time: '10:00',
       expiry_date: '',
       status: 'Published',
       action_links: []
@@ -133,86 +194,167 @@ export default function AdvertisementsClient({ initialAnnouncements }: Props) {
     setIsCreateModalOpen(true);
   };
 
+  // Open Edit Modal
   const openEditModal = (ann: Announcement) => {
     setEditingAnnouncement(ann);
+    const cIds = ann.target_course_id ? ann.target_course_id.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const bIds = ann.target_batch_id ? ann.target_batch_id.split(',').map(s => s.trim()).filter(Boolean) : [];
+    setSelectedCourseIds(cIds);
+    setSelectedBatchIds(bIds);
+
     const links = Array.isArray(ann.action_links) ? ann.action_links : [];
+
     setFormData({
       title: ann.title || '',
       message: ann.message || '',
       image_url: ann.image_url || '',
+      audience: (ann.audience || 'All students') as any,
+      target_course_id: ann.target_course_id || '',
+      target_course_title: ann.target_course_title || '',
+      target_batch_id: ann.target_batch_id || '',
+      target_batch_name: ann.target_batch_name || '',
+      type_tag: (ann.type_tag || 'General') as any,
       publish_date: ann.publish_date ? ann.publish_date.split('T')[0] : new Date().toISOString().split('T')[0],
+      publish_time: '10:00',
       expiry_date: ann.expiry_date ? ann.expiry_date.split('T')[0] : '',
       status: (ann.status || 'Published') as any,
       action_links: links
     });
     setFormErrors({});
     setActiveFormTab('edit');
-    setIsCreateModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Validation
+  const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (!formData.title.trim()) errors.title = 'Advertisement campaign title is required.';
-    if (!formData.image_url) errors.image_url = 'Please upload a banner poster image.';
+    if (!formData.title || !formData.title.trim()) {
+      errors.title = 'Banner headline is required';
+    }
+    if (!formData.image_url || !formData.image_url.trim()) {
+      errors.image_url = 'A banner image is required for app home banner showcase';
+    }
+    if (formData.status === 'Scheduled' && !formData.publish_date) {
+      errors.publish_date = 'Scheduled publish date is required';
+    }
+    if (formData.audience === 'Selected course or batch' && selectedCourseIds.length === 0) {
+      errors.target_course_id = 'Please select at least one course';
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
+  // Submit Create
+  const handleSubmitCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) {
+      setActiveFormTab('edit');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const payload = {
-        title: formData.title.trim(),
-        message: formData.message.trim(),
-        audience: 'All students',
-        type_tag: 'General',
-        publish_date: formData.publish_date,
-        expiry_date: formData.expiry_date || null,
-        status: formData.status,
-        image_url: formData.image_url,
-        announcement_type: 'banner',
-        action_links: formData.action_links
-      };
+      const courseTitles = courses
+        .filter(c => selectedCourseIds.includes(c.id))
+        .map(c => c.title)
+        .join(', ');
 
-      if (editingAnnouncement) {
-        const res = await fetch(`/api/announcements/${editingAnnouncement.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const json = await res.json();
-        if (json.success && json.announcement) {
-          setAnnouncements(prev => prev.map(a => a.id === editingAnnouncement.id ? json.announcement : a));
-          showToast('Advertisement updated successfully!');
-          setIsCreateModalOpen(false);
-        } else {
-          showToast(json.error || 'Failed to update advertisement', 'error');
-        }
+      const batchNames = batches
+        .filter(b => selectedBatchIds.includes(b.id))
+        .map(b => b.name)
+        .join(', ');
+
+      const effectivePublishDate = formData.status === 'Published' 
+        ? new Date().toISOString().split('T')[0]
+        : formData.publish_date;
+
+      const cleanActionLinks = formData.action_links.filter(l => l.title.trim() && l.url.trim());
+
+      const res = await fetch('/api/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          publish_date: effectivePublishDate,
+          announcement_type: 'banner',
+          action_links: cleanActionLinks,
+          target_course_id: selectedCourseIds.length > 0 ? selectedCourseIds.join(',') : undefined,
+          target_course_title: courseTitles || undefined,
+          target_batch_id: selectedBatchIds.length > 0 ? selectedBatchIds.join(',') : undefined,
+          target_batch_name: batchNames || undefined
+        })
+      });
+      const json = await res.json();
+      if (json.success && json.announcement) {
+        setAnnouncements(prev => [json.announcement, ...prev]);
+        setIsCreateModalOpen(false);
+        showToast('Banner Advertisement added to Student App Home carousel!');
       } else {
-        const res = await fetch('/api/announcements', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const json = await res.json();
-        if (json.success && json.announcement) {
-          setAnnouncements(prev => [json.announcement, ...prev]);
-          showToast('Advertisement published to student and guru app homepages!');
-          setIsCreateModalOpen(false);
-        } else {
-          showToast(json.error || 'Failed to create advertisement', 'error');
-        }
+        showToast(json.error || 'Failed to create banner ad', 'error');
       }
     } catch {
-      showToast('Network error while saving advertisement', 'error');
+      showToast('Network error while saving banner ad', 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async () => {
+  // Submit Edit
+  const handleSubmitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAnnouncement || !validateForm()) {
+      setActiveFormTab('edit');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const courseTitles = courses
+        .filter(c => selectedCourseIds.includes(c.id))
+        .map(c => c.title)
+        .join(', ');
+
+      const batchNames = batches
+        .filter(b => selectedBatchIds.includes(b.id))
+        .map(b => b.name)
+        .join(', ');
+
+      const effectivePublishDate = formData.status === 'Published' 
+        ? new Date().toISOString().split('T')[0]
+        : formData.publish_date;
+
+      const cleanActionLinks = formData.action_links.filter(l => l.title.trim() && l.url.trim());
+
+      const res = await fetch(`/api/announcements/${editingAnnouncement.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          publish_date: effectivePublishDate,
+          announcement_type: 'banner',
+          action_links: cleanActionLinks,
+          target_course_id: selectedCourseIds.length > 0 ? selectedCourseIds.join(',') : undefined,
+          target_course_title: courseTitles || undefined,
+          target_batch_id: selectedBatchIds.length > 0 ? selectedBatchIds.join(',') : undefined,
+          target_batch_name: batchNames || undefined
+        })
+      });
+      const json = await res.json();
+      if (json.success && json.announcement) {
+        setAnnouncements(prev => prev.map(item => item.id === editingAnnouncement.id ? json.announcement : item));
+        setEditingAnnouncement(null);
+        showToast('Banner advertisement updated successfully!');
+      } else {
+        showToast(json.error || 'Failed to update banner ad', 'error');
+      }
+    } catch {
+      showToast('Network error while updating banner ad', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Delete
+  const handleConfirmDelete = async () => {
     if (!deletingAnnouncement) return;
     setIsSubmitting(true);
     try {
@@ -221,209 +363,355 @@ export default function AdvertisementsClient({ initialAnnouncements }: Props) {
       });
       const json = await res.json();
       if (json.success) {
-        setAnnouncements(prev => prev.filter(a => a.id !== deletingAnnouncement.id));
-        showToast('Advertisement deleted.');
+        setAnnouncements(prev => prev.filter(item => item.id !== deletingAnnouncement.id));
         setDeletingAnnouncement(null);
+        showToast('Banner advertisement deleted successfully.');
       } else {
-        showToast(json.error || 'Failed to delete advertisement', 'error');
+        showToast(json.error || 'Failed to delete banner ad', 'error');
       }
     } catch {
-      showToast('Network error while deleting', 'error');
+      showToast('Network error while deleting banner ad', 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Status badge helper
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Published':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+            <span>Active in Carousel</span>
+          </span>
+        );
+      case 'Scheduled':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-blue-100 text-blue-800 border border-blue-300">
+            <Clock className="w-3 h-3 text-blue-600" />
+            <span>Scheduled</span>
+          </span>
+        );
+      case 'Draft':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-800 border border-amber-300">
+            <span>Draft</span>
+          </span>
+        );
+      case 'Expired':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-gray-100 text-gray-700 border border-gray-300">
+            <span>Expired</span>
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Type tag badge
+  const renderTypeTagBadge = (tag: string) => {
+    return (
+      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-black/40 backdrop-blur-xs text-[#F9E33A] border border-white/20">
+        {tag}
+      </span>
+    );
+  };
+
+  // Audience badge
+  const renderAudienceBadge = (aud: string) => {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-700">
+        <Users className="w-3 h-3 text-[#8A064D]" />
+        <span>{aud}</span>
+      </span>
+    );
+  };
+
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-16">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl shadow-xl flex items-center gap-3 text-sm font-semibold transition-all ${
-          toastMessage.type === 'success' ? 'bg-[#03543F] text-white' : 'bg-red-600 text-white'
-        }`}>
-          {toastMessage.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-emerald-300" /> : <X className="w-5 h-5" />}
-          <span>{toastMessage.text}</span>
+        <div className="fixed top-6 right-6 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className={`px-5 py-3 rounded-2xl shadow-xl font-bold text-sm text-white flex items-center gap-2 ${
+            toastMessage.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'
+          }`}>
+            <span>{toastMessage.text}</span>
+          </div>
         </div>
       )}
 
-      {/* Top Banner Header */}
-      <div className="bg-gradient-to-r from-[#590231] to-[#8A064D] p-6 sm:p-8 rounded-2xl text-white shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="bg-[#F9E33A] text-[#590231] text-xs font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">
-              APP HOME PROMOTIONS
-            </span>
-            <span className="text-white/70 text-xs font-semibold">• Live Mobile Carousels</span>
+      {/* Header Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#590231] via-[#8A064D] to-[#4A0128] text-white p-6 sm:p-8 shadow-xl">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-xs border border-white/15 text-[#F9E33A] text-xs font-black tracking-wide uppercase">
+              <ImageIcon className="w-3.5 h-3.5" />
+              <span>App Home Banner Management</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+              Advertisements & Promo Banners
+            </h1>
+            <p className="text-xs sm:text-sm text-white/80 leading-relaxed font-medium">
+              Manage vertical promotional flyers, masterclass posters, and cultural event banners showcased in the student mobile app moving carousel.
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-3">
-            <Sparkles className="w-7 h-7 text-[#F9E33A]" />
-            App Banner Advertisements
-          </h1>
-          <p className="text-white/80 text-sm mt-1 max-w-2xl">
-            Create high-impact promotional banners displayed on the home page below the welcome header in Student and Guru mobile apps.
-          </p>
-        </div>
 
-        <button
-          onClick={openCreateModal}
-          className="bg-[#F9E33A] hover:bg-[#ebd52f] text-[#590231] font-bold px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all text-sm shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Advertisement</span>
-        </button>
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={openCreateModal}
+              className="px-5 py-3 rounded-2xl bg-[#F9E33A] hover:bg-[#FDEE68] text-[#590231] text-xs sm:text-sm font-black shadow-lg transition flex items-center gap-2 cursor-pointer active:scale-95"
+            >
+              <Plus className="w-4 h-4 text-[#590231]" />
+              <span>Create New Banner Ad</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Metric Cards */}
+      {/* Statistics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-[#F0D5E4] shadow-xs">
-          <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Campaigns</div>
-          <div className="text-2xl font-black text-[#590231] mt-1">{bannerAds.length}</div>
+        <div className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Ads</p>
+            <p className="text-2xl font-black text-[#590231] mt-1">{stats.total}</p>
+          </div>
+          <div className="w-11 h-11 rounded-2xl bg-[#FFF2F8] text-[#8A064D] flex items-center justify-center font-bold">
+            <ImageIcon className="w-5 h-5" />
+          </div>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-xs">
-          <div className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Active & Visible</div>
-          <div className="text-2xl font-black text-emerald-700 mt-1">{activeCount}</div>
+
+        <div className="bg-white rounded-3xl p-5 border border-emerald-100 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Active in App</p>
+            <p className="text-2xl font-black text-emerald-800 mt-1">{stats.active}</p>
+          </div>
+          <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-blue-100 shadow-xs">
-          <div className="text-xs font-bold text-blue-600 uppercase tracking-wider">Scheduled</div>
-          <div className="text-2xl font-black text-blue-700 mt-1">{scheduledCount}</div>
+
+        <div className="bg-white rounded-3xl p-5 border border-blue-100 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">Scheduled</p>
+            <p className="text-2xl font-black text-blue-800 mt-1">{stats.scheduled}</p>
+          </div>
+          <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+            <Clock className="w-5 h-5" />
+          </div>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs">
-          <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Expired / Closed</div>
-          <div className="text-2xl font-black text-gray-500 mt-1">{expiredCount}</div>
+
+        <div className="bg-white rounded-3xl p-5 border border-amber-100 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">Drafts</p>
+            <p className="text-2xl font-black text-amber-800 mt-1">{stats.draft}</p>
+          </div>
+          <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+            <Edit3 className="w-5 h-5" />
+          </div>
         </div>
       </div>
 
-      {/* Search and Filters Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search advertisements by title or description..."
-            className="w-full pl-10 pr-4 py-2 text-sm bg-gray-50 rounded-xl border border-gray-200 focus:outline-hidden focus:border-[#8A064D] focus:bg-white transition-all"
-          />
-        </div>
+      {/* Filter and Search Bar */}
+      <div className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-xs space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search banner ads..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-[#F0D5E4] focus:outline-none focus:ring-2 focus:ring-[#8A064D] text-xs font-medium text-gray-800"
+            />
+          </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3.5 py-2 text-sm bg-gray-50 rounded-xl border border-gray-200 focus:outline-hidden focus:border-[#8A064D] text-gray-700 font-medium"
-          >
-            <option value="all">All Statuses</option>
-            <option value="published">Active (Published)</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="expired">Expired</option>
-          </select>
+          {/* Status Filter */}
+          <div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-2xl border border-[#F0D5E4] focus:outline-none focus:ring-2 focus:ring-[#8A064D] text-xs font-bold text-gray-700 bg-white"
+            >
+              <option value="all">All Statuses</option>
+              <option value="Published">Active (Published)</option>
+              <option value="Scheduled">Scheduled</option>
+              <option value="Draft">Drafts</option>
+              <option value="Expired">Expired</option>
+            </select>
+          </div>
+
+          {/* Audience Filter */}
+          <div>
+            <select
+              value={audienceFilter}
+              onChange={(e) => setAudienceFilter(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-2xl border border-[#F0D5E4] focus:outline-none focus:ring-2 focus:ring-[#8A064D] text-xs font-bold text-gray-700 bg-white"
+            >
+              <option value="all">All Audiences</option>
+              <option value="All students">All Students</option>
+              <option value="Students and Gurus">Students and Gurus</option>
+              <option value="Selected course or batch">Selected Course / Batch</option>
+              <option value="Trainers">Faculty Gurus</option>
+            </select>
+          </div>
+
+          {/* Reset Filters */}
+          <div className="flex items-center">
+            {(searchQuery || statusFilter !== 'all' || audienceFilter !== 'all' || typeTagFilter !== 'all') ? (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setStatusFilter('all');
+                  setAudienceFilter('all');
+                  setTypeTagFilter('all');
+                }}
+                className="w-full py-2.5 rounded-2xl border border-gray-300 hover:bg-gray-100 text-gray-700 text-xs font-bold transition flex items-center justify-center gap-1.5"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Clear Filters</span>
+              </button>
+            ) : (
+              <div className="w-full text-center text-xs text-gray-400 font-medium py-2.5">
+                Showing {filteredBanners.length} of {bannerList.length} flyers
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Advertisements Grid */}
+      {/* 3:4 Posters Grid */}
       {filteredBanners.length === 0 ? (
-        <div className="bg-white p-12 rounded-2xl border border-[#F0D5E4] text-center">
-          <div className="w-16 h-16 bg-[#FFF2F8] text-[#590231] rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <div className="bg-white rounded-3xl p-12 text-center border border-[#F0D5E4] shadow-xs space-y-4">
+          <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center bg-[#FFF2F8] text-[#8A064D]">
             <ImageIcon className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-bold text-gray-900">No Advertisements Found</h3>
-          <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
-            {searchQuery ? 'Try adjusting your search filters.' : 'Upload your first promotional banner for the student and guru app carousels.'}
-          </p>
+          <div>
+            <h3 className="text-lg font-black text-gray-800">No Banner Advertisements Found</h3>
+            <p className="text-xs text-gray-500 max-w-md mx-auto mt-1">
+              Create vertical poster banner advertisements (3:4 ratio) to showcase in the student mobile app moving carousel.
+            </p>
+          </div>
           <button
             onClick={openCreateModal}
-            className="mt-5 inline-flex items-center gap-2 bg-[#590231] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-[#70043e] transition-all"
+            className="px-6 py-3 rounded-2xl bg-[#8A064D] hover:bg-[#590231] text-white text-sm font-bold shadow-md transition flex items-center gap-2 mx-auto cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>Create First Advertisement</span>
+            <Plus className="w-4 h-4 text-white" />
+            <span>Create First Banner Ad</span>
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredBanners.map(ann => {
-            const isLive = ann.status === 'Published';
-            const isSched = ann.status === 'Scheduled';
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredBanners.map((ann) => {
+            const pubDateStr = ann.publish_date 
+              ? new Date(ann.publish_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+              : '—';
+
             return (
-              <div key={ann.id} className="bg-white rounded-2xl border border-[#F0D5E4] shadow-xs overflow-hidden flex flex-col hover:shadow-md transition-all">
-                {/* Image Poster Header */}
-                <div className="relative aspect-16/9 bg-gray-100 overflow-hidden group">
+              <div 
+                key={ann.id}
+                className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs hover:shadow-lg transition-all overflow-hidden flex flex-col group"
+              >
+                {/* Poster Image (Vertical 3:4 Aspect Ratio) */}
+                <div className="relative aspect-[3/4] bg-[#1E0111] overflow-hidden">
                   {ann.image_url ? (
                     <img 
                       src={ann.image_url} 
-                      alt={ann.title} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      alt={ann.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
-                      <ImageIcon className="w-12 h-12 stroke-1" />
+                    <div className="w-full h-full flex flex-col items-center justify-center text-white/40 p-4 text-center">
+                      <ImageIcon className="w-12 h-12 mb-2" />
+                      <span className="text-xs">No flyer image uploaded</span>
                     </div>
                   )}
 
-                  {/* Status Badge */}
-                  <div className="absolute top-3 left-3">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold tracking-wide shadow-xs ${
-                      isLive 
-                        ? 'bg-emerald-600 text-white' 
-                        : isSched 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-gray-700 text-white'
-                    }`}>
-                      {ann.status.toUpperCase()}
-                    </span>
-                  </div>
-
-                  {/* Quick Action Preview Overlay */}
-                  <button
-                    onClick={() => setPreviewAnnouncement(ann)}
-                    className="absolute bottom-3 right-3 bg-black/60 hover:bg-black/80 text-white p-2 rounded-xl backdrop-blur-xs transition-all"
-                    title="Preview on mobile device mockup"
-                  >
-                    <Smartphone className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Content */}
-                <div className="p-5 flex-1 flex flex-col justify-between">
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-base leading-snug">{ann.title}</h3>
-                    {ann.message && (
-                      <p className="text-xs text-gray-600 mt-1.5 line-clamp-2 leading-relaxed">{ann.message}</p>
-                    )}
-                  </div>
-
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                        <span>Active from: {ann.publish_date?.split('T')[0] || 'Today'}</span>
-                      </div>
-                      {ann.expiry_date && (
-                        <span>Exp: {ann.expiry_date.split('T')[0]}</span>
-                      )}
+                  {/* Gradient Overlay for Top & Bottom Details */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/40 flex flex-col justify-between p-4 text-white">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-1 rounded-xl bg-black/60 backdrop-blur-xs text-[#F9E33A] text-[10px] font-black border border-white/20">
+                        App Carousel Banner
+                      </span>
+                      {renderStatusBadge(ann.status)}
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center justify-between gap-2">
-                      <button
-                        onClick={() => setPreviewAnnouncement(ann)}
-                        className="flex-1 py-2 px-3 text-xs font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all flex items-center justify-center gap-1.5"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Preview</span>
-                      </button>
+                    <div>
+                      {renderTypeTagBadge(ann.type_tag)}
+                      <h3 className="text-base font-black text-white leading-tight drop-shadow-md mt-2">
+                        {ann.title}
+                      </h3>
+                      {ann.message && (
+                        <p className="text-xs text-white/80 line-clamp-2 mt-1 drop-shadow-sm font-medium">
+                          {ann.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Footer Info & Actions */}
+                <div className="p-4 space-y-3 bg-[#FFF9FB]/60 border-t border-[#F0D5E4] flex-1 flex flex-col justify-between">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500 font-semibold">Target:</span>
+                      {renderAudienceBadge(ann.audience)}
+                    </div>
+                    {ann.target_course_title && (
+                      <div className="text-[11px] text-[#8A064D] font-bold truncate">
+                        Course: {ann.target_course_title}
+                      </div>
+                    )}
+                    {ann.action_links && ann.action_links.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {ann.action_links.map((link, idx) => (
+                          <a
+                            key={idx}
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] hover:bg-[#FCE7F3] transition"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5" />
+                            <span className="truncate max-w-[120px]">{link.title}</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
+                      <span>Published: {pubDateStr}</span>
+                      <span className="font-semibold text-gray-400">by {ann.created_by || 'Director'}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-[#F0D5E4] flex items-center justify-between">
+                    <button
+                      onClick={() => setPreviewAnnouncement(ann)}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-[#8A064D] hover:underline cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Preview App Banner</span>
+                    </button>
+
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => openEditModal(ann)}
-                        className="p-2 text-gray-600 hover:text-[#590231] hover:bg-[#FFF2F8] rounded-xl transition-all"
-                        title="Edit advertisement"
+                        className="p-1.5 rounded-xl bg-[#FFF2F8] text-[#8A064D] hover:bg-[#FCE7F3] cursor-pointer"
+                        title="Edit Banner"
                       >
-                        <Edit3 className="w-4 h-4" />
+                        <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => setDeletingAnnouncement(ann)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                        title="Delete advertisement"
+                        className="p-1.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-pointer"
+                        title="Delete Banner"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -434,223 +722,400 @@ export default function AdvertisementsClient({ initialAnnouncements }: Props) {
         </div>
       )}
 
-      {/* Create / Edit Modal */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      {/* CREATE & EDIT BANNER MODAL */}
+      {(isCreateModalOpen || editingAnnouncement) && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full border border-[#F0D5E4] shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
             {/* Modal Header */}
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-[#590231] to-[#70043e] text-white">
-              <div className="flex items-center gap-2.5">
-                <Sparkles className="w-5 h-5 text-[#F9E33A]" />
-                <h2 className="text-lg font-bold">
-                  {editingAnnouncement ? 'Edit Banner Advertisement' : 'Create New App Banner Advertisement'}
-                </h2>
+            <div className="bg-[#8A064D] text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center">
+                  <ImageIcon className="w-5 h-5 text-[#F9E33A]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black">
+                    {editingAnnouncement ? 'Edit Banner Advertisement' : 'Create Banner Advertisement'}
+                  </h3>
+                  <p className="text-xs text-white/80">
+                    Displayed in the Student Mobile App Home Moving Carousel
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="text-white/70 hover:text-white p-1 rounded-lg"
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setEditingAnnouncement(null);
+                }}
+                className="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
-              {/* Image Upload Area */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                  Banner Poster Image (High Resolution) *
-                </label>
-                {formData.image_url ? (
-                  <div className="relative rounded-2xl overflow-hidden border border-[#F0D5E4] bg-gray-50 aspect-16/9">
-                    <img 
-                      src={formData.image_url} 
-                      alt="Banner Preview" 
-                      className="w-full h-full object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, image_url: '' }))}
-                      className="absolute top-3 right-3 bg-red-600 text-white p-2 rounded-xl shadow-md hover:bg-red-700 transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="border-2 border-dashed border-[#F0D5E4] hover:border-[#8A064D] rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer bg-[#FFF9FB] hover:bg-[#FFF2F8] transition-all group">
-                    <Upload className="w-8 h-8 text-[#8A064D] group-hover:scale-110 transition-transform mb-2" />
-                    <span className="text-sm font-bold text-[#590231]">Click to upload banner image</span>
-                    <span className="text-xs text-gray-500 mt-1">Recommended 800x450 or 800x1050 JPEG / PNG</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                  </label>
-                )}
-                {formErrors.image_url && (
-                  <p className="text-xs font-bold text-red-600 mt-1.5">{formErrors.image_url}</p>
-                )}
-              </div>
+            {/* Modal Tabs */}
+            <div className="flex border-b border-[#F0D5E4] bg-[#FFF9FB]">
+              <button
+                type="button"
+                onClick={() => setActiveFormTab('edit')}
+                className={`flex-1 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition ${
+                  activeFormTab === 'edit'
+                    ? 'border-[#8A064D] text-[#8A064D] bg-white'
+                    : 'border-transparent text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                1. Banner Details & Flyer
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveFormTab('preview')}
+                className={`flex-1 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition flex items-center justify-center gap-1.5 ${
+                  activeFormTab === 'preview'
+                    ? 'border-[#8A064D] text-[#8A064D] bg-white'
+                    : 'border-transparent text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>2. App Carousel Preview</span>
+              </button>
+            </div>
 
-              {/* Title */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Campaign Title *
-                </label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="e.g. Navaratri Classical Music Festival 2026"
-                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-xl border border-gray-200 focus:outline-hidden focus:border-[#8A064D] focus:bg-white font-medium"
-                />
-                {formErrors.title && (
-                  <p className="text-xs font-bold text-red-600 mt-1">{formErrors.title}</p>
-                )}
-              </div>
-
-              {/* Description / Caption */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Description / Caption (Optional)
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.message}
-                  onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
-                  placeholder="Brief details about the performance, workshop, or registration dates..."
-                  className="w-full px-4 py-2.5 text-sm bg-gray-50 rounded-xl border border-gray-200 focus:outline-hidden focus:border-[#8A064D] focus:bg-white font-medium"
-                />
-              </div>
-
-              {/* Action Links */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Interactive Button / Link (Optional)
-                  </label>
-                  {formData.action_links.length === 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({
-                        ...prev,
-                        action_links: [{ title: 'Explore Details', url: 'https://' }]
-                      }))}
-                      className="text-xs font-bold text-[#8A064D] hover:underline flex items-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Button</span>
-                    </button>
-                  )}
-                </div>
-
-                {formData.action_links.map((link, idx) => (
-                  <div key={idx} className="flex gap-2 items-center bg-gray-50 p-2.5 rounded-xl border border-gray-200">
+            {/* Modal Body */}
+            <form onSubmit={editingAnnouncement ? handleSubmitEdit : handleSubmitCreate} className="p-6 space-y-5">
+              {activeFormTab === 'edit' ? (
+                <>
+                  {/* Title / Headline */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black text-gray-700 uppercase tracking-wider">
+                        Banner Headline / Title *
+                      </label>
+                      <AiEnhanceButton
+                        context="announcement_title"
+                        value={formData.title}
+                        onEnhance={(text: string) => setFormData(prev => ({ ...prev, title: text }))}
+                      />
+                    </div>
                     <input
                       type="text"
-                      value={link.title}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setFormData(prev => {
-                          const updated = [...prev.action_links];
-                          updated[idx].title = val;
-                          return { ...prev, action_links: updated };
-                        });
-                      }}
-                      placeholder="Button text (e.g. Register Now)"
-                      className="flex-1 px-3 py-1.5 text-xs bg-white rounded-lg border border-gray-200"
+                      value={formData.title}
+                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="e.g. Annual Classical Dance Festival 2026"
+                      className="w-full px-4 py-3 rounded-2xl border border-[#F0D5E4] focus:outline-none focus:ring-2 focus:ring-[#8A064D] text-xs font-bold text-gray-800"
                     />
-                    <input
-                      type="url"
-                      value={link.url}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setFormData(prev => {
-                          const updated = [...prev.action_links];
-                          updated[idx].url = val;
-                          return { ...prev, action_links: updated };
-                        });
-                      }}
-                      placeholder="Destination URL (https://...)"
-                      className="flex-1 px-3 py-1.5 text-xs bg-white rounded-lg border border-gray-200"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, action_links: [] }))}
-                      className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {formErrors.title && <p className="text-xs font-bold text-rose-600">{formErrors.title}</p>}
                   </div>
-                ))}
-              </div>
 
-              {/* Schedule Dates */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Start Display Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.publish_date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, publish_date: e.target.value }))}
-                    className="w-full px-3.5 py-2 text-sm bg-gray-50 rounded-xl border border-gray-200"
-                  />
+                  {/* 3:4 Aspect Flyer Upload */}
+                  <div className="space-y-2 p-4 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4]">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black text-[#8A064D] uppercase tracking-wider flex items-center gap-1.5">
+                        <ImageIcon className="w-4 h-4 text-[#8A064D]" />
+                        <span>Poster Banner Image (3:4 Ratio) *</span>
+                      </label>
+                      {formData.image_url && (
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, image_url: '' }))}
+                          className="text-[11px] font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Remove Image
+                        </button>
+                      )}
+                    </div>
+                    
+                    <p className="text-[11px] text-gray-500">
+                      Images are automatically adjusted to the 3:4 vertical flyer format to perfectly fit the mobile home carousel.
+                    </p>
+
+                    <div className="pt-1">
+                      <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border-2 border-dashed border-[#8A064D]/50 bg-white hover:bg-[#FFF2F8] text-[#8A064D] text-xs font-black cursor-pointer transition">
+                        <Upload className="w-4 h-4" />
+                        <span>Upload Flyer & Auto-Fit</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleFileSelect}
+                        />
+                      </label>
+                    </div>
+
+                    {formErrors.image_url && (
+                      <p className="text-xs font-bold text-rose-600 mt-1">{formErrors.image_url}</p>
+                    )}
+
+                    {formData.image_url && (
+                      <div className="pt-2">
+                        <div className="text-[10px] font-bold text-[#8A064D] uppercase mb-1">
+                          Poster Aspect Ratio Preview (3:4 Format)
+                        </div>
+                        <div className="relative w-40 mx-auto aspect-[3/4] rounded-2xl overflow-hidden border-2 border-[#8A064D]/40 shadow-md bg-[#1E0111]">
+                          <img
+                            src={formData.image_url}
+                            alt="Banner Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Caption / Description */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black text-gray-700 uppercase tracking-wider">
+                        Banner Subtitle / Description (Optional)
+                      </label>
+                      <AiEnhanceButton
+                        context="announcement_message"
+                        value={formData.message}
+                        onEnhance={(text: string) => setFormData(prev => ({ ...prev, message: text }))}
+                      />
+                    </div>
+                    <textarea
+                      rows={2}
+                      value={formData.message}
+                      onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
+                      placeholder="Brief note or venue details shown under the banner headline..."
+                      className="w-full px-4 py-2.5 rounded-2xl border border-[#F0D5E4] focus:outline-none focus:ring-2 focus:ring-[#8A064D] text-xs font-medium text-gray-800"
+                    />
+                  </div>
+
+                  {/* Audience & Tag */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-black text-gray-700 uppercase tracking-wider">
+                        Target Audience *
+                      </label>
+                      <select
+                        value={formData.audience}
+                        onChange={(e) => setFormData(prev => ({ ...prev, audience: e.target.value as any }))}
+                        className="w-full px-3.5 py-2.5 rounded-2xl border border-[#F0D5E4] focus:outline-none focus:ring-2 focus:ring-[#8A064D] text-xs font-bold text-gray-700 bg-white"
+                      >
+                        <option value="All students">All Students</option>
+                        <option value="Students and Gurus">Students and Gurus</option>
+                        <option value="Selected course or batch">Selected Course / Batch</option>
+                        <option value="Trainers">Faculty Gurus</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-black text-gray-700 uppercase tracking-wider">
+                        Category Tag *
+                      </label>
+                      <select
+                        value={formData.type_tag}
+                        onChange={(e) => setFormData(prev => ({ ...prev, type_tag: e.target.value as any }))}
+                        className="w-full px-3.5 py-2.5 rounded-2xl border border-[#F0D5E4] focus:outline-none focus:ring-2 focus:ring-[#8A064D] text-xs font-bold text-gray-700 bg-white"
+                      >
+                        <option value="General">General Promo</option>
+                        <option value="Holiday">Special Workshop</option>
+                        <option value="Schedule change">Grand Recital / Arangetram</option>
+                        <option value="Cancellation">Competition</option>
+                        <option value="Fee reminder">Festival Greeting</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Course & Batch Selection (if Selected course or batch) */}
+                  {formData.audience === 'Selected course or batch' && (
+                    <div className="space-y-3 p-4 rounded-2xl bg-gray-50 border border-gray-200">
+                      <div>
+                        <label className="text-xs font-bold text-gray-700">Target Courses:</label>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {courses.map(c => {
+                            const isSelected = selectedCourseIds.includes(c.id);
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelectedCourseIds(prev => prev.filter(id => id !== c.id));
+                                  } else {
+                                    setSelectedCourseIds(prev => [...prev, c.id]);
+                                  }
+                                }}
+                                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition ${
+                                  isSelected 
+                                    ? 'bg-[#8A064D] text-white shadow-xs' 
+                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                                }`}
+                              >
+                                {c.title}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {formErrors.target_course_id && (
+                          <p className="text-xs font-bold text-rose-600 mt-1">{formErrors.target_course_id}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dispatch Status */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-black text-gray-700 uppercase tracking-wider">
+                      Publish Status *
+                    </label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
+                      className="w-full px-3.5 py-2.5 rounded-2xl border border-[#F0D5E4] focus:outline-none focus:ring-2 focus:ring-[#8A064D] text-xs font-bold text-gray-700 bg-white"
+                    >
+                      <option value="Published">Publish Now (Immediately Active)</option>
+                      <option value="Scheduled">Schedule for Future Date</option>
+                      <option value="Draft">Save as Draft</option>
+                    </select>
+                  </div>
+
+                  {/* Scheduled Date Input */}
+                  {formData.status === 'Scheduled' && (
+                    <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 space-y-2">
+                      <label className="text-xs font-bold text-blue-900">Scheduled Date *</label>
+                      <input
+                        type="date"
+                        value={formData.publish_date}
+                        onChange={(e) => setFormData(prev => ({ ...prev, publish_date: e.target.value }))}
+                        className="w-full px-3.5 py-2 rounded-xl border border-blue-300 text-xs font-bold text-blue-900 bg-white"
+                      />
+                      {formErrors.publish_date && <p className="text-xs font-bold text-rose-600">{formErrors.publish_date}</p>}
+                    </div>
+                  )}
+
+                  {/* Action Links */}
+                  <div className="space-y-2 p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black text-[#8A064D] uppercase tracking-wider flex items-center gap-1">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Action Links / External URLs (Optional)</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({
+                            ...prev,
+                            action_links: [...prev.action_links, { title: '', url: '' }]
+                          }));
+                        }}
+                        className="px-2.5 py-1 rounded-xl bg-[#8A064D] text-white text-[10px] font-black hover:bg-[#590231] cursor-pointer"
+                      >
+                        + Add Link
+                      </button>
+                    </div>
+
+                    {formData.action_links.length === 0 ? (
+                      <p className="text-[11px] text-gray-500 italic">
+                        No links attached. Click "+ Add Link" to include buttons like "Register Here" or "Event Location".
+                      </p>
+                    ) : (
+                      <div className="space-y-2 pt-1">
+                        {formData.action_links.map((link, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={link.title}
+                              placeholder="Button Label (e.g. Register)"
+                              onChange={(e) => {
+                                const newLinks = [...formData.action_links];
+                                newLinks[idx].title = e.target.value;
+                                setFormData(prev => ({ ...prev, action_links: newLinks }));
+                              }}
+                              className="flex-1 px-3 py-1.5 rounded-xl border border-[#F0D5E4] text-xs font-semibold"
+                            />
+                            <input
+                              type="url"
+                              value={link.url}
+                              placeholder="https://..."
+                              onChange={(e) => {
+                                const newLinks = [...formData.action_links];
+                                newLinks[idx].url = e.target.value;
+                                setFormData(prev => ({ ...prev, action_links: newLinks }));
+                              }}
+                              className="flex-1 px-3 py-1.5 rounded-xl border border-[#F0D5E4] text-xs font-semibold"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  action_links: prev.action_links.filter((_, i) => i !== idx)
+                                }));
+                              }}
+                              className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                /* Live Preview Tab */
+                <div className="space-y-4 py-2">
+                  <div className="text-center">
+                    <p className="text-xs font-bold text-gray-500">Live Preview in Student App Moving Carousel</p>
+                  </div>
+                  <div className="max-w-xs mx-auto aspect-[3/4] rounded-3xl overflow-hidden border-4 border-[#8A064D]/30 shadow-2xl bg-[#1E0111] relative">
+                    {formData.image_url ? (
+                      <img
+                        src={formData.image_url}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-white/50 p-4 text-center">
+                        <ImageIcon className="w-12 h-12 mb-2" />
+                        <span className="text-xs">Upload flyer to preview</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/40 flex flex-col justify-between p-4 text-white">
+                      <div className="flex justify-between items-center">
+                        <span className="px-2 py-0.5 rounded-lg bg-black/60 text-[#F9E33A] text-[9px] font-black border border-white/20">
+                          App Carousel
+                        </span>
+                        {renderTypeTagBadge(formData.type_tag)}
+                      </div>
+                      <div>
+                        <h4 className="text-base font-black text-white leading-tight">
+                          {formData.title || 'Banner Headline'}
+                        </h4>
+                        {formData.message && (
+                          <p className="text-xs text-white/80 line-clamp-2 mt-1">
+                            {formData.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Auto-Expiry Date (Optional)
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.expiry_date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, expiry_date: e.target.value }))}
-                    className="w-full px-3.5 py-2 text-sm bg-gray-50 rounded-xl border border-gray-200"
-                  />
-                </div>
-              </div>
+              )}
 
-              {/* Status */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Initial Status
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
-                  className="w-full px-3.5 py-2 text-sm bg-gray-50 rounded-xl border border-gray-200 font-medium"
-                >
-                  <option value="Published">Published (Live Immediately)</option>
-                  <option value="Scheduled">Scheduled (Wait for Start Date)</option>
-                  <option value="Draft">Draft (Saved but Not Visible)</option>
-                </select>
-              </div>
-
-              {/* Actions Footer */}
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
+              {/* Submit Buttons */}
+              <div className="pt-4 border-t border-[#F0D5E4] flex items-center justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+                  onClick={() => {
+                    setIsCreateModalOpen(false);
+                    setEditingAnnouncement(null);
+                  }}
+                  className="px-5 py-2.5 rounded-2xl border border-gray-300 text-gray-700 text-xs font-bold hover:bg-gray-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-6 py-2.5 text-sm font-bold text-white bg-[#590231] hover:bg-[#70043e] rounded-xl shadow-lg transition-all flex items-center gap-2"
+                  className="px-6 py-2.5 rounded-2xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-black shadow-md transition disabled:opacity-50 cursor-pointer"
                 >
-                  {isSubmitting ? (
-                    <span>Saving...</span>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4 text-[#F9E33A]" />
-                      <span>{editingAnnouncement ? 'Save Changes' : 'Publish Advertisement'}</span>
-                    </>
-                  )}
+                  {isSubmitting 
+                    ? 'Saving...' 
+                    : editingAnnouncement 
+                      ? 'Update Banner Ad' 
+                      : 'Publish Banner Ad'}
                 </button>
               </div>
             </form>
@@ -658,74 +1123,103 @@ export default function AdvertisementsClient({ initialAnnouncements }: Props) {
         </div>
       )}
 
-      {/* Mobile Mockup Preview Modal */}
+      {/* STANDALONE PHONE PREVIEW MODAL */}
       {previewAnnouncement && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl relative">
-            <button
-              onClick={() => setPreviewAnnouncement(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="text-center mb-4">
-              <span className="text-xs font-bold text-[#8A064D] uppercase tracking-wider">Mobile Preview</span>
-              <h4 className="text-base font-black text-gray-900 mt-0.5">App Home Banner</h4>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full border border-[#F0D5E4] shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-[#F0D5E4] pb-3">
+              <div className="flex items-center gap-2">
+                {renderTypeTagBadge(previewAnnouncement.type_tag)}
+                {renderStatusBadge(previewAnnouncement.status)}
+              </div>
+              <button
+                onClick={() => setPreviewAnnouncement(null)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* Smartphone frame */}
-            <div className="border-4 border-gray-900 rounded-2xl overflow-hidden shadow-xl bg-gray-50 p-3 space-y-3">
-              <div className="text-[10px] font-bold text-gray-400 text-center tracking-widest">• HOME DASHBOARD •</div>
-              <div className="rounded-xl overflow-hidden shadow-md bg-white border border-gray-200">
-                {previewAnnouncement.image_url ? (
-                  <img 
-                    src={previewAnnouncement.image_url} 
-                    alt={previewAnnouncement.title}
-                    className="w-full aspect-16/9 object-cover" 
-                  />
-                ) : (
-                  <div className="w-full aspect-16/9 bg-gray-200 flex items-center justify-center text-gray-400">
-                    <ImageIcon className="w-8 h-8" />
-                  </div>
-                )}
-                <div className="p-3">
-                  <div className="text-xs font-bold text-gray-900">{previewAnnouncement.title}</div>
-                  {previewAnnouncement.message && (
-                    <div className="text-[11px] text-gray-600 mt-1 line-clamp-2">{previewAnnouncement.message}</div>
-                  )}
-                  {previewAnnouncement.action_links && previewAnnouncement.action_links.length > 0 && (
-                    <div className="mt-2.5 inline-block text-[10px] font-bold bg-[#590231] text-[#F9E33A] px-3 py-1 rounded-lg">
-                      {previewAnnouncement.action_links[0].title || 'Explore Now'}
-                    </div>
-                  )}
-                </div>
+            <div className="space-y-3">
+              <div className="text-xs font-bold text-gray-500 flex items-center gap-1">
+                <Smartphone className="w-3.5 h-3.5 text-[#8A064D]" />
+                <span>Student App Home Carousel Preview</span>
               </div>
+              {previewAnnouncement.image_url && (
+                <div className="w-full aspect-[3/4] rounded-2xl overflow-hidden border border-[#F0D5E4] shadow-md bg-[#1E0111]">
+                  <img
+                    src={previewAnnouncement.image_url}
+                    alt={previewAnnouncement.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+              <h3 className="text-base font-black text-[#590231] text-center">
+                {previewAnnouncement.title}
+              </h3>
+              {previewAnnouncement.message && (
+                <p className="text-xs font-semibold text-gray-700 text-center">
+                  {previewAnnouncement.message}
+                </p>
+              )}
+              {previewAnnouncement.action_links && previewAnnouncement.action_links.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-2 pt-1">
+                  {previewAnnouncement.action_links.map((link, idx) => (
+                    <a
+                      key={idx}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-bold transition shadow-xs"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-[#F9E33A]" />
+                      <span>{link.title}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-[#F0D5E4] flex justify-end">
+              <button
+                onClick={() => setPreviewAnnouncement(null)}
+                className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold cursor-pointer"
+              >
+                Close Preview
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* DELETE CONFIRMATION MODAL */}
       {deletingAnnouncement && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-lg font-bold text-gray-900">Delete Advertisement</h3>
-            <p className="text-sm text-gray-600 mt-2">
-              Are you sure you want to delete <span className="font-bold text-gray-900">"{deletingAnnouncement.title}"</span>? This will immediately remove it from all student and guru app carousels.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-rose-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-lg font-black text-gray-900">Delete Banner Advertisement?</h3>
+              <p className="text-xs text-gray-600">
+                Are you sure you want to remove <span className="font-bold text-gray-900">"{deletingAnnouncement.title}"</span>? It will no longer appear in the student app carousel.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
               <button
+                type="button"
                 onClick={() => setDeletingAnnouncement(null)}
-                className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl"
+                className="px-5 py-2.5 rounded-2xl border border-gray-300 text-gray-700 text-xs font-bold hover:bg-gray-100 cursor-pointer"
               >
                 Cancel
               </button>
               <button
-                onClick={handleDelete}
+                type="button"
                 disabled={isSubmitting}
-                className="px-5 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-md"
+                onClick={handleConfirmDelete}
+                className="px-5 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-md cursor-pointer disabled:opacity-50"
               >
-                {isSubmitting ? 'Deleting...' : 'Delete'}
+                {isSubmitting ? 'Deleting...' : 'Confirm Delete'}
               </button>
             </div>
           </div>

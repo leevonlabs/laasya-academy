@@ -1368,6 +1368,91 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(_mockBannerAnnouncements);
   }
 
+  List<Map<String, dynamic>> _filterAnnouncementsForCurrentUser(List<Map<String, dynamic>> items) {
+    final profile = currentUserProfile;
+    if (profile == null) return items;
+
+    final role = (profile['role'] ?? '').toString().toLowerCase();
+    final isTrainer = role.contains('trainer') || role.contains('guru') || role == 'teacher';
+    final myId = (profile['id'] ?? profile['profile_id'] ?? '').toString().toLowerCase();
+    final myName = (profile['full_name'] ?? '').toString().toLowerCase();
+    final myRoll = (profile['roll_number'] ?? '').toString().toLowerCase();
+
+    final enrolledBatchIds = <String>{};
+    final enrolledCourseIds = <String>{};
+    final enrolled = profile['enrolled_courses'];
+    if (enrolled is List) {
+      for (var e in enrolled) {
+        if (e is Map) {
+          final bId = e['batch_id']?.toString().toLowerCase();
+          if (bId != null && bId.isNotEmpty) enrolledBatchIds.add(bId);
+          final cId = e['course_id']?.toString().toLowerCase();
+          if (cId != null && cId.isNotEmpty) enrolledCourseIds.add(cId);
+        }
+      }
+    }
+
+    return items.where((item) {
+      final senderRole = (item['sender_role'] ?? '').toString().toLowerCase();
+      final isGuruMsg = senderRole.contains('trainer') ||
+          senderRole.contains('guru') ||
+          item['trainer_id'] != null ||
+          (item['trainer_name'] != null && item['trainer_name'].toString().trim().isNotEmpty);
+
+      if (isTrainer) {
+        if (!isGuruMsg) {
+          final aud = (item['audience'] ?? '').toString().toLowerCase();
+          if (aud.contains('trainer') || aud.contains('all') || aud.contains('gurus') || aud == '') {
+            return true;
+          }
+          return false;
+        }
+        final tId = (item['trainer_id'] ?? '').toString().toLowerCase();
+        final tName = (item['trainer_name'] ?? item['created_by'] ?? '').toString().toLowerCase();
+        if (tId.isNotEmpty && tId == myId) return true;
+        if (tName.isNotEmpty && (tName.contains(myName) || myName.contains(tName))) return true;
+        return false;
+      } else {
+        if (!isGuruMsg) {
+          final aud = (item['audience'] ?? '').toString().toLowerCase();
+          if (aud.contains('trainer') && !aud.contains('student') && !aud.contains('all')) {
+            return false;
+          }
+          return true;
+        }
+
+        final targetBatchId = (item['target_batch_id'] ?? '').toString().toLowerCase();
+        final targetCourseId = (item['target_course_id'] ?? '').toString().toLowerCase();
+
+        if (targetBatchId.isNotEmpty && targetBatchId != 'all') {
+          if (enrolledBatchIds.contains(targetBatchId)) return true;
+        }
+        if (targetCourseId.isNotEmpty && targetCourseId != 'all') {
+          if (enrolledCourseIds.contains(targetCourseId)) return true;
+        }
+
+        final targetStudents = item['target_students'];
+        if (targetStudents is List && targetStudents.isNotEmpty) {
+          for (var s in targetStudents) {
+            final sStr = s.toString().toLowerCase();
+            if (sStr.contains(myId) || (myRoll.isNotEmpty && sStr.contains(myRoll)) || (myName.isNotEmpty && sStr.contains(myName))) {
+              return true;
+            }
+          }
+          return false;
+        }
+
+        if (targetBatchId == 'all' || targetBatchId.isEmpty) {
+          if (targetCourseId.isNotEmpty && enrolledCourseIds.contains(targetCourseId)) {
+            return true;
+          }
+        }
+
+        return false;
+      }
+    }).toList();
+  }
+
   Future<List<Map<String, dynamic>>> getMessageAnnouncements({bool forceRefresh = false}) async {
     if (!forceRefresh && _cachedMessageAnnouncements.isNotEmpty) {
       return List<Map<String, dynamic>>.from(_cachedMessageAnnouncements);
@@ -1401,9 +1486,10 @@ class SupabaseService {
             mapItem['is_read'] = false;
             valid.add(mapItem);
           }
-          if (valid.isNotEmpty) {
-            _cachedMessageAnnouncements = valid;
-            return _filterMessagesForCurrentUser(valid);
+          final filtered = _filterAnnouncementsForCurrentUser(valid);
+          if (filtered.isNotEmpty) {
+            _cachedMessageAnnouncements = filtered;
+            return filtered;
           }
         }
       } catch (e) {
@@ -1436,9 +1522,10 @@ class SupabaseService {
               item['image_url'] = _normalizeImageUrl(item['image_url']);
               valid.add(item);
             }
-            if (valid.isNotEmpty) {
-              _cachedMessageAnnouncements = valid;
-              return _filterMessagesForCurrentUser(valid);
+            final filtered = _filterAnnouncementsForCurrentUser(valid);
+            if (filtered.isNotEmpty) {
+              _cachedMessageAnnouncements = filtered;
+              return filtered;
             }
           }
         }
@@ -1448,99 +1535,9 @@ class SupabaseService {
     }
 
     if (_cachedMessageAnnouncements.isNotEmpty) {
-      return _filterMessagesForCurrentUser(List<Map<String, dynamic>>.from(_cachedMessageAnnouncements));
+      return List<Map<String, dynamic>>.from(_cachedMessageAnnouncements);
     }
-    return _filterMessagesForCurrentUser(List<Map<String, dynamic>>.from(_mockMessageAnnouncements));
-  }
-
-  List<Map<String, dynamic>> _filterMessagesForCurrentUser(List<Map<String, dynamic>> messages) {
-    final profile = currentUserProfile;
-    if (profile == null) return messages;
-
-    final role = (profile['role'] ?? 'student').toString().toLowerCase();
-
-    if (role == 'trainer' || role == 'guru') {
-      final trainerId = (profile['id'] ?? profile['trainer_id'] ?? profile['profile_id'] ?? '').toString().toLowerCase();
-      final trainerName = (profile['full_name'] ?? '').toString().toLowerCase();
-
-      return messages.where((m) {
-        final senderRole = (m['sender_role'] ?? '').toString().toLowerCase();
-        final msgTrainerId = (m['trainer_id'] ?? '').toString().toLowerCase();
-        final createdBy = (m['created_by'] ?? m['trainer_name'] ?? '').toString().toLowerCase();
-        final audience = (m['audience'] ?? '').toString().toLowerCase();
-
-        // Admin messages for trainers or everyone
-        if (senderRole == 'admin' || senderRole == 'owner') {
-          return audience.contains('trainer') || audience.contains('all') || audience.contains('everyone');
-        }
-
-        // Guru messages: ONLY show messages sent by THIS trainer
-        if (msgTrainerId.isNotEmpty && trainerId.isNotEmpty && msgTrainerId == trainerId) return true;
-        if (trainerName.isNotEmpty && (createdBy.contains(trainerName) || trainerName.contains(createdBy))) return true;
-
-        // Do NOT show other trainers' messages
-        return false;
-      }).toList();
-    } else {
-      // Role is student
-      final studentId = (profile['id'] ?? profile['profile_id'] ?? '').toString().toLowerCase();
-      final rollNumber = (profile['roll_number'] ?? '').toString().toLowerCase();
-      final enrolled = profile['enrolled_courses'];
-      final List<String> myBatchIds = [];
-      final List<String> myCourseIds = [];
-      if (enrolled is List) {
-        for (var e in enrolled) {
-          if (e is Map) {
-            if (e['batch_id'] != null) myBatchIds.add(e['batch_id'].toString().toLowerCase());
-            if (e['course_id'] != null) myCourseIds.add(e['course_id'].toString().toLowerCase());
-          }
-        }
-      }
-
-      return messages.where((m) {
-        final senderRole = (m['sender_role'] ?? '').toString().toLowerCase();
-        final isFromGuru = senderRole.contains('trainer') || senderRole.contains('guru') || m['trainer_id'] != null;
-
-        // Check if explicitly targeted to this disciple
-        final targetStudents = m['target_students'];
-        if (targetStudents is List && targetStudents.isNotEmpty) {
-          final isExplicitlyIncluded = targetStudents.any((s) {
-            if (s is Map) {
-              final sId = (s['id'] ?? '').toString().toLowerCase();
-              final sRoll = (s['roll_number'] ?? '').toString().toLowerCase();
-              if (studentId.isNotEmpty && sId == studentId) return true;
-              if (rollNumber.isNotEmpty && sRoll == rollNumber) return true;
-            }
-            return false;
-          });
-          if (isExplicitlyIncluded) return true;
-        }
-
-        final targetBatchId = (m['target_batch_id'] ?? '').toString().toLowerCase();
-        final targetCourseId = (m['target_course_id'] ?? '').toString().toLowerCase();
-
-        if (targetBatchId.isNotEmpty && targetBatchId != 'all') {
-          return myBatchIds.contains(targetBatchId);
-        }
-
-        if (targetCourseId.isNotEmpty && targetCourseId != 'all') {
-          return myCourseIds.contains(targetCourseId);
-        }
-
-        if (isFromGuru) {
-          final audience = (m['audience'] ?? '').toString().toLowerCase();
-          if (audience == 'all' || audience.contains('all students')) {
-            return myBatchIds.contains(targetBatchId) || myCourseIds.contains(targetCourseId);
-          }
-          return false;
-        }
-
-        // Message from Admin
-        final audience = (m['audience'] ?? '').toString().toLowerCase();
-        if (audience.contains('trainer') && !audience.contains('student')) return false;
-        return true;
-      }).toList();
-    }
+    return List<Map<String, dynamic>>.from(_mockMessageAnnouncements);
   }
 
   final Set<String> _readNotifIds = {};
@@ -1589,8 +1586,7 @@ class SupabaseService {
     if (!_readStateLoaded) {
       _ensureReadStateLoaded();
     }
-    final rawList = _cachedMessageAnnouncements.isNotEmpty ? _cachedMessageAnnouncements : _mockMessageAnnouncements;
-    final list = _filterMessagesForCurrentUser(rawList);
+    final list = _cachedMessageAnnouncements.isNotEmpty ? _cachedMessageAnnouncements : _mockMessageAnnouncements;
     return list.where((m) {
       final id = m['id']?.toString();
       if (id != null && _readMessageIds.contains(id)) return false;
