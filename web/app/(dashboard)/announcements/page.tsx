@@ -2,7 +2,7 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { getAnnouncements } from '@/lib/announcements';
-import { getCourses, getBatches, getTrainers } from '@/lib/academy';
+import { getCourses, getBatches, getTrainers, getStudents } from '@/lib/academy';
 import AnnouncementsClient from '@/components/announcements/AnnouncementsClient';
 
 export const revalidate = 15;
@@ -13,20 +13,22 @@ export default async function AnnouncementsPage() {
     redirect('/login');
   }
 
-  const [announcements, courses, batches, trainers] = await Promise.all([
+  const [announcements, courses, batches, trainers, students] = await Promise.all([
     getAnnouncements({ announcementType: 'message' }),
     getCourses(),
     getBatches(),
-    getTrainers()
+    getTrainers(),
+    getStudents()
   ]);
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="w-full">
       <AnnouncementsClient 
         initialAnnouncements={announcements}
         courses={courses}
         batches={batches}
         trainers={trainers}
+        students={students}
       />
     </div>
   );

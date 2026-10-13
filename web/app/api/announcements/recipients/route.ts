@@ -12,6 +12,66 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
+interface RecipientStudent {
+  id: string;
+  roll_number: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  parent_name: string;
+  parent_contact: string;
+  course_title: string;
+  batch_name: string;
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function extractValidUuids(input: any): string[] {
+  if (!input) return [];
+  const result: string[] = [];
+
+  const addIfUuid = (str: any) => {
+    if (typeof str === 'string') {
+      const clean = str.trim();
+      if (UUID_REGEX.test(clean)) {
+        result.push(clean);
+      }
+    }
+  };
+
+  const processItem = (item: any) => {
+    if (!item) return;
+    if (typeof item === 'string') {
+      const trimmed = item.trim();
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          processItem(parsed);
+          return;
+        } catch {
+          // not json
+        }
+      }
+      if (trimmed.includes(',')) {
+        trimmed.split(',').forEach(s => addIfUuid(s));
+      } else {
+        addIfUuid(trimmed);
+      }
+    } else if (typeof item === 'object') {
+      if (Array.isArray(item)) {
+        item.forEach(sub => processItem(sub));
+      } else {
+        if (item.id) addIfUuid(item.id);
+        if (item.student_id) addIfUuid(item.student_id);
+        if (item.uuid) addIfUuid(item.uuid);
+      }
+    }
+  };
+
+  processItem(input);
+  return Array.from(new Set(result));
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -47,23 +107,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Announcement not found' }, { status: 404, headers: corsHeaders });
     }
 
-    let students: any[] = [];
-    const targetStudentIds: string[] = Array.isArray(ann.target_students) 
-      ? ann.target_students 
-      : typeof ann.target_students === 'string'
-        ? (ann.target_students as string).split(',').map(s => s.trim()).filter(Boolean)
-        : [];
+    let students: RecipientStudent[] = [];
 
-    if (targetStudentIds.length > 0) {
-      students = await query(`
+    const validStudentIds = extractValidUuids(ann.target_students);
+    const validBatchIds = extractValidUuids(ann.target_batch_id);
+    const validCourseIds = extractValidUuids(ann.target_course_id);
+    const validTrainerId = ann.trainer_id && UUID_REGEX.test(ann.trainer_id.trim()) ? ann.trainer_id.trim() : null;
+
+    if (validStudentIds.length > 0) {
+      students = await query<RecipientStudent>(`
         SELECT DISTINCT
           s.id,
           s.roll_number,
           p.full_name,
-          p.email,
-          p.phone,
-          s.parent_name,
-          s.parent_contact,
+          COALESCE(p.email, '') as email,
+          COALESCE(p.phone, '') as phone,
+          COALESCE(s.parent_name, '') as parent_name,
+          COALESCE(s.parent_contact, p.phone, '') as parent_contact,
           COALESCE(c.title, 'General') as course_title,
           COALESCE(b.name, 'All Batches') as batch_name
         FROM public.students s
@@ -73,20 +133,19 @@ export async function GET(request: NextRequest) {
         LEFT JOIN public.courses c ON c.id = b.course_id
         WHERE s.id = ANY($1::uuid[])
         ORDER BY p.full_name ASC;
-      `, [targetStudentIds]);
-    } else if (ann.target_batch_id) {
-      const batchIds = ann.target_batch_id.split(',').map(s => s.trim()).filter(Boolean);
-      students = await query(`
+      `, [validStudentIds]);
+    } else if (validBatchIds.length > 0) {
+      students = await query<RecipientStudent>(`
         SELECT DISTINCT
           s.id,
           s.roll_number,
           p.full_name,
-          p.email,
-          p.phone,
-          s.parent_name,
-          s.parent_contact,
-          c.title as course_title,
-          b.name as batch_name
+          COALESCE(p.email, '') as email,
+          COALESCE(p.phone, '') as phone,
+          COALESCE(s.parent_name, '') as parent_name,
+          COALESCE(s.parent_contact, p.phone, '') as parent_contact,
+          COALESCE(c.title, 'General') as course_title,
+          COALESCE(b.name, 'All Batches') as batch_name
         FROM public.students s
         JOIN public.profiles p ON p.id = s.profile_id
         JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
@@ -94,20 +153,19 @@ export async function GET(request: NextRequest) {
         JOIN public.courses c ON c.id = b.course_id
         WHERE be.batch_id = ANY($1::uuid[])
         ORDER BY p.full_name ASC;
-      `, [batchIds]);
-    } else if (ann.target_course_id) {
-      const courseIds = ann.target_course_id.split(',').map(s => s.trim()).filter(Boolean);
-      students = await query(`
+      `, [validBatchIds]);
+    } else if (validCourseIds.length > 0) {
+      students = await query<RecipientStudent>(`
         SELECT DISTINCT
           s.id,
           s.roll_number,
           p.full_name,
-          p.email,
-          p.phone,
-          s.parent_name,
-          s.parent_contact,
-          c.title as course_title,
-          b.name as batch_name
+          COALESCE(p.email, '') as email,
+          COALESCE(p.phone, '') as phone,
+          COALESCE(s.parent_name, '') as parent_name,
+          COALESCE(s.parent_contact, p.phone, '') as parent_contact,
+          COALESCE(c.title, 'General') as course_title,
+          COALESCE(b.name, 'All Batches') as batch_name
         FROM public.students s
         JOIN public.profiles p ON p.id = s.profile_id
         JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
@@ -115,19 +173,19 @@ export async function GET(request: NextRequest) {
         JOIN public.courses c ON c.id = b.course_id
         WHERE b.course_id = ANY($1::uuid[])
         ORDER BY p.full_name ASC;
-      `, [courseIds]);
-    } else if (ann.sender_role === 'trainer' && ann.trainer_id) {
-      students = await query(`
+      `, [validCourseIds]);
+    } else if (validTrainerId) {
+      students = await query<RecipientStudent>(`
         SELECT DISTINCT
           s.id,
           s.roll_number,
           p.full_name,
-          p.email,
-          p.phone,
-          s.parent_name,
-          s.parent_contact,
-          c.title as course_title,
-          b.name as batch_name
+          COALESCE(p.email, '') as email,
+          COALESCE(p.phone, '') as phone,
+          COALESCE(s.parent_name, '') as parent_name,
+          COALESCE(s.parent_contact, p.phone, '') as parent_contact,
+          COALESCE(c.title, 'General') as course_title,
+          COALESCE(b.name, 'All Batches') as batch_name
         FROM public.students s
         JOIN public.profiles p ON p.id = s.profile_id
         JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
@@ -135,17 +193,17 @@ export async function GET(request: NextRequest) {
         JOIN public.courses c ON c.id = b.course_id
         WHERE b.trainer_id = $1::uuid
         ORDER BY p.full_name ASC;
-      `, [ann.trainer_id]);
+      `, [validTrainerId]);
     } else {
-      students = await query(`
+      students = await query<RecipientStudent>(`
         SELECT DISTINCT
           s.id,
           s.roll_number,
           p.full_name,
-          p.email,
-          p.phone,
-          s.parent_name,
-          s.parent_contact,
+          COALESCE(p.email, '') as email,
+          COALESCE(p.phone, '') as phone,
+          COALESCE(s.parent_name, '') as parent_name,
+          COALESCE(s.parent_contact, p.phone, '') as parent_contact,
           COALESCE(c.title, 'General') as course_title,
           COALESCE(b.name, 'All Batches') as batch_name
         FROM public.students s

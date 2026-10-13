@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Megaphone, 
   Plus, 
@@ -19,17 +19,18 @@ import {
   MessageSquare,
   CheckCheck,
   ShieldCheck,
-  Smartphone,
+  GraduationCap,
   ExternalLink,
   Filter,
   Calendar,
-  UserCheck,
-  GraduationCap,
-  ChevronRight,
-  Phone,
+  Check,
+  ChevronDown,
   RefreshCw,
-  Mail,
-  AlertCircle
+  Link as LinkIcon,
+  Globe,
+  Info,
+  User,
+  BookOpen
 } from 'lucide-react';
 import { Announcement } from '@/lib/announcements';
 import AiEnhanceButton from '@/components/common/AiEnhanceButton';
@@ -37,6 +38,7 @@ import AiEnhanceButton from '@/components/common/AiEnhanceButton';
 interface Course {
   id: string;
   title: string;
+  category?: string;
 }
 
 interface Batch {
@@ -51,6 +53,15 @@ interface Trainer {
   display_title?: string;
   phone?: string;
   email?: string;
+}
+
+interface Student {
+  id: string;
+  roll_number?: string;
+  full_name: string;
+  phone?: string;
+  parent_name?: string;
+  parent_contact?: string;
 }
 
 interface RecipientStudent {
@@ -70,10 +81,183 @@ interface Props {
   courses: Course[];
   batches: Batch[];
   trainers?: Trainer[];
+  students?: Student[];
 }
 
-export default function AnnouncementsClient({ initialAnnouncements, courses, batches, trainers = [] }: Props) {
-  // Filter out any legacy pure banner ads if any
+// -------------------------------------------------------------
+// Searchable Multi-Select Dropdown Component
+// -------------------------------------------------------------
+function SearchableMultiSelect({
+  label,
+  placeholder,
+  items,
+  selectedIds,
+  onChange,
+  className = ''
+}: {
+  label: string;
+  placeholder: string;
+  items: Array<{ id: string; label: string; sublabel?: string }>;
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  className?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredItems = useMemo(() => {
+    if (!searchTerm.trim()) return items;
+    const q = searchTerm.toLowerCase();
+    return items.filter(
+      item => item.label.toLowerCase().includes(q) || (item.sublabel && item.sublabel.toLowerCase().includes(q))
+    );
+  }, [items, searchTerm]);
+
+  const toggleItem = (id: string) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter(i => i !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  const selectAll = () => {
+    onChange(items.map(i => i.id));
+  };
+
+  const clearAll = () => {
+    onChange([]);
+  };
+
+  return (
+    <div className={`relative ${className}`} ref={dropdownRef}>
+      <label className="block text-[11px] font-black text-gray-700 uppercase tracking-wider mb-1">
+        {label}
+      </label>
+
+      {/* Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full min-h-[42px] px-3.5 py-2 rounded-2xl border border-gray-200 bg-white hover:border-[#075E54] focus:outline-none focus:ring-2 focus:ring-[#075E54] text-xs font-semibold text-left flex items-center justify-between gap-2 shadow-xs transition"
+      >
+        <div className="flex-1 truncate">
+          {selectedIds.length === 0 ? (
+            <span className="text-gray-400 font-medium">{placeholder}</span>
+          ) : (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-[#075E54] text-[10px] font-black shrink-0">
+                {selectedIds.length} Selected
+              </span>
+              <span className="text-gray-800 truncate text-[11px] font-bold">
+                {items
+                  .filter(i => selectedIds.includes(i.id))
+                  .map(i => i.label)
+                  .slice(0, 2)
+                  .join(', ')}
+                {selectedIds.length > 2 && ` +${selectedIds.length - 2} more`}
+              </span>
+            </div>
+          )}
+        </div>
+        <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${isOpen ? 'rotate-180 text-[#075E54]' : ''}`} />
+      </button>
+
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl border border-gray-200 shadow-2xl z-50 p-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-150 min-w-[260px]">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={`Search ${label.toLowerCase()}...`}
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-gray-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#075E54]"
+              autoFocus
+            />
+          </div>
+
+          {/* Quick Select Actions */}
+          <div className="flex items-center justify-between text-[10px] font-bold px-1 text-gray-500 border-b border-gray-100 pb-1.5">
+            <button
+              type="button"
+              onClick={selectAll}
+              className="text-[#075E54] hover:underline cursor-pointer"
+            >
+              Select All ({items.length})
+            </button>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="text-rose-600 hover:underline cursor-pointer"
+            >
+              Clear
+            </button>
+          </div>
+
+          {/* Items List */}
+          <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
+            {filteredItems.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4 font-medium">No results found</p>
+            ) : (
+              filteredItems.map(item => {
+                const isChecked = selectedIds.includes(item.id);
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => toggleItem(item.id)}
+                    className={`flex items-center justify-between p-2 rounded-xl text-xs cursor-pointer transition select-none ${
+                      isChecked ? 'bg-emerald-50 text-[#075E54] font-bold' : 'hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition ${
+                        isChecked ? 'bg-[#075E54] border-[#075E54] text-white' : 'border-gray-300 bg-white'
+                      }`}>
+                        {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                      <span className="truncate">{item.label}</span>
+                    </div>
+                    {item.sublabel && (
+                      <span className="text-[10px] text-gray-400 font-normal ml-2 shrink-0">
+                        {item.sublabel}
+                      </span>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// MAIN ANNOUNCEMENTS CLIENT
+// -------------------------------------------------------------
+export default function AnnouncementsClient({ 
+  initialAnnouncements, 
+  courses, 
+  batches, 
+  trainers = [], 
+  students = [] 
+}: Props) {
+  // Announcements list (excluding pure banners)
   const [announcements, setAnnouncements] = useState<Announcement[]>(
     initialAnnouncements.filter(a => a.announcement_type !== 'banner')
   );
@@ -81,7 +265,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
   // Active Tab: 'admin_sent' vs 'guru_sent'
   const [activeTab, setActiveTab] = useState<'admin_sent' | 'guru_sent'>('admin_sent');
 
-  // Default Current Month Dates
+  // Default Current Month
   const defaultDates = useMemo(() => {
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -89,35 +273,18 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
     return { firstDay, lastDay };
   }, []);
 
-  // Filter Form State for Guru Sent Messages
-  const [filterGuruId, setFilterGuruId] = useState('all');
-  const [filterCourseId, setFilterCourseId] = useState('all');
-  const [filterBatchId, setFilterBatchId] = useState('all');
+  // Filter State for Guru Sent (Searchable Multi-Selection for Guru, Batch, Student + Date Range)
+  const [guruSelectedGurus, setGuruSelectedGurus] = useState<string[]>([]);
+  const [guruSelectedBatches, setGuruSelectedBatches] = useState<string[]>([]);
+  const [guruSelectedStudents, setGuruSelectedStudents] = useState<string[]>([]);
   const [guruStartDate, setGuruStartDate] = useState(defaultDates.firstDay);
   const [guruEndDate, setGuruEndDate] = useState(defaultDates.lastDay);
 
-  // Applied Filters State for Guru Sent (Admin clicks "View Messages" to apply)
+  // Applied Filters State for Guru Sent (Admin clicks "View Messages" / "Apply" to filter)
   const [appliedGuruFilters, setAppliedGuruFilters] = useState({
-    guruId: 'all',
-    courseId: 'all',
-    batchId: 'all',
-    startDate: defaultDates.firstDay,
-    endDate: defaultDates.lastDay,
-    hasApplied: false
-  });
-
-  // Filter State for Admin Sent Messages
-  const [adminSearchQuery, setAdminSearchQuery] = useState('');
-  const [adminTypeTagFilter, setAdminTypeTagFilter] = useState('all');
-  const [adminAudienceFilter, setAdminAudienceFilter] = useState('all');
-  const [adminStartDate, setAdminStartDate] = useState(defaultDates.firstDay);
-  const [adminEndDate, setAdminEndDate] = useState(defaultDates.lastDay);
-
-  // Applied Filters State for Admin Sent
-  const [appliedAdminFilters, setAppliedAdminFilters] = useState({
-    search: '',
-    typeTag: 'all',
-    audience: 'all',
+    guruIds: [] as string[],
+    batchIds: [] as string[],
+    studentIds: [] as string[],
     startDate: defaultDates.firstDay,
     endDate: defaultDates.lastDay,
     hasApplied: false
@@ -128,39 +295,37 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [deletingAnnouncement, setDeletingAnnouncement] = useState<Announcement | null>(null);
 
-  // Eye Details Modal State
+  // Details Modal & Recipient Modal
   const [detailModalAnnouncement, setDetailModalAnnouncement] = useState<Announcement | null>(null);
-
-  // Students Recipient Modal State
   const [recipientModalAnnouncement, setRecipientModalAnnouncement] = useState<Announcement | null>(null);
   const [recipientStudents, setRecipientStudents] = useState<RecipientStudent[]>([]);
   const [isLoadingRecipients, setIsLoadingRecipients] = useState(false);
   const [recipientSearchQuery, setRecipientSearchQuery] = useState('');
 
-  // Compose / Edit Form State (Reference Image 1)
+  // Form State (Reference Image 1 + Schedule Date/Time + Side-by-Side Dropdowns + Share Link)
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     title: '',
     message: '',
     image_url: '',
-    audience: 'All students' as 'All students' | 'Students and Gurus' | 'Selected course or batch' | 'Trainers' | 'Chosen recipients',
-    target_course_id: '',
-    target_course_title: '',
-    target_batch_id: '',
-    target_batch_name: '',
+    audience: 'All students' as 'All students' | 'Students and Gurus' | 'Specific Courses & Batches' | 'Trainers',
     type_tag: 'General' as 'Holiday' | 'Schedule change' | 'Cancellation' | 'Fee reminder' | 'General',
     publish_date: new Date().toISOString().split('T')[0],
     publish_time: '10:00',
     expiry_date: '',
     status: 'Published' as 'Draft' | 'Scheduled' | 'Published' | 'Expired',
-    action_links: [] as Array<{ title: string; url: string }>
+    share_links: [] as Array<{ title: string; url: string }>
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeFormTab, setActiveFormTab] = useState<'compose' | 'preview'>('compose');
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Auto-scroll chat to bottom
+  const adminChatEndRef = useRef<HTMLDivElement>(null);
+  const guruChatEndRef = useRef<HTMLDivElement>(null);
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToastMessage({ text, type });
@@ -180,143 +345,30 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
     return !isGuruSent(ann);
   };
 
-  // Batches filtered by selected course for filter dropdown
-  const filteredBatchesForFilter = useMemo(() => {
-    if (filterCourseId === 'all') return batches;
-    return batches.filter(b => b.course_id === filterCourseId);
-  }, [batches, filterCourseId]);
-
-  // Handle Apply Filter for Guru Sent
-  const handleApplyGuruFilters = () => {
-    setAppliedGuruFilters({
-      guruId: filterGuruId,
-      courseId: filterCourseId,
-      batchId: filterBatchId,
-      startDate: guruStartDate,
-      endDate: guruEndDate,
-      hasApplied: true
-    });
+  // Format Date and Time
+  const formatDateTime = (dateStr?: string, createdStr?: string) => {
+    const raw = dateStr || createdStr;
+    if (!raw) return { date: '—', time: '—', rawDate: '' };
+    const d = new Date(raw);
+    const dateFormatted = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeFormatted = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return { date: dateFormatted, time: timeFormatted, rawDate: d.toISOString().split('T')[0] };
   };
 
-  // Handle Reset Filter for Guru Sent
-  const handleResetGuruFilters = () => {
-    setFilterGuruId('all');
-    setFilterCourseId('all');
-    setFilterBatchId('all');
-    setGuruStartDate(defaultDates.firstDay);
-    setGuruEndDate(defaultDates.lastDay);
-    setAppliedGuruFilters({
-      guruId: 'all',
-      courseId: 'all',
-      batchId: 'all',
-      startDate: defaultDates.firstDay,
-      endDate: defaultDates.lastDay,
-      hasApplied: false
-    });
+  // Format Day Separator Header (e.g. "TODAY", "YESTERDAY", or "06 OCT 2026")
+  const getDaySeparator = (dateStr?: string) => {
+    if (!dateStr) return '';
+    const msgDate = new Date(dateStr).toDateString();
+    const today = new Date().toDateString();
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    if (msgDate === today) return 'TODAY';
+    if (msgDate === yesterday) return 'YESTERDAY';
+    return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
   };
 
-  // Handle Apply Filter for Admin Sent
-  const handleApplyAdminFilters = () => {
-    setAppliedAdminFilters({
-      search: adminSearchQuery,
-      typeTag: adminTypeTagFilter,
-      audience: adminAudienceFilter,
-      startDate: adminStartDate,
-      endDate: adminEndDate,
-      hasApplied: true
-    });
-  };
-
-  // Handle Reset Filter for Admin Sent
-  const handleResetAdminFilters = () => {
-    setAdminSearchQuery('');
-    setAdminTypeTagFilter('all');
-    setAdminAudienceFilter('all');
-    setAdminStartDate(defaultDates.firstDay);
-    setAdminEndDate(defaultDates.lastDay);
-    setAppliedAdminFilters({
-      search: '',
-      typeTag: 'all',
-      audience: 'all',
-      startDate: defaultDates.firstDay,
-      endDate: defaultDates.lastDay,
-      hasApplied: false
-    });
-  };
-
-  // Filtered Guru Sent Messages
-  const guruMessages = useMemo(() => {
-    return announcements.filter(ann => {
-      if (!isGuruSent(ann)) return false;
-
-      // Guru filter
-      if (appliedGuruFilters.guruId !== 'all') {
-        const matchesId = ann.trainer_id === appliedGuruFilters.guruId;
-        const selectedTrainer = trainers.find(t => t.id === appliedGuruFilters.guruId);
-        const matchesName = selectedTrainer && ann.trainer_name?.toLowerCase().includes(selectedTrainer.full_name.toLowerCase());
-        if (!matchesId && !matchesName) return false;
-      }
-
-      // Course filter
-      if (appliedGuruFilters.courseId !== 'all') {
-        const matchesCourse = ann.target_course_id?.includes(appliedGuruFilters.courseId);
-        if (!matchesCourse) return false;
-      }
-
-      // Batch filter
-      if (appliedGuruFilters.batchId !== 'all') {
-        const matchesBatch = ann.target_batch_id?.includes(appliedGuruFilters.batchId);
-        if (!matchesBatch) return false;
-      }
-
-      // Date Range filter
-      const dateStr = ann.publish_date?.split('T')[0] || ann.created_at?.split('T')[0];
-      if (dateStr) {
-        if (appliedGuruFilters.startDate && dateStr < appliedGuruFilters.startDate) return false;
-        if (appliedGuruFilters.endDate && dateStr > appliedGuruFilters.endDate) return false;
-      }
-
-      return true;
-    });
-  }, [announcements, appliedGuruFilters, trainers]);
-
-  // Filtered Admin Sent Messages
+  // Admin Sent Messages: Sorted CHRONOLOGICALLY (Oldest on top, Latest below like WhatsApp)
   const adminMessages = useMemo(() => {
-    return announcements.filter(ann => {
-      if (!isAdminSent(ann)) return false;
-
-      // Search
-      if (appliedAdminFilters.search.trim()) {
-        const q = appliedAdminFilters.search.toLowerCase();
-        const matchesTitle = ann.title?.toLowerCase().includes(q);
-        const matchesMsg = ann.message?.toLowerCase().includes(q);
-        if (!matchesTitle && !matchesMsg) return false;
-      }
-
-      // Type Tag
-      if (appliedAdminFilters.typeTag !== 'all' && ann.type_tag !== appliedAdminFilters.typeTag) {
-        return false;
-      }
-
-      // Audience
-      if (appliedAdminFilters.audience !== 'all' && ann.audience !== appliedAdminFilters.audience) {
-        return false;
-      }
-
-      // Date Range
-      const dateStr = ann.publish_date?.split('T')[0] || ann.created_at?.split('T')[0];
-      if (dateStr) {
-        if (appliedAdminFilters.startDate && dateStr < appliedAdminFilters.startDate) return false;
-        if (appliedAdminFilters.endDate && dateStr > appliedAdminFilters.endDate) return false;
-      }
-
-      return true;
-    });
-  }, [announcements, appliedAdminFilters]);
-
-  // Combined Messages (sorted chronologically oldest to newest for realistic chat timeline)
-  const combinedChronologicalMessages = useMemo(() => {
-    const list = [...announcements];
+    const list = announcements.filter(isAdminSent);
     list.sort((a, b) => {
       const timeA = new Date(a.publish_date || a.created_at).getTime();
       const timeB = new Date(b.publish_date || b.created_at).getTime();
@@ -325,7 +377,90 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
     return list;
   }, [announcements]);
 
-  // Fetch Recipients for "View Students" button
+  // Guru Sent Messages: Filtered and Sorted CHRONOLOGICALLY (Oldest on top, Latest below like WhatsApp)
+  const guruMessages = useMemo(() => {
+    const list = announcements.filter(ann => {
+      if (!isGuruSent(ann)) return false;
+
+      // Guru Filter
+      if (appliedGuruFilters.guruIds.length > 0) {
+        const matchesId = ann.trainer_id && appliedGuruFilters.guruIds.includes(ann.trainer_id);
+        const matchesName = trainers.some(
+          t => appliedGuruFilters.guruIds.includes(t.id) && ann.trainer_name?.toLowerCase().includes(t.full_name.toLowerCase())
+        );
+        if (!matchesId && !matchesName) return false;
+      }
+
+      // Batch Filter
+      if (appliedGuruFilters.batchIds.length > 0) {
+        const matchesBatch = appliedGuruFilters.batchIds.some(bId => ann.target_batch_id?.includes(bId));
+        if (!matchesBatch) return false;
+      }
+
+      // Student Filter
+      if (appliedGuruFilters.studentIds.length > 0) {
+        const studentRaw = ann.target_students ? JSON.stringify(ann.target_students) : '';
+        const matchesStudent = appliedGuruFilters.studentIds.some(sId => studentRaw.includes(sId));
+        if (!matchesStudent) return false;
+      }
+
+      // Date Range Filter
+      const dateStr = ann.publish_date?.split('T')[0] || ann.created_at?.split('T')[0];
+      if (dateStr) {
+        if (appliedGuruFilters.startDate && dateStr < appliedGuruFilters.startDate) return false;
+        if (appliedGuruFilters.endDate && dateStr > appliedGuruFilters.endDate) return false;
+      }
+
+      return true;
+    });
+
+    list.sort((a, b) => {
+      const timeA = new Date(a.publish_date || a.created_at).getTime();
+      const timeB = new Date(b.publish_date || b.created_at).getTime();
+      return timeA - timeB;
+    });
+    return list;
+  }, [announcements, appliedGuruFilters, trainers]);
+
+  // Scroll to bottom on initial load / message change
+  useEffect(() => {
+    if (activeTab === 'admin_sent') {
+      adminChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      guruChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeTab, adminMessages.length, guruMessages.length]);
+
+  // Handle Apply Guru Filters
+  const handleApplyGuruFilters = () => {
+    setAppliedGuruFilters({
+      guruIds: guruSelectedGurus,
+      batchIds: guruSelectedBatches,
+      studentIds: guruSelectedStudents,
+      startDate: guruStartDate,
+      endDate: guruEndDate,
+      hasApplied: true
+    });
+  };
+
+  // Handle Reset Guru Filters
+  const handleResetGuruFilters = () => {
+    setGuruSelectedGurus([]);
+    setGuruSelectedBatches([]);
+    setGuruSelectedStudents([]);
+    setGuruStartDate(defaultDates.firstDay);
+    setGuruEndDate(defaultDates.lastDay);
+    setAppliedGuruFilters({
+      guruIds: [],
+      batchIds: [],
+      studentIds: [],
+      startDate: defaultDates.firstDay,
+      endDate: defaultDates.lastDay,
+      hasApplied: false
+    });
+  };
+
+  // Fetch Recipient Students for "View Recipient Students" button
   const handleOpenRecipientsModal = async (ann: Announcement) => {
     setRecipientModalAnnouncement(ann);
     setIsLoadingRecipients(true);
@@ -347,7 +482,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
     }
   };
 
-  // Filtered recipients search inside modal
+  // Filtered Recipient Search Inside Modal
   const filteredRecipientStudents = useMemo(() => {
     if (!recipientSearchQuery.trim()) return recipientStudents;
     const q = recipientSearchQuery.toLowerCase();
@@ -402,16 +537,12 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
       message: '',
       image_url: '',
       audience: 'All students',
-      target_course_id: '',
-      target_course_title: '',
-      target_batch_id: '',
-      target_batch_name: '',
       type_tag: 'General',
       publish_date: new Date().toISOString().split('T')[0],
       publish_time: '10:00',
       expiry_date: '',
       status: 'Published',
-      action_links: []
+      share_links: []
     });
     setFormErrors({});
     setActiveFormTab('compose');
@@ -433,16 +564,12 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
       message: ann.message || '',
       image_url: ann.image_url || '',
       audience: (ann.audience || 'All students') as any,
-      target_course_id: ann.target_course_id || '',
-      target_course_title: ann.target_course_title || '',
-      target_batch_id: ann.target_batch_id || '',
-      target_batch_name: ann.target_batch_name || '',
       type_tag: (ann.type_tag || 'General') as any,
       publish_date: ann.publish_date ? ann.publish_date.split('T')[0] : new Date().toISOString().split('T')[0],
-      publish_time: '10:00',
+      publish_time: ann.publish_time || '10:00',
       expiry_date: ann.expiry_date ? ann.expiry_date.split('T')[0] : '',
       status: (ann.status || 'Published') as any,
-      action_links: links
+      share_links: links
     });
     setFormErrors({});
     setActiveFormTab('compose');
@@ -457,17 +584,18 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
     if (!formData.message || !formData.message.trim()) {
       errors.message = 'Broadcast message content is required';
     }
-    if (formData.status === 'Scheduled' && !formData.publish_date) {
-      errors.publish_date = 'Scheduled date is required';
+    if (formData.status === 'Scheduled') {
+      if (!formData.publish_date) errors.publish_date = 'Scheduled date is required';
+      if (!formData.publish_time) errors.publish_time = 'Scheduled time is required';
     }
-    if (formData.audience === 'Selected course or batch' && selectedCourseIds.length === 0) {
-      errors.target_course_id = 'Please select at least one course';
+    if (formData.audience === 'Specific Courses & Batches' && selectedCourseIds.length === 0 && selectedBatchIds.length === 0) {
+      errors.audience = 'Please select at least one course or batch';
     }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // Handle Submit Create
+  // Submit Create
   const handleSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) {
@@ -491,7 +619,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
         ? new Date().toISOString().split('T')[0]
         : formData.publish_date;
 
-      const cleanActionLinks = formData.action_links.filter(l => l.title.trim() && l.url.trim());
+      const cleanShareLinks = formData.share_links.filter(l => l.title.trim() && l.url.trim());
 
       const res = await fetch('/api/announcements', {
         method: 'POST',
@@ -499,8 +627,9 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
         body: JSON.stringify({
           ...formData,
           publish_date: effectivePublishDate,
+          publish_time: formData.publish_time,
           announcement_type: 'message',
-          action_links: cleanActionLinks,
+          action_links: cleanShareLinks,
           target_course_id: selectedCourseIds.length > 0 ? selectedCourseIds.join(',') : undefined,
           target_course_title: courseTitles || undefined,
           target_batch_id: selectedBatchIds.length > 0 ? selectedBatchIds.join(',') : undefined,
@@ -509,7 +638,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
       });
       const json = await res.json();
       if (json.success && json.announcement) {
-        setAnnouncements(prev => [json.announcement, ...prev]);
+        setAnnouncements(prev => [...prev, json.announcement]);
         setIsCreateModalOpen(false);
         showToast('Message broadcasted directly to student mobile apps!');
       } else {
@@ -522,7 +651,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
     }
   };
 
-  // Handle Submit Edit
+  // Submit Edit
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAnnouncement || !validateForm()) {
@@ -546,7 +675,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
         ? new Date().toISOString().split('T')[0]
         : formData.publish_date;
 
-      const cleanActionLinks = formData.action_links.filter(l => l.title.trim() && l.url.trim());
+      const cleanShareLinks = formData.share_links.filter(l => l.title.trim() && l.url.trim());
 
       const res = await fetch(`/api/announcements/${editingAnnouncement.id}`, {
         method: 'PUT',
@@ -554,8 +683,9 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
         body: JSON.stringify({
           ...formData,
           publish_date: effectivePublishDate,
+          publish_time: formData.publish_time,
           announcement_type: 'message',
-          action_links: cleanActionLinks,
+          action_links: cleanShareLinks,
           target_course_id: selectedCourseIds.length > 0 ? selectedCourseIds.join(',') : undefined,
           target_course_title: courseTitles || undefined,
           target_batch_id: selectedBatchIds.length > 0 ? selectedBatchIds.join(',') : undefined,
@@ -577,7 +707,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
     }
   };
 
-  // Handle Confirm Delete
+  // Confirm Delete
   const handleConfirmDelete = async () => {
     if (!deletingAnnouncement) return;
     setIsSubmitting(true);
@@ -600,17 +730,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
     }
   };
 
-  // Formatted date and time helper
-  const formatDateTime = (dateStr?: string, createdStr?: string) => {
-    const raw = dateStr || createdStr;
-    if (!raw) return { date: '—', time: '—' };
-    const d = new Date(raw);
-    const dateFormatted = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    const timeFormatted = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-    return { date: dateFormatted, time: timeFormatted };
-  };
-
-  // Render Category Tag Badge
+  // Category Tag Badge
   const renderCategoryTag = (tag: string) => {
     let colorClasses = 'bg-blue-50 text-blue-700 border-blue-200';
     if (tag === 'Holiday') colorClasses = 'bg-amber-50 text-amber-700 border-amber-200';
@@ -625,9 +745,15 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
     );
   };
 
+  // Available Batches for Compose Modal (filtered by selected courses if any)
+  const availableBatchesForCompose = useMemo(() => {
+    if (selectedCourseIds.length === 0) return batches;
+    return batches.filter(b => selectedCourseIds.includes(b.course_id));
+  }, [batches, selectedCourseIds]);
+
   return (
-    <div className="space-y-6 pb-20">
-      {/* Toast */}
+    <div className="w-full space-y-4 pb-20">
+      {/* Toast Alert */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
           <div className={`px-5 py-3 rounded-2xl shadow-xl font-bold text-sm text-white flex items-center gap-2 ${
@@ -638,48 +764,46 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
         </div>
       )}
 
-      {/* Hero Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#075E54] via-[#128C7E] to-[#0A473E] text-white p-6 sm:p-8 shadow-xl">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-xs border border-white/20 text-[#25D366] text-xs font-black tracking-wide uppercase">
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>WhatsApp Style Broadcast Messages</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Announcements & Message Broadcasts
+      {/* MINIMISED TOP HEADING BAR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-3xl border border-gray-200 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-[#075E54] text-[#25D366] flex items-center justify-center shadow-xs shrink-0">
+            <MessageSquare className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+              <span>Announcements & Broadcast Messages</span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-[#075E54] text-[10px] font-black border border-emerald-200 uppercase">
+                WhatsApp Channel View
+              </span>
             </h1>
-            <p className="text-xs sm:text-sm text-white/80 leading-relaxed font-medium">
-              Official circulars, exam notifications, and faculty messages delivered directly to student mobile app inboxes. Admin messages align on right, and Guru messages align on left.
+            <p className="text-xs text-gray-500 font-medium">
+              Official notifications, class alerts & faculty messages stream directly to student mobile inboxes.
             </p>
           </div>
+        </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={openCreateModal}
-              className="px-5 py-3 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] text-[#075E54] text-xs sm:text-sm font-black shadow-lg transition flex items-center gap-2 cursor-pointer active:scale-95"
-            >
-              <Plus className="w-4 h-4 text-[#075E54]" />
-              <span>Broadcast New Message</span>
-            </button>
-          </div>
+        {/* Real-time Indicator */}
+        <div className="flex items-center gap-2 text-xs font-bold text-[#075E54] bg-[#E8F8F0] px-3.5 py-1.5 rounded-2xl border border-[#BCE8D0] shrink-0 self-start sm:self-auto">
+          <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
+          <span>Real-time Live Sync</span>
         </div>
       </div>
 
-      {/* Main Tabs: "Admin Sent" and "Guru Sent" */}
-      <div className="flex items-center gap-3 border-b border-gray-200 pb-2">
+      {/* FULL-WIDTH EQUAL BUTTONS ROW: ADMIN SENT & GURU SENT */}
+      <div className="w-full grid grid-cols-2 gap-3 sm:gap-4">
         <button
           onClick={() => setActiveTab('admin_sent')}
-          className={`px-6 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
+          className={`w-full py-4 px-4 rounded-3xl font-black text-xs sm:text-sm md:text-base transition-all flex items-center justify-center gap-3 cursor-pointer shadow-xs border-2 ${
             activeTab === 'admin_sent'
-              ? 'bg-[#075E54] text-white shadow-md'
-              : 'bg-white text-gray-600 hover:text-gray-900 border border-gray-200'
+              ? 'bg-[#075E54] text-white border-[#075E54] shadow-md ring-2 ring-[#075E54]/20'
+              : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
           }`}
         >
-          <ShieldCheck className="w-4 h-4" />
+          <ShieldCheck className="w-5 h-5 shrink-0" />
           <span>Admin Sent</span>
-          <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
-            activeTab === 'admin_sent' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
+            activeTab === 'admin_sent' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-800'
           }`}>
             {adminMessages.length}
           </span>
@@ -687,16 +811,16 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
 
         <button
           onClick={() => setActiveTab('guru_sent')}
-          className={`px-6 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
+          className={`w-full py-4 px-4 rounded-3xl font-black text-xs sm:text-sm md:text-base transition-all flex items-center justify-center gap-3 cursor-pointer shadow-xs border-2 ${
             activeTab === 'guru_sent'
-              ? 'bg-[#075E54] text-white shadow-md'
-              : 'bg-white text-gray-600 hover:text-gray-900 border border-gray-200'
+              ? 'bg-[#075E54] text-white border-[#075E54] shadow-md ring-2 ring-[#075E54]/20'
+              : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
           }`}
         >
-          <GraduationCap className="w-4 h-4" />
+          <GraduationCap className="w-5 h-5 shrink-0" />
           <span>Guru Sent</span>
-          <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
-            activeTab === 'guru_sent' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
+            activeTab === 'guru_sent' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-800'
           }`}>
             {guruMessages.length}
           </span>
@@ -704,16 +828,195 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
       </div>
 
       {/* ===================================================================== */}
-      {/* 1. GURU SENT TAB WITH REPORT-STYLE FILTER BAR                         */}
+      {/* 1. ADMIN SENT TAB (NO EXTRA FILTERS, CLEAN WHATSAPP CHAT + FAB)       */}
+      {/* ===================================================================== */}
+      {activeTab === 'admin_sent' && (
+        <div className="relative rounded-3xl bg-[#EFEAE2] border border-gray-300 shadow-inner min-h-[620px] flex flex-col justify-between overflow-hidden">
+          {/* Subtle WhatsApp chat watermark pattern */}
+          <div className="absolute inset-0 opacity-[0.035] pointer-events-none bg-[radial-gradient(#075E54_1px,transparent_1px)] [background-size:16px_16px]" />
+
+          {/* Chat Stream: Oldest on Top, Latest Below */}
+          <div className="p-4 sm:p-6 md:p-8 space-y-6 relative z-10 w-full overflow-y-auto max-h-[750px]">
+            {adminMessages.length === 0 ? (
+              <div className="text-center py-24 space-y-3 bg-white/70 backdrop-blur-xs rounded-3xl p-8 max-w-md mx-auto border border-gray-200 my-auto">
+                <div className="w-14 h-14 rounded-full bg-emerald-50 text-[#075E54] mx-auto flex items-center justify-center">
+                  <MessageSquare className="w-7 h-7" />
+                </div>
+                <h3 className="text-base font-black text-gray-800">No Admin Broadcasts Yet</h3>
+                <p className="text-xs text-gray-500">
+                  Broadcast notices, circulars, and fee reminders to all students or specific batches.
+                </p>
+              </div>
+            ) : (
+              adminMessages.map((ann, idx) => {
+                const { date, time } = formatDateTime(ann.publish_date, ann.created_at);
+                const prevMsg = idx > 0 ? adminMessages[idx - 1] : null;
+                const prevDate = prevMsg ? formatDateTime(prevMsg.publish_date, prevMsg.created_at).date : null;
+                const showDateHeader = idx === 0 || date !== prevDate;
+
+                return (
+                  <div key={ann.id} className="space-y-4">
+                    {/* Centered WhatsApp Date Header Divider */}
+                    {showDateHeader && (
+                      <div className="flex justify-center my-3">
+                        <span className="px-3.5 py-1 rounded-full bg-white/95 shadow-xs border border-gray-200 text-[10px] font-black uppercase text-gray-600 tracking-wider">
+                          {getDaySeparator(ann.publish_date || ann.created_at)} • {date}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Right-Aligned Admin Chat Bubble */}
+                    <div className="flex justify-end">
+                      <div className="max-w-2xl w-full sm:w-auto min-w-[280px] sm:min-w-[360px] bg-[#D9FDD3] rounded-2xl rounded-tr-xs p-4 sm:p-5 shadow-md border border-[#C2EDB9] space-y-3 transition hover:shadow-lg">
+                        {/* Top of Message: Sender Info & Date Tag */}
+                        <div className="flex items-center justify-between border-b border-[#C2EDB9] pb-2 gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-[#075E54] text-white flex items-center justify-center font-black text-xs shadow-xs">
+                              👑
+                            </div>
+                            <div>
+                              <div className="text-xs font-black text-[#075E54] flex items-center gap-1.5">
+                                <span>Academy Administration</span>
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-[#075E54] text-white">
+                                  Director / Admin
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-gray-500 font-semibold">
+                                {date}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0">
+                            {renderCategoryTag(ann.type_tag)}
+                          </div>
+                        </div>
+
+                        {/* Message Subject / Title */}
+                        <div>
+                          <h4 className="text-sm font-black text-gray-900 leading-snug">
+                            {ann.title}
+                          </h4>
+                          {/* Target Audience Pill */}
+                          <div className="flex flex-wrap gap-1.5 text-[10px] text-gray-600 font-bold mt-1">
+                            <span className="px-2 py-0.5 rounded-lg bg-white/80 text-[#075E54] border border-[#C2EDB9]">
+                              🎯 Target: {ann.audience}
+                            </span>
+                            {ann.target_course_title && (
+                              <span className="px-2 py-0.5 rounded-lg bg-white/80 text-gray-700">
+                                📚 {ann.target_course_title}
+                              </span>
+                            )}
+                            {ann.target_batch_name && (
+                              <span className="px-2 py-0.5 rounded-lg bg-white/80 text-gray-700">
+                                👥 {ann.target_batch_name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Attached Image/Flyer */}
+                        {ann.image_url && (
+                          <div className="rounded-xl overflow-hidden border border-[#C2EDB9] max-h-60 bg-black/5">
+                            <img
+                              src={ann.image_url}
+                              alt={ann.title}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+
+                        {/* Full Broadcast Message Content */}
+                        <p className="text-xs text-gray-800 whitespace-pre-line leading-relaxed font-medium">
+                          {ann.message}
+                        </p>
+
+                        {/* Share Links (if any) */}
+                        {ann.action_links && ann.action_links.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {ann.action_links.map((link, lIdx) => (
+                              <a
+                                key={lIdx}
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white text-[#075E54] border border-[#C2EDB9] hover:bg-emerald-50 transition shadow-xs"
+                              >
+                                <ExternalLink className="w-3 h-3 text-[#075E54]" />
+                                <span>{link.title}</span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Bottom of Message: Time & Action Buttons */}
+                        <div className="pt-2 border-t border-[#C2EDB9] flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-1.5">
+                            {/* Eye Details Button */}
+                            <button
+                              onClick={() => setDetailModalAnnouncement(ann)}
+                              className="px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-[#075E54] text-xs font-black shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-[#075E54]" />
+                              <span>Details & Students</span>
+                            </button>
+
+                            <button
+                              onClick={() => openEditModal(ann)}
+                              className="p-1.5 rounded-xl bg-white hover:bg-emerald-50 text-gray-700 cursor-pointer shadow-xs"
+                              title="Edit Message"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => setDeletingAnnouncement(ann)}
+                              className="p-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-600 cursor-pointer shadow-xs"
+                              title="Delete Message"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Time & Double Checkmarks (Delivered) */}
+                          <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-bold shrink-0">
+                            <span>{time}</span>
+                            <CheckCheck className="w-4 h-4 text-[#34B7F1]" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={adminChatEndRef} />
+          </div>
+
+          {/* RIGHT SIDE DOWN NEW MESSAGE BUTTON (FLOATING ACTION BUTTON) */}
+          <div className="sticky bottom-4 right-4 p-4 flex justify-end z-20 pointer-events-none">
+            <button
+              onClick={openCreateModal}
+              className="pointer-events-auto px-6 py-3.5 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] text-[#075E54] font-black text-xs sm:text-sm shadow-xl flex items-center gap-2.5 cursor-pointer transition transform hover:scale-105 active:scale-95 border-2 border-white"
+            >
+              <Plus className="w-5 h-5 text-[#075E54] stroke-[3]" />
+              <span>Broadcast New Message</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 2. GURU SENT TAB (SEARCHABLE MULTI-SELECT FILTERS, READ-ONLY CHAT)     */}
       {/* ===================================================================== */}
       {activeTab === 'guru_sent' && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Filter Bar (Guru, Course, Batch, Date Range, View Messages Button) */}
-          <div className="bg-white rounded-3xl p-5 border border-emerald-100 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* SEARCHABLE MULTI-SELECTION FILTER BAR (GURU, BATCH, STUDENT, DATES) */}
+          <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <div className="flex items-center gap-2 text-xs font-black text-[#075E54] uppercase tracking-wider">
                 <Filter className="w-4 h-4 text-emerald-600" />
-                <span>Filter Faculty Guru Broadcasts</span>
+                <span>Searchable Filters for Faculty Guru Broadcasts</span>
               </div>
               <span className="text-[11px] font-bold text-gray-400">
                 Default: Current Month ({new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' })})
@@ -721,87 +1024,71 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-              {/* Guru Filter */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 mb-1">Guru / Faculty:</label>
-                <select
-                  value={filterGuruId}
-                  onChange={(e) => setFilterGuruId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#075E54] bg-white"
-                >
-                  <option value="all">All Gurus / Faculty</option>
-                  {trainers.map(t => (
-                    <option key={t.id} value={t.id}>{t.full_name}</option>
-                  ))}
-                </select>
-              </div>
+              {/* 1. Guru Filter (Searchable Multi-Select) */}
+              <SearchableMultiSelect
+                label="Guru / Faculty"
+                placeholder="All Gurus"
+                items={trainers.map(t => ({ id: t.id, label: t.full_name, sublabel: t.display_title || 'Faculty Guru' }))}
+                selectedIds={guruSelectedGurus}
+                onChange={setGuruSelectedGurus}
+              />
 
-              {/* Course Filter */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 mb-1">Course:</label>
-                <select
-                  value={filterCourseId}
-                  onChange={(e) => {
-                    setFilterCourseId(e.target.value);
-                    setFilterBatchId('all');
-                  }}
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#075E54] bg-white"
-                >
-                  <option value="all">All Courses</option>
-                  {courses.map(c => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
-                  ))}
-                </select>
-              </div>
+              {/* 2. Batch Filter (Searchable Multi-Select) */}
+              <SearchableMultiSelect
+                label="Assigned Batch"
+                placeholder="All Batches"
+                items={batches.map(b => ({ id: b.id, label: b.name }))}
+                selectedIds={guruSelectedBatches}
+                onChange={setGuruSelectedBatches}
+              />
 
-              {/* Batch Filter */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 mb-1">Batch:</label>
-                <select
-                  value={filterBatchId}
-                  onChange={(e) => setFilterBatchId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#075E54] bg-white"
-                >
-                  <option value="all">All Batches</option>
-                  {filteredBatchesForFilter.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-              </div>
+              {/* 3. Student Filter (Searchable Multi-Select) */}
+              <SearchableMultiSelect
+                label="Disciple Student"
+                placeholder="All Students"
+                items={students.map(s => ({ id: s.id, label: s.full_name, sublabel: s.roll_number || 'Disciple' }))}
+                selectedIds={guruSelectedStudents}
+                onChange={setGuruSelectedStudents}
+              />
 
-              {/* Start Date */}
+              {/* 4. Start Date */}
               <div>
-                <label className="block text-[11px] font-bold text-gray-600 mb-1">From Date:</label>
+                <label className="block text-[11px] font-black text-gray-700 uppercase tracking-wider mb-1">
+                  From Date
+                </label>
                 <input
                   type="date"
                   value={guruStartDate}
                   onChange={(e) => setGuruStartDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#075E54] bg-white"
+                  className="w-full px-3 py-2 rounded-2xl border border-gray-200 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#075E54] bg-white h-[42px]"
                 />
               </div>
 
-              {/* End Date */}
+              {/* 5. End Date */}
               <div>
-                <label className="block text-[11px] font-bold text-gray-600 mb-1">To Date:</label>
+                <label className="block text-[11px] font-black text-gray-700 uppercase tracking-wider mb-1">
+                  To Date
+                </label>
                 <input
                   type="date"
                   value={guruEndDate}
                   onChange={(e) => setGuruEndDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#075E54] bg-white"
+                  className="w-full px-3 py-2 rounded-2xl border border-gray-200 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#075E54] bg-white h-[42px]"
                 />
               </div>
             </div>
 
-            {/* Filter Actions: "View Messages" Button */}
-            <div className="flex items-center justify-between pt-2">
+            {/* Filter Actions */}
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
               <div className="text-xs font-medium text-gray-500">
-                Found <span className="font-bold text-[#075E54]">{guruMessages.length}</span> faculty broadcasts
+                Found <span className="font-bold text-[#075E54]">{guruMessages.length}</span> faculty broadcasts matching filters
               </div>
+
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handleResetGuruFilters}
-                  className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 text-xs font-bold hover:bg-gray-50 transition cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 text-xs font-bold hover:bg-gray-50 cursor-pointer"
                 >
                   Reset
                 </button>
@@ -817,383 +1104,160 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
             </div>
           </div>
 
-          {/* WhatsApp Chat View for Guru Messages */}
-          <div className="rounded-3xl p-6 sm:p-8 bg-[#EFEAE2] border border-gray-300 shadow-inner min-h-[500px] flex flex-col justify-between relative overflow-hidden">
-            {/* Subtle WhatsApp wallpaper watermark feel */}
-            <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#075E54_1px,transparent_1px)] [background-size:16px_16px]" />
+          {/* GURU CHAT FEED: Left-Aligned Chat Bubbles, Oldest on Top, Latest Below */}
+          <div className="relative rounded-3xl bg-[#EFEAE2] border border-gray-300 shadow-inner min-h-[620px] flex flex-col justify-between overflow-hidden">
+            <div className="absolute inset-0 opacity-[0.035] pointer-events-none bg-[radial-gradient(#075E54_1px,transparent_1px)] [background-size:16px_16px]" />
 
-            {guruMessages.length === 0 ? (
-              <div className="my-auto text-center py-12 space-y-3 bg-white/70 backdrop-blur-xs rounded-3xl p-8 max-w-md mx-auto border border-gray-200">
-                <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-700 mx-auto flex items-center justify-center">
-                  <GraduationCap className="w-7 h-7" />
+            <div className="p-4 sm:p-6 md:p-8 space-y-6 relative z-10 w-full overflow-y-auto max-h-[750px]">
+              {guruMessages.length === 0 ? (
+                <div className="text-center py-24 space-y-3 bg-white/70 backdrop-blur-xs rounded-3xl p-8 max-w-md mx-auto border border-gray-200 my-auto">
+                  <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-700 mx-auto flex items-center justify-center">
+                    <GraduationCap className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-base font-black text-gray-800">No Guru Messages Found</h3>
+                  <p className="text-xs text-gray-500">
+                    No faculty broadcasts match the current filters. Adjust your Guru, batch, student, or date selection.
+                  </p>
+                  <button
+                    onClick={handleResetGuruFilters}
+                    className="px-4 py-2 rounded-xl bg-[#075E54] text-white text-xs font-bold cursor-pointer"
+                  >
+                    Reset All Filters
+                  </button>
                 </div>
-                <h3 className="text-base font-black text-gray-800">No Guru Messages Found</h3>
-                <p className="text-xs text-gray-500">
-                  No messages match the current filter selection. Adjust the Guru, course, or date range and click "View Messages".
-                </p>
-                <button
-                  onClick={handleResetGuruFilters}
-                  className="px-4 py-2 rounded-xl bg-[#075E54] text-white text-xs font-bold cursor-pointer"
-                >
-                  Show All Current Month Messages
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-6 relative z-10 max-w-4xl mx-auto w-full">
-                {/* Date Header Pill */}
-                <div className="flex justify-center">
-                  <span className="px-3 py-1 rounded-full bg-white/90 shadow-xs border border-gray-200 text-[11px] font-black uppercase text-gray-600 tracking-wider">
-                    Guru Broadcast History
-                  </span>
-                </div>
-
-                {/* Left Aligned Guru Messages */}
-                {guruMessages.map((ann) => {
+              ) : (
+                guruMessages.map((ann, idx) => {
                   const { date, time } = formatDateTime(ann.publish_date, ann.created_at);
+                  const prevMsg = idx > 0 ? guruMessages[idx - 1] : null;
+                  const prevDate = prevMsg ? formatDateTime(prevMsg.publish_date, prevMsg.created_at).date : null;
+                  const showDateHeader = idx === 0 || date !== prevDate;
 
                   return (
-                    <div key={ann.id} className="flex justify-start">
-                      <div className="max-w-xl w-full bg-white rounded-2xl rounded-tl-xs p-4 sm:p-5 shadow-md border border-gray-200 space-y-3">
-                        {/* Header: Guru Name and Role */}
-                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-emerald-100 text-[#075E54] flex items-center justify-center font-black text-xs">
-                              🙏
+                    <div key={ann.id} className="space-y-4">
+                      {/* Centered Date Header Divider */}
+                      {showDateHeader && (
+                        <div className="flex justify-center my-3">
+                          <span className="px-3.5 py-1 rounded-full bg-white/95 shadow-xs border border-gray-200 text-[10px] font-black uppercase text-gray-600 tracking-wider">
+                            {getDaySeparator(ann.publish_date || ann.created_at)} • {date}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Left-Aligned Guru Chat Bubble */}
+                      <div className="flex justify-start">
+                        <div className="max-w-2xl w-full sm:w-auto min-w-[280px] sm:min-w-[360px] bg-white rounded-2xl rounded-tl-xs p-4 sm:p-5 shadow-md border border-gray-200 space-y-3 transition hover:shadow-lg">
+                          {/* Top of Message: Guru Name, Role & Date */}
+                          <div className="flex items-center justify-between border-b border-gray-100 pb-2 gap-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-emerald-100 text-[#075E54] flex items-center justify-center font-black text-xs">
+                                🙏
+                              </div>
+                              <div>
+                                <div className="text-xs font-black text-[#075E54] flex items-center gap-1.5">
+                                  <span>Guru: {ann.trainer_name || ann.created_by || 'Faculty Guru'}</span>
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    Faculty
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-gray-400 font-bold">
+                                  {date}
+                                </div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="text-xs font-black text-[#075E54] flex items-center gap-1.5">
-                                <span>Guru: {ann.trainer_name || ann.created_by || 'Faculty Guru'}</span>
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                  Faculty
+
+                            <div className="shrink-0">
+                              {renderCategoryTag(ann.type_tag)}
+                            </div>
+                          </div>
+
+                          {/* Message Subject */}
+                          <div>
+                            <h4 className="text-sm font-black text-gray-900 leading-snug">
+                              {ann.title}
+                            </h4>
+                            {/* Target Course & Batch Tags */}
+                            <div className="flex flex-wrap gap-1.5 text-[10px] text-gray-600 font-bold mt-1">
+                              {ann.target_course_title && (
+                                <span className="px-2 py-0.5 rounded-lg bg-gray-100 text-gray-700">
+                                  📚 {ann.target_course_title}
                                 </span>
-                              </div>
-                              <div className="text-[10px] text-gray-400 font-medium">
-                                {date} at {time}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            {renderCategoryTag(ann.type_tag)}
-                          </div>
-                        </div>
-
-                        {/* Title */}
-                        <div>
-                          <h4 className="text-sm font-black text-gray-900 leading-snug">
-                            {ann.title}
-                          </h4>
-                          {/* Target info */}
-                          <div className="flex flex-wrap gap-2 text-[11px] text-gray-500 font-semibold mt-1">
-                            {ann.target_course_title && (
-                              <span className="px-2 py-0.5 rounded-lg bg-gray-100 text-gray-700">
-                                📚 {ann.target_course_title}
-                              </span>
-                            )}
-                            {ann.target_batch_name && (
-                              <span className="px-2 py-0.5 rounded-lg bg-gray-100 text-gray-700">
-                                👥 {ann.target_batch_name}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Attached Image if present */}
-                        {ann.image_url && (
-                          <div className="rounded-xl overflow-hidden border border-gray-200 max-h-56 bg-black/5">
-                            <img
-                              src={ann.image_url}
-                              alt={ann.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-
-                        {/* Message Content */}
-                        <p className="text-xs text-gray-800 whitespace-pre-line leading-relaxed font-medium">
-                          {ann.message}
-                        </p>
-
-                        {/* Action Links */}
-                        {ann.action_links && ann.action_links.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {ann.action_links.map((link, idx) => (
-                              <a
-                                key={idx}
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-[#075E54] border border-emerald-200 hover:bg-emerald-100 transition"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                <span>{link.title}</span>
-                              </a>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Card Footer with Details Button */}
-                        <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
-                          <div className="flex items-center gap-1 text-[10px] text-gray-400">
-                            <Megaphone className="w-3 h-3 text-[#075E54]" />
-                            <span>Broadcasted to Enrolled Disciples</span>
-                          </div>
-
-                          {/* Eye Details Button */}
-                          <button
-                            onClick={() => setDetailModalAnnouncement(ann)}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#075E54] text-xs font-black shadow-xs flex items-center gap-1.5 transition cursor-pointer"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>View Details & Students</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ===================================================================== */}
-      {/* 2. ADMIN SENT TAB WITH RIGHT-ALIGNED WHATSAPP BUBBLES                 */}
-      {/* ===================================================================== */}
-      {activeTab === 'admin_sent' && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Admin Sent Filter Bar */}
-          <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-xs space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-              {/* Search */}
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={adminSearchQuery}
-                  onChange={(e) => setAdminSearchQuery(e.target.value)}
-                  placeholder="Search admin messages..."
-                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#075E54] text-xs font-medium text-gray-800"
-                />
-              </div>
-
-              {/* Category Tag */}
-              <div>
-                <select
-                  value={adminTypeTagFilter}
-                  onChange={(e) => setAdminTypeTagFilter(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#075E54] text-xs font-bold text-gray-700 bg-white"
-                >
-                  <option value="all">All Category Tags</option>
-                  <option value="General">General Circular</option>
-                  <option value="Holiday">Holiday Notice</option>
-                  <option value="Schedule change">Schedule Update</option>
-                  <option value="Cancellation">Class Cancellation</option>
-                  <option value="Fee reminder">Fee Reminder</option>
-                </select>
-              </div>
-
-              {/* Target Audience */}
-              <div>
-                <select
-                  value={adminAudienceFilter}
-                  onChange={(e) => setAdminAudienceFilter(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#075E54] text-xs font-bold text-gray-700 bg-white"
-                >
-                  <option value="all">All Audiences</option>
-                  <option value="All students">All Students</option>
-                  <option value="Students and Gurus">Students and Gurus</option>
-                  <option value="Selected course or batch">Selected Course / Batch</option>
-                  <option value="Trainers">Faculty Gurus</option>
-                </select>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleResetAdminFilters}
-                  className="flex-1 py-2.5 rounded-2xl border border-gray-200 hover:bg-gray-50 text-gray-600 text-xs font-bold transition"
-                >
-                  Clear
-                </button>
-                <button
-                  type="button"
-                  onClick={handleApplyAdminFilters}
-                  className="flex-1 py-2.5 rounded-2xl bg-[#075E54] hover:bg-[#128C7E] text-white text-xs font-black shadow-md transition"
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* WhatsApp Chat View for Admin Messages */}
-          <div className="rounded-3xl p-6 sm:p-8 bg-[#EFEAE2] border border-gray-300 shadow-inner min-h-[500px] flex flex-col justify-between relative overflow-hidden">
-            <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#075E54_1px,transparent_1px)] [background-size:16px_16px]" />
-
-            {adminMessages.length === 0 ? (
-              <div className="my-auto text-center py-12 space-y-3 bg-white/70 backdrop-blur-xs rounded-3xl p-8 max-w-md mx-auto border border-gray-200">
-                <div className="w-14 h-14 rounded-full bg-emerald-50 text-[#075E54] mx-auto flex items-center justify-center">
-                  <MessageSquare className="w-7 h-7" />
-                </div>
-                <h3 className="text-base font-black text-gray-800">No Admin Broadcasts Found</h3>
-                <p className="text-xs text-gray-500">
-                  Broadcast official notices, fee reminders, and circulars directly to student app message feeds.
-                </p>
-                <button
-                  onClick={openCreateModal}
-                  className="px-5 py-2.5 rounded-2xl bg-[#075E54] hover:bg-[#128C7E] text-white text-xs font-bold shadow-md cursor-pointer"
-                >
-                  + Broadcast First Message
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-6 relative z-10 max-w-4xl mx-auto w-full">
-                {/* Date Header Pill */}
-                <div className="flex justify-center">
-                  <span className="px-3 py-1 rounded-full bg-white/90 shadow-xs border border-gray-200 text-[11px] font-black uppercase text-gray-600 tracking-wider">
-                    Official Academy Dispatches
-                  </span>
-                </div>
-
-                {/* Right Aligned Admin Messages */}
-                {adminMessages.map((ann) => {
-                  const { date, time } = formatDateTime(ann.publish_date, ann.created_at);
-
-                  return (
-                    <div key={ann.id} className="flex justify-end">
-                      <div className="max-w-xl w-full bg-[#D9FDD3] rounded-2xl rounded-tr-xs p-4 sm:p-5 shadow-md border border-[#C2EDB9] space-y-3">
-                        {/* Header: Admin / Director Info */}
-                        <div className="flex items-center justify-between border-b border-[#C2EDB9] pb-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-[#075E54] text-white flex items-center justify-center font-black text-xs shadow-xs">
-                              👑
-                            </div>
-                            <div>
-                              <div className="text-xs font-black text-[#075E54] flex items-center gap-1.5">
-                                <span>Academy Administration</span>
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-[#075E54] text-white">
-                                  Director / Admin
+                              )}
+                              {ann.target_batch_name && (
+                                <span className="px-2 py-0.5 rounded-lg bg-gray-100 text-gray-700">
+                                  👥 {ann.target_batch_name}
                                 </span>
-                              </div>
-                              <div className="text-[10px] text-gray-500 font-medium">
-                                {date} at {time}
-                              </div>
+                              )}
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1.5">
-                            {renderCategoryTag(ann.type_tag)}
-                          </div>
-                        </div>
+                          {/* Attached Image if present */}
+                          {ann.image_url && (
+                            <div className="rounded-xl overflow-hidden border border-gray-200 max-h-60 bg-black/5">
+                              <img
+                                src={ann.image_url}
+                                alt={ann.title}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
 
-                        {/* Title */}
-                        <div>
-                          <h4 className="text-sm font-black text-gray-900 leading-snug">
-                            {ann.title}
-                          </h4>
-                          {/* Target Audience Pill */}
-                          <div className="flex flex-wrap gap-2 text-[11px] text-gray-600 font-semibold mt-1">
-                            <span className="px-2 py-0.5 rounded-lg bg-white/70 text-[#075E54] border border-[#C2EDB9]">
-                              🎯 Target: {ann.audience}
-                            </span>
-                            {ann.target_course_title && (
-                              <span className="px-2 py-0.5 rounded-lg bg-white/70 text-gray-700">
-                                📚 {ann.target_course_title}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                          {/* Message Content */}
+                          <p className="text-xs text-gray-800 whitespace-pre-line leading-relaxed font-medium">
+                            {ann.message}
+                          </p>
 
-                        {/* Attached Image if present */}
-                        {ann.image_url && (
-                          <div className="rounded-xl overflow-hidden border border-[#C2EDB9] max-h-56 bg-black/5">
-                            <img
-                              src={ann.image_url}
-                              alt={ann.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
+                          {/* Action / Share Links if any */}
+                          {ann.action_links && ann.action_links.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {ann.action_links.map((link, lIdx) => (
+                                <a
+                                  key={lIdx}
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-[#075E54] border border-emerald-200 hover:bg-emerald-100 transition shadow-xs"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span>{link.title}</span>
+                                </a>
+                              ))}
+                            </div>
+                          )}
 
-                        {/* Message Content */}
-                        <p className="text-xs text-gray-800 whitespace-pre-line leading-relaxed font-medium">
-                          {ann.message}
-                        </p>
-
-                        {/* Action Links */}
-                        {ann.action_links && ann.action_links.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {ann.action_links.map((link, idx) => (
-                              <a
-                                key={idx}
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white text-[#075E54] border border-[#C2EDB9] hover:bg-emerald-50 transition"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                <span>{link.title}</span>
-                              </a>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Card Footer with Details, Edit & Delete */}
-                        <div className="pt-2 border-t border-[#C2EDB9] flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                            <CheckCheck className="w-3.5 h-3.5 text-[#34B7F1]" />
-                            <span>Delivered to Student Inboxes</span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {/* Eye Details Button */}
+                          {/* Bottom of Message: Time & Details Button */}
+                          <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-3">
+                            {/* Eye Details & Students Button */}
                             <button
                               onClick={() => setDetailModalAnnouncement(ann)}
-                              className="px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-[#075E54] text-xs font-black shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+                              className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#075E54] text-xs font-black shadow-xs flex items-center gap-1.5 transition cursor-pointer"
                             >
                               <Eye className="w-3.5 h-3.5" />
-                              <span>Details & Students</span>
+                              <span>View Details & Students</span>
                             </button>
 
-                            {/* Edit */}
-                            <button
-                              onClick={() => openEditModal(ann)}
-                              className="p-1.5 rounded-xl bg-white hover:bg-emerald-50 text-gray-700 cursor-pointer shadow-xs"
-                              title="Edit Message"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-
-                            {/* Delete */}
-                            <button
-                              onClick={() => setDeletingAnnouncement(ann)}
-                              className="p-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-600 cursor-pointer shadow-xs"
-                              title="Delete Message"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {/* Time */}
+                            <div className="text-[11px] text-gray-400 font-bold shrink-0">
+                              {time}
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            )}
+                })
+              )}
+              <div ref={guruChatEndRef} />
+            </div>
           </div>
         </div>
       )}
 
       {/* ===================================================================== */}
-      {/* 3. EYE DETAILS MODAL WITH "VIEW STUDENTS" BUTTON                      */}
+      {/* 3. DETAILS MODAL                                                      */}
       {/* ===================================================================== */}
       {detailModalAnnouncement && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-xl w-full border border-gray-200 shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200 my-8">
-            {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className={`w-9 h-9 rounded-2xl flex items-center justify-center text-sm ${
@@ -1216,7 +1280,6 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
               </button>
             </div>
 
-            {/* Sender & Target Information Table */}
             <div className="bg-gray-50 rounded-2xl p-4 space-y-2 text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -1254,7 +1317,6 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
               </div>
             </div>
 
-            {/* Message Body */}
             <div className="space-y-2">
               <h4 className="text-base font-black text-gray-900">
                 {detailModalAnnouncement.title}
@@ -1264,7 +1326,6 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
               </p>
             </div>
 
-            {/* Attached Photo */}
             {detailModalAnnouncement.image_url && (
               <div className="rounded-2xl overflow-hidden border border-gray-200 max-h-64 bg-black/5">
                 <img
@@ -1275,10 +1336,9 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
               </div>
             )}
 
-            {/* Action Links */}
             {detailModalAnnouncement.action_links && detailModalAnnouncement.action_links.length > 0 && (
               <div className="space-y-1">
-                <div className="text-[11px] font-bold text-gray-500">Action Links:</div>
+                <div className="text-[11px] font-bold text-gray-500">Share Links:</div>
                 <div className="flex flex-wrap gap-2">
                   {detailModalAnnouncement.action_links.map((link, idx) => (
                     <a
@@ -1296,7 +1356,6 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
               </div>
             )}
 
-            {/* Action Buttons: "View Students" Button */}
             <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
               <button
                 type="button"
@@ -1324,12 +1383,11 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
       )}
 
       {/* ===================================================================== */}
-      {/* 4. RECIPIENT STUDENTS MODAL (LIST OF STUDENTS WHO RECEIVED MESSAGE)  */}
+      {/* 4. RECIPIENT STUDENTS MODAL (ERROR-FREE & POLISHED)                   */}
       {/* ===================================================================== */}
       {recipientModalAnnouncement && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-2xl w-full border border-gray-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200 my-8">
-            {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-[#075E54] flex items-center justify-center">
@@ -1350,7 +1408,6 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
               </button>
             </div>
 
-            {/* Stats and Search */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="text-xs font-bold text-gray-700">
                 Total Recipient Disciples:{' '}
@@ -1371,7 +1428,6 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
               </div>
             </div>
 
-            {/* Students Table */}
             <div className="border border-gray-200 rounded-2xl overflow-hidden max-h-96 overflow-y-auto">
               {isLoadingRecipients ? (
                 <div className="py-16 text-center space-y-2">
@@ -1420,10 +1476,9 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
               )}
             </div>
 
-            {/* Footer */}
             <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
               <span className="text-[11px] text-gray-400">
-                Verified delivery to Student Mobile App notifications & messages feed.
+                Verified delivery to Student Mobile App notifications & messages channel.
               </span>
               <button
                 type="button"
@@ -1438,12 +1493,12 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
       )}
 
       {/* ===================================================================== */}
-      {/* 5. ADMIN COMPOSE MODAL (EXACTLY MATCHING REFERENCE IMAGE 1)           */}
+      {/* 5. ADMIN COMPOSE MODAL (SCHEDULE DATE+TIME, SIDE-BY-SIDE DROPDOWNS)    */}
       {/* ===================================================================== */}
       {(isCreateModalOpen || editingAnnouncement) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full border border-gray-200 shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
-            {/* Header: Dark Green with Message Icon */}
+          <div className="bg-white rounded-3xl max-w-3xl w-full border border-gray-200 shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header: Dark Green */}
             <div className="bg-[#075E54] text-white p-5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center">
@@ -1469,7 +1524,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
               </button>
             </div>
 
-            {/* Tabs matching Reference Image 1 */}
+            {/* Tabs */}
             <div className="flex border-b border-gray-200 bg-gray-50">
               <button
                 type="button"
@@ -1496,11 +1551,11 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
               </button>
             </div>
 
-            {/* Form Content */}
-            <form onSubmit={editingAnnouncement ? handleSubmitEdit : handleSubmitCreate} className="p-6 space-y-5">
+            {/* Form Body */}
+            <form onSubmit={editingAnnouncement ? handleSubmitEdit : handleSubmitCreate} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
               {activeFormTab === 'compose' ? (
                 <>
-                  {/* NOTICE SUBJECT / TITLE * with Enhance button */}
+                  {/* Notice Subject / Title */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-black text-gray-700 uppercase tracking-wider">
@@ -1522,7 +1577,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                     {formErrors.title && <p className="text-xs font-bold text-rose-600">{formErrors.title}</p>}
                   </div>
 
-                  {/* ATTACH IMAGE / FLYER (OPTIONAL) matching Reference Image 1 */}
+                  {/* Attach Image / Flyer (Optional) */}
                   <div className="space-y-2 p-4 rounded-2xl bg-[#F0FDF4] border border-emerald-200">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-black text-[#075E54] uppercase tracking-wider flex items-center gap-1.5">
@@ -1557,7 +1612,6 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                       </label>
                     </div>
 
-                    {/* Attached Image Thumbnail */}
                     {formData.image_url && (
                       <div className="pt-2 flex items-center gap-3">
                         <div className="w-20 h-20 rounded-xl overflow-hidden border border-emerald-300 bg-black/5 shrink-0">
@@ -1568,13 +1622,13 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                           />
                         </div>
                         <div className="text-xs text-gray-600 font-semibold">
-                          Image attached! Will appear inside the broadcast chat bubble.
+                          Image attached! Will display inside the broadcast message card.
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {/* BROADCAST MESSAGE CONTENT * with Enhance button */}
+                  {/* Broadcast Message Content */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-black text-gray-700 uppercase tracking-wider">
@@ -1596,7 +1650,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                     {formErrors.message && <p className="text-xs font-bold text-rose-600">{formErrors.message}</p>}
                   </div>
 
-                  {/* TARGET AUDIENCE * & CATEGORY TAG * */}
+                  {/* Target Audience & Category Tag */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-black text-gray-700 uppercase tracking-wider">
@@ -1609,9 +1663,8 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                       >
                         <option value="All students">All students</option>
                         <option value="Students and Gurus">Students and Gurus</option>
-                        <option value="Selected course or batch">Selected course or batch</option>
-                        <option value="Trainers">Faculty Gurus</option>
-                        <option value="Chosen recipients">Chosen recipients</option>
+                        <option value="Specific Courses & Batches">Specific Courses & Batches</option>
+                        <option value="Trainers">Faculty Gurus Only</option>
                       </select>
                     </div>
 
@@ -1633,44 +1686,41 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                     </div>
                   </div>
 
-                  {/* Course & Batch Selection when "Selected course or batch" is selected */}
-                  {formData.audience === 'Selected course or batch' && (
-                    <div className="space-y-3 p-4 rounded-2xl bg-gray-50 border border-gray-200">
-                      <div>
-                        <label className="text-xs font-bold text-gray-700">Target Courses:</label>
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {courses.map(c => {
-                            const isSelected = selectedCourseIds.includes(c.id);
-                            return (
-                              <button
-                                key={c.id}
-                                type="button"
-                                onClick={() => {
-                                  if (isSelected) {
-                                    setSelectedCourseIds(prev => prev.filter(id => id !== c.id));
-                                  } else {
-                                    setSelectedCourseIds(prev => [...prev, c.id]);
-                                  }
-                                }}
-                                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition ${
-                                  isSelected 
-                                    ? 'bg-[#075E54] text-white shadow-xs' 
-                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
-                                }`}
-                              >
-                                {c.title}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        {formErrors.target_course_id && (
-                          <p className="text-xs font-bold text-rose-600 mt-1">{formErrors.target_course_id}</p>
-                        )}
+                  {/* SIDE-BY-SIDE SEARCHABLE MULTI-SELECT DROPDOWNS FOR COURSES & BATCHES */}
+                  {formData.audience === 'Specific Courses & Batches' && (
+                    <div className="p-4 rounded-3xl bg-gray-50 border border-gray-200 space-y-3">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-[#075E54] uppercase tracking-wider">
+                        <BookOpen className="w-4 h-4 text-emerald-600" />
+                        <span>Select Target Courses & Batches (Side-by-Side Searchable)</span>
                       </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Left: Courses Searchable Multi-Select */}
+                        <SearchableMultiSelect
+                          label="Select Courses"
+                          placeholder="Search & choose courses..."
+                          items={courses.map(c => ({ id: c.id, label: c.title, sublabel: c.category || 'Course' }))}
+                          selectedIds={selectedCourseIds}
+                          onChange={setSelectedCourseIds}
+                        />
+
+                        {/* Right: Batches Searchable Multi-Select */}
+                        <SearchableMultiSelect
+                          label="Select Batches"
+                          placeholder="Search & choose batches..."
+                          items={availableBatchesForCompose.map(b => ({ id: b.id, label: b.name }))}
+                          selectedIds={selectedBatchIds}
+                          onChange={setSelectedBatchIds}
+                        />
+                      </div>
+
+                      {formErrors.audience && (
+                        <p className="text-xs font-bold text-rose-600">{formErrors.audience}</p>
+                      )}
                     </div>
                   )}
 
-                  {/* DISPATCH STATUS * */}
+                  {/* DISPATCH STATUS */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-black text-gray-700 uppercase tracking-wider">
                       DISPATCH STATUS *
@@ -1686,7 +1736,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                     </select>
                   </div>
 
-                  {/* Informational banner matching Reference Image 1 */}
+                  {/* Informational Banner for Publish Now */}
                   {formData.status === 'Published' && (
                     <div className="p-3.5 rounded-2xl bg-[#E8F8F0] border border-[#BCE8D0] flex items-center gap-2.5 text-xs font-bold text-[#075E54]">
                       <CheckCircle2 className="w-4 h-4 text-[#25D366] shrink-0" />
@@ -1696,29 +1746,54 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                     </div>
                   )}
 
+                  {/* SCHEDULE LATER: DATE AND TIME SELECTION */}
                   {formData.status === 'Scheduled' && (
-                    <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 space-y-2">
-                      <label className="text-xs font-bold text-blue-900">Scheduled Date *</label>
-                      <input
-                        type="date"
-                        value={formData.publish_date}
-                        onChange={(e) => setFormData(prev => ({ ...prev, publish_date: e.target.value }))}
-                        className="w-full px-3.5 py-2 rounded-xl border border-blue-300 text-xs font-bold text-blue-900 bg-white"
-                      />
-                      {formErrors.publish_date && <p className="text-xs font-bold text-rose-600">{formErrors.publish_date}</p>}
+                    <div className="p-4 rounded-3xl bg-blue-50 border border-blue-200 space-y-3">
+                      <div className="flex items-center gap-2 text-xs font-black text-blue-900 uppercase tracking-wider">
+                        <Clock className="w-4 h-4 text-blue-600" />
+                        <span>Select Scheduled Dispatch Date & Time *</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-blue-900 mb-1">
+                            Scheduled Date:
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.publish_date}
+                            onChange={(e) => setFormData(prev => ({ ...prev, publish_date: e.target.value }))}
+                            className="w-full px-3.5 py-2 rounded-xl border border-blue-300 text-xs font-bold text-blue-900 bg-white"
+                          />
+                          {formErrors.publish_date && <p className="text-xs font-bold text-rose-600 mt-1">{formErrors.publish_date}</p>}
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-blue-900 mb-1">
+                            Scheduled Time:
+                          </label>
+                          <input
+                            type="time"
+                            value={formData.publish_time}
+                            onChange={(e) => setFormData(prev => ({ ...prev, publish_time: e.target.value }))}
+                            className="w-full px-3.5 py-2 rounded-xl border border-blue-300 text-xs font-bold text-blue-900 bg-white"
+                          />
+                          {formErrors.publish_time && <p className="text-xs font-bold text-rose-600 mt-1">{formErrors.publish_time}</p>}
+                        </div>
+                      </div>
                     </div>
                   )}
 
-                  {/* ACTION LINKS / EXTERNAL URLS (OPTIONAL) matching Reference Image 1 */}
-                  <div className="space-y-2 p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                  {/* SHARE LINK (IMPROVED UI) */}
+                  <div className="space-y-3 p-4 rounded-3xl bg-[#FFF9FB] border border-[#F0D5E4]">
                     <div className="flex items-center justify-between">
                       <div>
-                        <label className="text-xs font-black text-[#8A064D] uppercase tracking-wider flex items-center gap-1">
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          <span>ACTION LINKS / EXTERNAL URLS (OPTIONAL)</span>
+                        <label className="text-xs font-black text-[#8A064D] uppercase tracking-wider flex items-center gap-1.5">
+                          <LinkIcon className="w-3.5 h-3.5" />
+                          <span>SHARE LINK (OPTIONAL)</span>
                         </label>
                         <p className="text-[11px] text-gray-500 mt-0.5">
-                          Add link title and URL pairs (e.g. Register for Workshop, Drive Link, Syllabus PDF)
+                          Attach registration URLs, Google Drive syllabus folders, or video links.
                         </p>
                       </div>
                       <button
@@ -1726,54 +1801,56 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                         onClick={() => {
                           setFormData(prev => ({
                             ...prev,
-                            action_links: [...prev.action_links, { title: '', url: '' }]
+                            share_links: [...prev.share_links, { title: '', url: '' }]
                           }));
                         }}
-                        className="px-3 py-1.5 rounded-xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-bold cursor-pointer transition flex items-center gap-1 shadow-xs"
+                        className="px-3.5 py-1.5 rounded-xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-bold cursor-pointer transition flex items-center gap-1 shadow-xs"
                       >
-                        + Add Link
+                        + Add Share Link
                       </button>
                     </div>
 
-                    {formData.action_links.length === 0 ? (
+                    {formData.share_links.length === 0 ? (
                       <div className="p-4 rounded-2xl border border-dashed border-gray-200 text-center text-xs text-gray-400 font-medium bg-white">
-                        No external links attached. Click "+ Add Link" to include clickable links in the mobile app.
+                        No share links attached. Click "+ Add Share Link" to include buttons in the mobile app.
                       </div>
                     ) : (
-                      <div className="space-y-2 pt-1">
-                        {formData.action_links.map((link, idx) => (
-                          <div key={idx} className="flex items-center gap-2">
+                      <div className="space-y-2.5 pt-1">
+                        {formData.share_links.map((link, idx) => (
+                          <div key={idx} className="flex items-center gap-2 p-2.5 rounded-2xl bg-white border border-[#F0D5E4] shadow-xs">
+                            <Globe className="w-4 h-4 text-[#8A064D] shrink-0 ml-1" />
                             <input
                               type="text"
                               value={link.title}
-                              placeholder="Link Title (e.g. Workshop Registration)"
+                              placeholder="Link Title (e.g. Register for Workshop)"
                               onChange={(e) => {
-                                const newLinks = [...formData.action_links];
+                                const newLinks = [...formData.share_links];
                                 newLinks[idx].title = e.target.value;
-                                setFormData(prev => ({ ...prev, action_links: newLinks }));
+                                setFormData(prev => ({ ...prev, share_links: newLinks }));
                               }}
-                              className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold"
+                              className="flex-1 px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
                             />
                             <input
                               type="url"
                               value={link.url}
                               placeholder="https://..."
                               onChange={(e) => {
-                                const newLinks = [...formData.action_links];
+                                const newLinks = [...formData.share_links];
                                 newLinks[idx].url = e.target.value;
-                                setFormData(prev => ({ ...prev, action_links: newLinks }));
+                                setFormData(prev => ({ ...prev, share_links: newLinks }));
                               }}
-                              className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold"
+                              className="flex-1 px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
                             />
                             <button
                               type="button"
                               onClick={() => {
                                 setFormData(prev => ({
                                   ...prev,
-                                  action_links: prev.action_links.filter((_, i) => i !== idx)
+                                  share_links: prev.share_links.filter((_, i) => i !== idx)
                                 }));
                               }}
-                              className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                              className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-xl cursor-pointer"
+                              title="Remove Link"
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -1798,7 +1875,7 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                         </div>
                         <div>
                           <div className="text-xs font-black text-[#075E54]">Academy Administration</div>
-                          <div className="text-[10px] text-gray-500">Today, 10:30 AM</div>
+                          <div className="text-[10px] text-gray-500">Today</div>
                         </div>
                       </div>
                       {renderCategoryTag(formData.type_tag)}
@@ -1822,10 +1899,24 @@ export default function AnnouncementsClient({ initialAnnouncements, courses, bat
                       {formData.message || 'Broadcast message content will appear here...'}
                     </p>
 
-                    <div className="pt-2 border-t border-[#C2EDB9] flex items-center justify-between text-[10px] text-gray-500">
+                    {formData.share_links && formData.share_links.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {formData.share_links.map((link, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white text-[#075E54] border border-[#C2EDB9]"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>{link.title || 'Link'}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-[#C2EDB9] flex items-center justify-between text-[10px] text-gray-500 font-bold">
                       <span>Target: {formData.audience}</span>
                       <div className="flex items-center gap-1">
-                        <span>10:30 AM</span>
+                        <span>{formData.publish_time || '10:30 AM'}</span>
                         <CheckCheck className="w-3.5 h-3.5 text-[#34B7F1]" />
                       </div>
                     </div>
