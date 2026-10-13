@@ -22,7 +22,7 @@ export default async function AnnouncementsPage() {
   ]);
 
   return (
-    <div className="w-full">
+    <div className="w-full flex-1 flex flex-col">
       <AnnouncementsClient 
         initialAnnouncements={announcements}
         courses={courses}

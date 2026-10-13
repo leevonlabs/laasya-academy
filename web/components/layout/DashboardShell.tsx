@@ -274,7 +274,7 @@ export default function DashboardShell({ user, children }: Props) {
         </header>
 
         {/* Page Content */}
-        <div className="p-4 md:p-8 flex-1">
+        <div className={`${pathname.startsWith('/announcements') ? 'p-2 sm:p-4' : 'p-4 md:p-8'} flex-1 flex flex-col`}>
           {children}
         </div>
       </main>
