@@ -5,6 +5,7 @@ import {
   getStudentsForCourse,
   createEventFolder,
   createUniversalEventFolders,
+  getGuruComplianceData,
 } from '@/lib/videoLibrary';
 
 const corsHeaders = {
@@ -20,6 +21,19 @@ export async function OPTIONS() {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const isCompliance = searchParams.get('compliance') === 'true' || searchParams.get('guruCompliance') === 'true';
+
+    // If requesting Guru performance video compliance audit
+    if (isCompliance) {
+      const month = searchParams.get('month') || undefined;
+      const year = searchParams.get('year') || undefined;
+      const trainerId = searchParams.get('trainerId') || undefined;
+      const trainerName = searchParams.get('trainerName') || undefined;
+
+      const compliance = await getGuruComplianceData({ month, year, trainerId, trainerName });
+      return NextResponse.json({ success: true, ...compliance }, { headers: corsHeaders });
+    }
+
     const courseId = searchParams.get('courseId') || undefined;
     const courseTitle = searchParams.get('courseTitle') || undefined;
     const batchId = searchParams.get('batchId') || undefined;
@@ -29,6 +43,7 @@ export async function GET(request: NextRequest) {
     const trainerId = searchParams.get('trainerId') || undefined;
     const includeCourses = searchParams.get('includeCourses') === 'true';
     const courseStudents = searchParams.get('courseStudents');
+
 
     // If requesting enrolled students for a specific course
     if (courseStudents) {

@@ -27,17 +27,42 @@ import {
   Filter,
   SlidersHorizontal,
   RotateCcw,
-  GraduationCap
+  GraduationCap,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Phone,
+  Mail,
+  UserCheck,
+  UserX,
+  Play,
+  ArrowUpRight,
+  ShieldCheck,
+  Eye,
 } from 'lucide-react';
 import AiEnhanceButton from '@/components/common/AiEnhanceButton';
-import { CourseWithDetails, VideoLibraryItem, EnrolledStudent } from '@/lib/videoLibrary';
+import {
+  CourseWithDetails,
+  VideoLibraryItem,
+  EnrolledStudent,
+  GuruComplianceItem,
+  GuruComplianceSummary,
+  GuruComplianceDisciple,
+} from '@/lib/videoLibrary';
 
 interface Props {
   initialCourses: CourseWithDetails[];
   initialItems: VideoLibraryItem[];
+  initialCompliance?: {
+    month: string;
+    year: string;
+    summary: GuruComplianceSummary;
+    gurus: GuruComplianceItem[];
+  };
 }
 
-export default function VideoLibraryClient({ initialCourses, initialItems }: Props) {
+export default function VideoLibraryClient({ initialCourses, initialItems, initialCompliance }: Props) {
+
   const [courses, setCourses] = useState<CourseWithDetails[]>(initialCourses);
   const [items, setItems] = useState<VideoLibraryItem[]>(initialItems);
 
@@ -72,6 +97,59 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
   const [guruShareCourseFilter, setGuruShareCourseFilter] = useState('all');
   const [guruShareMonthFilter, setGuruShareMonthFilter] = useState('all');
   const [guruShareYearFilter, setGuruShareYearFilter] = useState('all');
+
+  // GURU PERFORMANCE VIDEO COMPLIANCE TRACKING STATE
+  const [complianceMonth, setComplianceMonth] = useState<string>(() => {
+    return initialCompliance?.month || (new Date().getMonth() + 1).toString();
+  });
+  const [complianceYear, setComplianceYear] = useState<string>(() => {
+    return initialCompliance?.year || new Date().getFullYear().toString();
+  });
+  const [complianceData, setComplianceData] = useState<{
+    summary: GuruComplianceSummary;
+    gurus: GuruComplianceItem[];
+  }>(() => ({
+    summary: initialCompliance?.summary || {
+      total_gurus: 0,
+      completed_gurus: 0,
+      partial_gurus: 0,
+      pending_gurus: 0,
+      total_students: 0,
+      total_received: 0,
+      total_missing: 0,
+      overall_compliance_rate: 0,
+    },
+    gurus: initialCompliance?.gurus || [],
+  }));
+  const [isLoadingCompliance, setIsLoadingCompliance] = useState(false);
+  const [selectedGuruForModal, setSelectedGuruForModal] = useState<GuruComplianceItem | null>(null);
+  const [guruModalActiveTab, setGuruModalActiveTab] = useState<'received' | 'missing' | 'all_videos'>('received');
+  const [complianceStatusFilter, setComplianceStatusFilter] = useState<'all' | 'needs_attention' | 'completed' | 'no_students'>('all');
+  const [complianceSearch, setComplianceSearch] = useState('');
+  const [guruShareViewMode, setGuruShareViewMode] = useState<'compliance_grid' | 'media_archive'>('compliance_grid');
+
+  const fetchComplianceData = async (month: string, year: string) => {
+    setIsLoadingCompliance(true);
+    try {
+      const res = await fetch(`/api/video-library?compliance=true&month=${month}&year=${year}`);
+      const data = await res.json();
+      if (data.success) {
+        setComplianceData({
+          summary: data.summary,
+          gurus: data.gurus,
+        });
+        if (selectedGuruForModal) {
+          const updated = data.gurus.find((g: any) => g.trainer_id === selectedGuruForModal.trainer_id);
+          if (updated) setSelectedGuruForModal(updated);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching guru compliance data:', err);
+    } finally {
+      setIsLoadingCompliance(false);
+    }
+  };
+
 
   // Search & Filter state for courses grid
   const [courseSearch, setCourseSearch] = useState('');
@@ -355,6 +433,35 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
       return true;
     });
   }, [guruSharedItems, guruShareTrainerFilter, guruShareCourseFilter, guruShareMonthFilter, guruShareYearFilter, guruShareSearch]);
+
+  // Filtered Gurus for Compliance Directory
+  const filteredComplianceGurus = useMemo(() => {
+    return complianceData.gurus.filter(guru => {
+      if (complianceStatusFilter === 'completed') {
+        if (guru.compliance_status !== 'completed') return false;
+      } else if (complianceStatusFilter === 'needs_attention') {
+        if (guru.missing_count === 0 || guru.total_students === 0) return false;
+      } else if (complianceStatusFilter === 'no_students') {
+        if (guru.total_students > 0) return false;
+      }
+
+      if (complianceSearch.trim()) {
+        const q = complianceSearch.toLowerCase();
+        const matchName = guru.full_name.toLowerCase().includes(q);
+        const matchTitle = (guru.display_title || '').toLowerCase().includes(q);
+        const matchCourses = guru.courses.some(c => c.title.toLowerCase().includes(q));
+        const matchSpecialization = guru.specializations.some(s => s.toLowerCase().includes(q));
+        const matchDisciples = [...guru.received_disciples, ...guru.missing_disciples].some(d => 
+          d.student_name.toLowerCase().includes(q) || d.roll_number.toLowerCase().includes(q)
+        );
+        if (!matchName && !matchTitle && !matchCourses && !matchSpecialization && !matchDisciples) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [complianceData.gurus, complianceStatusFilter, complianceSearch]);
+
 
   // Handle Subpage Share Link Submit
   const handleSubpageShareSubmit = async (e: React.FormEvent) => {
@@ -1594,64 +1701,186 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
         </div>
       ) : (
         /* ===================================================================== */
-        /* TAB 3: GURU SHARE (FACULTY SHARED MEDIA ARCHIVE)                      */
+        /* TAB 3: GURU SHARE & MONTHLY PERFORMANCE VIDEO TRACKING HUB           */
         /* ===================================================================== */
         <div className="space-y-6 animate-in fade-in duration-200">
           {/* Header Summary Banner */}
-          <div className="bg-gradient-to-r from-[#2D041A] via-[#590231] to-[#8A064D] text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-[#D4AF37]/30 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-            <div className="space-y-2 z-10">
+          <div className="bg-gradient-to-r from-[#2D041A] via-[#590231] to-[#8A064D] text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative overflow-hidden">
+            <div className="space-y-2 z-10 max-w-2xl">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#F9E33A] font-mono text-xs font-bold border border-[#D4AF37]/30 uppercase tracking-wider">
                 <GraduationCap className="w-4 h-4 text-[#F9E33A]" />
-                Faculty Contributions • Guru Share Hub
+                Faculty Disciples Audit • Monthly Performance Videos
               </span>
               <h2 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-white">
-                Links Shared by Gurus
+                Guru Performance Video Tracking & Hub
               </h2>
-              <p className="text-xs sm:text-sm text-rose-100/90 max-w-xl leading-relaxed">
-                Centralized archive of practice recordings, event videos, and learning resources shared by faculty Gurus directly to their assigned course disciples.
+              <p className="text-xs sm:text-sm text-rose-100/90 leading-relaxed">
+                Faculty Gurus must share at least 1 performance video link (Google Drive / YouTube) for every disciple per month. Track compliance across all Gurus, identify missing disciples, and view video recordings.
               </p>
             </div>
 
-            <div className="flex items-center gap-3 z-10 shrink-0">
-              <div className="bg-black/25 backdrop-blur-md border border-white/15 px-4 py-3 rounded-2xl text-center">
-                <span className="text-[10px] uppercase font-bold text-rose-200 block">Total Guru Shares</span>
-                <span className="text-2xl font-black text-[#F9E33A] mt-0.5 block">{guruSharedItems.length}</span>
+            {/* Audit Period & View Toggle Controls */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 z-10 shrink-0">
+              {/* Month Picker */}
+              <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md border border-white/15 px-3 py-2 rounded-2xl">
+                <Calendar className="w-4 h-4 text-[#F9E33A] shrink-0" />
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={complianceMonth}
+                    onChange={(e) => {
+                      const newM = e.target.value;
+                      setComplianceMonth(newM);
+                      fetchComplianceData(newM, complianceYear);
+                    }}
+                    className="bg-transparent text-xs font-bold text-white focus:outline-hidden cursor-pointer"
+                  >
+                    {MONTHS.map((m) => (
+                      <option key={`audit-month-${m.value}`} value={m.value} className="text-gray-900 bg-white">
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={complianceYear}
+                    onChange={(e) => {
+                      const newY = e.target.value;
+                      setComplianceYear(newY);
+                      fetchComplianceData(complianceMonth, newY);
+                    }}
+                    className="bg-transparent text-xs font-bold text-white focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="all" className="text-gray-900 bg-white">All Years</option>
+                    {availableYears.filter((y) => y !== 'all').map((y) => (
+                      <option key={`audit-year-${y}`} value={y} className="text-gray-900 bg-white">
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="bg-black/25 backdrop-blur-md border border-white/15 px-4 py-3 rounded-2xl text-center">
-                <span className="text-[10px] uppercase font-bold text-rose-200 block">Active Gurus</span>
-                <span className="text-2xl font-black text-white mt-0.5 block">{guruNames.length}</span>
+
+              {/* View Switcher: Compliance Directory vs Media Archive */}
+              <div className="flex p-1 bg-black/30 backdrop-blur-md rounded-2xl border border-white/15">
+                <button
+                  type="button"
+                  onClick={() => setGuruShareViewMode('compliance_grid')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    guruShareViewMode === 'compliance_grid'
+                      ? 'bg-[#D4AF37] text-[#4A0025] shadow-sm'
+                      : 'text-white/80 hover:text-white'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>All Gurus ({complianceData.gurus.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGuruShareViewMode('media_archive')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    guruShareViewMode === 'media_archive'
+                      ? 'bg-[#D4AF37] text-[#4A0025] shadow-sm'
+                      : 'text-white/80 hover:text-white'
+                  }`}
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  <span>Media Archive ({guruSharedItems.length})</span>
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Guru Share Filter Controls */}
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#F0D5E4] space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-gray-100">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <Video className="w-5 h-5 text-[#8A064D]" />
-                  <span>Shared Resource Archive ({guruFilteredItems.length})</span>
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Filter by Guru, enrolled course, or search resource titles
-                </p>
+          {/* KPI Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Total Gurus */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#F0D5E4] shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Faculty Gurus</span>
+                <div className="w-8 h-8 rounded-xl bg-[#FFF2F8] text-[#8A064D] flex items-center justify-center">
+                  <GraduationCap className="w-4 h-4" />
+                </div>
               </div>
+              <div className="mt-2">
+                <span className="text-2xl sm:text-3xl font-black text-[#2D041A]">{complianceData.summary.total_gurus}</span>
+                <span className="text-xs text-gray-500 block mt-0.5 font-medium">
+                  <strong className="text-emerald-700 font-bold">{complianceData.summary.completed_gurus}</strong> 100% Completed
+                </span>
+              </div>
+            </div>
 
-              {/* Filters */}
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Search */}
-                <div className="relative w-full sm:w-60">
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            {/* Card 2: Total Disciples */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#F0D5E4] shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Enrolled Disciples</span>
+                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
+                  <Users className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2">
+                <span className="text-2xl sm:text-3xl font-black text-[#2D041A]">{complianceData.summary.total_students}</span>
+                <span className="text-xs text-gray-500 block mt-0.5 font-medium">
+                  Across all Guru Batches
+                </span>
+              </div>
+            </div>
+
+            {/* Card 3: Videos Shared */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#F0D5E4] shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Videos Received</span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl sm:text-3xl font-black text-emerald-700">{complianceData.summary.total_received}</span>
+                  <span className="text-xs font-bold text-emerald-600">({complianceData.summary.overall_compliance_rate}%)</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(complianceData.summary.overall_compliance_rate, 100)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Card 4: Missing Disciples */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#F0D5E4] shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Missing This Month</span>
+                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2">
+                <span className="text-2xl sm:text-3xl font-black text-rose-600">{complianceData.summary.total_missing}</span>
+                <span className="text-xs text-rose-700 font-bold block mt-0.5">
+                  {complianceData.summary.total_missing === 0 ? 'All Disciples Completed!' : 'Pending Performance Videos'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* VIEW MODE 1: ALL GURUS COMPLIANCE DIRECTORY */}
+          {guruShareViewMode === 'compliance_grid' ? (
+            <div className="space-y-4">
+              {/* Filter Pills & Search Bar */}
+              <div className="bg-white rounded-2xl p-4 border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                {/* Search Input */}
+                <div className="relative flex-1 max-w-md">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Search guru links..."
-                    value={guruShareSearch}
-                    onChange={e => setGuruShareSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-gray-200 text-xs bg-[#FFF9FB] focus:outline-hidden focus:ring-1 focus:ring-[#8A064D]"
+                    placeholder="Search Guru name, course, batch, or disciple..."
+                    value={complianceSearch}
+                    onChange={(e) => setComplianceSearch(e.target.value)}
+                    className="w-full pl-10 pr-8 py-2 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-medium text-gray-900 focus:outline-hidden focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
                   />
-                  {guruShareSearch && (
+                  {complianceSearch && (
                     <button
-                      onClick={() => setGuruShareSearch('')}
+                      onClick={() => setComplianceSearch('')}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -1659,230 +1888,801 @@ export default function VideoLibraryClient({ initialCourses, initialItems }: Pro
                   )}
                 </div>
 
-                {/* Guru Filter */}
-                <select
-                  value={guruShareTrainerFilter}
-                  onChange={e => setGuruShareTrainerFilter(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer"
-                >
-                  <option value="all">All Gurus ({guruNames.length})</option>
-                  {guruNames.map(name => (
-                    <option key={`guru-filter-${name}`} value={name}>
-                      Guru {name}
-                    </option>
-                  ))}
-                </select>
+                {/* Filter Pills */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                  <button
+                    type="button"
+                    onClick={() => setComplianceStatusFilter('all')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                      complianceStatusFilter === 'all'
+                        ? 'bg-[#590231] text-white shadow-xs'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    All Gurus ({complianceData.gurus.length})
+                  </button>
 
-                {/* Course Filter */}
-                <select
-                  value={guruShareCourseFilter}
-                  onChange={e => setGuruShareCourseFilter(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer max-w-[180px] truncate"
-                >
-                  <option value="all">All Courses</option>
-                  {courses.map(c => (
-                    <option key={`guru-course-${c.id}`} value={c.title}>
-                      {c.title}
-                    </option>
-                  ))}
-                </select>
+                  <button
+                    type="button"
+                    onClick={() => setComplianceStatusFilter('needs_attention')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      complianceStatusFilter === 'needs_attention'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                    }`}
+                  >
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>Needs Attention ({complianceData.summary.partial_gurus + complianceData.summary.pending_gurus})</span>
+                  </button>
 
-                {/* Month Filter */}
-                <select
-                  value={guruShareMonthFilter}
-                  onChange={e => setGuruShareMonthFilter(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer"
-                >
-                  {MONTHS.map(m => (
-                    <option key={`guru-month-${m.value}`} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
+                  <button
+                    type="button"
+                    onClick={() => setComplianceStatusFilter('completed')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      complianceStatusFilter === 'completed'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>100% Completed ({complianceData.summary.completed_gurus})</span>
+                  </button>
 
-                {/* Year Filter */}
-                <select
-                  value={guruShareYearFilter}
-                  onChange={e => setGuruShareYearFilter(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer"
-                >
-                  <option value="all">All Years</option>
-                  {availableYears.filter(y => y !== 'all').map(y => (
-                    <option key={`guru-year-${y}`} value={y}>
-                      Year {y}
-                    </option>
-                  ))}
-                </select>
+                  <button
+                    type="button"
+                    onClick={() => fetchComplianceData(complianceMonth, complianceYear)}
+                    title="Refresh Data"
+                    className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition cursor-pointer"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isLoadingCompliance ? 'animate-spin text-[#8A064D]' : ''}`} />
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Content List */}
-            {guruFilteredItems.length === 0 ? (
-              <div className="p-12 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
-                <GraduationCap className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm font-bold text-gray-700">No resources shared by Gurus yet</p>
-                <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
-                  When faculty Gurus share video or Google Drive links with their enrolled batches via the Guru mobile app, all links will automatically be cataloged and manageable here.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {guruFilteredItems.map((item, idx) => {
-                  const formattedDate = item.event_date
-                    ? new Date(item.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                    : 'Recent Share';
-                  const guruInitials = (item.trainer_name || 'G').charAt(0).toUpperCase();
+              {/* ALL GURUS DIRECTORY GRID */}
+              {filteredComplianceGurus.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-3xl border border-[#F0D5E4] shadow-xs">
+                  <GraduationCap className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                  <h4 className="text-sm font-bold text-gray-700">No Gurus match the selected filters</h4>
+                  <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+                    Try clearing your search query or selecting a different filter status pill above.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4.5">
+                  {filteredComplianceGurus.map((guru) => {
+                    const initials = guru.full_name
+                      .split(' ')
+                      .map((p) => p[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2);
 
-                  return (
-                    <div
-                      key={`guru-item-${item.id}-${idx}`}
-                      className="bg-white rounded-3xl p-5 border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                    >
-                      {/* Top Header: Guru Author & Meta */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#590231] text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
-                              {guruInitials}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-sm text-[#2D041A] truncate">
-                                  Guru {item.trainer_name || 'Faculty Member'}
-                                </span>
-                                <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 text-[9px] font-extrabold uppercase border border-emerald-200">
-                                  Verified
-                                </span>
+                    const isFullyCompliant = guru.compliance_status === 'completed';
+                    const hasMissing = guru.missing_count > 0;
+                    const noStudents = guru.total_students === 0;
+
+                    return (
+                      <div
+                        key={`guru-card-${guru.trainer_id}`}
+                        className={`bg-white rounded-3xl p-5 border transition-all duration-200 shadow-xs hover:shadow-md flex flex-col justify-between space-y-4 ${
+                          isFullyCompliant
+                            ? 'border-emerald-200 hover:border-emerald-400'
+                            : hasMissing
+                            ? 'border-rose-200 hover:border-[#8A064D]'
+                            : 'border-[#F0D5E4] hover:border-[#8A064D]'
+                        }`}
+                      >
+                        <div className="space-y-3">
+                          {/* Top Row: Guru Identity & Compliance Pill */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {guru.avatar_url ? (
+                                <img
+                                  src={guru.avatar_url}
+                                  alt={guru.full_name}
+                                  className="w-11 h-11 rounded-2xl object-cover border border-[#F0D5E4] shadow-2xs shrink-0"
+                                />
+                              ) : (
+                                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#590231] to-[#8A064D] text-white flex items-center justify-center font-bold text-sm shadow-2xs shrink-0">
+                                  {initials}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-sm text-[#2D041A] truncate flex items-center gap-1.5">
+                                  <span>Guru {guru.full_name}</span>
+                                </h4>
+                                <p className="text-[11px] text-gray-500 font-medium truncate mt-0.5">
+                                  {guru.display_title || (guru.specializations.length > 0 ? guru.specializations.join(', ') : 'Faculty Guru')}
+                                </p>
                               </div>
-                              <span className="text-[11px] text-gray-400 font-medium flex items-center gap-1 mt-0.5">
-                                <Calendar className="w-3 h-3 text-gray-400" />
-                                {formattedDate}
+                            </div>
+
+                            {/* Compliance Badge */}
+                            {noStudents ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 shrink-0">
+                                No Disciples
+                              </span>
+                            ) : isFullyCompliant ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#DEF7EC] text-[#03543F] border border-emerald-300 flex items-center gap-1 shrink-0">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>100% Done</span>
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 shrink-0">
+                                <AlertCircle className="w-3 h-3 text-rose-600" />
+                                <span>{guru.missing_count} Missing</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Courses & Batches Pills */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {guru.courses.map((c) => (
+                              <span
+                                key={`guru-c-${guru.trainer_id}-${c.id}`}
+                                className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-100"
+                              >
+                                {c.title}
+                              </span>
+                            ))}
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-600">
+                              {guru.assigned_batches_count} {guru.assigned_batches_count === 1 ? 'Batch' : 'Batches'}
+                            </span>
+                          </div>
+
+                          {/* Compliance Progress Bar & Metrics */}
+                          <div className="bg-[#FFF9FB] p-3 rounded-2xl border border-[#F0D5E4]/60 space-y-2">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-gray-700">
+                                Monthly Video Status
+                              </span>
+                              <span className="font-extrabold text-[#2D041A]">
+                                {guru.received_count} / {guru.total_students}{' '}
+                                <span className="text-[11px] text-gray-500 font-semibold">({guru.compliance_rate}%)</span>
+                              </span>
+                            </div>
+
+                            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  isFullyCompliant
+                                    ? 'bg-emerald-500'
+                                    : guru.received_count > 0
+                                    ? 'bg-[#D4AF37]'
+                                    : 'bg-rose-400'
+                                }`}
+                                style={{ width: `${Math.min(guru.compliance_rate, 100)}%` }}
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between text-[11px] pt-0.5">
+                              <span className="text-emerald-700 font-bold flex items-center gap-1">
+                                <Check className="w-3 h-3" />
+                                {guru.received_count} Received
+                              </span>
+                              <span className={`font-bold flex items-center gap-1 ${guru.missing_count > 0 ? 'text-rose-600' : 'text-gray-400'}`}>
+                                <AlertCircle className="w-3 h-3" />
+                                {guru.missing_count} Missing
                               </span>
                             </div>
                           </div>
-
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleOpenEditItem(item)}
-                              title="Edit Link Info"
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-[#8A064D] hover:bg-[#FFF2F8] transition cursor-pointer"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteItem(item.id)}
-                              title="Remove Link (Admin Moderation)"
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
                         </div>
 
-                        {/* Badges Row: Course, Batch, Disciples */}
-                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                          <span className="px-2.5 py-0.5 rounded-lg text-[10.5px] font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-100">
-                            {item.target_course_title || 'Enrolled Course'}
-                          </span>
-                          {item.target_batch_name && (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-700">
-                              {item.target_batch_name}
-                            </span>
-                          )}
-                          {item.target_student_names && (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 max-w-xs truncate" title={item.target_student_names}>
-                              Disciples: {item.target_student_names}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Title */}
-                        <h4 className="font-bold text-base text-[#2D041A] leading-snug">
-                          {item.title}
-                        </h4>
-
-                        {/* Description */}
-                        {item.description && (
-                          <p className="text-xs text-gray-600 bg-[#FFF9FB] p-2.5 rounded-xl border border-[#F0D5E4]/60 line-clamp-2">
-                            {item.description}
-                          </p>
-                        )}
+                        {/* Action Button: Open Inspector Modal */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedGuruForModal(guru);
+                            setGuruModalActiveTab(guru.missing_count > 0 ? 'missing' : 'received');
+                          }}
+                          className="w-full py-2.5 px-4 rounded-xl bg-[#590231] hover:bg-[#740340] active:scale-98 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                        >
+                          <Eye className="w-4 h-4 text-[#D4AF37]" />
+                          <span>Audit Disciples & Video Links</span>
+                        </button>
                       </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* VIEW MODE 2: SHARED RESOURCE MEDIA ARCHIVE */
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#F0D5E4] space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-gray-100">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <Video className="w-5 h-5 text-[#8A064D]" />
+                    <span>Shared Resource Archive ({guruFilteredItems.length})</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Filter by Guru, enrolled course, or search resource titles
+                  </p>
+                </div>
 
-                      {/* Interactive Media Links Deck */}
-                      <div className="space-y-2 pt-2 border-t border-gray-100">
-                        {item.drive_url && (
-                          <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                                <LinkIcon className="w-4 h-4" />
-                              </div>
-                              <div className="min-w-0">
-                                <span className="text-[11px] font-bold text-emerald-900 block truncate">Google Drive Media Folder</span>
-                                <span className="text-[10px] text-emerald-700 font-mono truncate block max-w-xs">{item.drive_url}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => copyToClipboard(item.drive_url!, `${item.id}-drive`, 'Drive Link')}
-                                className="px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-800 text-[11px] font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
-                              >
-                                {copiedId === `${item.id}-drive` ? 'Copied' : 'Copy'}
-                              </button>
-                              <a
-                                href={item.drive_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-3 py-1.5 rounded-xl bg-[#03543F] hover:bg-[#023e2f] text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                              >
-                                <span>Open Drive</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            </div>
-                          </div>
-                        )}
+                {/* Filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative w-full sm:w-60">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search guru links..."
+                      value={guruShareSearch}
+                      onChange={(e) => setGuruShareSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-gray-200 text-xs bg-[#FFF9FB] focus:outline-hidden focus:ring-1 focus:ring-[#8A064D]"
+                    />
+                    {guruShareSearch && (
+                      <button
+                        onClick={() => setGuruShareSearch('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
 
-                        {item.youtube_url && (
-                          <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-rose-50/70 border border-rose-200/80">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                                <Video className="w-4 h-4" />
-                              </div>
-                              <div className="min-w-0">
-                                <span className="text-[11px] font-bold text-rose-950 block truncate">YouTube Recording Broadcast</span>
-                                <span className="text-[10px] text-rose-700 font-mono truncate block max-w-xs">{item.youtube_url}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => copyToClipboard(item.youtube_url!, `${item.id}-yt`, 'YouTube Link')}
-                                className="px-2.5 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-800 text-[11px] font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
-                              >
-                                {copiedId === `${item.id}-yt` ? 'Copied' : 'Copy'}
-                              </button>
-                              <a
-                                href={item.youtube_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                              >
-                                <span>Open YouTube</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                  <select
+                    value={guruShareTrainerFilter}
+                    onChange={(e) => setGuruShareTrainerFilter(e.target.value)}
+                    className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer"
+                  >
+                    <option value="all">All Gurus ({guruNames.length})</option>
+                    {guruNames.map((name) => (
+                      <option key={`guru-filter-${name}`} value={name}>
+                        Guru {name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={guruShareCourseFilter}
+                    onChange={(e) => setGuruShareCourseFilter(e.target.value)}
+                    className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer max-w-[180px] truncate"
+                  >
+                    <option value="all">All Courses</option>
+                    {courses.map((c) => (
+                      <option key={`guru-course-${c.id}`} value={c.title}>
+                        {c.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            )}
-          </div>
+
+              {guruFilteredItems.length === 0 ? (
+                <div className="p-12 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
+                  <GraduationCap className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-gray-700">No resources shared by Gurus yet</p>
+                  <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                    When faculty Gurus share video or Google Drive links with their enrolled batches via the Guru mobile app, all links will automatically be cataloged and manageable here.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {guruFilteredItems.map((item, idx) => {
+                    const formattedDate = item.event_date
+                      ? new Date(item.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                      : 'Recent Share';
+                    const guruInitials = (item.trainer_name || 'G').charAt(0).toUpperCase();
+
+                    return (
+                      <div
+                        key={`guru-item-${item.id}-${idx}`}
+                        className="bg-white rounded-3xl p-5 border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#590231] text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+                                {guruInitials}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-sm text-[#2D041A] truncate">
+                                    Guru {item.trainer_name || 'Faculty Member'}
+                                  </span>
+                                  <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 text-[9px] font-extrabold uppercase border border-emerald-200">
+                                    Verified
+                                  </span>
+                                </div>
+                                <span className="text-[11px] text-gray-400 font-medium flex items-center gap-1 mt-0.5">
+                                  <Calendar className="w-3 h-3 text-gray-400" />
+                                  {formattedDate}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleOpenEditItem(item)}
+                                title="Edit Link Info"
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-[#8A064D] hover:bg-[#FFF2F8] transition cursor-pointer"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteItem(item.id)}
+                                title="Remove Link (Admin Moderation)"
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            <span className="px-2.5 py-0.5 rounded-lg text-[10.5px] font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-100">
+                              {item.target_course_title || 'Enrolled Course'}
+                            </span>
+                            {item.target_batch_name && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-700">
+                                {item.target_batch_name}
+                              </span>
+                            )}
+                            {item.target_student_names && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 max-w-xs truncate" title={item.target_student_names}>
+                                Disciples: {item.target_student_names}
+                              </span>
+                            )}
+                          </div>
+
+                          <h4 className="font-bold text-base text-[#2D041A] leading-snug">
+                            {item.title}
+                          </h4>
+
+                          {item.description && (
+                            <p className="text-xs text-gray-600 bg-[#FFF9FB] p-2.5 rounded-xl border border-[#F0D5E4]/60 line-clamp-2">
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Interactive Media Links Deck */}
+                        <div className="space-y-2 pt-2 border-t border-gray-100">
+                          {item.drive_url && (
+                            <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                  <LinkIcon className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="text-[11px] font-bold text-emerald-900 block truncate">Google Drive Media Folder</span>
+                                  <span className="text-[10px] text-emerald-700 font-mono truncate block max-w-xs">{item.drive_url}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(item.drive_url!, `${item.id}-drive`, 'Drive Link')}
+                                  className="px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-800 text-[11px] font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                                >
+                                  {copiedId === `${item.id}-drive` ? 'Copied' : 'Copy'}
+                                </button>
+                                <a
+                                  href={item.drive_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 rounded-xl bg-[#03543F] hover:bg-[#023e2f] text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                >
+                                  <span>Open Drive</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                            </div>
+                          )}
+
+                          {item.youtube_url && (
+                            <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-rose-50/70 border border-rose-200/80">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                  <Video className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="text-[11px] font-bold text-rose-950 block truncate">YouTube Recording Broadcast</span>
+                                  <span className="text-[10px] text-rose-700 font-mono truncate block max-w-xs">{item.youtube_url}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(item.youtube_url!, `${item.id}-yt`, 'YouTube Link')}
+                                  className="px-2.5 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-800 text-[11px] font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
+                                >
+                                  {copiedId === `${item.id}-yt` ? 'Copied' : 'Copy'}
+                                </button>
+                                <a
+                                  href={item.youtube_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                >
+                                  <span>Open YouTube</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* =================================================================== */}
+          {/* GURU PERFORMANCE INSPECTOR MODAL                                   */}
+          {/* =================================================================== */}
+          {selectedGuruForModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+              <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-[#F0D5E4] overflow-hidden">
+                {/* Modal Header */}
+                <div className="px-6 py-5 bg-gradient-to-r from-[#590231] to-[#8A064D] text-white flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    {selectedGuruForModal.avatar_url ? (
+                      <img
+                        src={selectedGuruForModal.avatar_url}
+                        alt={selectedGuruForModal.full_name}
+                        className="w-12 h-12 rounded-2xl object-cover border-2 border-[#D4AF37] shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md text-[#F9E33A] flex items-center justify-center font-bold text-base border border-white/30">
+                        {selectedGuruForModal.full_name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-lg text-white">
+                          Guru {selectedGuruForModal.full_name}
+                        </h3>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#F9E33A] text-[#4A0025]">
+                          {complianceMonth !== 'all' ? MONTHS.find((m) => m.value === complianceMonth)?.label : 'All Months'} {complianceYear} Audit
+                        </span>
+                      </div>
+                      <p className="text-xs text-rose-100 mt-0.5 flex flex-wrap items-center gap-2">
+                        <span>{selectedGuruForModal.display_title || 'Faculty Guru'}</span>
+                        {selectedGuruForModal.phone && (
+                          <span className="flex items-center gap-1 font-mono">
+                            <Phone className="w-3 h-3 text-[#D4AF37]" />
+                            {selectedGuruForModal.phone}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedGuruForModal(null)}
+                    className="text-white/80 hover:text-white p-1 rounded-xl hover:bg-white/10 transition cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Modal Subheader & Tab Switcher */}
+                <div className="px-6 py-3 bg-[#FFF9FB] border-b border-[#F0D5E4] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setGuruModalActiveTab('received')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                        guruModalActiveTab === 'received'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Received Videos ({selectedGuruForModal.received_count})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setGuruModalActiveTab('missing')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                        guruModalActiveTab === 'missing'
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>Missing Disciples ({selectedGuruForModal.missing_count})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setGuruModalActiveTab('all_videos')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                        guruModalActiveTab === 'all_videos'
+                          ? 'bg-[#590231] text-white shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <Video className="w-3.5 h-3.5" />
+                      <span>All Media ({selectedGuruForModal.shared_videos_count})</span>
+                    </button>
+                  </div>
+
+                  <div className="text-xs font-bold text-gray-700">
+                    Compliance: <span className={selectedGuruForModal.compliance_status === 'completed' ? 'text-emerald-700' : 'text-[#8A064D]'}>
+                      {selectedGuruForModal.received_count} / {selectedGuruForModal.total_students} ({selectedGuruForModal.compliance_rate}%)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Modal Tab Content Body */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                  {/* TAB A: RECEIVED VIDEOS */}
+                  {guruModalActiveTab === 'received' && (
+                    <div className="space-y-4">
+                      {selectedGuruForModal.received_disciples.length === 0 ? (
+                        <div className="p-8 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
+                          <Video className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                          <h4 className="text-sm font-bold text-gray-700">No performance videos received yet for this month</h4>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Disciples will appear here once Guru {selectedGuruForModal.full_name} shares their monthly performance recordings.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {selectedGuruForModal.received_disciples.map((disciple, idx) => (
+                            <div
+                              key={`received-disciple-${disciple.student_id}-${idx}`}
+                              className="p-4 bg-white rounded-2xl border border-emerald-200 shadow-2xs hover:border-emerald-400 transition space-y-3 flex flex-col justify-between"
+                            >
+                              <div className="space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <h5 className="font-bold text-sm text-[#2D041A]">
+                                      {disciple.student_name}
+                                    </h5>
+                                    <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium mt-0.5">
+                                      <span className="font-mono font-bold text-gray-700">{disciple.roll_number}</span>
+                                      <span>•</span>
+                                      <span>{disciple.batch_name}</span>
+                                    </div>
+                                  </div>
+                                  <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-[#DEF7EC] text-[#03543F]">
+                                    Received
+                                  </span>
+                                </div>
+
+                                {/* Video Info Card */}
+                                <div className="p-2.5 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4]/60 space-y-1">
+                                  <div className="text-xs font-bold text-gray-900 truncate">
+                                    {disciple.video_title}
+                                  </div>
+                                  {disciple.event_date && (
+                                    <div className="text-[10.5px] text-gray-500 flex items-center gap-1">
+                                      <Calendar className="w-3 h-3 text-gray-400" />
+                                      <span>
+                                        {new Date(disciple.event_date).toLocaleDateString('en-GB', {
+                                          day: '2-digit',
+                                          month: 'short',
+                                          year: 'numeric',
+                                        })}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {disciple.description && (
+                                    <p className="text-[11px] text-gray-600 line-clamp-2 mt-0.5">
+                                      {disciple.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Clickable Action Links */}
+                              <div className="pt-2 border-t border-gray-100 space-y-2">
+                                {disciple.drive_url && (
+                                  <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-emerald-50 border border-emerald-200">
+                                    <span className="text-[11px] font-bold text-emerald-900 truncate">
+                                      Google Drive Link
+                                    </span>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => copyToClipboard(disciple.drive_url!, `${disciple.student_id}-gd`, 'Drive Link')}
+                                        className="px-2 py-1 rounded-lg bg-white border border-emerald-200 text-emerald-800 text-[10.5px] font-bold hover:bg-emerald-50 transition cursor-pointer"
+                                      >
+                                        {copiedId === `${disciple.student_id}-gd` ? 'Copied' : 'Copy'}
+                                      </button>
+                                      <a
+                                        href={disciple.drive_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 rounded-lg bg-[#03543F] hover:bg-[#023e2f] text-white text-[10.5px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <span>Open</span>
+                                        <ExternalLink className="w-3 h-3" />
+                                      </a>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {disciple.youtube_url && (
+                                  <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-rose-50 border border-rose-200">
+                                    <span className="text-[11px] font-bold text-rose-950 truncate">
+                                      YouTube Video Link
+                                    </span>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => copyToClipboard(disciple.youtube_url!, `${disciple.student_id}-yt`, 'YouTube Link')}
+                                        className="px-2 py-1 rounded-lg bg-white border border-rose-200 text-rose-800 text-[10.5px] font-bold hover:bg-rose-50 transition cursor-pointer"
+                                      >
+                                        {copiedId === `${disciple.student_id}-yt` ? 'Copied' : 'Copy'}
+                                      </button>
+                                      <a
+                                        href={disciple.youtube_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[10.5px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <span>Open</span>
+                                        <ExternalLink className="w-3 h-3" />
+                                      </a>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB B: MISSING DISCIPLES */}
+                  {guruModalActiveTab === 'missing' && (
+                    <div className="space-y-4">
+                      {selectedGuruForModal.missing_disciples.length === 0 ? (
+                        <div className="p-8 text-center bg-emerald-50/60 rounded-2xl border border-emerald-200">
+                          <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
+                          <h4 className="text-sm font-bold text-emerald-900">
+                            All Disciples Completed!
+                          </h4>
+                          <p className="text-xs text-emerald-700 mt-1">
+                            Guru {selectedGuruForModal.full_name} has shared a monthly performance video for every assigned disciple in this period.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 flex items-center gap-3">
+                            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                            <p className="text-xs text-rose-900 font-medium">
+                              <strong>{selectedGuruForModal.missing_disciples.length} disciples</strong> are currently missing their monthly performance video link. Follow up with Guru {selectedGuruForModal.full_name} to ensure every disciple receives their performance video.
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                            {selectedGuruForModal.missing_disciples.map((disciple, idx) => (
+                              <div
+                                key={`missing-disciple-${disciple.student_id}-${idx}`}
+                                className="p-4 bg-white rounded-2xl border border-rose-200 hover:border-rose-400 transition shadow-2xs space-y-2.5"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <h5 className="font-bold text-sm text-[#2D041A]">
+                                      {disciple.student_name}
+                                    </h5>
+                                    <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium mt-0.5">
+                                      <span className="font-mono font-bold text-gray-700">{disciple.roll_number}</span>
+                                      <span>•</span>
+                                      <span>{disciple.batch_name}</span>
+                                    </div>
+                                  </div>
+                                  <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-rose-100 text-rose-800">
+                                    Missing Video
+                                  </span>
+                                </div>
+
+                                <div className="text-xs text-gray-600 bg-[#FFF9FB] p-2.5 rounded-xl border border-[#F0D5E4]/60 space-y-1">
+                                  <div className="text-[11px] text-gray-500">
+                                    Course: <strong className="text-gray-800 font-bold">{disciple.course_title}</strong>
+                                  </div>
+                                  <div className="text-[11px] text-gray-500 flex items-center justify-between">
+                                    <span>Parent: <strong className="text-gray-800 font-semibold">{disciple.parent_name || 'Parent'}</strong></span>
+                                    {disciple.parent_phone && (
+                                      <a
+                                        href={`tel:${disciple.parent_phone}`}
+                                        className="text-[#8A064D] hover:underline font-mono font-bold text-[10.5px] flex items-center gap-1"
+                                      >
+                                        <Phone className="w-3 h-3" />
+                                        <span>{disciple.parent_phone}</span>
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB C: ALL SHARED VIDEOS BY THIS GURU */}
+                  {guruModalActiveTab === 'all_videos' && (
+                    <div className="space-y-4">
+                      {selectedGuruForModal.shared_videos.length === 0 ? (
+                        <div className="p-8 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
+                          <Video className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                          <h4 className="text-sm font-bold text-gray-700">No media links recorded yet</h4>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {selectedGuruForModal.shared_videos.map((vid, idx) => (
+                            <div
+                              key={`guru-modal-vid-${vid.id}-${idx}`}
+                              className="p-4 bg-white rounded-2xl border border-[#F0D5E4] shadow-2xs space-y-2.5"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <h5 className="font-bold text-sm text-[#2D041A]">{vid.title}</h5>
+                                  <div className="flex items-center gap-2 text-[11px] text-gray-500 mt-0.5">
+                                    <span className="font-semibold text-[#8A064D]">{vid.target_course_title}</span>
+                                    <span>•</span>
+                                    <span>{vid.target_batch_name}</span>
+                                  </div>
+                                </div>
+                                {vid.event_date && (
+                                  <span className="text-[11px] text-gray-400 font-medium">
+                                    {new Date(vid.event_date).toLocaleDateString('en-GB', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    })}
+                                  </span>
+                                )}
+                              </div>
+
+                              {vid.description && (
+                                <p className="text-xs text-gray-600 bg-[#FFF9FB] p-2 rounded-xl border border-[#F0D5E4]/60">
+                                  {vid.description}
+                                </p>
+                              )}
+
+                              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100">
+                                {vid.drive_url && (
+                                  <a
+                                    href={vid.drive_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-3 py-1.5 rounded-xl bg-[#03543F] hover:bg-[#023e2f] text-white text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                  >
+                                    <LinkIcon className="w-3.5 h-3.5" />
+                                    <span>Open Google Drive</span>
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                )}
+                                {vid.youtube_url && (
+                                  <a
+                                    href={vid.youtube_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                  >
+                                    <Video className="w-3.5 h-3.5" />
+                                    <span>Open YouTube</span>
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
+
 
       {/* ===================================================================== */}
       {/* 5. UNIVERSAL SHARE MODAL (SELECT MULTIPLE OR ALL COURSES) */}

@@ -25,6 +25,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
   List<Map<String, dynamic>> _myCourses = [];
   List<Map<String, dynamic>> _myBatches = [];
   String _searchQuery = '';
+  String _activeTab = 'missing'; // 'missing' or 'shared'
 
   String get _trainerName =>
       widget.trainerProfile?['full_name'] ?? 'Faculty Guru';
@@ -32,6 +33,111 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
       widget.trainerProfile?['phone'] ?? '';
   String get _trainerId =>
       widget.trainerProfile?['id'] ?? '';
+
+  String get _currentMonthName {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    final now = DateTime.now();
+    return '${months[now.month - 1]} ${now.year}';
+  }
+
+  List<Map<String, dynamic>> get _allAssignedDisciples {
+    final Map<String, Map<String, dynamic>> disciplesMap = {};
+    for (final b in _myBatches) {
+      final students = b['students'];
+      if (students is List) {
+        for (final s in students) {
+          if (s is Map && s['id'] != null) {
+            final sId = s['id'].toString();
+            if (!disciplesMap.containsKey(sId)) {
+              disciplesMap[sId] = {
+                ...Map<String, dynamic>.from(s),
+                'batch_id': b['id'],
+                'batch_name': b['name'] ?? 'Batch',
+                'course_id': b['course_id'],
+                'course_title': b['course_title'] ?? 'Course',
+              };
+            }
+          }
+        }
+      }
+    }
+    return disciplesMap.values.toList();
+  }
+
+  List<Map<String, dynamic>> get _thisMonthSharedVideos {
+    final now = DateTime.now();
+    return _mySharedItems.where((item) {
+      final dateVal = item['event_date'] ?? item['created_at'];
+      if (dateVal == null) return false;
+      try {
+        final dt = DateTime.parse(
+          dateVal.toString().contains('T')
+              ? dateVal.toString()
+              : '${dateVal.toString()} 00:00:00',
+        );
+        return dt.month == now.month && dt.year == now.year;
+      } catch (_) {
+        return false;
+      }
+    }).toList();
+  }
+
+  Set<String> get _thisMonthCompletedStudentIds {
+    final Set<String> set = {};
+    for (final v in _thisMonthSharedVideos) {
+      if (v['target_student_id'] != null &&
+          v['target_student_id'].toString().isNotEmpty) {
+        set.add(v['target_student_id'].toString());
+      }
+      final tsList = v['target_students'];
+      if (tsList is List) {
+        for (final ts in tsList) {
+          if (ts is Map && ts['id'] != null) {
+            set.add(ts['id'].toString());
+          }
+        }
+      }
+    }
+    return set;
+  }
+
+  List<Map<String, dynamic>> get _missingDisciplesThisMonth {
+    final completedIds = _thisMonthCompletedStudentIds;
+    return _allAssignedDisciples
+        .where((d) => !completedIds.contains(d['id'].toString()))
+        .toList();
+  }
+
+  List<Map<String, dynamic>> get _completedDisciplesThisMonth {
+    final completedIds = _thisMonthCompletedStudentIds;
+    return _allAssignedDisciples
+        .where((d) => completedIds.contains(d['id'].toString()))
+        .toList();
+  }
+
+  Future<void> _shareForDisciple(Map<String, dynamic> disciple) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TrainerCreateShareVideoScreen(
+          trainerProfile: widget.trainerProfile,
+          initialCourses: _myCourses,
+          initialBatches: _myBatches,
+          preselectedStudent: disciple,
+          preselectedCourseId: disciple['course_id']?.toString(),
+          preselectedBatchId: disciple['batch_id']?.toString(),
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      _loadData();
+    }
+  }
+
 
   @override
   void initState() {
@@ -201,7 +307,15 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _mySharedItems.where((item) {
+    final int totalDisciples = _allAssignedDisciples.length;
+    final int completedDisciples = _completedDisciplesThisMonth.length;
+    final int missingDisciplesCount = _missingDisciplesThisMonth.length;
+    final double complianceRate =
+        totalDisciples > 0 ? (completedDisciples / totalDisciples) : 1.0;
+    final int compliancePercent = (complianceRate * 100).round();
+
+    // Filter shared items
+    final filteredShared = _mySharedItems.where((item) {
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
       final title = (item['title'] ?? '').toString().toLowerCase();
@@ -209,6 +323,17 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
       final course = (item['target_course_title'] ?? '').toString().toLowerCase();
       final batch = (item['target_batch_name'] ?? '').toString().toLowerCase();
       return title.contains(q) || desc.contains(q) || course.contains(q) || batch.contains(q);
+    }).toList();
+
+    // Filter missing disciples
+    final filteredMissing = _missingDisciplesThisMonth.where((d) {
+      if (_searchQuery.isEmpty) return true;
+      final q = _searchQuery.toLowerCase();
+      final name = (d['name'] ?? '').toString().toLowerCase();
+      final roll = (d['roll_number'] ?? d['roll'] ?? '').toString().toLowerCase();
+      final course = (d['course_title'] ?? '').toString().toLowerCase();
+      final batch = (d['batch_name'] ?? '').toString().toLowerCase();
+      return name.contains(q) || roll.contains(q) || course.contains(q) || batch.contains(q);
     }).toList();
 
     return Scaffold(
@@ -242,21 +367,21 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top Hero Action Banner
+                    // TOP MONTHLY PERFORMANCE VIDEO TRACKER BANNER
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF590231), Color(0xFF8A064D)],
+                          colors: [Color(0xFF2D041A), Color(0xFF590231), Color(0xFF8A064D)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
+                            color: Colors.black.withOpacity(0.12),
                             blurRadius: 10,
-                            offset: const Offset(0, 3),
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -268,35 +393,82 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: Colors.white.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: const Icon(Icons.video_library_rounded, color: Colors.white, size: 22),
+                                child: const Icon(Icons.verified_rounded, color: Color(0xFFF9E33A), size: 22),
                               ),
                               const SizedBox(width: 10),
-                              const Expanded(
+                              Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Share Videos With Disciples',
-                                      style: TextStyle(
+                                      '$_currentMonthName Videos',
+                                      style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    SizedBox(height: 2),
-                                    Text(
-                                      'Google Drive & YouTube links for your assigned batches',
-                                      style: TextStyle(color: Colors.white70, fontSize: 11),
+                                    const SizedBox(height: 1),
+                                    const Text(
+                                      'Share at least 1 performance video per disciple/month',
+                                      style: TextStyle(color: Colors.white70, fontSize: 10.5),
                                     ),
                                   ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: missingDisciplesCount == 0
+                                      ? const Color(0xFF03543F)
+                                      : const Color(0xFFD4AF37),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  missingDisciplesCount == 0 ? '100% Done' : '$missingDisciplesCount Pending',
+                                  style: TextStyle(
+                                    color: missingDisciplesCount == 0 ? Colors.white : const Color(0xFF4A0025),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 14),
+
+                          // Progress Bar
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '$completedDisciples / $totalDisciples Disciples Completed',
+                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                '$compliancePercent%',
+                                style: const TextStyle(color: Color(0xFFF9E33A), fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: LinearProgressIndicator(
+                              value: complianceRate.clamp(0.0, 1.0),
+                              minHeight: 8,
+                              backgroundColor: Colors.white.withOpacity(0.2),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                missingDisciplesCount == 0 ? const Color(0xFF31C48D) : const Color(0xFFF9E33A),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Quick Action Button
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
@@ -305,12 +477,12 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                 backgroundColor: const Color(0xFFD4AF37),
                                 foregroundColor: const Color(0xFF4A0025),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(vertical: 11),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
                                 elevation: 0,
                               ),
                               icon: const Icon(Icons.add_link_rounded, size: 18),
                               label: const Text(
-                                'Share New Video Links',
+                                '+ Share New Video Link',
                                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                               ),
                             ),
@@ -319,6 +491,85 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+
+                    // SEGMENTED TAB SWITCHER
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFF0D5E4)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _activeTab = 'missing'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: _activeTab == 'missing'
+                                      ? (missingDisciplesCount > 0 ? const Color(0xFFE53E3E) : const Color(0xFF590231))
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      missingDisciplesCount > 0 ? Icons.error_outline_rounded : Icons.check_circle_rounded,
+                                      size: 16,
+                                      color: _activeTab == 'missing' ? Colors.white : Colors.grey.shade700,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Missing This Month ($missingDisciplesCount)',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: _activeTab == 'missing' ? Colors.white : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _activeTab = 'shared'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: _activeTab == 'shared' ? const Color(0xFF590231) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.video_library_rounded,
+                                      size: 16,
+                                      color: _activeTab == 'shared' ? Colors.white : Colors.grey.shade700,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Shared Videos (${_mySharedItems.length})',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: _activeTab == 'shared' ? Colors.white : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
 
                     // Search Bar
                     Container(
@@ -340,7 +591,9 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                         decoration: InputDecoration(
                           icon: const Icon(Icons.search_rounded, color: Colors.grey, size: 20),
                           border: InputBorder.none,
-                          hintText: 'Search your shared video links...',
+                          hintText: _activeTab == 'missing'
+                              ? 'Search pending disciples by name or roll...'
+                              : 'Search shared video links...',
                           hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? IconButton(
@@ -351,233 +604,422 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
 
-                    // Heading
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Your Shared Media (${filtered.length})',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: LaasyaColors.textDark,
-                          ),
-                        ),
+                    // TAB 1: MISSING DISCIPLES THIS MONTH
+                    if (_activeTab == 'missing') ...[
+                      if (missingDisciplesCount == 0)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.all(28),
+                          width: double.infinity,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFDEF7EC),
-                            borderRadius: BorderRadius.circular(6),
+                            color: const Color(0xFFDEF7EC).withOpacity(0.4),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFF31C48D)),
                           ),
-                          child: const Text(
-                            'Synced with Admin',
-                            style: TextStyle(
-                              color: Color(0xFF03543F),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                          child: Column(
+                            children: [
+                              const Icon(Icons.celebration_rounded, size: 44, color: Color(0xFF03543F)),
+                              const SizedBox(height: 10),
+                              const Text(
+                                'All Disciples Completed! 🎉',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Color(0xFF03543F),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Every one of your $totalDisciples assigned disciples has received their monthly performance video for $_currentMonthName.',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF03543F)),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        )
+                      else if (filteredMissing.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(28),
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFF0D5E4)),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'No pending disciples match "$_searchQuery"',
+                              style: const TextStyle(fontSize: 13, color: Colors.grey),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // List of Shared Videos
-                    if (filtered.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(28),
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFFF0D5E4)),
-                        ),
-                        child: Column(
+                        )
+                      else ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(Icons.video_collection_outlined, size: 44, color: Colors.grey.shade400),
-                            const SizedBox(height: 10),
                             Text(
-                              _searchQuery.isNotEmpty
-                                  ? 'No shared links matching "$_searchQuery"'
-                                  : 'No video links shared yet',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                              'Disciples Missing $_currentMonthName Video (${filteredMissing.length})',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: LaasyaColors.textDark,
+                              ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Use the button above to share Google Drive or YouTube links with your enrolled disciples.',
-                              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
-                              textAlign: TextAlign.center,
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Action Required',
+                                style: TextStyle(
+                                  color: Colors.red.shade700,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      )
-                    else
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 14),
-                        itemBuilder: (context, idx) {
-                          final item = filtered[idx];
-                          final id = (item['id'] ?? '').toString();
-                          final title = (item['title'] ?? 'Shared Media').toString();
-                          final desc = (item['description'] ?? '').toString();
-                          final course = (item['target_course_title'] ?? 'Assigned Course').toString();
-                          final batch = (item['target_batch_name'] ?? 'All Batches').toString();
-                          final dateStr = _formatDate(item['event_date'] ?? item['created_at']);
-                          final driveUrl = (item['drive_url'] ?? '').toString().trim();
-                          final youtubeUrl = (item['youtube_url'] ?? '').toString().trim();
-                          final hasDrive = driveUrl.isNotEmpty;
-                          final hasYoutube = youtubeUrl.isNotEmpty;
+                        const SizedBox(height: 10),
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filteredMissing.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (context, idx) {
+                            final disciple = filteredMissing[idx];
+                            final name = (disciple['name'] ?? 'Disciple').toString();
+                            final roll = (disciple['roll_number'] ?? disciple['roll'] ?? 'LCA').toString();
+                            final course = (disciple['course_title'] ?? 'Course').toString();
+                            final batch = (disciple['batch_name'] ?? 'Batch').toString();
+                            final avatarUrl = disciple['avatar_url']?.toString();
+                            final initials = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'D';
 
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: const Color(0xFFF0D5E4)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.02),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(15),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            return Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFFF8B4B4)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.02),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
                                 children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF3E8EE),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          '$course • $batch',
+                                  CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: const Color(0xFFFFF2F8),
+                                    backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+                                        ? NetworkImage(avatarUrl)
+                                        : null,
+                                    child: (avatarUrl == null || avatarUrl.isEmpty)
+                                        ? Text(
+                                            initials,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF8A064D),
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          name,
                                           style: const TextStyle(
-                                            color: Color(0xFF8A064D),
-                                            fontSize: 10.5,
                                             fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: Color(0xFF2D041A),
                                           ),
                                         ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '$roll • $course ($batch)',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.black54,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () => _shareForDisciple(disciple),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFD4AF37),
+                                      foregroundColor: const Color(0xFF4A0025),
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    icon: const Icon(Icons.video_call_rounded, size: 16),
+                                    label: const Text(
+                                      'Share Video',
+                                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ],
+
+                    // TAB 2: SHARED VIDEOS LIST
+                    if (_activeTab == 'shared') ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Your Shared Media (${filteredShared.length})',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: LaasyaColors.textDark,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDEF7EC),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'Synced with Admin',
+                              style: TextStyle(
+                                color: Color(0xFF03543F),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      if (filteredShared.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(28),
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFF0D5E4)),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(Icons.video_collection_outlined, size: 44, color: Colors.grey.shade400),
+                              const SizedBox(height: 10),
+                              Text(
+                                _searchQuery.isNotEmpty
+                                    ? 'No shared links matching "$_searchQuery"'
+                                    : 'No video links shared yet',
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Use the button above to share Google Drive or YouTube links with your enrolled disciples.',
+                                style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filteredShared.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 14),
+                          itemBuilder: (context, idx) {
+                            final item = filteredShared[idx];
+                            final id = (item['id'] ?? '').toString();
+                            final title = (item['title'] ?? 'Shared Media').toString();
+                            final desc = (item['description'] ?? '').toString();
+                            final course = (item['target_course_title'] ?? 'Assigned Course').toString();
+                            final batch = (item['target_batch_name'] ?? 'All Batches').toString();
+                            final dateStr = _formatDate(item['event_date'] ?? item['created_at']);
+                            final driveUrl = (item['drive_url'] ?? '').toString().trim();
+                            final youtubeUrl = (item['youtube_url'] ?? '').toString().trim();
+                            final targetNames = (item['target_student_names'] ?? item['target_student_name'] ?? '').toString();
+                            final hasDrive = driveUrl.isNotEmpty;
+                            final hasYoutube = youtubeUrl.isNotEmpty;
+
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: const Color(0xFFF0D5E4)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.02),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(15),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF3E8EE),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            '$course • $batch',
+                                            style: const TextStyle(
+                                              color: Color(0xFF8A064D),
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              dateStr,
+                                              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            IconButton(
+                                              icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.grey),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              onPressed: () => _deleteItem(id),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    if (targetNames.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'Disciples: $targetNames',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF03543F),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
+                                    ],
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      title,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: LaasyaColors.textDark,
+                                      ),
+                                    ),
+                                    if (desc.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        desc,
+                                        style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                    const SizedBox(height: 12),
+
+                                    // Action buttons for YouTube and Drive
+                                    if (hasDrive) ...[
                                       Row(
                                         children: [
-                                          Text(
-                                            dateStr,
-                                            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                          Expanded(
+                                            child: ElevatedButton.icon(
+                                              onPressed: () => _launchExternalUrl(driveUrl),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFF03543F),
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                                elevation: 0,
+                                              ),
+                                              icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                                              label: const Text('Open Drive', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                            ),
                                           ),
-                                          const SizedBox(width: 4),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.grey),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                            onPressed: () => _deleteItem(id),
+                                          const SizedBox(width: 8),
+                                          OutlinedButton.icon(
+                                            onPressed: () => _copyToClipboard(driveUrl, 'Drive link'),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: const Color(0xFF03543F),
+                                              side: const BorderSide(color: Color(0xFF03543F)),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                                            ),
+                                            icon: const Icon(Icons.copy_rounded, size: 14),
+                                            label: const Text('Copy', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ],
+                                      ),
+                                      if (hasYoutube) const SizedBox(height: 8),
+                                    ],
+
+                                    if (hasYoutube) ...[
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: ElevatedButton.icon(
+                                              onPressed: () => _launchExternalUrl(youtubeUrl),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFFE53E3E),
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                                elevation: 0,
+                                              ),
+                                              icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                                              label: const Text('Open YouTube', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          OutlinedButton.icon(
+                                            onPressed: () => _copyToClipboard(youtubeUrl, 'YouTube link'),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: const Color(0xFFE53E3E),
+                                              side: const BorderSide(color: Color(0xFFE53E3E)),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                                            ),
+                                            icon: const Icon(Icons.copy_rounded, size: 14),
+                                            label: const Text('Copy', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                           ),
                                         ],
                                       ),
                                     ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    title,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: LaasyaColors.textDark,
-                                    ),
-                                  ),
-                                  if (desc.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      desc,
-                                      style: const TextStyle(fontSize: 12, color: Colors.black87),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
                                   ],
-                                  const SizedBox(height: 12),
-
-                                  // Links Actions (SHOWS ONLY THE LINK(S) PRESENT)
-                                  if (hasDrive) ...[
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: ElevatedButton.icon(
-                                            onPressed: () => _launchExternalUrl(driveUrl),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFF03543F),
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                              padding: const EdgeInsets.symmetric(vertical: 9),
-                                              elevation: 0,
-                                            ),
-                                            icon: const Icon(Icons.open_in_new_rounded, size: 14),
-                                            label: const Text('Open Drive', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        OutlinedButton.icon(
-                                          onPressed: () => _copyToClipboard(driveUrl, 'Drive link'),
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor: const Color(0xFF03543F),
-                                            side: const BorderSide(color: Color(0xFF03543F)),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                                          ),
-                                          icon: const Icon(Icons.copy_rounded, size: 14),
-                                          label: const Text('Copy', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                        ),
-                                      ],
-                                    ),
-                                    if (hasYoutube) const SizedBox(height: 8),
-                                  ],
-
-                                  if (hasYoutube) ...[
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: ElevatedButton.icon(
-                                            onPressed: () => _launchExternalUrl(youtubeUrl),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFFE53E3E),
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                              padding: const EdgeInsets.symmetric(vertical: 9),
-                                              elevation: 0,
-                                            ),
-                                            icon: const Icon(Icons.play_arrow_rounded, size: 16),
-                                            label: const Text('Open YouTube', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        OutlinedButton.icon(
-                                          onPressed: () => _copyToClipboard(youtubeUrl, 'YouTube link'),
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor: const Color(0xFFE53E3E),
-                                            side: const BorderSide(color: Color(0xFFE53E3E)),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                                          ),
-                                          icon: const Icon(Icons.copy_rounded, size: 14),
-                                          label: const Text('Copy', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
+                            );
+                          },
+                        ),
+                    ],
                   ],
                 ),
               ),
@@ -585,3 +1027,4 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     );
   }
 }
+

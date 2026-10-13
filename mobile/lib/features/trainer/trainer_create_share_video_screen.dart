@@ -10,18 +10,25 @@ class TrainerCreateShareVideoScreen extends StatefulWidget {
   final Map<String, dynamic>? trainerProfile;
   final List<Map<String, dynamic>>? initialCourses;
   final List<Map<String, dynamic>>? initialBatches;
+  final Map<String, dynamic>? preselectedStudent;
+  final String? preselectedCourseId;
+  final String? preselectedBatchId;
 
   const TrainerCreateShareVideoScreen({
     super.key,
     this.trainerProfile,
     this.initialCourses,
     this.initialBatches,
+    this.preselectedStudent,
+    this.preselectedCourseId,
+    this.preselectedBatchId,
   });
 
   @override
   State<TrainerCreateShareVideoScreen> createState() =>
       _TrainerCreateShareVideoScreenState();
 }
+
 
 class _TrainerCreateShareVideoScreenState
     extends State<TrainerCreateShareVideoScreen> {
@@ -112,11 +119,37 @@ class _TrainerCreateShareVideoScreenState
   }
 
   void _setupDefaultSelection() {
-    if (_myCourses.isNotEmpty) {
+    if (widget.preselectedCourseId != null) {
+      final match = _myCourses.firstWhere(
+        (c) => c['id'] == widget.preselectedCourseId,
+        orElse: () => _myCourses.isNotEmpty ? _myCourses.first : {},
+      );
+      if (match.isNotEmpty) {
+        _selectedCourseId = match['id'];
+        _selectedCourseTitle = match['title'] ?? 'Course';
+      }
+    } else if (_myCourses.isNotEmpty) {
       _selectedCourseId = _myCourses.first['id'];
       _selectedCourseTitle = _myCourses.first['title'] ?? 'Course';
-      _updateAvailableStudents();
     }
+
+    if (widget.preselectedBatchId != null) {
+      final bMatch = _myBatches.firstWhere(
+        (b) => b['id'] == widget.preselectedBatchId,
+        orElse: () => {},
+      );
+      if (bMatch.isNotEmpty) {
+        _selectedBatchOption = bMatch['id'];
+        _selectedBatchName = bMatch['name'] ?? 'Batch';
+      }
+    }
+
+    if (widget.preselectedStudent != null && _titleController.text.isEmpty) {
+      final sName = widget.preselectedStudent!['name'] ?? 'Disciple';
+      _titleController.text = '$sName - Monthly Performance Video';
+    }
+
+    _updateAvailableStudents();
   }
 
   void _updateAvailableStudents() {
@@ -143,13 +176,28 @@ class _TrainerCreateShareVideoScreenState
       }
     }
 
+    // Ensure preselected disciple is present in list if applicable
+    if (widget.preselectedStudent != null && widget.preselectedStudent!['id'] != null) {
+      final pId = widget.preselectedStudent!['id'].toString();
+      if (!uniqueStudents.containsKey(pId)) {
+        uniqueStudents[pId] = Map<String, dynamic>.from(widget.preselectedStudent!);
+      }
+    }
+
     _availableStudents = uniqueStudents.values.toList();
-    // Default to selecting all disciples in this scope
-    _selectedStudentIds.clear();
-    for (final s in _availableStudents) {
-      _selectedStudentIds.add(s['id'].toString());
+
+    // If preselected disciple provided, select ONLY that disciple
+    if (widget.preselectedStudent != null && widget.preselectedStudent!['id'] != null) {
+      _selectedStudentIds.clear();
+      _selectedStudentIds.add(widget.preselectedStudent!['id'].toString());
+    } else {
+      _selectedStudentIds.clear();
+      for (final s in _availableStudents) {
+        _selectedStudentIds.add(s['id'].toString());
+      }
     }
   }
+
 
   List<Map<String, dynamic>> get _filteredStudents {
     if (_studentFilterText.trim().isEmpty) {
@@ -244,6 +292,10 @@ class _TrainerCreateShareVideoScreenState
           .toList();
 
       final selectedNames = selectedList.map((s) => s['name']).join(', ');
+      final singleTargetStudent = selectedList.length == 1 ? selectedList.first : null;
+      final targetStudentId = singleTargetStudent?['id']?.toString();
+      final targetStudentName = singleTargetStudent?['name']?.toString();
+      final targetStudentRoll = (singleTargetStudent?['roll_number'] ?? singleTargetStudent?['roll'])?.toString();
 
       final payload = {
         'title': title,
@@ -257,15 +309,19 @@ class _TrainerCreateShareVideoScreenState
         'target_batch_name': _selectedBatchName,
         'target_students': selectedList,
         'target_student_names': selectedNames,
+        'target_student_id': targetStudentId,
+        'target_student_name': targetStudentName,
+        'target_student_roll': targetStudentRoll,
         'shared_by_type': 'guru',
         'trainer_id': _trainerId.isNotEmpty ? _trainerId : null,
         'trainer_name': _trainerName,
         'created_by': _trainerName,
-        'category': 'rehearsal',
+        'category': 'performance',
         'event_date': _dateController.text.trim().isNotEmpty
             ? _dateController.text.trim()
             : DateTime.now().toIso8601String().split('T')[0],
       };
+
 
       final res = await http.post(
         Uri.parse('${ApiConstants.baseUrl}/api/video-library'),

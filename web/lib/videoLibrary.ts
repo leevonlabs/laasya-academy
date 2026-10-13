@@ -61,6 +61,69 @@ export interface EnrolledStudent {
   enrollment_status: string;
 }
 
+export interface GuruComplianceDisciple {
+  student_id: string;
+  roll_number: string;
+  student_name: string;
+  avatar_url?: string | null;
+  batch_id: string;
+  batch_name: string;
+  course_id?: string | null;
+  course_title?: string | null;
+  parent_name?: string | null;
+  parent_phone?: string | null;
+  video_id?: string;
+  video_title?: string;
+  drive_url?: string | null;
+  youtube_url?: string | null;
+  event_date?: string | null;
+  created_at?: string | null;
+  category?: string | null;
+  description?: string | null;
+  all_matching_videos?: Array<{
+    id: string;
+    title: string;
+    drive_url?: string | null;
+    youtube_url?: string | null;
+    event_date?: string | null;
+    created_at?: string | null;
+  }>;
+}
+
+export interface GuruComplianceItem {
+  trainer_id: string;
+  full_name: string;
+  display_title: string;
+  phone?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
+  specializations: string[];
+  courses: Array<{ id: string; title: string; category: string }>;
+  assigned_batches_count: number;
+  assigned_batches: Array<{ id: string; name: string; course_title: string }>;
+  total_students: number;
+  received_count: number;
+  missing_count: number;
+  compliance_rate: number;
+  compliance_status: 'completed' | 'partial' | 'pending' | 'no_students';
+  received_disciples: GuruComplianceDisciple[];
+  missing_disciples: GuruComplianceDisciple[];
+  shared_videos_count: number;
+  shared_videos: any[];
+}
+
+export interface GuruComplianceSummary {
+  total_gurus: number;
+  completed_gurus: number;
+  partial_gurus: number;
+  pending_gurus: number;
+  total_students: number;
+  total_received: number;
+  total_missing: number;
+  overall_compliance_rate: number;
+}
+
+
 // -----------------------------------------------------------------------------
 export async function getVideoLibraryItems(filters?: {
   courseId?: string;
@@ -277,6 +340,11 @@ export async function createEventFolder(data: {
     const validCourseId = isValidUuid(data.target_course_id) ? data.target_course_id : null;
     const validBatchId = isValidUuid(data.target_batch_id) ? data.target_batch_id : null;
 
+    const singleStudent = (data.target_students && data.target_students.length === 1) ? data.target_students[0] : null;
+    const targetStudentId = (data as any).target_student_id || singleStudent?.id || null;
+    const targetStudentName = (data as any).target_student_name || singleStudent?.name || null;
+    const targetStudentRoll = (data as any).target_student_roll || singleStudent?.roll_number || null;
+
     const sql = `
       INSERT INTO video_library (
         title,
@@ -297,10 +365,13 @@ export async function createEventFolder(data: {
         created_by,
         target_students,
         target_student_names,
+        target_student_id,
+        target_student_name,
+        target_student_roll,
         is_active,
         created_at,
         updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18, true, NOW(), NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18, $19, $20, $21, true, NOW(), NOW())
       RETURNING *;
     `;
     const params = [
@@ -321,9 +392,13 @@ export async function createEventFolder(data: {
       data.access_level || (validBatchId ? 'Batch' : validCourseId ? 'Course' : 'All Students'),
       data.created_by || data.trainer_name || 'Academy Owner',
       JSON.stringify(data.target_students || []),
-      data.target_student_names || null,
+      data.target_student_names || (singleStudent ? singleStudent.name : null),
+      targetStudentId,
+      targetStudentName,
+      targetStudentRoll,
     ];
     const item = await queryOne<VideoLibraryItem>(sql, params);
+
 
     try {
       const isGuru = data.shared_by_type === 'guru' || Boolean(data.trainer_id);
@@ -492,3 +567,355 @@ export async function updateVideoLibraryItem(id: string, data: Partial<VideoLibr
     throw error;
   }
 }
+
+// -----------------------------------------------------------------------------
+// GET GURU MONTHLY PERFORMANCE VIDEO COMPLIANCE
+// -----------------------------------------------------------------------------
+export async function getGuruComplianceData(options?: {
+  month?: string;
+  year?: string;
+  trainerId?: string;
+  trainerName?: string;
+}): Promise<{
+  month: string;
+  year: string;
+  summary: GuruComplianceSummary;
+  gurus: GuruComplianceItem[];
+}> {
+  const currentDate = new Date();
+  const monthParam = options?.month || (currentDate.getMonth() + 1).toString();
+  const yearParam = options?.year || currentDate.getFullYear().toString();
+
+  try {
+    // 1. Fetch all active Gurus
+    const trainersSql = `
+      SELECT 
+        t.id as trainer_id,
+        t.profile_id,
+        p.full_name,
+        p.phone,
+        p.email,
+        COALESCE(t.avatar_url, p.avatar_url) as avatar_url,
+        t.specializations,
+        t.display_title,
+        t.is_active
+      FROM public.trainers t
+      JOIN public.profiles p ON t.profile_id = p.id
+      WHERE t.is_active = true
+      ORDER BY p.full_name ASC;
+    `;
+    const trainers = await query<any>(trainersSql);
+
+    // 2. Fetch all batches
+    const batchesSql = `
+      SELECT 
+        b.id as batch_id,
+        b.name as batch_name,
+        b.course_id,
+        c.title as course_title,
+        c.category as course_category,
+        b.trainer_id
+      FROM public.batches b
+      JOIN public.courses c ON b.course_id = c.id
+      WHERE b.trainer_id IS NOT NULL;
+    `;
+    const allBatches = await query<any>(batchesSql);
+
+    // 3. Fetch all active enrollments
+    const studentsSql = `
+      SELECT 
+        be.batch_id,
+        s.id as student_id,
+        s.roll_number,
+        p.full_name as student_name,
+        COALESCE(s.avatar_url, p.avatar_url) as avatar_url,
+        COALESCE(s.parent_name, 'Parent / Guardian') as parent_name,
+        p.phone as student_phone,
+        p.phone as parent_phone
+      FROM public.batch_enrollments be
+      JOIN public.students s ON be.student_id = s.id
+      JOIN public.profiles p ON s.profile_id = p.id
+      WHERE be.status = 'active';
+    `;
+    const allEnrollments = await query<any>(studentsSql);
+
+
+    // 4. Fetch all guru video library items
+    const videosSql = `
+      SELECT 
+        vl.id,
+        vl.title,
+        vl.category,
+        vl.drive_url,
+        vl.youtube_url,
+        vl.shared_by_type,
+        vl.trainer_id,
+        vl.trainer_name,
+        vl.description,
+        vl.event_name,
+        vl.event_date,
+        vl.target_student_id,
+        vl.target_student_name,
+        vl.target_student_roll,
+        vl.target_students,
+        vl.target_student_names,
+        vl.target_course_id,
+        vl.target_course_title,
+        vl.target_batch_id,
+        vl.target_batch_name,
+        vl.created_at
+      FROM public.video_library vl
+      WHERE (
+        vl.shared_by_type = 'guru' 
+        OR vl.category = 'guru_share' 
+        OR vl.trainer_id IS NOT NULL
+      )
+      ORDER BY vl.created_at DESC;
+    `;
+    const allGuruVideos = await query<any>(videosSql);
+
+    // Filter videos by month & year
+    const filteredVideos = allGuruVideos.filter((v: any) => {
+      const dateStr = v.event_date || v.created_at;
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return false;
+
+      if (monthParam !== 'all') {
+        const m = (d.getMonth() + 1).toString();
+        if (m !== monthParam) return false;
+      }
+      if (yearParam !== 'all') {
+        const y = d.getFullYear().toString();
+        if (y !== yearParam) return false;
+      }
+      return true;
+    });
+
+    const isVideoByTrainer = (video: any, trainer: any): boolean => {
+      if (video.trainer_id && trainer.trainer_id && video.trainer_id === trainer.trainer_id) {
+        return true;
+      }
+      const vName = (video.trainer_name || '').toLowerCase().trim();
+      const tName = (trainer.full_name || '').toLowerCase().trim();
+      if (vName && tName && (vName.includes(tName) || tName.includes(vName))) {
+        return true;
+      }
+      return false;
+    };
+
+    const isStudentTargeted = (video: any, student: any): boolean => {
+      if (video.target_student_id && video.target_student_id === student.student_id) {
+        return true;
+      }
+      if (video.target_student_roll && student.roll_number && video.target_student_roll === student.roll_number) {
+        return true;
+      }
+      if (video.target_students) {
+        let list: any[] = [];
+        if (Array.isArray(video.target_students)) {
+          list = video.target_students;
+        } else if (typeof video.target_students === 'string') {
+          try {
+            list = JSON.parse(video.target_students);
+          } catch (_) {
+            list = [];
+          }
+        }
+        for (const ts of list) {
+          if (!ts) continue;
+          if (ts.id && ts.id === student.student_id) return true;
+          if (ts.roll_number && student.roll_number && ts.roll_number === student.roll_number) return true;
+          if (ts.name && student.student_name && ts.name.toLowerCase() === student.student_name.toLowerCase()) return true;
+        }
+      }
+      if (video.target_student_names && student.student_name) {
+        if (video.target_student_names.toLowerCase().includes(student.student_name.toLowerCase())) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const gurusCompliance: GuruComplianceItem[] = trainers.map((trainer: any) => {
+      const assignedBatches = allBatches.filter((b: any) => b.trainer_id === trainer.trainer_id);
+      const batchIds = assignedBatches.map((b: any) => b.batch_id);
+
+      const courseMap = new Map<string, { id: string; title: string; category: string }>();
+      assignedBatches.forEach((b: any) => {
+        if (b.course_id && !courseMap.has(b.course_id)) {
+          courseMap.set(b.course_id, {
+            id: b.course_id,
+            title: b.course_title,
+            category: b.course_category || 'Arts',
+          });
+        }
+      });
+      const courses = Array.from(courseMap.values());
+
+      const enrolledStudentRows = allEnrollments.filter((e: any) => batchIds.includes(e.batch_id));
+      const studentMap = new Map<string, any>();
+      enrolledStudentRows.forEach((row: any) => {
+        if (!studentMap.has(row.student_id)) {
+          const batch = assignedBatches.find((b: any) => b.batch_id === row.batch_id);
+          studentMap.set(row.student_id, {
+            ...row,
+            course_id: batch?.course_id || null,
+            course_title: batch?.course_title || 'Course',
+            batch_name: batch?.batch_name || 'Batch',
+          });
+        }
+      });
+      const assignedStudents = Array.from(studentMap.values());
+      const trainerVideos = filteredVideos.filter((v: any) => isVideoByTrainer(v, trainer));
+
+      const receivedDisciples: GuruComplianceDisciple[] = [];
+      const missingDisciples: GuruComplianceDisciple[] = [];
+
+      assignedStudents.forEach((student: any) => {
+        const matchingVideos = trainerVideos.filter((v: any) => isStudentTargeted(v, student));
+
+        if (matchingVideos.length > 0) {
+          const primaryVideo = matchingVideos[0];
+          receivedDisciples.push({
+            student_id: student.student_id,
+            roll_number: student.roll_number,
+            student_name: student.student_name,
+            avatar_url: student.avatar_url,
+            batch_id: student.batch_id,
+            batch_name: student.batch_name,
+            course_id: student.course_id,
+            course_title: student.course_title,
+            parent_name: student.parent_name,
+            parent_phone: student.parent_phone,
+            video_id: primaryVideo.id,
+            video_title: primaryVideo.title,
+            drive_url: primaryVideo.drive_url,
+            youtube_url: primaryVideo.youtube_url,
+            event_date: primaryVideo.event_date,
+            created_at: primaryVideo.created_at,
+            category: primaryVideo.category,
+            description: primaryVideo.description,
+            all_matching_videos: matchingVideos.map((mv: any) => ({
+              id: mv.id,
+              title: mv.title,
+              drive_url: mv.drive_url,
+              youtube_url: mv.youtube_url,
+              event_date: mv.event_date,
+              created_at: mv.created_at,
+            })),
+          });
+        } else {
+          missingDisciples.push({
+            student_id: student.student_id,
+            roll_number: student.roll_number,
+            student_name: student.student_name,
+            avatar_url: student.avatar_url,
+            batch_id: student.batch_id,
+            batch_name: student.batch_name,
+            course_id: student.course_id,
+            course_title: student.course_title,
+            parent_name: student.parent_name,
+            parent_phone: student.parent_phone,
+          });
+        }
+      });
+
+      const totalStudents = assignedStudents.length;
+      const receivedCount = receivedDisciples.length;
+      const missingCount = missingDisciples.length;
+      const complianceRate = totalStudents > 0 ? Math.round((receivedCount / totalStudents) * 100) : 100;
+
+      let complianceStatus: 'completed' | 'partial' | 'pending' | 'no_students' = 'pending';
+      if (totalStudents === 0) {
+        complianceStatus = 'no_students';
+      } else if (receivedCount === totalStudents) {
+        complianceStatus = 'completed';
+      } else if (receivedCount > 0) {
+        complianceStatus = 'partial';
+      } else {
+        complianceStatus = 'pending';
+      }
+
+      return {
+        trainer_id: trainer.trainer_id,
+        full_name: trainer.full_name,
+        display_title: trainer.display_title || 'Faculty Guru',
+        phone: trainer.phone,
+        email: trainer.email,
+        avatar_url: trainer.avatar_url,
+        specializations: Array.isArray(trainer.specializations) ? trainer.specializations : [],
+        courses,
+        assigned_batches_count: assignedBatches.length,
+        assigned_batches: assignedBatches.map((b: any) => ({
+          id: b.batch_id,
+          name: b.batch_name,
+          course_title: b.course_title,
+        })),
+        total_students: totalStudents,
+        received_count: receivedCount,
+        missing_count: missingCount,
+        compliance_rate: complianceRate,
+        compliance_status: complianceStatus,
+        received_disciples: receivedDisciples,
+        missing_disciples: missingDisciples,
+        shared_videos_count: trainerVideos.length,
+        shared_videos: trainerVideos,
+      };
+    });
+
+    let finalGurus = gurusCompliance;
+    if (options?.trainerId) {
+      finalGurus = finalGurus.filter((g) => g.trainer_id === options.trainerId);
+    } else if (options?.trainerName) {
+      const q = options.trainerName.toLowerCase().trim();
+      finalGurus = finalGurus.filter((g) => g.full_name.toLowerCase().includes(q));
+    }
+
+    const totalGurus = finalGurus.length;
+    const completedGurus = finalGurus.filter((g) => g.compliance_status === 'completed' && g.total_students > 0).length;
+    const partialGurus = finalGurus.filter((g) => g.compliance_status === 'partial').length;
+    const pendingGurus = finalGurus.filter((g) => g.compliance_status === 'pending' && g.total_students > 0).length;
+
+    const totalStudentsAcrossAll = finalGurus.reduce((acc, g) => acc + g.total_students, 0);
+    const totalReceivedAcrossAll = finalGurus.reduce((acc, g) => acc + g.received_count, 0);
+    const totalMissingAcrossAll = finalGurus.reduce((acc, g) => acc + g.missing_count, 0);
+    const overallComplianceRate = totalStudentsAcrossAll > 0 
+      ? Math.round((totalReceivedAcrossAll / totalStudentsAcrossAll) * 100) 
+      : 100;
+
+    return {
+      month: monthParam,
+      year: yearParam,
+      summary: {
+        total_gurus: totalGurus,
+        completed_gurus: completedGurus,
+        partial_gurus: partialGurus,
+        pending_gurus: pendingGurus,
+        total_students: totalStudentsAcrossAll,
+        total_received: totalReceivedAcrossAll,
+        total_missing: totalMissingAcrossAll,
+        overall_compliance_rate: overallComplianceRate,
+      },
+      gurus: finalGurus,
+    };
+  } catch (error) {
+    console.error('Error in getGuruComplianceData:', error);
+    return {
+      month: monthParam,
+      year: yearParam,
+      summary: {
+        total_gurus: 0,
+        completed_gurus: 0,
+        partial_gurus: 0,
+        pending_gurus: 0,
+        total_students: 0,
+        total_received: 0,
+        total_missing: 0,
+        overall_compliance_rate: 0,
+      },
+      gurus: [],
+    };
+  }
+}
+
