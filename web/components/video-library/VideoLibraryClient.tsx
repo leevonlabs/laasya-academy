@@ -18,6 +18,7 @@ import {
   Globe,
   Layers,
   ChevronRight,
+  ChevronDown,
   Info,
   CheckSquare,
   Square,
@@ -72,13 +73,20 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
   // Dedicated Course Page View state (when clicked from Course-Wise)
   const [selectedCourseSubpage, setSelectedCourseSubpage] = useState<CourseWithDetails | null>(null);
 
-  // Subpage Share Form State
+  // Helper to remove "Guru" prefix from names
+  const stripGuruPrefix = (name?: string | null) => {
+    if (!name) return '';
+    return name.replace(/^Guru\s+/i, '').replace(/^Guru\s+Sri\s+/i, 'Sri ').trim();
+  };
+
+  // Subpage Share Modal State
+  const [isSubpageShareModalOpen, setIsSubpageShareModalOpen] = useState(false);
   const [subpageShareTitle, setSubpageShareTitle] = useState('');
   const [subpageShareDriveUrl, setSubpageShareDriveUrl] = useState('');
   const [subpageShareYoutubeUrl, setSubpageShareYoutubeUrl] = useState('');
   const [subpageShareDate, setSubpageShareDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [subpageShareDesc, setSubpageShareDesc] = useState('');
-  const [subpageTargetBatch, setSubpageTargetBatch] = useState<'all' | string>('all');
+  const [subpageSelectedBatchIds, setSubpageSelectedBatchIds] = useState<string[]>([]);
   const [isSubmittingSubpageShare, setIsSubmittingSubpageShare] = useState(false);
 
   // Subpage Previous Shared Links Filters (Month, Year, Search)
@@ -124,6 +132,10 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
   const [isLoadingCompliance, setIsLoadingCompliance] = useState(false);
   const [selectedGuruForModal, setSelectedGuruForModal] = useState<GuruComplianceItem | null>(null);
   const [guruModalActiveTab, setGuruModalActiveTab] = useState<'received' | 'missing' | 'all_videos'>('received');
+  const [guruModalBatchFilter, setGuruModalBatchFilter] = useState<string>('all');
+  const [guruModalStudentSearch, setGuruModalStudentSearch] = useState<string>('');
+  const [guruModalSelectedStudentIds, setGuruModalSelectedStudentIds] = useState<string[]>([]);
+  const [isGuruModalStudentDropdownOpen, setIsGuruModalStudentDropdownOpen] = useState(false);
   const [complianceStatusFilter, setComplianceStatusFilter] = useState<'all' | 'needs_attention' | 'completed' | 'no_students'>('all');
   const [complianceSearch, setComplianceSearch] = useState('');
   const [guruShareViewMode, setGuruShareViewMode] = useState<'compliance_grid' | 'media_archive'>('compliance_grid');
@@ -180,6 +192,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
   const [courseShareDate, setCourseShareDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [courseShareDesc, setCourseShareDesc] = useState('');
   const [targetBatchOption, setTargetBatchOption] = useState<'all' | string>('all');
+  const [courseShareSelectedBatchIds, setCourseShareSelectedBatchIds] = useState<string[]>([]);
   const [isSubmittingCourseShare, setIsSubmittingCourseShare] = useState(false);
 
   // Edit Link State
@@ -311,18 +324,17 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
     { value: '12', label: 'December' },
   ];
 
-  // Available Years dynamically gathered from event items
+  // Available Years: Comprehensive scrollable list of all years
   const availableYears = useMemo(() => {
-    const set = new Set<string>();
-    items.forEach(i => {
-      if (i.event_date) {
-        const y = new Date(i.event_date).getFullYear().toString();
-        if (y && !isNaN(parseInt(y, 10))) set.add(y);
-      }
-    });
-    set.add(new Date().getFullYear().toString());
-    return ['all', ...Array.from(set).sort((a, b) => b.localeCompare(a))];
-  }, [items]);
+    const currentYear = new Date().getFullYear();
+    const maxYear = Math.max(currentYear + 2, 2028);
+    const minYear = 2018;
+    const list: string[] = ['all'];
+    for (let y = maxYear; y >= minYear; y--) {
+      list.push(y.toString());
+    }
+    return list;
+  }, []);
 
   // Subpage Filtered Items (Specific to selectedCourseSubpage)
   const subpageFilteredItems = useMemo(() => {
@@ -462,26 +474,145 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
     });
   }, [complianceData.gurus, complianceStatusFilter, complianceSearch]);
 
+  // All unique disciples under this Guru for the multi-select filter
+  const guruAllDisciplesList = useMemo(() => {
+    if (!selectedGuruForModal) return [];
+    const map = new Map<string, { student_id: string; student_name: string; roll_number: string; batch_id?: string; batch_name?: string }>();
+    selectedGuruForModal.received_disciples.forEach(d => {
+      if (!map.has(d.student_id)) {
+        map.set(d.student_id, {
+          student_id: d.student_id,
+          student_name: d.student_name,
+          roll_number: d.roll_number,
+          batch_id: d.batch_id,
+          batch_name: d.batch_name,
+        });
+      }
+    });
+    selectedGuruForModal.missing_disciples.forEach(d => {
+      if (!map.has(d.student_id)) {
+        map.set(d.student_id, {
+          student_id: d.student_id,
+          student_name: d.student_name,
+          roll_number: d.roll_number,
+          batch_id: d.batch_id,
+          batch_name: d.batch_name,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.student_name.localeCompare(b.student_name));
+  }, [selectedGuruForModal]);
+
+  // All enrolled batches for the selected Guru
+  const guruModalAvailableBatches = useMemo(() => {
+    if (!selectedGuruForModal) return [];
+    const map = new Map<string, string>();
+    if (Array.isArray(selectedGuruForModal.assigned_batches)) {
+      selectedGuruForModal.assigned_batches.forEach(b => {
+        map.set(b.id, b.name + (b.course_title ? ` (${b.course_title})` : ''));
+      });
+    }
+    selectedGuruForModal.received_disciples.forEach(d => {
+      if (d.batch_id && !map.has(d.batch_id)) {
+        map.set(d.batch_id, d.batch_name || 'Batch');
+      }
+    });
+    selectedGuruForModal.missing_disciples.forEach(d => {
+      if (d.batch_id && !map.has(d.batch_id)) {
+        map.set(d.batch_id, d.batch_name || 'Batch');
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [selectedGuruForModal]);
+
+  // Disciples available in the modal student filter (scoped to selected batch)
+  const disciplesForFilterList = useMemo(() => {
+    return guruAllDisciplesList.filter(d => {
+      if (guruModalBatchFilter !== 'all' && d.batch_id !== guruModalBatchFilter) {
+        return false;
+      }
+      if (guruModalStudentSearch.trim()) {
+        const q = guruModalStudentSearch.toLowerCase();
+        return d.student_name.toLowerCase().includes(q) || d.roll_number.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [guruAllDisciplesList, guruModalBatchFilter, guruModalStudentSearch]);
+
+  // Filtered disciples inside Guru Modal based on batch, student selection, and search
+  const modalFilteredReceived = useMemo(() => {
+    if (!selectedGuruForModal) return [];
+    return selectedGuruForModal.received_disciples.filter((d) => {
+      if (guruModalBatchFilter !== 'all' && d.batch_id !== guruModalBatchFilter) {
+        return false;
+      }
+      if (guruModalSelectedStudentIds.length > 0 && !guruModalSelectedStudentIds.includes(d.student_id)) {
+        return false;
+      }
+      if (guruModalStudentSearch.trim()) {
+        const q = guruModalStudentSearch.toLowerCase();
+        const matchName = d.student_name.toLowerCase().includes(q);
+        const matchRoll = d.roll_number.toLowerCase().includes(q);
+        const matchBatch = (d.batch_name || '').toLowerCase().includes(q);
+        const matchTitle = (d.video_title || '').toLowerCase().includes(q);
+        if (!matchName && !matchRoll && !matchBatch && !matchTitle) return false;
+      }
+      return true;
+    });
+  }, [selectedGuruForModal, guruModalBatchFilter, guruModalSelectedStudentIds, guruModalStudentSearch]);
+
+  const modalFilteredMissing = useMemo(() => {
+    if (!selectedGuruForModal) return [];
+    return selectedGuruForModal.missing_disciples.filter((d) => {
+      if (guruModalBatchFilter !== 'all' && d.batch_id !== guruModalBatchFilter) {
+        return false;
+      }
+      if (guruModalSelectedStudentIds.length > 0 && !guruModalSelectedStudentIds.includes(d.student_id)) {
+        return false;
+      }
+      if (guruModalStudentSearch.trim()) {
+        const q = guruModalStudentSearch.toLowerCase();
+        const matchName = d.student_name.toLowerCase().includes(q);
+        const matchRoll = d.roll_number.toLowerCase().includes(q);
+        const matchBatch = (d.batch_name || '').toLowerCase().includes(q);
+        const matchCourse = (d.course_title || '').toLowerCase().includes(q);
+        if (!matchName && !matchRoll && !matchBatch && !matchCourse) return false;
+      }
+      return true;
+    });
+  }, [selectedGuruForModal, guruModalBatchFilter, guruModalSelectedStudentIds, guruModalStudentSearch]);
+
 
   // Handle Subpage Share Link Submit
   const handleSubpageShareSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCourseSubpage) return;
     if (!subpageShareTitle.trim()) {
-      alert('Please provide the Event Title.');
+      alert('Please provide the Event Shoot Title.');
       return;
     }
     if (!subpageShareDriveUrl.trim() && !subpageShareYoutubeUrl.trim()) {
       alert('Please provide at least a Google Drive link or YouTube link.');
       return;
     }
+    if (subpageSelectedBatchIds.length === 0) {
+      alert('Please select at least one batch to share with.');
+      return;
+    }
 
     setIsSubmittingSubpageShare(true);
     try {
-      const isBatchSpecific = subpageTargetBatch !== 'all';
-      const selectedBatch = isBatchSpecific
-        ? selectedCourseSubpage.batches.find(b => b.id === subpageTargetBatch)
-        : null;
+      const allSelected = subpageSelectedBatchIds.length === selectedCourseSubpage.batches.length;
+      const selectedBatches = allSelected
+        ? [{ id: 'all', name: 'All Batches', course_id: selectedCourseSubpage.id, course_title: selectedCourseSubpage.title }]
+        : selectedCourseSubpage.batches
+            .filter(b => subpageSelectedBatchIds.includes(b.id))
+            .map(b => ({
+              id: b.id,
+              name: b.name,
+              course_id: selectedCourseSubpage.id,
+              course_title: selectedCourseSubpage.title,
+            }));
 
       const res = await fetch('/api/video-library', {
         method: 'POST',
@@ -495,9 +626,8 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
           description: subpageShareDesc.trim(),
           target_course_id: selectedCourseSubpage.id,
           target_course_title: selectedCourseSubpage.title,
-          target_batch_id: selectedBatch ? selectedBatch.id : null,
-          target_batch_name: selectedBatch ? selectedBatch.name : 'All Batches',
-          access_level: selectedBatch ? 'Batch' : 'Course',
+          selected_batches: selectedBatches,
+          access_level: allSelected ? 'Course' : 'Batch',
         }),
       });
 
@@ -522,7 +652,10 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
       setSubpageShareDriveUrl('');
       setSubpageShareYoutubeUrl('');
       setSubpageShareDesc('');
-      showToast(`Event link shared with ${selectedBatch ? selectedBatch.name : 'All Batches'}!`);
+      setIsSubpageShareModalOpen(false);
+      showToast(
+        `Event link shared with ${allSelected ? 'All Batches' : `${selectedBatches.length} Batches`} successfully!`
+      );
     } catch (err: any) {
       alert(err.message || 'Error sharing folder');
     } finally {
@@ -535,6 +668,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
     setActiveCourse(course);
     setSelectedBatchId('all');
     setTargetBatchOption('all');
+    setCourseShareSelectedBatchIds(course.batches.map(b => b.id));
     setIsCourseShareOpen(false);
     setStudentSearch('');
     setIsLoadingStudents(true);
@@ -664,13 +798,24 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
       alert('Please provide at least a Google Drive link or YouTube link.');
       return;
     }
+    if (courseShareSelectedBatchIds.length === 0) {
+      alert('Please select at least one batch to share with.');
+      return;
+    }
 
     setIsSubmittingCourseShare(true);
     try {
-      const isBatchSpecific = targetBatchOption !== 'all';
-      const selectedBatch = isBatchSpecific
-        ? activeCourse.batches.find(b => b.id === targetBatchOption)
-        : null;
+      const allSelected = courseShareSelectedBatchIds.length === activeCourse.batches.length;
+      const selectedBatches = allSelected
+        ? [{ id: 'all', name: 'All Batches', course_id: activeCourse.id, course_title: activeCourse.title }]
+        : activeCourse.batches
+            .filter(b => courseShareSelectedBatchIds.includes(b.id))
+            .map(b => ({
+              id: b.id,
+              name: b.name,
+              course_id: activeCourse.id,
+              course_title: activeCourse.title,
+            }));
 
       const res = await fetch('/api/video-library', {
         method: 'POST',
@@ -684,9 +829,8 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
           description: courseShareDesc.trim(),
           target_course_id: activeCourse.id,
           target_course_title: activeCourse.title,
-          target_batch_id: selectedBatch ? selectedBatch.id : null,
-          target_batch_name: selectedBatch ? selectedBatch.name : 'All Batches',
-          access_level: selectedBatch ? 'Batch' : 'Course',
+          selected_batches: selectedBatches,
+          access_level: allSelected ? 'Course' : 'Batch',
         }),
       });
 
@@ -712,7 +856,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
       setCourseShareDriveUrl('');
       setCourseShareYoutubeUrl('');
       setCourseShareDesc('');
-      showToast(`Event link shared to ${activeCourse.title}!`);
+      showToast(`Event link shared to ${allSelected ? 'All Batches' : `${selectedBatches.length} Batches`} in ${activeCourse.title}!`);
     } catch (err: any) {
       alert(err.message || 'Error sharing folder');
     } finally {
@@ -930,11 +1074,22 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                   {selectedCourseSubpage.title}
                 </h2>
                 <p className="text-xs sm:text-sm text-rose-100/90 max-w-xl leading-relaxed">
-                  Guru: <strong>{selectedCourseSubpage.batches[0]?.trainer_name || 'Assigned Faculty Master'}</strong> • Hall: {selectedCourseSubpage.batches[0]?.room || 'Mandapam'}
+                  Faculty: <strong>{stripGuruPrefix(selectedCourseSubpage.batches[0]?.trainer_name) || 'Assigned Faculty'}</strong> • Hall: {selectedCourseSubpage.batches[0]?.room || 'Mandapam'}
                 </p>
               </div>
 
               <div className="flex items-center gap-3 z-10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubpageSelectedBatchIds(selectedCourseSubpage.batches.map(b => b.id));
+                    setIsSubpageShareModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#F9E33A] hover:brightness-105 text-[#2D041A] font-black text-xs sm:text-sm shadow-lg transition active:scale-95 cursor-pointer"
+                >
+                  <FolderPlus className="w-4 h-4 text-[#2D041A]" />
+                  <span>Share Link</span>
+                </button>
                 <div className="bg-black/25 backdrop-blur-md border border-white/15 px-4 py-3 rounded-2xl text-center">
                   <span className="text-[10px] uppercase font-bold text-rose-200 block">Course Shared Links</span>
                   <span className="text-xl font-black text-[#F9E33A] mt-0.5 block">{subpageFilteredItems.length}</span>
@@ -942,163 +1097,237 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
               </div>
             </div>
 
-            {/* CARD 1: SHARE DRIVE LINK FORM FOR THIS COURSE */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#F0D5E4] space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
-                <div>
-                  <h3 className="font-bold text-base text-[#2D041A] flex items-center gap-2">
-                    <FolderPlus className="w-5 h-5 text-[#8A064D]" />
-                    <span>Share Event Google Drive Link</span>
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Select a batch or all batches in this course, enter link, and distribute instantly.
-                  </p>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubpageShareSubmit} className="space-y-4">
-                {/* 1. Target Batch Selector */}
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-2">
-                    Select Target Batch <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="flex flex-wrap gap-2">
+            {/* SUBPAGE SHARE LINK MODAL (EXACT LAYOUT FROM REFERENCE IMAGE WITH MULTI-BATCH SELECTION) */}
+            {isSubpageShareModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in">
+                <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-[#F0D5E4] overflow-hidden">
+                  {/* Modal Header */}
+                  <div className="px-6 py-4.5 bg-gradient-to-r from-[#590231] to-[#8A064D] text-white flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-lg flex items-center gap-2">
+                        <FolderPlus className="w-5 h-5 text-[#D4AF37]" />
+                        <span>Share Event Media Link • {selectedCourseSubpage.title}</span>
+                      </h3>
+                      <p className="text-xs text-rose-100 mt-0.5">
+                        Broadcast Google Drive and/or YouTube performance links to disciples in this course
+                      </p>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setSubpageTargetBatch('all')}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                        subpageTargetBatch === 'all'
-                          ? 'bg-[#590231] text-white shadow-xs'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                      }`}
+                      onClick={() => setIsSubpageShareModalOpen(false)}
+                      className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition cursor-pointer"
                     >
-                      <Layers className="w-3.5 h-3.5" />
-                      <span>All Batches in Course ({selectedCourseSubpage.student_count} Disciples)</span>
+                      <X className="w-5 h-5" />
                     </button>
+                  </div>
 
-                    {selectedCourseSubpage.batches.map((b, idx) => {
-                      const isSelected = subpageTargetBatch === b.id;
-                      return (
+                  {/* Modal Form */}
+                  <form onSubmit={handleSubpageShareSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+                    {/* Event Shoot Title */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        EVENT SHOOT TITLE <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Annual Natya Utsav 2026 Stage Shoot"
+                        value={subpageShareTitle}
+                        onChange={e => setSubpageShareTitle(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 placeholder-gray-400"
+                      />
+                    </div>
+
+                    {/* Google Drive & YouTube Links */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                          <span>GOOGLE DRIVE FOLDER LINK</span>
+                          <span className="text-[10.5px] text-gray-400 font-normal lowercase">(optional if youtube provided)</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="url"
+                            placeholder="https://drive.google.com/drive/folders/..."
+                            value={subpageShareDriveUrl}
+                            onChange={e => setSubpageShareDriveUrl(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 font-mono text-xs"
+                          />
+                          <LinkIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                          <span>YOUTUBE VIDEO / PLAYLIST LINK</span>
+                          <span className="text-[10.5px] text-gray-400 font-normal lowercase">(optional if drive provided)</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="url"
+                            placeholder="https://youtube.com/watch?v=... or playlist"
+                            value={subpageShareYoutubeUrl}
+                            onChange={e => setSubpageShareYoutubeUrl(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 font-mono text-xs"
+                          />
+                          <Video className="w-4 h-4 text-rose-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-gray-500 -mt-2">
+                      Provide either a Google Drive folder link, a YouTube link, or both. Disciples will see the corresponding platforms directly in their mobile app.
+                    </p>
+
+                    {/* Date & Category */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                          EVENT SHOOT DATE
+                        </label>
+                        <input
+                          type="date"
+                          value={subpageShareDate}
+                          onChange={e => setSubpageShareDate(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                          SHARING CATEGORY
+                        </label>
+                        <div className="px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-[#DEF7EC] text-[#03543F] font-bold text-xs flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600" />
+                          <span>Course Event Folder & Practice Video</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Description / Instructions */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          DESCRIPTION / INSTRUCTIONS FOR DISCIPLES
+                        </label>
+                        <AiEnhanceButton
+                          value={subpageShareDesc}
+                          onEnhance={(val) => setSubpageShareDesc(val)}
+                          context="classical arts choreography video description and practice instructions"
+                          size="xs"
+                        />
+                      </div>
+                      <textarea
+                        rows={3}
+                        placeholder="e.g. Contains multi-cam 4K stage recordings, individual solo clips, and high-res photo gallery."
+                        value={subpageShareDesc}
+                        onChange={e => setSubpageShareDesc(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 min-h-[85px] resize-y"
+                      />
+                    </div>
+
+                    {/* SELECT TARGET BATCHES [can select all and multiple] (RED OUTLINE CONTAINER FROM REFERENCE IMAGE) */}
+                    <div className="p-4 rounded-2xl border-2 border-[#E02424] bg-white space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="block text-xs font-extrabold text-[#2D041A] uppercase tracking-wider">
+                            SELECT TARGET BATCHES
+                          </label>
+                          <p className="text-xs text-gray-500 font-medium">
+                            Chosen: <strong className="text-[#8A064D] font-black">{subpageSelectedBatchIds.length}</strong> of {selectedCourseSubpage.batches.length} batches
+                          </p>
+                        </div>
                         <button
-                          key={`subpage-batch-${b.id}-${idx}`}
                           type="button"
-                          onClick={() => setSubpageTargetBatch(b.id)}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                            isSelected
-                              ? 'bg-[#8A064D] text-white shadow-xs'
-                              : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                          }`}
+                          onClick={() => {
+                            if (subpageSelectedBatchIds.length === selectedCourseSubpage.batches.length) {
+                              setSubpageSelectedBatchIds([]);
+                            } else {
+                              setSubpageSelectedBatchIds(selectedCourseSubpage.batches.map(b => b.id));
+                            }
+                          }}
+                          className="text-xs font-black text-[#8A064D] hover:underline flex items-center gap-1.5 cursor-pointer"
                         >
-                          <span>{b.name}</span>
-                          <span className="text-[10px] opacity-75 font-normal">({b.trainer_name || 'Guru'})</span>
+                          {subpageSelectedBatchIds.length === selectedCourseSubpage.batches.length ? (
+                            <>
+                              <Square className="w-4 h-4 text-[#8A064D]" />
+                              <span>Deselect All</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckSquare className="w-4 h-4 text-[#8A064D]" />
+                              <span>Select All ({selectedCourseSubpage.batches.length} Batches)</span>
+                            </>
+                          )}
                         </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                      </div>
 
-                {/* 2. Event Title & Shoot Date */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                      Event Shoot Title / Session Name <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Navaratri Recital 2026 - Mandapam Showcase"
-                      value={subpageShareTitle}
-                      onChange={e => setSubpageShareTitle(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-900 focus:bg-white focus:ring-2 focus:ring-[#8A064D]/30 focus:border-[#8A064D]"
-                    />
-                  </div>
+                      {/* Batches Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+                        {selectedCourseSubpage.batches.map((batch) => {
+                          const isChecked = subpageSelectedBatchIds.includes(batch.id);
+                          return (
+                            <button
+                              key={`batch-choice-${batch.id}`}
+                              type="button"
+                              onClick={() => {
+                                setSubpageSelectedBatchIds(prev =>
+                                  prev.includes(batch.id)
+                                    ? prev.filter(id => id !== batch.id)
+                                    : [...prev, batch.id]
+                                );
+                              }}
+                              className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                                isChecked
+                                  ? 'border-[#8A064D] bg-[#FFF2F8] shadow-xs'
+                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                              }`}
+                            >
+                              <div className={`w-4.5 h-4.5 rounded-md flex items-center justify-center shrink-0 border transition-all ${
+                                isChecked
+                                  ? 'bg-[#1C64F2] border-[#1C64F2] text-white shadow-xs'
+                                  : 'border-gray-300 bg-white'
+                              }`}>
+                                {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <span className="text-xs font-bold text-gray-900 block truncate">
+                                  {batch.name}
+                                </span>
+                                <span className="text-[10.5px] text-gray-500 block truncate mt-0.5 font-medium">
+                                  {batch.trainer_name ? stripGuruPrefix(batch.trainer_name) : 'Faculty'}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                      Event Date <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={subpageShareDate}
-                      onChange={e => setSubpageShareDate(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-900 focus:bg-white focus:ring-2 focus:ring-[#8A064D]/30 focus:border-[#8A064D]"
-                    />
-                  </div>
-                </div>
-
-                {/* 3. Media Links: Google Drive & YouTube */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5 flex items-center justify-between">
-                      <span>Google Drive Link</span>
-                      <span className="text-[10px] text-gray-400 font-normal">Optional if YouTube is provided</span>
-                    </label>
-                    <input
-                      type="url"
-                      placeholder="https://drive.google.com/drive/folders/..."
-                      value={subpageShareDriveUrl}
-                      onChange={e => setSubpageShareDriveUrl(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-mono font-medium text-gray-900 focus:bg-white focus:ring-2 focus:ring-[#8A064D]/30 focus:border-[#8A064D]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-black text-rose-700 uppercase tracking-wide mb-1.5 flex items-center justify-between">
-                      <span>YouTube Video Link</span>
-                      <span className="text-[10px] text-gray-400 font-normal">Optional if Drive is provided</span>
-                    </label>
-                    <input
-                      type="url"
-                      placeholder="https://www.youtube.com/watch?v=... or youtu.be/..."
-                      value={subpageShareYoutubeUrl}
-                      onChange={e => setSubpageShareYoutubeUrl(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-rose-200 bg-rose-50/30 text-xs font-mono font-medium text-gray-900 focus:bg-white focus:ring-2 focus:ring-rose-500/30 focus:border-rose-600"
-                    />
-                  </div>
-                </div>
-
-                {/* 4. Instructions / Description */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
-                      Event Description / Instructions <span className="text-[11px] font-normal text-gray-400 capitalize">(Optional)</span>
-                    </label>
-                    <AiEnhanceButton
-                      value={subpageShareDesc}
-                      onEnhance={(val) => setSubpageShareDesc(val)}
-                      context="classical arts choreography video description and practice instructions"
-                      size="xs"
-                    />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="e.g. Masterclass choreography recordings, costume trial videos, high-res photos"
-                    value={subpageShareDesc}
-                    onChange={e => setSubpageShareDesc(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-[#8A064D]/30 focus:border-[#8A064D]"
-                  />
-                </div>
-
-                {/* Submit Button */}
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="submit"
-                    disabled={isSubmittingSubpageShare}
-                    className="px-6 py-2.5 rounded-xl bg-[#8A064D] hover:bg-[#70043E] active:scale-95 text-white font-bold text-xs shadow-md disabled:opacity-50 transition flex items-center gap-2 cursor-pointer"
-                  >
-                    {isSubmittingSubpageShare ? (
-                      <span>Distributing Drive Link...</span>
-                    ) : (
-                      <>
+                    {/* Modal Footer Actions */}
+                    <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => setIsSubpageShareModalOpen(false)}
+                        className="px-4 py-2.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmittingSubpageShare || subpageSelectedBatchIds.length === 0}
+                        className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#8A064D] to-[#B31267] hover:from-[#740340] hover:to-[#8A064D] active:scale-95 text-white font-black text-xs shadow-md disabled:opacity-50 transition flex items-center gap-2 cursor-pointer"
+                      >
                         <Share2 className="w-4 h-4 text-[#F9E33A]" />
-                        <span>Share Drive Link with Selected Batch(es)</span>
-                      </>
-                    )}
-                  </button>
+                        <span>
+                          {isSubmittingSubpageShare
+                            ? 'Distributing Link...'
+                            : `Share with ${subpageSelectedBatchIds.length} Batches`}
+                        </span>
+                      </button>
+                    </div>
+                  </form>
                 </div>
-              </form>
-            </div>
+              </div>
+            )}
 
             {/* CARD 2: PREVIOUSLY SHARED LINKS WITH MONTH & YEAR RANGE FILTER + SEARCH BAR */}
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#F0D5E4] space-y-5">
@@ -1381,7 +1610,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                         key={`course-card-${course.id}-${idx}`}
                         onClick={() => {
                           setSelectedCourseSubpage(course);
-                          setSubpageTargetBatch('all');
+                          setSubpageSelectedBatchIds(course.batches.map(b => b.id));
                           setSubpageSearch('');
                           setSubpageMonthFilter('all');
                           setSubpageYearFilter('all');
@@ -1422,7 +1651,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                               {course.title}
                             </h3>
                             <p className="text-[11px] text-white/80 line-clamp-1 mt-0.5">
-                              Guru: {primaryTrainer}
+                              Faculty: {stripGuruPrefix(primaryTrainer)}
                             </p>
                           </div>
                         </div>
@@ -1704,88 +1933,54 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
         /* TAB 3: GURU SHARE & MONTHLY PERFORMANCE VIDEO TRACKING HUB           */
         /* ===================================================================== */
         <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Header Summary Banner */}
-          <div className="bg-gradient-to-r from-[#2D041A] via-[#590231] to-[#8A064D] text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative overflow-hidden">
-            <div className="space-y-2 z-10 max-w-2xl">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#F9E33A] font-mono text-xs font-bold border border-[#D4AF37]/30 uppercase tracking-wider">
-                <GraduationCap className="w-4 h-4 text-[#F9E33A]" />
-                Faculty Disciples Audit • Monthly Performance Videos
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-white">
-                Guru Performance Video Tracking & Hub
-              </h2>
-              <p className="text-xs sm:text-sm text-rose-100/90 leading-relaxed">
-                Faculty Gurus must share at least 1 performance video link (Google Drive / YouTube) for every disciple per month. Track compliance across all Gurus, identify missing disciples, and view video recordings.
+          {/* Nice Summary Row with Month & Year Filter */}
+          <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-[#F0D5E4] flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-lg text-[#2D041A] flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#8A064D]" />
+                <span>Faculty Performance Videos Compliance</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Monthly performance video tracking and audit across all faculty members and disciples
               </p>
             </div>
 
-            {/* Audit Period & View Toggle Controls */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 z-10 shrink-0">
-              {/* Month Picker */}
-              <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md border border-white/15 px-3 py-2 rounded-2xl">
-                <Calendar className="w-4 h-4 text-[#F9E33A] shrink-0" />
-                <div className="flex items-center gap-1.5">
-                  <select
-                    value={complianceMonth}
-                    onChange={(e) => {
-                      const newM = e.target.value;
-                      setComplianceMonth(newM);
-                      fetchComplianceData(newM, complianceYear);
-                    }}
-                    className="bg-transparent text-xs font-bold text-white focus:outline-hidden cursor-pointer"
-                  >
-                    {MONTHS.map((m) => (
-                      <option key={`audit-month-${m.value}`} value={m.value} className="text-gray-900 bg-white">
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={complianceYear}
-                    onChange={(e) => {
-                      const newY = e.target.value;
-                      setComplianceYear(newY);
-                      fetchComplianceData(complianceMonth, newY);
-                    }}
-                    className="bg-transparent text-xs font-bold text-white focus:outline-hidden cursor-pointer"
-                  >
-                    <option value="all" className="text-gray-900 bg-white">All Years</option>
-                    {availableYears.filter((y) => y !== 'all').map((y) => (
-                      <option key={`audit-year-${y}`} value={y} className="text-gray-900 bg-white">
-                        {y}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* View Switcher: Compliance Directory vs Media Archive */}
-              <div className="flex p-1 bg-black/30 backdrop-blur-md rounded-2xl border border-white/15">
-                <button
-                  type="button"
-                  onClick={() => setGuruShareViewMode('compliance_grid')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                    guruShareViewMode === 'compliance_grid'
-                      ? 'bg-[#D4AF37] text-[#4A0025] shadow-sm'
-                      : 'text-white/80 hover:text-white'
-                  }`}
+            {/* Month & Scrollable All Years Filter */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-[#FFF9FB] shadow-2xs">
+                <Calendar className="w-4 h-4 text-[#8A064D] shrink-0" />
+                <select
+                  value={complianceMonth}
+                  onChange={(e) => {
+                    const newM = e.target.value;
+                    setComplianceMonth(newM);
+                    fetchComplianceData(newM, complianceYear);
+                  }}
+                  className="bg-transparent text-xs font-bold text-gray-800 focus:outline-hidden cursor-pointer"
                 >
-                  <Users className="w-3.5 h-3.5" />
-                  <span>All Gurus ({complianceData.gurus.length})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setGuruShareViewMode('media_archive')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                    guruShareViewMode === 'media_archive'
-                      ? 'bg-[#D4AF37] text-[#4A0025] shadow-sm'
-                      : 'text-white/80 hover:text-white'
-                  }`}
+                  {MONTHS.map((m) => (
+                    <option key={`audit-month-${m.value}`} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={complianceYear}
+                  onChange={(e) => {
+                    const newY = e.target.value;
+                    setComplianceYear(newY);
+                    fetchComplianceData(complianceMonth, newY);
+                  }}
+                  className="bg-transparent text-xs font-bold text-gray-800 focus:outline-hidden cursor-pointer"
                 >
-                  <Video className="w-3.5 h-3.5" />
-                  <span>Media Archive ({guruSharedItems.length})</span>
-                </button>
+                  <option value="all">All Years</option>
+                  {availableYears.filter((y) => y !== 'all').map((y) => (
+                    <option key={`audit-year-${y}`} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -1863,9 +2058,8 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
             </div>
           </div>
 
-          {/* VIEW MODE 1: ALL GURUS COMPLIANCE DIRECTORY */}
-          {guruShareViewMode === 'compliance_grid' ? (
-            <div className="space-y-4">
+          {/* FACULTY DISCIPLES COMPLIANCE DIRECTORY */}
+          <div className="space-y-4">
               {/* Filter Pills & Search Bar */}
               <div className="bg-white rounded-2xl p-4 border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
                 {/* Search Input */}
@@ -1990,10 +2184,10 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                               )}
                               <div className="min-w-0">
                                 <h4 className="font-bold text-sm text-[#2D041A] truncate flex items-center gap-1.5">
-                                  <span>Guru {guru.full_name}</span>
+                                  <span>{stripGuruPrefix(guru.full_name)}</span>
                                 </h4>
                                 <p className="text-[11px] text-gray-500 font-medium truncate mt-0.5">
-                                  {guru.display_title || (guru.specializations.length > 0 ? guru.specializations.join(', ') : 'Faculty Guru')}
+                                  {stripGuruPrefix(guru.display_title) || (guru.specializations.length > 0 ? guru.specializations.join(', ') : 'Faculty')}
                                 </p>
                               </div>
                             </div>
@@ -2075,6 +2269,10 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                           onClick={() => {
                             setSelectedGuruForModal(guru);
                             setGuruModalActiveTab(guru.missing_count > 0 ? 'missing' : 'received');
+                            setGuruModalBatchFilter('all');
+                            setGuruModalStudentSearch('');
+                            setGuruModalSelectedStudentIds([]);
+                            setIsGuruModalStudentDropdownOpen(false);
                           }}
                           className="w-full py-2.5 px-4 rounded-xl bg-[#590231] hover:bg-[#740340] active:scale-98 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                         >
@@ -2087,230 +2285,6 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                 </div>
               )}
             </div>
-          ) : (
-            /* VIEW MODE 2: SHARED RESOURCE MEDIA ARCHIVE */
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#F0D5E4] space-y-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-gray-100">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <Video className="w-5 h-5 text-[#8A064D]" />
-                    <span>Shared Resource Archive ({guruFilteredItems.length})</span>
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Filter by Guru, enrolled course, or search resource titles
-                  </p>
-                </div>
-
-                {/* Filters */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="relative w-full sm:w-60">
-                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Search guru links..."
-                      value={guruShareSearch}
-                      onChange={(e) => setGuruShareSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-gray-200 text-xs bg-[#FFF9FB] focus:outline-hidden focus:ring-1 focus:ring-[#8A064D]"
-                    />
-                    {guruShareSearch && (
-                      <button
-                        onClick={() => setGuruShareSearch('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  <select
-                    value={guruShareTrainerFilter}
-                    onChange={(e) => setGuruShareTrainerFilter(e.target.value)}
-                    className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer"
-                  >
-                    <option value="all">All Gurus ({guruNames.length})</option>
-                    {guruNames.map((name) => (
-                      <option key={`guru-filter-${name}`} value={name}>
-                        Guru {name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={guruShareCourseFilter}
-                    onChange={(e) => setGuruShareCourseFilter(e.target.value)}
-                    className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer max-w-[180px] truncate"
-                  >
-                    <option value="all">All Courses</option>
-                    {courses.map((c) => (
-                      <option key={`guru-course-${c.id}`} value={c.title}>
-                        {c.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {guruFilteredItems.length === 0 ? (
-                <div className="p-12 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
-                  <GraduationCap className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm font-bold text-gray-700">No resources shared by Gurus yet</p>
-                  <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
-                    When faculty Gurus share video or Google Drive links with their enrolled batches via the Guru mobile app, all links will automatically be cataloged and manageable here.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  {guruFilteredItems.map((item, idx) => {
-                    const formattedDate = item.event_date
-                      ? new Date(item.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                      : 'Recent Share';
-                    const guruInitials = (item.trainer_name || 'G').charAt(0).toUpperCase();
-
-                    return (
-                      <div
-                        key={`guru-item-${item.id}-${idx}`}
-                        className="bg-white rounded-3xl p-5 border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                      >
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#590231] text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
-                                {guruInitials}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-bold text-sm text-[#2D041A] truncate">
-                                    Guru {item.trainer_name || 'Faculty Member'}
-                                  </span>
-                                  <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 text-[9px] font-extrabold uppercase border border-emerald-200">
-                                    Verified
-                                  </span>
-                                </div>
-                                <span className="text-[11px] text-gray-400 font-medium flex items-center gap-1 mt-0.5">
-                                  <Calendar className="w-3 h-3 text-gray-400" />
-                                  {formattedDate}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleOpenEditItem(item)}
-                                title="Edit Link Info"
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-[#8A064D] hover:bg-[#FFF2F8] transition cursor-pointer"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteItem(item.id)}
-                                title="Remove Link (Admin Moderation)"
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                            <span className="px-2.5 py-0.5 rounded-lg text-[10.5px] font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-100">
-                              {item.target_course_title || 'Enrolled Course'}
-                            </span>
-                            {item.target_batch_name && (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-700">
-                                {item.target_batch_name}
-                              </span>
-                            )}
-                            {item.target_student_names && (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 max-w-xs truncate" title={item.target_student_names}>
-                                Disciples: {item.target_student_names}
-                              </span>
-                            )}
-                          </div>
-
-                          <h4 className="font-bold text-base text-[#2D041A] leading-snug">
-                            {item.title}
-                          </h4>
-
-                          {item.description && (
-                            <p className="text-xs text-gray-600 bg-[#FFF9FB] p-2.5 rounded-xl border border-[#F0D5E4]/60 line-clamp-2">
-                              {item.description}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Interactive Media Links Deck */}
-                        <div className="space-y-2 pt-2 border-t border-gray-100">
-                          {item.drive_url && (
-                            <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                                  <LinkIcon className="w-4 h-4" />
-                                </div>
-                                <div className="min-w-0">
-                                  <span className="text-[11px] font-bold text-emerald-900 block truncate">Google Drive Media Folder</span>
-                                  <span className="text-[10px] text-emerald-700 font-mono truncate block max-w-xs">{item.drive_url}</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(item.drive_url!, `${item.id}-drive`, 'Drive Link')}
-                                  className="px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-800 text-[11px] font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
-                                >
-                                  {copiedId === `${item.id}-drive` ? 'Copied' : 'Copy'}
-                                </button>
-                                <a
-                                  href={item.drive_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-3 py-1.5 rounded-xl bg-[#03543F] hover:bg-[#023e2f] text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                                >
-                                  <span>Open Drive</span>
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              </div>
-                            </div>
-                          )}
-
-                          {item.youtube_url && (
-                            <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-rose-50/70 border border-rose-200/80">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                                  <Video className="w-4 h-4" />
-                                </div>
-                                <div className="min-w-0">
-                                  <span className="text-[11px] font-bold text-rose-950 block truncate">YouTube Recording Broadcast</span>
-                                  <span className="text-[10px] text-rose-700 font-mono truncate block max-w-xs">{item.youtube_url}</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(item.youtube_url!, `${item.id}-yt`, 'YouTube Link')}
-                                  className="px-2.5 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-800 text-[11px] font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
-                                >
-                                  {copiedId === `${item.id}-yt` ? 'Copied' : 'Copy'}
-                                </button>
-                                <a
-                                  href={item.youtube_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                                >
-                                  <span>Open YouTube</span>
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* =================================================================== */}
           {/* GURU PERFORMANCE INSPECTOR MODAL                                   */}
@@ -2335,14 +2309,14 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="font-bold text-lg text-white">
-                          Guru {selectedGuruForModal.full_name}
+                          {stripGuruPrefix(selectedGuruForModal.full_name)}
                         </h3>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#F9E33A] text-[#4A0025]">
                           {complianceMonth !== 'all' ? MONTHS.find((m) => m.value === complianceMonth)?.label : 'All Months'} {complianceYear} Audit
                         </span>
                       </div>
                       <p className="text-xs text-rose-100 mt-0.5 flex flex-wrap items-center gap-2">
-                        <span>{selectedGuruForModal.display_title || 'Faculty Guru'}</span>
+                        <span>{stripGuruPrefix(selectedGuruForModal.display_title) || 'Faculty Member'}</span>
                         {selectedGuruForModal.phone && (
                           <span className="flex items-center gap-1 font-mono">
                             <Phone className="w-3 h-3 text-[#D4AF37]" />
@@ -2374,7 +2348,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                       }`}
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Received Videos ({selectedGuruForModal.received_count})</span>
+                      <span>Received Videos ({modalFilteredReceived.length})</span>
                     </button>
 
                     <button
@@ -2387,7 +2361,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                       }`}
                     >
                       <AlertCircle className="w-3.5 h-3.5" />
-                      <span>Missing Disciples ({selectedGuruForModal.missing_count})</span>
+                      <span>Missing Disciples ({modalFilteredMissing.length})</span>
                     </button>
 
                     <button
@@ -2411,22 +2385,202 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                   </div>
                 </div>
 
+                {/* Dedicated Filter Bar: Enrolled Batch Filter & Searchable Multi-Select Student Filter */}
+                <div className="px-6 py-3 bg-[#FFF2F8]/60 border-b border-[#F0D5E4] flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {/* 1. Batch Filter for Batches Enrolled by this Guru */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold text-gray-500 uppercase">Batch:</span>
+                      <select
+                        value={guruModalBatchFilter}
+                        onChange={(e) => {
+                          setGuruModalBatchFilter(e.target.value);
+                          setGuruModalSelectedStudentIds([]);
+                        }}
+                        className="px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-[#8A064D]/20 cursor-pointer shadow-2xs max-w-[210px] truncate"
+                      >
+                        <option value="all">All Enrolled Batches ({guruModalAvailableBatches.length})</option>
+                        {guruModalAvailableBatches.map((b) => (
+                          <option key={`guru-batch-opt-${b.id}`} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 2. Searchable Multi-Select Student Filter */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsGuruModalStudentDropdownOpen(prev => !prev)}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-2xs ${
+                          guruModalSelectedStudentIds.length > 0
+                            ? 'bg-[#8A064D] text-white border-[#8A064D]'
+                            : 'bg-white text-gray-800 border-gray-200 hover:border-[#8A064D]'
+                        }`}
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>
+                          {guruModalSelectedStudentIds.length === 0
+                            ? `All Disciples (${disciplesForFilterList.length})`
+                            : `${guruModalSelectedStudentIds.length} Selected`}
+                        </span>
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isGuruModalStudentDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {isGuruModalStudentDropdownOpen && (
+                        <div className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 bg-white rounded-2xl shadow-xl border border-[#F0D5E4] p-3 z-50 space-y-2 animate-in fade-in zoom-in-95">
+                          {/* Search Input */}
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              placeholder="Search disciple name or roll..."
+                              value={guruModalStudentSearch}
+                              onChange={(e) => setGuruModalStudentSearch(e.target.value)}
+                              className="w-full pl-8 pr-7 py-1.5 rounded-xl border border-gray-200 text-xs bg-[#FFF9FB] text-gray-800 focus:outline-hidden focus:ring-1 focus:ring-[#8A064D]"
+                              autoFocus
+                            />
+                            {guruModalStudentSearch && (
+                              <button
+                                type="button"
+                                onClick={() => setGuruModalStudentSearch('')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Quick Actions: Select All / Clear */}
+                          <div className="flex items-center justify-between text-[11px] px-1 py-0.5 border-b border-gray-100">
+                            <span className="text-gray-500 font-semibold">
+                              {disciplesForFilterList.length} Disciples
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGuruModalSelectedStudentIds(disciplesForFilterList.map(d => d.student_id));
+                                }}
+                                className="text-[#8A064D] hover:underline font-bold cursor-pointer"
+                              >
+                                Select All
+                              </button>
+                              <span className="text-gray-300">•</span>
+                              <button
+                                type="button"
+                                onClick={() => setGuruModalSelectedStudentIds([])}
+                                className="text-gray-500 hover:underline font-semibold cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Checkbox List */}
+                          <div className="max-h-52 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+                            {disciplesForFilterList.length === 0 ? (
+                              <div className="p-4 text-center text-xs text-gray-400">
+                                No disciples match search
+                              </div>
+                            ) : (
+                              disciplesForFilterList.map((disciple) => {
+                                const isChecked = guruModalSelectedStudentIds.includes(disciple.student_id);
+                                return (
+                                  <label
+                                    key={`modal-student-chk-${disciple.student_id}`}
+                                    className={`flex items-center gap-2 p-1.5 rounded-lg text-xs cursor-pointer transition ${
+                                      isChecked
+                                        ? 'bg-[#FFF2F8] text-[#8A064D] font-bold'
+                                        : 'hover:bg-gray-50 text-gray-700'
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        setGuruModalSelectedStudentIds(prev =>
+                                          prev.includes(disciple.student_id)
+                                            ? prev.filter(id => id !== disciple.student_id)
+                                            : [...prev, disciple.student_id]
+                                        );
+                                      }}
+                                      className="w-3.5 h-3.5 rounded-md text-[#8A064D] focus:ring-[#8A064D] border-gray-300 cursor-pointer"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                      <span className="block truncate">{disciple.student_name}</span>
+                                      <span className="text-[10px] text-gray-400 font-normal block truncate">
+                                        {disciple.roll_number} {disciple.batch_name ? `• ${disciple.batch_name}` : ''}
+                                      </span>
+                                    </div>
+                                  </label>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          {/* Done Button */}
+                          <div className="pt-1 border-t border-gray-100 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => setIsGuruModalStudentDropdownOpen(false)}
+                              className="px-3 py-1 rounded-lg bg-[#590231] hover:bg-[#740340] text-white text-[11px] font-bold cursor-pointer"
+                            >
+                              Done
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Reset Filters button if any active */}
+                    {(guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch.trim()) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGuruModalBatchFilter('all');
+                          setGuruModalSelectedStudentIds([]);
+                          setGuruModalStudentSearch('');
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                        title="Clear Filters"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Reset</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Active Filter Summary Text */}
+                  <div className="text-[11px] font-medium text-gray-500">
+                    Showing: <strong className="text-emerald-700 font-bold">{modalFilteredReceived.length} Received</strong>, <strong className="text-rose-600 font-bold">{modalFilteredMissing.length} Missing</strong>
+                  </div>
+                </div>
+
                 {/* Modal Tab Content Body */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
                   {/* TAB A: RECEIVED VIDEOS */}
                   {guruModalActiveTab === 'received' && (
                     <div className="space-y-4">
-                      {selectedGuruForModal.received_disciples.length === 0 ? (
+                      {modalFilteredReceived.length === 0 ? (
                         <div className="p-8 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
                           <Video className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                          <h4 className="text-sm font-bold text-gray-700">No performance videos received yet for this month</h4>
+                          <h4 className="text-sm font-bold text-gray-700">
+                            {guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch
+                              ? 'No received performance videos match the selected filters'
+                              : 'No performance videos received yet for this month'}
+                          </h4>
                           <p className="text-xs text-gray-500 mt-1">
-                            Disciples will appear here once Guru {selectedGuruForModal.full_name} shares their monthly performance recordings.
+                            {guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch
+                              ? 'Try adjusting your batch filter or disciple selection above.'
+                              : `Disciples will appear here once ${stripGuruPrefix(selectedGuruForModal.full_name)} shares their monthly performance recordings.`}
                           </p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {selectedGuruForModal.received_disciples.map((disciple, idx) => (
+                          {modalFilteredReceived.map((disciple, idx) => (
                             <div
                               key={`received-disciple-${disciple.student_id}-${idx}`}
                               className="p-4 bg-white rounded-2xl border border-emerald-200 shadow-2xs hover:border-emerald-400 transition space-y-3 flex flex-col justify-between"
@@ -2537,14 +2691,18 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                   {/* TAB B: MISSING DISCIPLES */}
                   {guruModalActiveTab === 'missing' && (
                     <div className="space-y-4">
-                      {selectedGuruForModal.missing_disciples.length === 0 ? (
+                      {modalFilteredMissing.length === 0 ? (
                         <div className="p-8 text-center bg-emerald-50/60 rounded-2xl border border-emerald-200">
                           <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
                           <h4 className="text-sm font-bold text-emerald-900">
-                            All Disciples Completed!
+                            {guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch
+                              ? 'No missing disciples match the selected filters'
+                              : 'All Disciples Completed!'}
                           </h4>
                           <p className="text-xs text-emerald-700 mt-1">
-                            Guru {selectedGuruForModal.full_name} has shared a monthly performance video for every assigned disciple in this period.
+                            {guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch
+                              ? 'Try adjusting your batch filter or disciple selection above.'
+                              : `${stripGuruPrefix(selectedGuruForModal.full_name)} has shared a monthly performance video for every assigned disciple in this period.`}
                           </p>
                         </div>
                       ) : (
@@ -2552,12 +2710,12 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                           <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 flex items-center gap-3">
                             <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
                             <p className="text-xs text-rose-900 font-medium">
-                              <strong>{selectedGuruForModal.missing_disciples.length} disciples</strong> are currently missing their monthly performance video link. Follow up with Guru {selectedGuruForModal.full_name} to ensure every disciple receives their performance video.
+                              <strong>{modalFilteredMissing.length} disciples</strong> are currently missing their monthly performance video link. Follow up with {stripGuruPrefix(selectedGuruForModal.full_name)} to ensure every disciple receives their performance video.
                             </p>
                           </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                            {selectedGuruForModal.missing_disciples.map((disciple, idx) => (
+                            {modalFilteredMissing.map((disciple, idx) => (
                               <div
                                 key={`missing-disciple-${disciple.student_id}-${idx}`}
                                 className="p-4 bg-white rounded-2xl border border-rose-200 hover:border-rose-400 transition shadow-2xs space-y-2.5"
@@ -2604,78 +2762,97 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                   )}
 
                   {/* TAB C: ALL SHARED VIDEOS BY THIS GURU */}
-                  {guruModalActiveTab === 'all_videos' && (
-                    <div className="space-y-4">
-                      {selectedGuruForModal.shared_videos.length === 0 ? (
-                        <div className="p-8 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
-                          <Video className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                          <h4 className="text-sm font-bold text-gray-700">No media links recorded yet</h4>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {selectedGuruForModal.shared_videos.map((vid, idx) => (
-                            <div
-                              key={`guru-modal-vid-${vid.id}-${idx}`}
-                              className="p-4 bg-white rounded-2xl border border-[#F0D5E4] shadow-2xs space-y-2.5"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div>
-                                  <h5 className="font-bold text-sm text-[#2D041A]">{vid.title}</h5>
-                                  <div className="flex items-center gap-2 text-[11px] text-gray-500 mt-0.5">
-                                    <span className="font-semibold text-[#8A064D]">{vid.target_course_title}</span>
-                                    <span>•</span>
-                                    <span>{vid.target_batch_name}</span>
+                  {guruModalActiveTab === 'all_videos' && (() => {
+                    const filteredSharedVideos = selectedGuruForModal.shared_videos.filter((vid) => {
+                      if (guruModalBatchFilter !== 'all' && vid.target_batch_id !== guruModalBatchFilter) return false;
+                      if (guruModalStudentSearch.trim()) {
+                        const q = guruModalStudentSearch.toLowerCase();
+                        const matchTitle = (vid.title || '').toLowerCase().includes(q);
+                        const matchDesc = (vid.description || '').toLowerCase().includes(q);
+                        const matchCourse = (vid.target_course_title || '').toLowerCase().includes(q);
+                        const matchBatch = (vid.target_batch_name || '').toLowerCase().includes(q);
+                        if (!matchTitle && !matchDesc && !matchCourse && !matchBatch) return false;
+                      }
+                      return true;
+                    });
+
+                    return (
+                      <div className="space-y-4">
+                        {filteredSharedVideos.length === 0 ? (
+                          <div className="p-8 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
+                            <Video className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                            <h4 className="text-sm font-bold text-gray-700">
+                              {guruModalBatchFilter !== 'all' || guruModalStudentSearch
+                                ? 'No media links match the selected filter'
+                                : 'No media links recorded yet'}
+                            </h4>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {filteredSharedVideos.map((vid, idx) => (
+                              <div
+                                key={`guru-modal-vid-${vid.id}-${idx}`}
+                                className="p-4 bg-white rounded-2xl border border-[#F0D5E4] shadow-2xs space-y-2.5"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <h5 className="font-bold text-sm text-[#2D041A]">{vid.title}</h5>
+                                    <div className="flex items-center gap-2 text-[11px] text-gray-500 mt-0.5">
+                                      <span className="font-semibold text-[#8A064D]">{vid.target_course_title}</span>
+                                      <span>•</span>
+                                      <span>{vid.target_batch_name}</span>
+                                    </div>
                                   </div>
+                                  {vid.event_date && (
+                                    <span className="text-[11px] text-gray-400 font-medium">
+                                      {new Date(vid.event_date).toLocaleDateString('en-GB', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                        year: 'numeric',
+                                      })}
+                                    </span>
+                                  )}
                                 </div>
-                                {vid.event_date && (
-                                  <span className="text-[11px] text-gray-400 font-medium">
-                                    {new Date(vid.event_date).toLocaleDateString('en-GB', {
-                                      day: '2-digit',
-                                      month: 'short',
-                                      year: 'numeric',
-                                    })}
-                                  </span>
-                                )}
-                              </div>
 
-                              {vid.description && (
-                                <p className="text-xs text-gray-600 bg-[#FFF9FB] p-2 rounded-xl border border-[#F0D5E4]/60">
-                                  {vid.description}
-                                </p>
-                              )}
+                                {vid.description && (
+                                  <p className="text-xs text-gray-600 bg-[#FFF9FB] p-2 rounded-xl border border-[#F0D5E4]/60">
+                                    {vid.description}
+                                  </p>
+                                )}
 
-                              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100">
-                                {vid.drive_url && (
-                                  <a
-                                    href={vid.drive_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-3 py-1.5 rounded-xl bg-[#03543F] hover:bg-[#023e2f] text-white text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                                  >
-                                    <LinkIcon className="w-3.5 h-3.5" />
-                                    <span>Open Google Drive</span>
-                                    <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                )}
-                                {vid.youtube_url && (
-                                  <a
-                                    href={vid.youtube_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                                  >
-                                    <Video className="w-3.5 h-3.5" />
-                                    <span>Open YouTube</span>
-                                    <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                )}
+                                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100">
+                                  {vid.drive_url && (
+                                    <a
+                                      href={vid.drive_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-3 py-1.5 rounded-xl bg-[#03543F] hover:bg-[#023e2f] text-white text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                    >
+                                      <LinkIcon className="w-3.5 h-3.5" />
+                                      <span>Open Google Drive</span>
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                  {vid.youtube_url && (
+                                    <a
+                                      href={vid.youtube_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                    >
+                                      <Video className="w-3.5 h-3.5" />
+                                      <span>Open YouTube</span>
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -3077,7 +3254,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                 </div>
                 <h3 className="text-xl md:text-2xl font-bold">{activeCourse.title}</h3>
                 <p className="text-xs text-rose-100 max-w-xl">
-                  Guru: {activeCourse.batches[0]?.trainer_name || 'Assigned Guru'} • Room: {activeCourse.batches[0]?.room || 'Mandapam'}
+                  Faculty: {stripGuruPrefix(activeCourse.batches[0]?.trainer_name) || 'Assigned Faculty'} • Room: {activeCourse.batches[0]?.room || 'Mandapam'}
                 </p>
               </div>
 
@@ -3116,39 +3293,96 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                 {/* Inline Share Form */}
                 {isCourseShareOpen && (
                   <form onSubmit={handleCourseShareSubmit} className="mt-4 pt-4 border-t border-[#F0D5E4] space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Target Batch Selector */}
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                          Target Participants
-                        </label>
-                        <select
-                          value={targetBatchOption}
-                          onChange={e => setTargetBatchOption(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 font-semibold"
+                    {/* Event Shoot Title */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Event Shoot Title <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Navaratri Mandapam Showcase 2026"
+                        value={courseShareTitle}
+                        onChange={e => setCourseShareTitle(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900 font-semibold"
+                      />
+                    </div>
+
+                    {/* SELECT TARGET BATCHES [can select all and multiple] */}
+                    <div className="p-4 rounded-2xl border-2 border-[#E02424] bg-white space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="block text-xs font-extrabold text-[#2D041A] uppercase tracking-wider">
+                            SELECT TARGET BATCHES
+                          </label>
+                          <p className="text-xs text-gray-500 font-medium">
+                            Chosen: <strong className="text-[#8A064D] font-black">{courseShareSelectedBatchIds.length}</strong> of {activeCourse.batches.length} batches
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (courseShareSelectedBatchIds.length === activeCourse.batches.length) {
+                              setCourseShareSelectedBatchIds([]);
+                            } else {
+                              setCourseShareSelectedBatchIds(activeCourse.batches.map(b => b.id));
+                            }
+                          }}
+                          className="text-xs font-black text-[#8A064D] hover:underline flex items-center gap-1.5 cursor-pointer"
                         >
-                          <option value="all">Everyone in this Course (All Batches - {courseStudents.length} students)</option>
-                          {activeCourse.batches.map(b => (
-                            <option key={b.id} value={b.id}>
-                              Only {b.name} ({b.trainer_name || 'Guru'})
-                            </option>
-                          ))}
-                        </select>
+                          {courseShareSelectedBatchIds.length === activeCourse.batches.length ? (
+                            <>
+                              <Square className="w-4 h-4 text-[#8A064D]" />
+                              <span>Deselect All</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckSquare className="w-4 h-4 text-[#8A064D]" />
+                              <span>Select All ({activeCourse.batches.length} Batches)</span>
+                            </>
+                          )}
+                        </button>
                       </div>
 
-                      {/* Event Shoot Title */}
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                          Event Shoot Title <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Navaratri Mandapam Showcase 2026"
-                          value={courseShareTitle}
-                          onChange={e => setCourseShareTitle(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
-                        />
+                      {/* Batches Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+                        {activeCourse.batches.map((batch) => {
+                          const isChecked = courseShareSelectedBatchIds.includes(batch.id);
+                          return (
+                            <button
+                              key={`active-course-batch-${batch.id}`}
+                              type="button"
+                              onClick={() => {
+                                setCourseShareSelectedBatchIds(prev =>
+                                  prev.includes(batch.id)
+                                    ? prev.filter(id => id !== batch.id)
+                                    : [...prev, batch.id]
+                                );
+                              }}
+                              className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                                isChecked
+                                  ? 'border-[#8A064D] bg-[#FFF2F8] shadow-xs'
+                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                              }`}
+                            >
+                              <div className={`w-4.5 h-4.5 rounded-md flex items-center justify-center shrink-0 border transition-all ${
+                                isChecked
+                                  ? 'bg-[#1C64F2] border-[#1C64F2] text-white shadow-xs'
+                                  : 'border-gray-300 bg-white'
+                              }`}>
+                                {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <span className="text-xs font-bold text-gray-900 block truncate">
+                                  {batch.name}
+                                </span>
+                                <span className="text-[10.5px] text-gray-500 block truncate mt-0.5 font-medium">
+                                  {batch.trainer_name ? stripGuruPrefix(batch.trainer_name) : 'Faculty'}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 

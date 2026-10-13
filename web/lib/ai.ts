@@ -2,8 +2,9 @@ import { query, queryOne } from './db';
 
 const DEFAULT_GEMINI_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODELS = [
-  'gemini-flash-lite-latest',
+  'gemini-3.6-flash',
   'gemini-3.5-flash-lite',
+  'gemini-flash-lite-latest',
   'gemini-3.8-flash',
   'gemini-3.1-flash-lite',
 ];
@@ -144,39 +145,56 @@ ${trimmed}`;
   let lastError = '';
   for (const model of GEMINI_MODELS) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const maxAttempts = model === 'gemini-3.6-flash' ? 2 : 1;
 
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(6000),
-      });
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+          signal: AbortSignal.timeout(10000),
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        let candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        candidateText = candidateText.trim();
+        if (response.ok) {
+          const data = await response.json();
+          let candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          candidateText = candidateText.trim();
 
-        // Strip accidental outer quotes if Gemini wraps them
-        if (
-          (candidateText.startsWith('"') && candidateText.endsWith('"')) ||
-          (candidateText.startsWith("'") && candidateText.endsWith("'"))
-        ) {
-          candidateText = candidateText.slice(1, -1).trim();
+          // Strip accidental outer quotes if Gemini wraps them
+          if (
+            (candidateText.startsWith('"') && candidateText.endsWith('"')) ||
+            (candidateText.startsWith("'") && candidateText.endsWith("'"))
+          ) {
+            candidateText = candidateText.slice(1, -1).trim();
+          }
+
+          if (candidateText.length > 0) {
+            return candidateText;
+          }
+        } else {
+          const errText = await response.text();
+          lastError = `${model} HTTP ${response.status}: ${errText.slice(0, 100)}`;
+          if (response.status === 503 && attempt < maxAttempts) {
+            await new Promise(r => setTimeout(r, 1200));
+            continue;
+          }
         }
-
-        if (candidateText.length > 0) {
-          return candidateText;
-        }
-      } else {
-        const errText = await response.text();
-        lastError = `HTTP ${response.status}: ${errText.slice(0, 100)}`;
+      } catch (err: any) {
+        lastError = `${model}: ${err?.message || String(err)}`;
       }
-    } catch (err: any) {
-      lastError = err?.message || String(err);
     }
   }
 
-  throw new Error(`AI enhancement failed across models: ${lastError}`);
+  console.warn('AI enhancement falling back to linguistic formatter:', lastError);
+  return fallbackFormatText(trimmed, context);
+}
+
+function fallbackFormatText(text: string, _context: string): string {
+  let cleaned = text.trim();
+  cleaned = cleaned.replace(/(^\s*|[.!?]\s+)([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase());
+  if (!/[.!?]$/.test(cleaned) && !cleaned.includes('\n')) {
+    cleaned += '.';
+  }
+  return cleaned;
 }

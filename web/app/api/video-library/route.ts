@@ -146,6 +146,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Multiple batches chosen for a course
+    if (Array.isArray(body.selected_batches) && body.selected_batches.length > 0) {
+      const createdItems = [];
+      for (const batch of body.selected_batches) {
+        const singleItem = await createEventFolder({
+          title: title.trim(),
+          drive_url: cleanDriveUrl,
+          youtube_url: cleanYoutubeUrl,
+          shared_by_type: shared_by_type || 'admin',
+          trainer_id: trainer_id || null,
+          trainer_name: trainer_name || null,
+          category: category || (shared_by_type === 'guru' ? 'guru_share' : 'event_folder'),
+          description: description?.trim() || '',
+          event_name: event_name?.trim() || title.trim(),
+          event_date,
+          target_course_id: batch.course_id || target_course_id,
+          target_course_title: batch.course_title || target_course_title,
+          target_batch_id: batch.id === 'all' ? null : batch.id,
+          target_batch_name: batch.name || 'All Batches',
+          access_level: batch.id === 'all' ? 'Course' : 'Batch',
+          created_by: created_by || (shared_by_type === 'guru' ? (trainer_name || 'Guru Faculty') : 'Academy Owner'),
+        });
+        if (singleItem) createdItems.push(singleItem);
+      }
+      return NextResponse.json(
+        { success: true, items: createdItems, item: createdItems[0] || null },
+        { headers: corsHeaders }
+      );
+    }
+
     // Single course or specific batch sharing
     const item = await createEventFolder({
       title: title.trim(),
