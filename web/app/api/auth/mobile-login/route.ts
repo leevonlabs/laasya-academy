@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
           p.full_name,
           p.phone,
           p.email,
-          p.avatar_url,
+          COALESCE(t.avatar_url, p.avatar_url) as avatar_url,
           p.age,
           p.gender,
           u.encrypted_password

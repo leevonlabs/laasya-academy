@@ -40,10 +40,28 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
     return 'Classical Arts';
   }
 
+  String _formatShortDay(dynamic day) {
+    if (day == null) return 'Day';
+    final s = day.toString().trim();
+    if (s.isEmpty) return 'Day';
+    final lower = s.toLowerCase();
+    if (lower.startsWith('mon')) return 'Mon';
+    if (lower.startsWith('tue')) return 'Tue';
+    if (lower.startsWith('wed')) return 'Wed';
+    if (lower.startsWith('thu')) return 'Thu';
+    if (lower.startsWith('fri')) return 'Fri';
+    if (lower.startsWith('sat')) return 'Sat';
+    if (lower.startsWith('sun')) return 'Sun';
+    return s.length > 3 ? s.substring(0, 3) : s;
+  }
+
   String _getDays(Map<String, dynamic> b) {
     final d = b['days_of_week'];
-    if (d is List) return d.join(', ');
-    if (d != null && d.toString().isNotEmpty) return d.toString();
+    if (d is List) return d.map((x) => _formatShortDay(x)).join(', ');
+    if (d != null && d.toString().isNotEmpty) {
+      final parts = d.toString().split(',');
+      return parts.map((x) => _formatShortDay(x.trim())).join(', ');
+    }
     return 'Mon, Wed, Fri';
   }
 
@@ -75,7 +93,7 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
       for (var s in rawSchedules) {
         if (s is Map) {
           scheduleSlots.add({
-            'day': s['day']?.toString() ?? '',
+            'day': _formatShortDay(s['day']),
             'startTime': s['startTime']?.toString() ?? '',
             'endTime': s['endTime']?.toString() ?? '',
             'room': s['room']?.toString() ?? room,
@@ -274,7 +292,7 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
                         for (var s in rawSchedules) {
                           if (s is Map) {
                             cardSlots.add({
-                              'day': s['day']?.toString() ?? '',
+                              'day': _formatShortDay(s['day']),
                               'startTime': s['startTime']?.toString() ?? '',
                               'endTime': s['endTime']?.toString() ?? '',
                               'room': s['room']?.toString() ?? room,

@@ -208,6 +208,10 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Supabase initialize error: $e. Operating with local fallback.');
       _isInitialized = false;
+    } finally {
+      try {
+        await _ensureReadStateLoaded();
+      } catch (_) {}
     }
   }
 
@@ -1452,6 +1456,8 @@ class SupabaseService {
   final Set<String> _readNotifIds = {};
   final Set<String> _readMessageIds = {};
   final Set<String> _readVideoIds = {};
+  int _lastReadMessageTimestamp = 0;
+  int _lastReadVideoTimestamp = 0;
   bool _readStateLoaded = false;
   List<Map<String, dynamic>> _cachedNotifications = [];
 
@@ -1465,6 +1471,8 @@ class SupabaseService {
       if (vids != null) _readVideoIds.addAll(vids);
       final notifs = prefs.getStringList('laasya_read_notif_ids');
       if (notifs != null) _readNotifIds.addAll(notifs);
+      _lastReadMessageTimestamp = prefs.getInt('laasya_msg_read_ts') ?? 0;
+      _lastReadVideoTimestamp = prefs.getInt('laasya_vid_read_ts') ?? 0;
       _readStateLoaded = true;
     } catch (_) {}
   }
@@ -1474,6 +1482,7 @@ class SupabaseService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList('laasya_read_message_ids', _readMessageIds.toList());
       await prefs.setStringList('laasya_read_notif_ids', _readNotifIds.toList());
+      await prefs.setInt('laasya_msg_read_ts', _lastReadMessageTimestamp);
     } catch (_) {}
   }
 
@@ -1482,6 +1491,7 @@ class SupabaseService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList('laasya_read_video_ids', _readVideoIds.toList());
       await prefs.setStringList('laasya_read_notif_ids', _readNotifIds.toList());
+      await prefs.setInt('laasya_vid_read_ts', _lastReadVideoTimestamp);
     } catch (_) {}
   }
 
@@ -1490,7 +1500,20 @@ class SupabaseService {
       _ensureReadStateLoaded();
     }
     final list = _cachedMessageAnnouncements.isNotEmpty ? _cachedMessageAnnouncements : _mockMessageAnnouncements;
-    return list.where((m) => !_readMessageIds.contains(m['id']?.toString())).length;
+    return list.where((m) {
+      final id = m['id']?.toString();
+      if (id != null && _readMessageIds.contains(id)) return false;
+      if (_lastReadMessageTimestamp > 0) {
+        final dateStr = (m['publish_date'] ?? m['created_at'])?.toString();
+        if (dateStr != null) {
+          final dt = DateTime.tryParse(dateStr.contains('T') ? dateStr : '$dateStr 00:00:00');
+          if (dt != null && dt.millisecondsSinceEpoch <= _lastReadMessageTimestamp) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }).length;
   }
 
   int getUnreadVideosCount() {
@@ -1501,7 +1524,20 @@ class SupabaseService {
       final t = (n['type'] ?? '').toString();
       return t == 'video' || t == 'video_shared';
     });
-    return videoAlerts.where((n) => !_readVideoIds.contains(n['id']?.toString())).length;
+    return videoAlerts.where((n) {
+      final id = n['id']?.toString();
+      if (id != null && _readVideoIds.contains(id)) return false;
+      if (_lastReadVideoTimestamp > 0) {
+        final dateStr = (n['date'] ?? n['created_at'])?.toString();
+        if (dateStr != null) {
+          final dt = DateTime.tryParse(dateStr.contains('T') ? dateStr : '$dateStr 00:00:00');
+          if (dt != null && dt.millisecondsSinceEpoch <= _lastReadVideoTimestamp) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }).length;
   }
 
   void markMessageAsRead(String id) {
@@ -1510,8 +1546,10 @@ class SupabaseService {
     _saveReadMessages();
   }
 
-  void markAllMessagesAsRead() {
-    final list = _cachedMessageAnnouncements.isNotEmpty ? _cachedMessageAnnouncements : _mockMessageAnnouncements;
+  void markAllMessagesAsRead([List<Map<String, dynamic>>? currentList]) {
+    final list = (currentList != null && currentList.isNotEmpty)
+        ? currentList
+        : (_cachedMessageAnnouncements.isNotEmpty ? _cachedMessageAnnouncements : _mockMessageAnnouncements);
     for (var m in list) {
       final id = m['id']?.toString();
       if (id != null) {
@@ -1519,6 +1557,7 @@ class SupabaseService {
         _readNotifIds.add(id);
       }
     }
+    _lastReadMessageTimestamp = DateTime.now().millisecondsSinceEpoch;
     _saveReadMessages();
   }
 
@@ -1536,6 +1575,7 @@ class SupabaseService {
         _readNotifIds.add(id);
       }
     }
+    _lastReadVideoTimestamp = DateTime.now().millisecondsSinceEpoch;
     _saveReadVideos();
   }
 
@@ -1600,7 +1640,7 @@ class SupabaseService {
               final alertType = (a['alert_type'] ?? '').toString();
               final isAttendance = alertType == 'attendance_marked';
               final isVideo = alertType == 'video_shared';
-              final isMessage = alertType == 'message';
+              final isMessage = alertType == 'message' || alertType == 'announcement';
               final status = (a['student_status'] ?? 'present').toString().toUpperCase();
               final courseTitle = a['course_title'] ?? 'Classical Dance';
               final batchName = a['batch_name'] ?? 'Session';

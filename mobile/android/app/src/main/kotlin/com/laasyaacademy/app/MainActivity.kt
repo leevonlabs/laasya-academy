@@ -51,6 +51,38 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            )
+        }
+    }
+
+    override fun onNewIntent(newIntent: Intent) {
+        super.onNewIntent(newIntent)
+        setIntent(newIntent)
+        val route = newIntent.getStringExtra("route")
+        if (route != null && flutterEngine != null) {
+            val payload = mapOf(
+                "route" to route,
+                "title" to (newIntent.getStringExtra("title") ?: ""),
+                "message" to (newIntent.getStringExtra("message") ?: "")
+            )
+            newIntent.removeExtra("route")
+            MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL)
+                .invokeMethod("onNotificationOpened", payload)
+        }
+    }
+
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -144,6 +176,18 @@ class MainActivity: FlutterActivity() {
                     val alertId = call.argument<String>("alert_id") ?: ""
                     val prefs = getSharedPreferences("laasya_processed_alerts", Context.MODE_PRIVATE)
                     result.success(prefs.getBoolean(alertId, false))
+                }
+                "getPendingNotificationRoute" -> {
+                    val route = intent?.getStringExtra("route")
+                    val data = if (route != null) {
+                        mapOf(
+                            "route" to route,
+                            "title" to (intent?.getStringExtra("title") ?: ""),
+                            "message" to (intent?.getStringExtra("message") ?: "")
+                        )
+                    } else null
+                    intent?.removeExtra("route")
+                    result.success(data)
                 }
                 else -> {
                     result.notImplemented()

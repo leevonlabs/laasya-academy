@@ -80,7 +80,8 @@ export async function GET(request: NextRequest) {
 
     const alerts = await query<any>(`
       SELECT id, batch_id, batch_name, course_title, trainer_name, message, COALESCE(alert_type, 'class_closed') AS alert_type, 
-             target_student_id, student_status, target_roll_number, target_student_name, created_at
+             target_student_id, student_status, target_roll_number, target_student_name, created_at,
+             (EXTRACT(EPOCH FROM created_at) * 1000)::bigint AS created_at_ms
       FROM public.session_alerts
       WHERE created_at >= NOW() - ($1 || ' seconds')::interval
       ORDER BY created_at DESC

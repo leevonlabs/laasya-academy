@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Laasya Academy requires camera access to scan class attendance QR codes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Laasya Academy requires photo library access to upload student and guru profile photos.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

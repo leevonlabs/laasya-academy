@@ -118,10 +118,12 @@ class LaasyaAlertService : Service() {
             val monitorChannel = NotificationChannel(
                 CHANNEL_MONITORING,
                 "Class Alert Monitoring",
-                NotificationManager.IMPORTANCE_MIN
+                NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Monitors real-time class conclusion alarms and roll-call status"
                 setShowBadge(false)
+                enableVibration(false)
+                setSound(null, null)
             }
             nm.createNotificationChannel(monitorChannel)
 
@@ -176,28 +178,14 @@ class LaasyaAlertService : Service() {
             .setLargeIcon(logo)
             .setColor(0xFF800020.toInt())
             .setContentTitle("Laasya Cultural Academy")
-            .setContentText("Live class completion & pickup alerts active")
-            .setPriority(NotificationCompat.PRIORITY_MIN)
-            .setOngoing(false)
-            .setAutoCancel(true)
+            .setContentText("Live Attention & Alert Sync Active")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setSilent(true)
             .setContentIntent(pendingIntent)
             .build()
 
         startForeground(NOTIF_ID_FOREGROUND, notif)
-
-        // Remove the persistent monitoring notification immediately so it does not stay permanently in the notification tray
-        mainHandler.postDelayed({
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                } else {
-                    @Suppress("DEPRECATION")
-                    stopForeground(true)
-                }
-                val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                nm.cancel(NOTIF_ID_FOREGROUND)
-            } catch (_: Exception) {}
-        }, 250L)
     }
 
     private fun saveMonitoringConfig(studentId: String, rollNumber: String, name: String, phone: String, batchIds: String) {
@@ -257,7 +245,12 @@ class LaasyaAlertService : Service() {
         val urlString = "https://laasya-academy.vercel.app/api/sessions/alerts?batchIds=$encBatch&studentId=$encSId&rollNumber=$encRoll&name=$encName&phone=$encPhone&sinceSeconds=180"
 
         var connection: HttpURLConnection? = null
+        var pollWakeLock: PowerManager.WakeLock? = null
         try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            pollWakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "laasya:poll_lock")
+            pollWakeLock?.acquire(4000L)
+
             val url = URL(urlString)
             connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
@@ -276,23 +269,23 @@ class LaasyaAlertService : Service() {
                 if (json.optBoolean("success", false)) {
                     val alerts = json.optJSONArray("alerts")
                     if (alerts != null && alerts.length() > 0) {
-                        if (isFirstPoll) {
-                            isFirstPoll = false
-                            // On initial startup poll, mark all existing alerts as seen so historical alerts never ring
-                            for (i in 0 until alerts.length()) {
-                                val alert = alerts.getJSONObject(i)
-                                val id = alert.optString("id", "")
-                                if (id.isNotEmpty()) {
-                                    markAlertProcessed(id)
-                                }
-                            }
-                            return
-                        }
-
+                        val nowMs = System.currentTimeMillis()
                         for (i in 0 until alerts.length()) {
                             val alert = alerts.getJSONObject(i)
                             val id = alert.optString("id", "")
-                            if (id.isNotEmpty() && !isAlertProcessed(id)) {
+                            if (id.isEmpty()) continue
+
+                            val createdAtMs = alert.optLong("created_at_ms", 0L)
+                            val isRecent = createdAtMs > 0 && (nowMs - createdAtMs) < 45000L
+
+                            // If this is the initial cold start poll, ignore historical alerts (>45s old)
+                            // but DO NOT discard fresh alerts created within the last 45 seconds!
+                            if (isFirstPoll && !isRecent) {
+                                markAlertProcessed(id)
+                                continue
+                            }
+
+                            if (!isAlertProcessed(id)) {
                                 markAlertProcessed(id)
 
                                 val alertType = alert.optString("alert_type", "class_closed")
@@ -325,6 +318,7 @@ class LaasyaAlertService : Service() {
                                 }
                             }
                         }
+                        isFirstPoll = false
                     } else {
                         isFirstPoll = false
                     }
@@ -332,6 +326,9 @@ class LaasyaAlertService : Service() {
             }
         } finally {
             connection?.disconnect()
+            if (pollWakeLock?.isHeld == true) {
+                try { pollWakeLock.release() } catch (_: Exception) {}
+            }
         }
     }
 
@@ -446,6 +443,9 @@ class LaasyaAlertService : Service() {
 
             val appIntent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("route", "alarm")
+                putExtra("title", title)
+                putExtra("message", message)
             }
             val pendingAppIntent = PendingIntent.getActivity(
                 this, 0, appIntent,
@@ -486,6 +486,9 @@ class LaasyaAlertService : Service() {
 
             val intent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("route", "attendance")
+                putExtra("title", title)
+                putExtra("message", message)
             }
             val pendingIntent = PendingIntent.getActivity(
                 this, 0, intent,
@@ -518,6 +521,9 @@ class LaasyaAlertService : Service() {
 
             val intent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("route", "messages")
+                putExtra("title", title)
+                putExtra("message", message)
             }
             val pendingIntent = PendingIntent.getActivity(
                 this, 0, intent,

@@ -5,9 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
-import '../student/student_messages_screen.dart';
 import '../student/student_video_library_screen.dart';
 import 'trainer_salaries_screen.dart';
+import 'trainer_announcements_screen.dart';
 import 'trainer_data_store.dart';
 
 class TrainerDashboardTab extends StatefulWidget {
@@ -464,17 +464,19 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
       } else if (trimmed.startsWith('assets/')) {
         imageContent = Image.asset(trimmed, fit: BoxFit.cover, width: size, height: size);
       } else {
-        imageContent = CircleAvatar(
-          backgroundColor: const Color(0xFFD4AF37),
-          radius: size / 2,
-          child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
+        imageContent = Image.asset(
+          'assets/images/crest_logo.png',
+          fit: BoxFit.cover,
+          width: size,
+          height: size,
         );
       }
     } else {
-      imageContent = CircleAvatar(
-        backgroundColor: const Color(0xFFD4AF37),
-        radius: size / 2,
-        child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
+      imageContent = Image.asset(
+        'assets/images/crest_logo.png',
+        fit: BoxFit.cover,
+        width: size,
+        height: size,
       );
     }
 
@@ -617,22 +619,10 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
 
   Widget _buildPlaceholderPhoto() {
     return Container(
-      padding: const EdgeInsets.all(32),
-      color: const Color(0xFF590231),
-      child: const Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircleAvatar(
-            radius: 48,
-            backgroundColor: Colors.white24,
-            child: Icon(Icons.person_rounded, size: 54, color: Colors.white70),
-          ),
-          SizedBox(height: 12),
-          Text(
-            'Official Academy Faculty Profile Photo',
-            style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
-          ),
-        ],
+      padding: const EdgeInsets.all(24),
+      color: Colors.black,
+      child: Center(
+        child: Image.asset('assets/images/crest_logo.png', fit: BoxFit.contain),
       ),
     );
   }
@@ -652,10 +642,6 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
     final bool isPaid = salaryPaymentStatus == 'paid';
     final batchCount = _profile?['assigned_batches_count'] ?? _batches.length;
     final studentCount = _profile?['total_students_count'] ?? 42;
-
-    // Today's first session quick alert strip
-    final todaySession = _todaySessions.isNotEmpty ? _todaySessions.first : null;
-    final todaySessionBatch = todaySession?['batches'];
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -757,42 +743,6 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                       ),
                     ],
                   ),
-
-                  // Today's Session Quick Notification Strip
-                  if (todaySession != null) ...[
-                    const SizedBox(height: 14),
-                    InkWell(
-                      onTap: widget.onNavigateToAttendance,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.22),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.35)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.event_available_rounded, size: 16, color: LaasyaColors.accentGold),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Today\'s Session: ${todaySessionBatch?['name'] ?? "Batch"} • ${todaySession['start_time']} - ${todaySession['end_time']}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const Icon(Icons.arrow_forward_ios_rounded, size: 11, color: LaasyaColors.accentGold),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -842,7 +792,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const StudentMessagesScreen(),
+                        builder: (_) => TrainerAnnouncementsScreen(trainerProfile: _profile),
                       ),
                     );
                     setState(() {});
@@ -1097,18 +1047,25 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.currency_rupee_rounded, color: LaasyaColors.primary, size: 19),
-                          SizedBox(width: 6),
-                          Text(
-                            'Monthly Compensation & Payroll',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
-                          ),
-                        ],
+                      const Expanded(
+                        child: Row(
+                          children: [
+                            Icon(Icons.currency_rupee_rounded, color: LaasyaColors.primary, size: 18),
+                            SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                'Monthly Compensation & Payroll',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: isPaid ? const Color(0xFFDEF7EC) : const Color(0xFFFEF3C7),
                           borderRadius: BorderRadius.circular(8),
@@ -1126,10 +1083,10 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              isPaid ? 'Salary Credited' : 'Pending Verification',
+                              isPaid ? 'Salary Credited' : 'Pending',
                               style: TextStyle(
                                 color: isPaid ? const Color(0xFF03543F) : const Color(0xFF92400E),
-                                fontSize: 10.5,
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -1138,66 +1095,75 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFF9FB),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: const Color(0xFFF0D5E4)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Base Salary', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const Text('Base Salary', style: TextStyle(fontSize: 9.5, color: Colors.grey, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                               const SizedBox(height: 3),
-                              Text('₹$monthlySalary', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text('₹$monthlySalary', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
+                              ),
                             ],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF3FAF7),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: const Color(0xFFC7EBD9)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Net Disbursed', style: TextStyle(fontSize: 10, color: Color(0xFF03543F), fontWeight: FontWeight.bold)),
+                              const Text('Net Disbursed', style: TextStyle(fontSize: 9.5, color: Color(0xFF03543F), fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                               const SizedBox(height: 3),
-                              Text('₹${isPaid ? monthlySalary : 0}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text('₹${isPaid ? monthlySalary : 0}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
+                              ),
                             ],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                           decoration: BoxDecoration(
                             color: isPaid ? const Color(0xFFF3FAF7) : const Color(0xFFFFFBEB),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: isPaid ? const Color(0xFFC7EBD9) : const Color(0xFFFDE68A)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Disbursal Status', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const Text('Status', style: TextStyle(fontSize: 9.5, color: Colors.grey, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                               const SizedBox(height: 3),
-                              Text(
-                                isPaid ? 'CREDITED' : 'PENDING',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: isPaid ? const Color(0xFF03543F) : const Color(0xFFB45309),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  isPaid ? 'CREDITED' : 'PENDING',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isPaid ? const Color(0xFF03543F) : const Color(0xFFB45309),
+                                  ),
                                 ),
                               ),
                             ],
@@ -1384,17 +1350,22 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF3E8EE),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          batch?['courses']?['title'] ?? 'Bharatanatyam',
-                                          style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                                      Flexible(
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF3E8EE),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            batch?['courses']?['title'] ?? 'Bharatanatyam',
+                                            style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
                                       ),
+                                      const SizedBox(width: 6),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
@@ -1419,11 +1390,15 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                                   Text(
                                     batch?['name'] ?? 'Bharatanatyam - Batch A',
                                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     'Room: ${batch?['room_or_hall']} • Time: ${sess['start_time']} - ${sess['end_time']}',
                                     style: const TextStyle(fontSize: 12, color: LaasyaColors.textMuted),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 14),
                                   Row(

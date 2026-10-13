@@ -162,11 +162,7 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
           final bytes = base64Decode(trimmed.split(',').last);
           imageContent = Image.memory(bytes, fit: BoxFit.cover, width: size, height: size);
         } catch (_) {
-          imageContent = CircleAvatar(
-            backgroundColor: const Color(0xFFD4AF37),
-            radius: size / 2,
-            child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
-          );
+          imageContent = Image.asset('assets/images/crest_logo.png', fit: BoxFit.cover, width: size, height: size);
         }
       } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
         imageContent = Image.network(
@@ -174,27 +170,15 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
           fit: BoxFit.cover,
           width: size,
           height: size,
-          errorBuilder: (_, __, ___) => CircleAvatar(
-            backgroundColor: const Color(0xFFD4AF37),
-            radius: size / 2,
-            child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
-          ),
+          errorBuilder: (_, __, ___) => Image.asset('assets/images/crest_logo.png', fit: BoxFit.cover, width: size, height: size),
         );
       } else if (trimmed.startsWith('assets/')) {
         imageContent = Image.asset(trimmed, fit: BoxFit.cover, width: size, height: size);
       } else {
-        imageContent = CircleAvatar(
-          backgroundColor: const Color(0xFFD4AF37),
-          radius: size / 2,
-          child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
-        );
+        imageContent = Image.asset('assets/images/crest_logo.png', fit: BoxFit.cover, width: size, height: size);
       }
     } else {
-      imageContent = CircleAvatar(
-        backgroundColor: const Color(0xFFD4AF37),
-        radius: size / 2,
-        child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
-      );
+      imageContent = Image.asset('assets/images/crest_logo.png', fit: BoxFit.cover, width: size, height: size);
     }
 
     final avatarCircle = Container(

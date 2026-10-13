@@ -6,6 +6,8 @@ import 'trainer_students_tab.dart';
 import 'trainer_attendance_tab.dart';
 import 'trainer_settings_tab.dart';
 import 'trainer_notifications_screen.dart';
+import 'trainer_announcements_screen.dart';
+import '../../core/services/alarm_service.dart';
 
 class TrainerMainScaffold extends StatefulWidget {
   const TrainerMainScaffold({super.key});
@@ -16,6 +18,35 @@ class TrainerMainScaffold extends StatefulWidget {
 
 class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkInitialNotificationRoute();
+    AlarmService.setNotificationOpenedHandler(_handleNotificationOpened);
+  }
+
+  void _handleNotificationOpened(Map<String, dynamic> data) {
+    if (!mounted) return;
+    final route = data['route']?.toString().toLowerCase();
+    if (route == 'messages' || route == 'announcements') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen()),
+      );
+    } else if (route == 'attendance') {
+      setState(() => _currentIndex = 3);
+    }
+  }
+
+  Future<void> _checkInitialNotificationRoute() async {
+    try {
+      final data = await AlarmService.getPendingNotificationRoute();
+      if (data != null && mounted) {
+        _handleNotificationOpened(data);
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {

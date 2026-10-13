@@ -16,6 +16,7 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
   int _unreadCount = 0;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -24,9 +25,15 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
     _loadMessages();
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadMessages() async {
     setState(() => _isLoading = true);
-    final msgs = await SupabaseService().getMessageAnnouncements();
+    final msgs = await SupabaseService().getMessageAnnouncements(forceRefresh: true);
     if (mounted) {
       final now = DateTime.now();
       // Enforce 30-day lifespan rule: Automatically clear messages older than 30 days
@@ -43,12 +50,28 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
         return true;
       }).toList();
 
+      // Sort chronologically: oldest at top, latest at bottom (chat stream style)
+      validMsgs.sort((a, b) {
+        final da = _parseMessageDate(a['publish_date'] ?? a['created_at']) ?? DateTime(2000);
+        final db = _parseMessageDate(b['publish_date'] ?? b['created_at']) ?? DateTime(2000);
+        return da.compareTo(db);
+      });
+
       setState(() {
         _messages = validMsgs;
         _isLoading = false;
+        _unreadCount = 0;
       });
+
       // Mark as read after user has seen the messages
-      SupabaseService().markAllMessagesAsRead();
+      SupabaseService().markAllMessagesAsRead(validMsgs);
+
+      // Smoothly scroll down to latest message
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        }
+      });
     }
   }
 
@@ -427,6 +450,7 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                           onRefresh: _loadMessages,
                           color: LaasyaColors.primary,
                           child: ListView.builder(
+                            controller: _scrollController,
                             padding: const EdgeInsets.fromLTRB(14, 6, 14, 16),
                             itemCount: _messages.length,
                             itemBuilder: (context, index) {
@@ -435,7 +459,18 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                               final content = msg['message'] ?? '';
                               final tag = msg['type_tag'];
                               final tagColor = _getTagColor(tag);
-                              final sender = msg['sender_name'] ?? 'Academy Administration';
+
+                              final isGuru = ((msg['sender_role'] ?? '').toString().toLowerCase().contains('trainer') ||
+                                              (msg['sender_role'] ?? '').toString().toLowerCase().contains('guru') ||
+                                              msg['trainer_id'] != null ||
+                                              (msg['trainer_name'] != null && msg['trainer_name'].toString().trim().isNotEmpty));
+                              String sender;
+                              if (isGuru) {
+                                final tName = (msg['trainer_name'] ?? msg['created_by'] ?? 'Faculty').toString().trim();
+                                sender = tName.toLowerCase().startsWith('guru') ? tName : 'Guru $tName';
+                              } else {
+                                sender = msg['created_by'] ?? msg['sender_name'] ?? 'Academy Director';
+                              }
                               final timeStr = msg['time'] ?? '10:00 AM';
                               final imageUrl = msg['image_url']?.toString();
                               final actionLinks = _parseActionLinks(msg['action_links']);

@@ -37,6 +37,32 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     _startBackgroundAlertService();
     TrainerDataStore.classClosedAlertNotifier.addListener(_onClassClosedAlert);
     _startNetworkAlertPolling();
+    _checkInitialNotificationRoute();
+    AlarmService.setNotificationOpenedHandler(_handleNotificationOpened);
+  }
+
+  void _handleNotificationOpened(Map<String, dynamic> data) {
+    if (!mounted) return;
+    final route = data['route']?.toString().toLowerCase();
+    if (route == 'messages') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StudentMessagesScreen()),
+      );
+    } else if (route == 'attendance') {
+      setState(() => _currentIndex = 3);
+    } else if (route == 'alarm') {
+      _showClassClosedAttentionAlarm(data);
+    }
+  }
+
+  Future<void> _checkInitialNotificationRoute() async {
+    try {
+      final data = await AlarmService.getPendingNotificationRoute();
+      if (data != null && mounted) {
+        _handleNotificationOpened(data);
+      }
+    } catch (_) {}
   }
 
   Future<void> _startBackgroundAlertService() async {

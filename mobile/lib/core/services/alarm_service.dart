@@ -120,4 +120,26 @@ class AlarmService {
       return false;
     }
   }
+
+  /// Checks if the app was launched by tapping a system notification
+  static Future<Map<String, dynamic>?> getPendingNotificationRoute() async {
+    try {
+      final res = await _channel.invokeMethod('getPendingNotificationRoute');
+      if (res is Map) {
+        return Map<String, dynamic>.from(res);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Sets a listener for notification taps when the app is already open
+  static void setNotificationOpenedHandler(Function(Map<String, dynamic>) handler) {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onNotificationOpened' && call.arguments is Map) {
+        handler(Map<String, dynamic>.from(call.arguments));
+      }
+    });
+  }
 }

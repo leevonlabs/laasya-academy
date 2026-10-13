@@ -39,7 +39,11 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    final assigned = widget.trainerProfile?['assigned_courses'];
+    if (assigned is List && assigned.isNotEmpty) {
+      _myCourses = List<Map<String, dynamic>>.from(assigned);
+    }
+    setState(() => _isLoading = _announcements.isEmpty);
     await Future.wait([
       _loadTrainerBatches(),
       _loadAnnouncements(),
@@ -56,7 +60,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
       final uri = Uri.parse(
         '${ApiConstants.baseUrl}/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam',
       );
-      final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         if (data['success'] == true) {
@@ -72,7 +76,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
   Future<void> _loadAnnouncements() async {
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements');
-      final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         if (data['success'] == true && data['announcements'] is List) {
@@ -88,6 +92,14 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
             if (a['trainer_id'] == _trainerId) return true;
             return false;
           }).toList();
+
+          // Chronological sort: oldest on top, latest below
+          _announcements.sort((a, b) {
+            final da = DateTime.tryParse(a['publish_date'] ?? a['created_at'] ?? '') ?? DateTime(2000);
+            final db = DateTime.tryParse(b['publish_date'] ?? b['created_at'] ?? '') ?? DateTime(2000);
+            return da.compareTo(db);
+          });
+
           SupabaseService().markAllMessagesAsRead();
         }
       }
@@ -375,20 +387,43 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFE8F5E9),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          typeTag.toUpperCase(),
-                                          style: const TextStyle(
-                                            color: Color(0xFF2E7D32),
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.bold,
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF0FDF4),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: const Color(0xFFBBF7D0), width: 0.8),
+                                            ),
+                                            child: const Text(
+                                              'YOU',
+                                              style: TextStyle(
+                                                color: Color(0xFF15803D),
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w900,
+                                                letterSpacing: 0.5,
+                                              ),
+                                            ),
                                           ),
-                                        ),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFFF2F8),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: const Color(0xFFF0D5E4), width: 0.8),
+                                            ),
+                                            child: Text(
+                                              typeTag.toUpperCase(),
+                                              style: const TextStyle(
+                                                color: LaasyaColors.primary,
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                       Text(
                                         dateStr,
