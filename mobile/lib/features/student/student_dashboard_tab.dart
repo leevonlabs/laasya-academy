@@ -1548,24 +1548,6 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                 ],
               ),
               const SizedBox(height: 4),
-              if (unreadCount != null && unreadCount > 0) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  margin: const EdgeInsets.only(bottom: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFDE8E8),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    '$unreadCount UNREAD',
-                    style: const TextStyle(
-                      fontSize: 7.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF9B1C1C),
-                    ),
-                  ),
-                ),
-              ],
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(

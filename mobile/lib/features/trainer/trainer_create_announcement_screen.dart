@@ -294,7 +294,7 @@ class _TrainerCreateAnnouncementScreenState
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'New Announcement Broadcast',
+          'New Message Broadcast',
           style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
         ),
       ),

@@ -114,6 +114,50 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
     }
   }
 
+  String _formatMessageTime(Map<String, dynamic> msg) {
+    final createdAtStr = msg['created_at']?.toString();
+    if (createdAtStr != null && createdAtStr.contains('T')) {
+      try {
+        final dt = DateTime.parse(createdAtStr).toLocal();
+        int hour = dt.hour;
+        final minute = dt.minute.toString().padLeft(2, '0');
+        final period = hour >= 12 ? 'PM' : 'AM';
+        hour = hour % 12;
+        if (hour == 0) hour = 12;
+        return '${hour.toString().padLeft(2, '0')}:$minute $period';
+      } catch (_) {}
+    }
+    final pubTime = msg['publish_time']?.toString();
+    if (pubTime != null && pubTime.contains(':')) {
+      final parts = pubTime.split(':');
+      if (parts.length >= 2) {
+        int h = int.tryParse(parts[0]) ?? 10;
+        final m = parts[1].padLeft(2, '0');
+        final period = h >= 12 ? 'PM' : 'AM';
+        h = h % 12;
+        if (h == 0) h = 12;
+        return '${h.toString().padLeft(2, '0')}:$m $period';
+      }
+    }
+    final tField = msg['time']?.toString();
+    if (tField != null && tField.isNotEmpty && tField != '10:00 AM') {
+      return tField;
+    }
+    final pDateStr = msg['publish_date']?.toString();
+    if (pDateStr != null && pDateStr.contains('T')) {
+      try {
+        final dt = DateTime.parse(pDateStr).toLocal();
+        int hour = dt.hour;
+        final minute = dt.minute.toString().padLeft(2, '0');
+        final period = hour >= 12 ? 'PM' : 'AM';
+        hour = hour % 12;
+        if (hour == 0) hour = 12;
+        return '${hour.toString().padLeft(2, '0')}:$minute $period';
+      } catch (_) {}
+    }
+    return '10:00 AM';
+  }
+
   List<Map<String, dynamic>> _parseActionLinks(dynamic rawLinks) {
     if (rawLinks == null) return [];
     if (rawLinks is List) {
@@ -274,39 +318,37 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                        margin: const EdgeInsets.only(bottom: 2),
-                        decoration: BoxDecoration(
-                          color: _unreadCount > 0 ? const Color(0xFFF9E33A) : Colors.white24,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
+                      const Flexible(
                         child: Text(
-                          _unreadCount > 0 ? '$_unreadCount UNREAD MESSAGES' : 'MESSAGES (ALL READ)',
+                          'Academy Messages',
                           style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: _unreadCount > 0 ? const Color(0xFF590231) : Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          'Notice Board',
-                          style: TextStyle(
-                            fontSize: 14.5,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      SizedBox(width: 4),
-                      Icon(Icons.verified_rounded, size: 14, color: LaasyaColors.accentGold),
+                      const SizedBox(width: 5),
+                      const Icon(Icons.verified_rounded, size: 14, color: LaasyaColors.accentGold),
+                      if (_unreadCount > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF9E33A),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$_unreadCount',
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF590231),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const Text(
@@ -471,7 +513,7 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                               } else {
                                 sender = msg['created_by'] ?? msg['sender_name'] ?? 'Academy Director';
                               }
-                              final timeStr = msg['time'] ?? '10:00 AM';
+                              final timeStr = _formatMessageTime(msg);
                               final imageUrl = msg['image_url']?.toString();
                               final actionLinks = _parseActionLinks(msg['action_links']);
 

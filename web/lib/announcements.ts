@@ -88,6 +88,8 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
         a.sender_role,
         a.trainer_id,
         a.trainer_name,
+        a.target_students,
+        a.target_student_names,
         a.created_at::text as created_at, 
         a.updated_at::text as updated_at
       FROM public.announcements a

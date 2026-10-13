@@ -206,13 +206,14 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
             }
 
             if (classClosedAlert != null) {
-              if (attendanceAlert != null) {
-                Future.delayed(const Duration(milliseconds: 600), () {
-                  if (mounted) _showClassClosedAttentionAlarm(classClosedAlert);
-                });
-              } else {
-                _showClassClosedAttentionAlarm(classClosedAlert);
-              }
+              final cTitle = classClosedAlert['course_title'] ?? 'Classical Class';
+              final bName = classClosedAlert['batch_name'] ?? 'Session';
+              AlarmService.startAlarmRing(
+                durationSeconds: 10,
+                title: 'CLASS COMPLETED: $cTitle',
+                message: 'The $cTitle ($bName) session has concluded. Please come to collect your child.',
+              );
+              _showClassClosedBannerNotification(classClosedAlert);
             }
           }
         }
@@ -453,11 +454,95 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   void _onClassClosedAlert() {
     final alertData = TrainerDataStore.classClosedAlertNotifier.value;
     if (alertData == null || !mounted) return;
-
-    // Reset notifier value so subsequent alarms trigger properly
     TrainerDataStore.classClosedAlertNotifier.value = null;
+    _showClassClosedBannerNotification(alertData);
+  }
 
-    _showClassClosedAttentionAlarm(alertData);
+  void _showClassClosedBannerNotification(Map<String, dynamic> alertData) {
+    final courseTitle = alertData['course_title'] ?? 'Classical Class';
+    final batchName = alertData['batch_name'] ?? 'Session';
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        elevation: 12,
+        backgroundColor: Colors.transparent,
+        padding: EdgeInsets.zero,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        duration: const Duration(seconds: 10),
+        content: GestureDetector(
+          onTap: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            _showClassClosedAttentionAlarm(alertData);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF9A3412), Color(0xFFC2410C)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFFDE047), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF9A3412).withOpacity(0.4),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.18),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFFDE047), width: 1.5),
+                  ),
+                  child: const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'CLASS COMPLETED • PICKUP ALERT',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                          color: Color(0xFFFEF08A),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '$courseTitle ($batchName)',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Tap here to view pickup confirmation',
+                        style: TextStyle(fontSize: 11, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 22),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _showClassClosedAttentionAlarm(Map<String, dynamic> alertData) {

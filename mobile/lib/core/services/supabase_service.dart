@@ -1403,7 +1403,7 @@ class SupabaseService {
           }
           if (valid.isNotEmpty) {
             _cachedMessageAnnouncements = valid;
-            return valid;
+            return _filterMessagesForCurrentUser(valid);
           }
         }
       } catch (e) {
@@ -1438,7 +1438,7 @@ class SupabaseService {
             }
             if (valid.isNotEmpty) {
               _cachedMessageAnnouncements = valid;
-              return valid;
+              return _filterMessagesForCurrentUser(valid);
             }
           }
         }
@@ -1448,9 +1448,99 @@ class SupabaseService {
     }
 
     if (_cachedMessageAnnouncements.isNotEmpty) {
-      return List<Map<String, dynamic>>.from(_cachedMessageAnnouncements);
+      return _filterMessagesForCurrentUser(List<Map<String, dynamic>>.from(_cachedMessageAnnouncements));
     }
-    return List<Map<String, dynamic>>.from(_mockMessageAnnouncements);
+    return _filterMessagesForCurrentUser(List<Map<String, dynamic>>.from(_mockMessageAnnouncements));
+  }
+
+  List<Map<String, dynamic>> _filterMessagesForCurrentUser(List<Map<String, dynamic>> messages) {
+    final profile = currentUserProfile;
+    if (profile == null) return messages;
+
+    final role = (profile['role'] ?? 'student').toString().toLowerCase();
+
+    if (role == 'trainer' || role == 'guru') {
+      final trainerId = (profile['id'] ?? profile['trainer_id'] ?? profile['profile_id'] ?? '').toString().toLowerCase();
+      final trainerName = (profile['full_name'] ?? '').toString().toLowerCase();
+
+      return messages.where((m) {
+        final senderRole = (m['sender_role'] ?? '').toString().toLowerCase();
+        final msgTrainerId = (m['trainer_id'] ?? '').toString().toLowerCase();
+        final createdBy = (m['created_by'] ?? m['trainer_name'] ?? '').toString().toLowerCase();
+        final audience = (m['audience'] ?? '').toString().toLowerCase();
+
+        // Admin messages for trainers or everyone
+        if (senderRole == 'admin' || senderRole == 'owner') {
+          return audience.contains('trainer') || audience.contains('all') || audience.contains('everyone');
+        }
+
+        // Guru messages: ONLY show messages sent by THIS trainer
+        if (msgTrainerId.isNotEmpty && trainerId.isNotEmpty && msgTrainerId == trainerId) return true;
+        if (trainerName.isNotEmpty && (createdBy.contains(trainerName) || trainerName.contains(createdBy))) return true;
+
+        // Do NOT show other trainers' messages
+        return false;
+      }).toList();
+    } else {
+      // Role is student
+      final studentId = (profile['id'] ?? profile['profile_id'] ?? '').toString().toLowerCase();
+      final rollNumber = (profile['roll_number'] ?? '').toString().toLowerCase();
+      final enrolled = profile['enrolled_courses'];
+      final List<String> myBatchIds = [];
+      final List<String> myCourseIds = [];
+      if (enrolled is List) {
+        for (var e in enrolled) {
+          if (e is Map) {
+            if (e['batch_id'] != null) myBatchIds.add(e['batch_id'].toString().toLowerCase());
+            if (e['course_id'] != null) myCourseIds.add(e['course_id'].toString().toLowerCase());
+          }
+        }
+      }
+
+      return messages.where((m) {
+        final senderRole = (m['sender_role'] ?? '').toString().toLowerCase();
+        final isFromGuru = senderRole.contains('trainer') || senderRole.contains('guru') || m['trainer_id'] != null;
+
+        // Check if explicitly targeted to this disciple
+        final targetStudents = m['target_students'];
+        if (targetStudents is List && targetStudents.isNotEmpty) {
+          final isExplicitlyIncluded = targetStudents.any((s) {
+            if (s is Map) {
+              final sId = (s['id'] ?? '').toString().toLowerCase();
+              final sRoll = (s['roll_number'] ?? '').toString().toLowerCase();
+              if (studentId.isNotEmpty && sId == studentId) return true;
+              if (rollNumber.isNotEmpty && sRoll == rollNumber) return true;
+            }
+            return false;
+          });
+          if (isExplicitlyIncluded) return true;
+        }
+
+        final targetBatchId = (m['target_batch_id'] ?? '').toString().toLowerCase();
+        final targetCourseId = (m['target_course_id'] ?? '').toString().toLowerCase();
+
+        if (targetBatchId.isNotEmpty && targetBatchId != 'all') {
+          return myBatchIds.contains(targetBatchId);
+        }
+
+        if (targetCourseId.isNotEmpty && targetCourseId != 'all') {
+          return myCourseIds.contains(targetCourseId);
+        }
+
+        if (isFromGuru) {
+          final audience = (m['audience'] ?? '').toString().toLowerCase();
+          if (audience == 'all' || audience.contains('all students')) {
+            return myBatchIds.contains(targetBatchId) || myCourseIds.contains(targetCourseId);
+          }
+          return false;
+        }
+
+        // Message from Admin
+        final audience = (m['audience'] ?? '').toString().toLowerCase();
+        if (audience.contains('trainer') && !audience.contains('student')) return false;
+        return true;
+      }).toList();
+    }
   }
 
   final Set<String> _readNotifIds = {};
@@ -1499,7 +1589,8 @@ class SupabaseService {
     if (!_readStateLoaded) {
       _ensureReadStateLoaded();
     }
-    final list = _cachedMessageAnnouncements.isNotEmpty ? _cachedMessageAnnouncements : _mockMessageAnnouncements;
+    final rawList = _cachedMessageAnnouncements.isNotEmpty ? _cachedMessageAnnouncements : _mockMessageAnnouncements;
+    final list = _filterMessagesForCurrentUser(rawList);
     return list.where((m) {
       final id = m['id']?.toString();
       if (id != null && _readMessageIds.contains(id)) return false;

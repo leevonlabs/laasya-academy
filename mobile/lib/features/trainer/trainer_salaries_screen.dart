@@ -443,7 +443,7 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Compensation & Pay Slips',
+              'Pay Slips',
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             Text(
@@ -507,9 +507,14 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
                                   ],
                                 ),
                               ),
-                              Text(
-                                spec,
-                                style: const TextStyle(color: LaasyaColors.accentGold, fontSize: 11, fontWeight: FontWeight.bold),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  spec,
+                                  style: const TextStyle(color: LaasyaColors.accentGold, fontSize: 11, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.end,
+                                ),
                               ),
                             ],
                           ),
@@ -611,18 +616,22 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFF2F8),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: const Color(0xFFF0D5E4)),
-                                    ),
-                                    child: Text(
-                                      '$vNo • $recNo',
-                                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: LaasyaColors.primary),
+                                   Flexible(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFF2F8),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFFF0D5E4)),
+                                      ),
+                                      child: Text(
+                                        '$vNo • $recNo',
+                                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: LaasyaColors.primary),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
                                   ),
+                                  const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
@@ -686,7 +695,7 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
                                   ),
                                   onPressed: () => _showSalarySlipModal(item),
                                   icon: const Icon(Icons.download_rounded, size: 16, color: LaasyaColors.primary),
-                                  label: const Text('Download Pay Slip (PDF) / View Voucher', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  label: const Text('View & Download Pay Slip', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                 ),
                               ),
                             ],

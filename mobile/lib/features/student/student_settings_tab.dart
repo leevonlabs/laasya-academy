@@ -504,7 +504,7 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
                     title: 'Video Library',
                     subtitle: 'Official event shoot Google Drive vaults & footage',
                     badgeText: SupabaseService().getUnreadVideosCount() > 0
-                        ? '${SupabaseService().getUnreadVideosCount()} NEW'
+                        ? '${SupabaseService().getUnreadVideosCount()}'
                         : null,
                     onTap: () async {
                       await Navigator.push(
@@ -529,8 +529,8 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
                     title: 'Messages',
                     subtitle: 'Official academy notices, circulars & announcements',
                     badgeText: SupabaseService().getUnreadMessagesCount() > 0
-                        ? '${SupabaseService().getUnreadMessagesCount()} UNREAD'
-                        : 'NOTICE BOARD',
+                        ? '${SupabaseService().getUnreadMessagesCount()}'
+                        : null,
                     onTap: () async {
                       await Navigator.push(
                         context,

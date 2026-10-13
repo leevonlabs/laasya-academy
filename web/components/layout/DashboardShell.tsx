@@ -64,6 +64,7 @@ export default function DashboardShell({ user, children }: Props) {
     { label: 'Guru Salaries', href: '/salaries', icon: Banknote },
     { label: 'Expenses', href: '/expenses', icon: TrendingDown },
     { label: 'Announcements', href: '/announcements', icon: Megaphone },
+    { label: 'Advertisements', href: '/advertisements', icon: Sparkles },
     { label: 'Reports & Audits', href: '/reports', icon: BarChart3 },
     { label: 'Courses (18)', href: '/courses', icon: BookOpen },
     { label: 'Gurus (14)', href: '/trainers', icon: Users },

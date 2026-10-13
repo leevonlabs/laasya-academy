@@ -818,7 +818,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Academy Announcements',
+                  'Academy Messages',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -1054,7 +1054,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                             SizedBox(width: 5),
                             Expanded(
                               child: Text(
-                                'Monthly Compensation & Payroll',
+                                'Pay Slips',
                                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1575,24 +1575,6 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                 ],
               ),
               const SizedBox(height: 4),
-              if (unreadCount != null && unreadCount > 0) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  margin: const EdgeInsets.only(bottom: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFDE8E8),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    '$unreadCount UNREAD',
-                    style: const TextStyle(
-                      fontSize: 7.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF9B1C1C),
-                    ),
-                  ),
-                ),
-              ],
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(

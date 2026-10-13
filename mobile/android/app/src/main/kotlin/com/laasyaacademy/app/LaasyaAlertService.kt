@@ -178,14 +178,26 @@ class LaasyaAlertService : Service() {
             .setLargeIcon(logo)
             .setColor(0xFF800020.toInt())
             .setContentTitle("Laasya Cultural Academy")
-            .setContentText("Live Attention & Alert Sync Active")
+            .setContentText("Alert Sync Ready")
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
             .setSilent(true)
             .setContentIntent(pendingIntent)
             .build()
 
         startForeground(NOTIF_ID_FOREGROUND, notif)
+        // Immediately dismiss ongoing notification so no persistent notification remains in status bar
+        mainHandler.postDelayed({
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+                val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                nm?.cancel(NOTIF_ID_FOREGROUND)
+            } catch (_: Exception) {}
+        }, 300L)
     }
 
     private fun saveMonitoringConfig(studentId: String, rollNumber: String, name: String, phone: String, batchIds: String) {
@@ -473,7 +485,6 @@ class LaasyaAlertService : Service() {
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setAutoCancel(true)
                 .setContentIntent(pendingAppIntent)
-                .setFullScreenIntent(pendingAppIntent, true)
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel, "STOP RINGING", pendingStopIntent)
 
             nm.notify(NOTIF_ID_ALARM, builder.build())

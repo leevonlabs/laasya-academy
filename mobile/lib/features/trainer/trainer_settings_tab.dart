@@ -523,7 +523,7 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                     title: 'Video Library',
                     subtitle: 'Academy event shoot Google Drive vaults & footage',
                     badgeText: SupabaseService().getUnreadVideosCount() > 0
-                        ? '${SupabaseService().getUnreadVideosCount()} NEW'
+                        ? '${SupabaseService().getUnreadVideosCount()}'
                         : null,
                     onTap: () async {
                       await Navigator.push(
@@ -540,14 +540,14 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                   ),
                   const Divider(height: 1, indent: 64),
 
-                  // 5. Compensation & Pay Slips
+                  // 5. Pay Slips
                   _settingsTile(
                     icon: Icons.receipt_long_rounded,
                     iconBg: const Color(0xFFDEF7EC),
                     iconColor: const Color(0xFF03543F),
-                    title: 'Compensation & Pay Slips',
+                    title: 'Pay Slips',
                     subtitle: 'Monthly salary disbursements & downloadable pay slips (PDF)',
-                    badgeText: 'PAYROLL',
+                    badgeText: null,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -567,8 +567,8 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                     title: 'Academy Messages',
                     subtitle: 'Official broadcasts, parent circulars & academy notices',
                     badgeText: SupabaseService().getUnreadMessagesCount() > 0
-                        ? '${SupabaseService().getUnreadMessagesCount()} UNREAD'
-                        : 'MESSAGES',
+                        ? '${SupabaseService().getUnreadMessagesCount()}'
+                        : null,
                     onTap: () async {
                       await Navigator.push(
                         context,
