@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
+import '../student/student_messages_screen.dart';
+import '../student/student_video_library_screen.dart';
+import 'trainer_salaries_screen.dart';
 
 class TrainerNotificationsScreen extends StatefulWidget {
   const TrainerNotificationsScreen({super.key});
@@ -31,6 +34,60 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
         _isLoading = false;
       });
     }
+  }
+
+  void _handleNotificationClick(Map<String, dynamic> item) {
+    final type = (item['type'] ?? 'general').toString().toLowerCase();
+    final title = (item['title'] ?? '').toString().toLowerCase();
+    final message = (item['message'] ?? '').toString().toLowerCase();
+
+    // 1. Attendance Redirection
+    if (type == 'attendance' || title.contains('attendance') || message.contains('attendance')) {
+      Navigator.pop(context, {'action': 'switch_tab', 'index': 3});
+      return;
+    }
+
+    // 2. Classes & Schedule Redirection
+    if (type == 'classes' || type == 'schedule' || title.contains('class') || title.contains('schedule') || title.contains('timetable')) {
+      Navigator.pop(context, {'action': 'switch_tab', 'index': 1});
+      return;
+    }
+
+    // 3. Students Redirection
+    if (type == 'students' || title.contains('student') || title.contains('disciple')) {
+      Navigator.pop(context, {'action': 'switch_tab', 'index': 2});
+      return;
+    }
+
+    // 4. Announcements / Messages Redirection
+    if (type == 'announcement' || type == 'message' || title.contains('announcement') || title.contains('message') || title.contains('notice')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StudentMessagesScreen()),
+      );
+      return;
+    }
+
+    // 5. Video Library Redirection
+    if (type == 'video' || type == 'video_shared' || title.contains('video') || message.contains('drive vault') || message.contains('learning video')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StudentVideoLibraryScreen()),
+      );
+      return;
+    }
+
+    // 6. Salaries Redirection
+    if (type == 'salary' || type == 'salaries' || title.contains('salary') || message.contains('salary') || message.contains('stipend')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const TrainerSalariesScreen()),
+      );
+      return;
+    }
+
+    // 7. Fallback Detail View
+    _showDetail(item);
   }
 
   void _showDetail(Map<String, dynamic> item) {
@@ -101,7 +158,143 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
                   style: const TextStyle(fontSize: 13.5, height: 1.45, color: Color(0xFF334155)),
                 ),
               ),
-              const SizedBox(height: 18),
+              Builder(
+                builder: (context) {
+                  final type = (item['type'] ?? 'general').toString().toLowerCase();
+                  final title = (item['title'] ?? '').toString().toLowerCase();
+                  final message = (item['message'] ?? '').toString().toLowerCase();
+
+                  if (type == 'attendance' || title.contains('attendance') || message.contains('attendance')) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF059669),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.fact_check_rounded, size: 18),
+                          label: const Text('Go to Attendance Tab', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            Navigator.pop(context, {'action': 'switch_tab', 'index': 3});
+                          },
+                        ),
+                      ),
+                    );
+                  } else if (type == 'classes' || type == 'schedule' || title.contains('class') || title.contains('schedule')) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: LaasyaColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.calendar_month_rounded, size: 18),
+                          label: const Text('Go to My Classes & Schedule', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            Navigator.pop(context, {'action': 'switch_tab', 'index': 1});
+                          },
+                        ),
+                      ),
+                    );
+                  } else if (type == 'students' || title.contains('student') || title.contains('disciple')) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4F46E5),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.groups_rounded, size: 18),
+                          label: const Text('Go to Student Management', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            Navigator.pop(context, {'action': 'switch_tab', 'index': 2});
+                          },
+                        ),
+                      ),
+                    );
+                  } else if (type == 'announcement' || type == 'message' || title.contains('announcement') || title.contains('message')) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: LaasyaColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.campaign_rounded, size: 18),
+                          label: const Text('Open Noticeboard Messages', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentMessagesScreen()));
+                          },
+                        ),
+                      ),
+                    );
+                  } else if (type == 'video' || type == 'video_shared' || title.contains('video')) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF92400E),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.video_library_rounded, size: 18),
+                          label: const Text('Open Learning Video Library', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentVideoLibraryScreen()));
+                          },
+                        ),
+                      ),
+                    );
+                  } else if (type == 'salary' || type == 'salaries' || title.contains('salary')) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D9488),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.payments_rounded, size: 18),
+                          label: const Text('View Salary Records', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const TrainerSalariesScreen()));
+                          },
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+              const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
@@ -239,7 +432,7 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
                             final accentColor = isAnnouncement ? const Color(0xFFD97706) : LaasyaColors.primary;
 
                             return InkWell(
-                              onTap: () => _showDetail(item),
+                              onTap: () => _handleNotificationClick(item),
                               borderRadius: BorderRadius.circular(16),
                               child: Container(
                                 decoration: BoxDecoration(

@@ -23,6 +23,7 @@ dist/
 local.properties
 **/android/app/build/
 **/android/.gradle/
+**/.kotlin/
 **/build/
 *.apk
 *.aab

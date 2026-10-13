@@ -330,36 +330,43 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                                               ),
                                             ),
                                             const SizedBox(width: 8),
-                                            InkWell(
-                                              onTap: () => _toggleReminder(item['id']),
-                                              borderRadius: BorderRadius.circular(8),
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                decoration: BoxDecoration(
-                                                  color: reminderOn ? const Color(0xFFFFF2F8) : Colors.grey.shade100,
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: reminderOn ? LaasyaColors.primary.withOpacity(0.3) : Colors.grey.shade300,
+                                            Material(
+                                              color: Colors.transparent,
+                                              child: InkWell(
+                                                onTap: () => _toggleReminder(item['id']),
+                                                borderRadius: BorderRadius.circular(8),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                  decoration: BoxDecoration(
+                                                    color: reminderOn ? const Color(0xFFFFF2F8) : Colors.grey.shade100,
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(
+                                                      color: reminderOn ? LaasyaColors.primary : Colors.grey.shade300,
+                                                      width: 1,
+                                                    ),
                                                   ),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Icon(
-                                                      reminderOn ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
-                                                      size: 14,
-                                                      color: reminderOn ? LaasyaColors.primary : Colors.grey.shade600,
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      reminderOn ? 'Reminder On' : 'Remind Me',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        fontWeight: FontWeight.w600,
-                                                        color: reminderOn ? LaasyaColors.primary : Colors.grey.shade700,
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        reminderOn ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+                                                        size: 14,
+                                                        color: reminderOn ? LaasyaColors.primary : Colors.grey.shade600,
                                                       ),
-                                                    ),
-                                                  ],
+                                                      const SizedBox(width: 5),
+                                                      Text(
+                                                        reminderOn ? 'Reminder On' : 'Remind Me',
+                                                        maxLines: 1,
+                                                        softWrap: false,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: reminderOn ? LaasyaColors.primary : Colors.grey.shade700,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
                                               ),
                                             ),

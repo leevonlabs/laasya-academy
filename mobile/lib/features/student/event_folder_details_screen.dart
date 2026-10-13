@@ -102,7 +102,11 @@ class EventFolderDetailsScreen extends StatelessWidget {
     final hasDrive = driveUrl.isNotEmpty;
     final hasYoutube = youtubeUrl.isNotEmpty;
     final desc = (folder['description'] ?? 'Official event shoot video media and high-resolution photography.').toString();
-    final createdBy = (folder['created_by'] ?? 'Academy Director').toString();
+    final sharedByType = (folder['shared_by_type'] ?? '').toString().toLowerCase();
+    final trainerName = folder['trainer_name']?.toString();
+    final bool isGuru = sharedByType == 'guru' || (trainerName != null && trainerName.isNotEmpty);
+    final senderRole = isGuru ? 'Guru / Trainer' : 'Admin / Director';
+    final senderName = isGuru ? (trainerName ?? 'Guru') : (folder['created_by'] ?? 'Academy Director');
 
     final eventDateFormatted = _formatDate(eventDateRaw);
     final uploadDateFormatted = _formatDate(uploadDateRaw);
@@ -176,7 +180,7 @@ class EventFolderDetailsScreen extends StatelessWidget {
                           border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.4)),
                         ),
                         child: Text(
-                          'By $createdBy',
+                          'Shared by $senderName ($senderRole)',
                           style: const TextStyle(color: LaasyaColors.accentGold, fontSize: 11, fontWeight: FontWeight.w600),
                         ),
                       ),

@@ -525,17 +525,49 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                                                   child: Row(
                                                     mainAxisSize: MainAxisSize.min,
                                                     children: [
-                                                      Text(
-                                                        sender,
-                                                        style: const TextStyle(
-                                                          fontSize: 11.5,
-                                                          fontWeight: FontWeight.bold,
-                                                          color: Color(0xFF075E54), // Sender emerald green
+                                                      Flexible(
+                                                        child: Text(
+                                                          sender,
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: ((msg['sender_role'] ?? '').toString().toLowerCase().contains('trainer') || (msg['sender_role'] ?? '').toString().toLowerCase().contains('guru') || msg['trainer_id'] != null)
+                                                                ? const Color(0xFF9A3412)
+                                                                : const Color(0xFF075E54),
+                                                          ),
+                                                          overflow: TextOverflow.ellipsis,
                                                         ),
-                                                        overflow: TextOverflow.ellipsis,
                                                       ),
-                                                      const SizedBox(width: 4),
-                                                      const Icon(Icons.verified_rounded, size: 12, color: Color(0xFF075E54)),
+                                                      const SizedBox(width: 5),
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                        decoration: BoxDecoration(
+                                                          color: (((msg['sender_role'] ?? '').toString().toLowerCase().contains('trainer') || (msg['sender_role'] ?? '').toString().toLowerCase().contains('guru') || msg['trainer_id'] != null)
+                                                                  ? const Color(0xFFC2410C)
+                                                                  : const Color(0xFF075E54))
+                                                              .withOpacity(0.12),
+                                                          borderRadius: BorderRadius.circular(4),
+                                                          border: Border.all(
+                                                            color: (((msg['sender_role'] ?? '').toString().toLowerCase().contains('trainer') || (msg['sender_role'] ?? '').toString().toLowerCase().contains('guru') || msg['trainer_id'] != null)
+                                                                    ? const Color(0xFFC2410C)
+                                                                    : const Color(0xFF075E54))
+                                                                .withOpacity(0.3),
+                                                            width: 0.8,
+                                                          ),
+                                                        ),
+                                                        child: Text(
+                                                          ((msg['sender_role'] ?? '').toString().toLowerCase().contains('trainer') || (msg['sender_role'] ?? '').toString().toLowerCase().contains('guru') || msg['trainer_id'] != null)
+                                                              ? 'Guru / Trainer'
+                                                              : 'Admin / Director',
+                                                          style: TextStyle(
+                                                            fontSize: 8.5,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: ((msg['sender_role'] ?? '').toString().toLowerCase().contains('trainer') || (msg['sender_role'] ?? '').toString().toLowerCase().contains('guru') || msg['trainer_id'] != null)
+                                                                ? const Color(0xFFC2410C)
+                                                                : const Color(0xFF075E54),
+                                                          ),
+                                                        ),
+                                                      ),
                                                     ],
                                                   ),
                                                 ),

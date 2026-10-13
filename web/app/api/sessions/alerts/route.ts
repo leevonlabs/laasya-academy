@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const alertMessage = message || `The ${course_title} (${batch_name}) class session has concluded. Parents are requested to pick up their child safely.`;
+    const alertMessage = message || `Class Completed! Please come to collect your child. The ${course_title} (${batch_name}) session has concluded. Please take your child back from the academy hall safely.`;
 
     // 1. Insert into session_alerts table
     const alert = await queryOne<any>(`

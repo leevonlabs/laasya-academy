@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/services/supabase_service.dart';
 import 'trainer_create_announcement_screen.dart';
 
 class TrainerAnnouncementsScreen extends StatefulWidget {
@@ -87,6 +88,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
             if (a['trainer_id'] == _trainerId) return true;
             return false;
           }).toList();
+          SupabaseService().markAllMessagesAsRead();
         }
       }
     } catch (e) {

@@ -1364,6 +1364,49 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                                     ),
                                   ),
 
+                                  // Sender Attribution: Name and Role
+                                  Builder(
+                                    builder: (context) {
+                                      final sharedByType = (item['shared_by_type'] ?? '').toString().toLowerCase();
+                                      final trainerName = item['trainer_name']?.toString();
+                                      final bool isGuru = sharedByType == 'guru' || (trainerName != null && trainerName.isNotEmpty);
+                                      final senderRole = isGuru ? 'Guru / Trainer' : 'Admin / Director';
+                                      final senderName = isGuru ? (trainerName ?? 'Guru') : (item['created_by'] ?? 'Academy Director');
+
+                                      return Container(
+                                        margin: const EdgeInsets.only(top: 6, bottom: 2),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                        decoration: BoxDecoration(
+                                          color: isGuru ? const Color(0xFFFFF7ED) : const Color(0xFFF0FDF4),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(
+                                            color: isGuru ? const Color(0xFFFDBA74) : const Color(0xFFBBF7D0),
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              isGuru ? Icons.person_pin_rounded : Icons.admin_panel_settings_rounded,
+                                              size: 13,
+                                              color: isGuru ? const Color(0xFFC2410C) : const Color(0xFF15803D),
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              'Shared by: $senderName ($senderRole)',
+                                              style: TextStyle(
+                                                fontSize: 10.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: isGuru ? const Color(0xFF9A3412) : const Color(0xFF166534),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+
                                   const SizedBox(height: 12),
 
                                   // ===========================================

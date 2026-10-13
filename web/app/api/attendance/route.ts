@@ -208,7 +208,7 @@ export async function POST(req: NextRequest) {
 
       for (const rec of resolvedRecords) {
         const statusUpper = rec.status.toUpperCase();
-        const statusMsg = `Attendance Marked: You have been marked ${statusUpper} for ${cTitle} (${bName}) on ${todayStr} by Guru ${guruName}.`;
+        const statusMsg = `Attendance Marked: ${rec.name} was marked ${statusUpper} for ${cTitle} (${bName}) on ${todayStr} by Guru ${guruName}.`;
 
         alertValuesSql.push(`($1, $2, $3, $4, $${aIdx++}, 'attendance_marked', $${aIdx++}, $${aIdx++}, $${aIdx++}, $${aIdx++}, NOW())`);
         alertParams.push(statusMsg, rec.student_id, rec.status, rec.roll, rec.name);

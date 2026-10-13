@@ -326,7 +326,13 @@ export async function createEventFolder(data: {
     const item = await queryOne<VideoLibraryItem>(sql, params);
 
     try {
+      const isGuru = data.shared_by_type === 'guru' || Boolean(data.trainer_id);
+      const senderRole = isGuru ? 'Guru' : 'Admin';
+      const senderName = isGuru ? (data.trainer_name || 'Guru') : (data.created_by || 'Admin / Director');
       const urlText = data.drive_url || data.youtube_url || '';
+      const alertTitle = `New Learning Video Shared by ${senderName} (${senderRole})`;
+      const alertMsg = `"${data.title}" was shared by ${senderName} (${senderRole}).${urlText ? ` Link: ${urlText}` : ''}`;
+
       await query(`
         INSERT INTO public.session_alerts (
           batch_id, batch_name, course_title, trainer_name, message, alert_type, created_at
@@ -334,9 +340,9 @@ export async function createEventFolder(data: {
       `, [
         validBatchId || 'all',
         data.target_batch_name || 'All Batches',
-        data.target_course_title || data.title,
-        data.trainer_name || data.created_by || 'Academy Video Library',
-        `New practice material shared: "${data.title}"${urlText ? ` - ${urlText}` : ''}`
+        alertTitle,
+        senderName,
+        alertMsg
       ]);
     } catch (alertErr) {
       console.warn('Could not insert session_alert for video link:', alertErr);
@@ -413,15 +419,21 @@ export async function createUniversalEventFolders(data: {
     const inserted = await query<VideoLibraryItem>(sql, params);
 
     try {
+      const isGuru = data.shared_by_type === 'guru' || Boolean(data.trainer_id);
+      const senderRole = isGuru ? 'Guru' : 'Admin';
+      const senderName = isGuru ? (data.trainer_name || 'Guru') : (data.created_by || 'Admin / Director');
       const urlText = data.drive_url || data.youtube_url || '';
+      const alertTitle = `New Learning Video Shared by ${senderName} (${senderRole})`;
+      const alertMsg = `"${data.title}" was shared across all courses by ${senderName} (${senderRole}).${urlText ? ` Link: ${urlText}` : ''}`;
+
       await query(`
         INSERT INTO public.session_alerts (
           batch_id, batch_name, course_title, trainer_name, message, alert_type, created_at
         ) VALUES ('all', 'All Batches', $1, $2, $3, 'video_shared', NOW());
       `, [
-        data.title,
-        data.trainer_name || data.created_by || 'Academy Video Library',
-        `New practice material shared: "${data.title}"${urlText ? ` - ${urlText}` : ''}`
+        alertTitle,
+        senderName,
+        alertMsg
       ]);
     } catch (alertErr) {
       console.warn('Could not insert session_alert for universal video link:', alertErr);

@@ -14,6 +14,7 @@ import 'student_schedule_tab.dart';
 import 'student_attendance_tab.dart';
 import 'student_settings_tab.dart';
 import 'student_notifications_screen.dart';
+import 'student_messages_screen.dart';
 
 class StudentMainScaffold extends StatefulWidget {
   const StudentMainScaffold({super.key});
@@ -227,7 +228,12 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         duration: const Duration(seconds: 5),
-        content: Container(
+        content: GestureDetector(
+          onTap: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            setState(() => _currentIndex = 3);
+          },
+          child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -321,7 +327,8 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   void _showMessageNotification(Map<String, dynamic> alertData) {
@@ -349,59 +356,68 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         duration: const Duration(seconds: 5),
-        content: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF800020), Color(0xFF4A0E17)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        content: GestureDetector(
+          onTap: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const StudentMessagesScreen()),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF800020), Color(0xFF4A0E17)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFFBBF24), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF800020).withOpacity(0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFFBBF24), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF800020).withOpacity(0.35),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFFBBF24), width: 1.5),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFFBBF24), width: 1.5),
+                  ),
+                  child: const Icon(Icons.campaign_rounded, color: Color(0xFFFBBF24), size: 24),
                 ),
-                child: const Icon(Icons.campaign_rounded, color: Color(0xFFFBBF24), size: 24),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      msg,
-                      style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.85), height: 1.3),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        msg,
+                        style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.85), height: 1.3),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -671,12 +687,18 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
                 ),
               ],
             ),
-            tooltip: 'Academy Notifications',
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const StudentNotificationsScreen()),
               );
+              if (result is Map && mounted) {
+                if (result['action'] == 'switch_tab' && result['index'] is int) {
+                  setState(() => _currentIndex = result['index']);
+                } else if (result['action'] == 'alarm' && result['data'] is Map) {
+                  _showClassClosedAttentionAlarm(Map<String, dynamic>.from(result['data']));
+                }
+              }
             },
           ),
         ],

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/alarm_service.dart';
+import 'student_messages_screen.dart';
+import 'student_video_library_screen.dart';
 
 class StudentNotificationsScreen extends StatefulWidget {
   const StudentNotificationsScreen({super.key});
@@ -58,6 +61,232 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
         ),
       );
     }
+  }
+
+  void _showClassCompletedAlarmDialog(Map<String, dynamic> item) {
+    _markRead(item['id']?.toString() ?? '');
+    final rawAlert = item['raw_alert'] as Map<String, dynamic>?;
+
+    String courseName = 'Yoga';
+    String batchName = 'Batch 2';
+
+    if (rawAlert != null) {
+      if (rawAlert['course_title'] != null && rawAlert['course_title'].toString().isNotEmpty) {
+        courseName = rawAlert['course_title'].toString();
+      }
+      if (rawAlert['batch_name'] != null && rawAlert['batch_name'].toString().isNotEmpty) {
+        batchName = rawAlert['batch_name'].toString();
+      }
+    } else {
+      final title = (item['title'] ?? '').toString();
+      final msg = (item['message'] ?? '').toString();
+      if (title.contains(':')) {
+        final afterColon = title.split(':').last.trim();
+        if (afterColon.contains('(')) {
+          final parts = afterColon.split('(');
+          courseName = parts.first.trim();
+          batchName = parts.last.replaceAll(')', '').trim();
+        } else {
+          courseName = afterColon;
+        }
+      } else if (msg.contains('(') && msg.contains(')')) {
+        final startIdx = msg.indexOf('(');
+        final endIdx = msg.indexOf(')');
+        batchName = msg.substring(startIdx + 1, endIdx).trim();
+      }
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 16,
+          child: Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFFF7ED), Colors.white],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              border: Border.all(color: const Color(0xFFF97316), width: 2),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Ringing Bell Icon with glow
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFED7AA),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF97316).withOpacity(0.35),
+                        blurRadius: 16,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.notifications_active_rounded,
+                    color: Color(0xFFC2410C),
+                    size: 44,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Title
+                const Text(
+                  'CLASS COMPLETED!',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF9A3412),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Notice pill
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEDD5),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFFDBA74)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.ring_volume_rounded, size: 14, color: Color(0xFFC2410C)),
+                      SizedBox(width: 6),
+                      Text(
+                        'Attention Alarm Ringing: 7s',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF9A3412),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Message Box
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFFED7AA)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'The $courseName ($batchName) session has concluded.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: LaasyaColors.textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Please come and take your child back from the academy hall safely.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: Colors.black87,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Stop Ringing Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      AlarmService.stopAlarmRing();
+                      Navigator.pop(ctx);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFC2410C),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 3,
+                    ),
+                    icon: const Icon(Icons.volume_off_rounded, size: 20),
+                    label: const Text(
+                      'Stop Ringing',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _handleNotificationClick(Map<String, dynamic> item) {
+    _markRead(item['id']?.toString() ?? '');
+    final type = (item['type'] ?? 'general').toString().toLowerCase();
+    final title = (item['title'] ?? '').toString().toLowerCase();
+    final message = (item['message'] ?? '').toString().toLowerCase();
+
+    // 1. Alarm / Class Concluded Alert (Reference Image 2)
+    if (type == 'class_alert' || type == 'alarm' || type == 'class_closed' ||
+        title.contains('class completed') || title.contains('concluded') || message.contains('class completed')) {
+      _showClassCompletedAlarmDialog(item);
+      return;
+    }
+
+    // 2. Attendance Redirection
+    if (type == 'attendance' || title.contains('attendance') || message.contains('attendance')) {
+      Navigator.pop(context, {'action': 'switch_tab', 'index': 3});
+      return;
+    }
+
+    // 3. Announcements / Noticeboard Messages Redirection
+    if (type == 'announcement' || type == 'message' || title.contains('announcement') || title.contains('notice') || title.contains('circular')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StudentMessagesScreen()),
+      );
+      return;
+    }
+
+    // 4. Video Library Redirection
+    if (type == 'video' || type == 'video_shared' || type == 'video_library' || title.contains('video') || message.contains('drive vault') || message.contains('youtube') || message.contains('learning video')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StudentVideoLibraryScreen()),
+      );
+      return;
+    }
+
+    // 5. Payment / Tuition Fee Redirection
+    if (type == 'payment' || type == 'fee' || title.contains('fee') || title.contains('receipt') || title.contains('payment') || message.contains('tuition')) {
+      Navigator.pop(context, {'action': 'switch_tab', 'index': 0, 'view': 'tuition'});
+      return;
+    }
+
+    // 6. Fallback / General Notice Details
+    _showNotificationDetail(item);
   }
 
   void _showNotificationDetail(Map<String, dynamic> item) {
@@ -233,7 +462,103 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
                   }).toList(),
                 ),
               ],
-              const SizedBox(height: 20),
+              if (isAttendance) ...[
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: themeColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.verified_rounded, size: 18),
+                    label: const Text('View Attendance Records', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.pop(context, {'action': 'switch_tab', 'index': 3});
+                    },
+                  ),
+                ),
+              ] else if (isClassAlert) ...[
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFC2410C),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.notifications_active_rounded, size: 18),
+                    label: const Text('View Alarm Alert', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showClassCompletedAlarmDialog(item);
+                    },
+                  ),
+                ),
+              ] else if (type == 'announcement' || type == 'message') ...[
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: themeColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.campaign_rounded, size: 18),
+                    label: const Text('Open Noticeboard Messages', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentMessagesScreen()));
+                    },
+                  ),
+                ),
+              ] else if (type == 'video' || type == 'video_shared') ...[
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: LaasyaColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.video_library_rounded, size: 18),
+                    label: const Text('Open Learning Video Library', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentVideoLibraryScreen()));
+                    },
+                  ),
+                ),
+              ] else if (type == 'payment' || type == 'fee') ...[
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                    label: const Text('View Tuition Fee Status', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.pop(context, {'action': 'switch_tab', 'index': 0, 'view': 'tuition'});
+                    },
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
@@ -468,7 +793,7 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
                             return Material(
                               color: Colors.transparent,
                               child: InkWell(
-                                onTap: () => _showNotificationDetail(item),
+                                onTap: () => _handleNotificationClick(item),
                                 borderRadius: BorderRadius.circular(16),
                                 child: Container(
                                   decoration: BoxDecoration(

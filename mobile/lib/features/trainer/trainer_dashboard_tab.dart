@@ -434,6 +434,209 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
     );
   }
 
+  Widget _buildAvatarWidget(String? avatarUrl, {double size = 58, VoidCallback? onTap}) {
+    Widget imageContent;
+    if (avatarUrl != null && avatarUrl.trim().isNotEmpty) {
+      final trimmed = avatarUrl.trim();
+      if (trimmed.startsWith('data:image')) {
+        try {
+          final bytes = base64Decode(trimmed.split(',').last);
+          imageContent = Image.memory(bytes, fit: BoxFit.cover, width: size, height: size);
+        } catch (_) {
+          imageContent = CircleAvatar(
+            backgroundColor: const Color(0xFFD4AF37),
+            radius: size / 2,
+            child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
+          );
+        }
+      } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        imageContent = Image.network(
+          trimmed,
+          fit: BoxFit.cover,
+          width: size,
+          height: size,
+          errorBuilder: (_, __, ___) => CircleAvatar(
+            backgroundColor: const Color(0xFFD4AF37),
+            radius: size / 2,
+            child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
+          ),
+        );
+      } else if (trimmed.startsWith('assets/')) {
+        imageContent = Image.asset(trimmed, fit: BoxFit.cover, width: size, height: size);
+      } else {
+        imageContent = CircleAvatar(
+          backgroundColor: const Color(0xFFD4AF37),
+          radius: size / 2,
+          child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
+        );
+      }
+    } else {
+      imageContent = CircleAvatar(
+        backgroundColor: const Color(0xFFD4AF37),
+        radius: size / 2,
+        child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
+      );
+    }
+
+    final avatarCircle = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: LaasyaColors.accentGold, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: ClipOval(child: imageContent),
+    );
+
+    if (onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: avatarCircle,
+      );
+    }
+    return avatarCircle;
+  }
+
+  void _showFullPhotoDialog(BuildContext context, String? avatarUrl, String name, String subtitle) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.92),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.4), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.5),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (subtitle.isNotEmpty)
+                            Text(
+                              subtitle,
+                              style: const TextStyle(
+                                color: LaasyaColors.accentGold,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 24),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Colors.white12, height: 1),
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.65,
+                    minHeight: 280,
+                  ),
+                  width: double.infinity,
+                  color: Colors.black,
+                  child: InteractiveViewer(
+                    minScale: 1.0,
+                    maxScale: 3.5,
+                    child: _buildFullPhotoWidget(avatarUrl),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFullPhotoWidget(String? avatarUrl) {
+    if (avatarUrl != null && avatarUrl.trim().isNotEmpty) {
+      final trimmed = avatarUrl.trim();
+      if (trimmed.startsWith('data:image')) {
+        try {
+          final bytes = base64Decode(trimmed.split(',').last);
+          return Image.memory(bytes, fit: BoxFit.contain);
+        } catch (_) {}
+      } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        return Image.network(
+          trimmed,
+          fit: BoxFit.contain,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return const Center(child: CircularProgressIndicator(color: LaasyaColors.accentGold));
+          },
+          errorBuilder: (_, __, ___) => _buildPlaceholderPhoto(),
+        );
+      } else if (trimmed.startsWith('assets/')) {
+        return Image.asset(trimmed, fit: BoxFit.contain);
+      }
+    }
+    return _buildPlaceholderPhoto();
+  }
+
+  Widget _buildPlaceholderPhoto() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      color: const Color(0xFF590231),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            radius: 48,
+            backgroundColor: Colors.white24,
+            child: Icon(Icons.person_rounded, size: 54, color: Colors.white70),
+          ),
+          SizedBox(height: 12),
+          Text(
+            'Official Academy Faculty Profile Photo',
+            style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -443,7 +646,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
     final name = _profile?['full_name'] ?? 'Smt. Anusha Sumesh';
     final designation = _profile?['designation'] ?? 'Head Guru & Choreographer';
     final specialization = _profile?['specialization'] ?? 'Bharatanatyam Classical Dance';
-    final avatarUrl = _profile?['avatar_url'] as String?;
+    final avatarUrl = _profile?['avatar_url'] as String? ?? _profile?['photo_url'] as String? ?? _profile?['image_url'] as String?;
     final monthlySalary = _profile?['monthly_salary'] ?? 45000;
     final salaryPaymentStatus = (_profile?['salary_payment_status'] ?? 'paid').toString().toLowerCase();
     final bool isPaid = salaryPaymentStatus == 'paid';
@@ -488,40 +691,10 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                 children: [
                   Row(
                     children: [
-                      // Avatar with golden border
-                      Container(
-                        width: 58,
-                        height: 58,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: LaasyaColors.accentGold, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 6,
-                            ),
-                          ],
-                        ),
-                        child: ClipOval(
-                          child: (avatarUrl != null && avatarUrl.isNotEmpty)
-                              ? (avatarUrl.startsWith('data:')
-                                  ? const CircleAvatar(
-                                      backgroundColor: Color(0xFFD4AF37),
-                                      child: Icon(Icons.person, size: 34, color: Colors.white),
-                                    )
-                                  : Image.network(
-                                      avatarUrl,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const CircleAvatar(
-                                        backgroundColor: Color(0xFFD4AF37),
-                                        child: Icon(Icons.person, size: 34, color: Colors.white),
-                                      ),
-                                    ))
-                              : const CircleAvatar(
-                                  backgroundColor: Color(0xFFD4AF37),
-                                  child: Icon(Icons.person, size: 34, color: Colors.white),
-                                ),
-                        ),
+                      // Avatar with golden border (Tap to view full length photo)
+                      _buildAvatarWidget(
+                        avatarUrl,
+                        onTap: () => _showFullPhotoDialog(context, avatarUrl, name, '$designation • $specialization'),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -1445,13 +1618,18 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                   ),
                 ),
               ],
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: LaasyaColors.textDark,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: LaasyaColors.textDark,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

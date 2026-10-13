@@ -191,6 +191,8 @@ class SupabaseService {
       debugPrint('Error restoring saved profile session: $e');
     }
 
+    await _ensureReadStateLoaded();
+
     try {
       if (SupabaseConstants.supabaseAnonKey.contains('placeholder')) {
         debugPrint('Using demo-ready mode. Set real SUPABASE_ANON_KEY for direct live cloud auth.');
@@ -1450,14 +1452,51 @@ class SupabaseService {
   final Set<String> _readNotifIds = {};
   final Set<String> _readMessageIds = {};
   final Set<String> _readVideoIds = {};
+  bool _readStateLoaded = false;
   List<Map<String, dynamic>> _cachedNotifications = [];
 
+  Future<void> _ensureReadStateLoaded() async {
+    if (_readStateLoaded) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final msgs = prefs.getStringList('laasya_read_message_ids');
+      if (msgs != null) _readMessageIds.addAll(msgs);
+      final vids = prefs.getStringList('laasya_read_video_ids');
+      if (vids != null) _readVideoIds.addAll(vids);
+      final notifs = prefs.getStringList('laasya_read_notif_ids');
+      if (notifs != null) _readNotifIds.addAll(notifs);
+      _readStateLoaded = true;
+    } catch (_) {}
+  }
+
+  Future<void> _saveReadMessages() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('laasya_read_message_ids', _readMessageIds.toList());
+      await prefs.setStringList('laasya_read_notif_ids', _readNotifIds.toList());
+    } catch (_) {}
+  }
+
+  Future<void> _saveReadVideos() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('laasya_read_video_ids', _readVideoIds.toList());
+      await prefs.setStringList('laasya_read_notif_ids', _readNotifIds.toList());
+    } catch (_) {}
+  }
+
   int getUnreadMessagesCount() {
+    if (!_readStateLoaded) {
+      _ensureReadStateLoaded();
+    }
     final list = _cachedMessageAnnouncements.isNotEmpty ? _cachedMessageAnnouncements : _mockMessageAnnouncements;
     return list.where((m) => !_readMessageIds.contains(m['id']?.toString())).length;
   }
 
   int getUnreadVideosCount() {
+    if (!_readStateLoaded) {
+      _ensureReadStateLoaded();
+    }
     final videoAlerts = _cachedNotifications.where((n) {
       final t = (n['type'] ?? '').toString();
       return t == 'video' || t == 'video_shared';
@@ -1468,6 +1507,7 @@ class SupabaseService {
   void markMessageAsRead(String id) {
     _readMessageIds.add(id);
     _readNotifIds.add(id);
+    _saveReadMessages();
   }
 
   void markAllMessagesAsRead() {
@@ -1479,11 +1519,13 @@ class SupabaseService {
         _readNotifIds.add(id);
       }
     }
+    _saveReadMessages();
   }
 
   void markVideoAsRead(String id) {
     _readVideoIds.add(id);
     _readNotifIds.add(id);
+    _saveReadVideos();
   }
 
   void markAllVideosAsRead() {
@@ -1494,6 +1536,7 @@ class SupabaseService {
         _readNotifIds.add(id);
       }
     }
+    _saveReadVideos();
   }
 
   Future<List<Map<String, dynamic>>> getNotifications() async {

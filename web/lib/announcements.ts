@@ -309,16 +309,27 @@ export async function createAnnouncement(data: {
   ]);
 
   try {
+    const isGuru = data.sender_role === 'trainer' || Boolean(data.trainer_id);
+    const senderRoleName = isGuru ? 'Guru' : 'Admin';
+    const senderFullName = isGuru ? (data.trainer_name || 'Guru') : (data.created_by || 'Admin / Director');
+    const alertCourseTitle = isGuru
+      ? `New Announcement from Guru: ${data.title.trim()}`
+      : `New Announcement from Admin: ${data.title.trim()}`;
+    const previewMessage = data.message.trim().length > 140 
+      ? `${data.message.trim().substring(0, 137)}...` 
+      : data.message.trim();
+    const alertMessage = `${previewMessage} (Shared by ${senderFullName} [${senderRoleName}])`;
+
     await query(`
       INSERT INTO public.session_alerts (
         batch_id, batch_name, course_title, trainer_name, message, alert_type, created_at
-      ) VALUES ($1, $2, $3, $4, $5, 'message', NOW());
+      ) VALUES ($1, $2, $3, $4, $5, 'announcement', NOW());
     `, [
       validBatchId || 'all',
       data.target_batch_name || 'All Batches',
-      data.title.trim(),
-      data.trainer_name || data.created_by || 'Academy Administration',
-      data.message.trim()
+      alertCourseTitle,
+      senderFullName,
+      alertMessage
     ]);
   } catch (alertErr) {
     console.warn('Could not insert session_alert copy for announcement:', alertErr);

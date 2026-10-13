@@ -178,11 +178,26 @@ class LaasyaAlertService : Service() {
             .setContentTitle("Laasya Cultural Academy")
             .setContentText("Live class completion & pickup alerts active")
             .setPriority(NotificationCompat.PRIORITY_MIN)
-            .setOngoing(true)
+            .setOngoing(false)
+            .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
 
         startForeground(NOTIF_ID_FOREGROUND, notif)
+
+        // Remove the persistent monitoring notification immediately so it does not stay permanently in the notification tray
+        mainHandler.postDelayed({
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+                val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                nm.cancel(NOTIF_ID_FOREGROUND)
+            } catch (_: Exception) {}
+        }, 250L)
     }
 
     private fun saveMonitoringConfig(studentId: String, rollNumber: String, name: String, phone: String, batchIds: String) {

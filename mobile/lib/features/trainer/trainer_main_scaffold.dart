@@ -74,11 +74,16 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
           IconButton(
             icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
             tooltip: 'Guru Notices',
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const TrainerNotificationsScreen()),
               );
+              if (result is Map && mounted) {
+                if (result['action'] == 'switch_tab' && result['index'] is int) {
+                  setState(() => _currentIndex = result['index']);
+                }
+              }
             },
           ),
         ],
