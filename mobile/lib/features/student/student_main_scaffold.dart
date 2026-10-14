@@ -41,7 +41,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     _checkInitialNotificationRoute();
     AlarmService.setNotificationOpenedHandler(_handleNotificationOpened);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) PermissionService.promptRequiredPermissions(context);
+      if (mounted) PermissionService.promptRequiredPermissions(context, role: 'student');
     });
   }
 
@@ -119,6 +119,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     _isPolling = true;
     try {
       final prof = SupabaseService().currentUserProfile;
+      if (prof?['role'] != 'student') return;
       final enrolled = prof?['enrolled_courses'];
       final studentId = (prof?['id'] ?? prof?['profile_id'] ?? '').toString();
       final rollNumber = (prof?['roll_number'] ?? '').toString();
@@ -460,6 +461,8 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   }
 
   void _onClassClosedAlert() {
+    final prof = SupabaseService().currentUserProfile;
+    if (prof?['role'] != 'student') return;
     final alertData = TrainerDataStore.classClosedAlertNotifier.value;
     if (alertData == null || !mounted) return;
 
@@ -552,6 +555,8 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   }
 
   void _showClassClosedAttentionAlarm(Map<String, dynamic> alertData) {
+    final prof = SupabaseService().currentUserProfile;
+    if (prof?['role'] != 'student') return;
     final courseTitle = alertData['course_title'] ?? 'Classical Dance';
     final batchName = alertData['batch_name'] ?? 'Class Session';
 

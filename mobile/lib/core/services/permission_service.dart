@@ -2,48 +2,56 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/colors.dart';
-import 'alarm_service.dart';
 
 class PermissionService {
-  static const String _prefKey = 'laasya_permissions_prompted_v3';
+  static const String _prefStudentNotifPrompted = 'laasya_student_notif_prompted_v4';
+  static const String _prefTrainerNotifPrompted = 'laasya_trainer_notif_prompted_v4';
   static bool _dialogShowing = false;
 
-  /// Proactively prompts the user if critical notifications or background battery exemption are missing.
-  /// Called upon login into StudentMainScaffold or TrainerMainScaffold.
-  static Future<void> promptRequiredPermissions(BuildContext context) async {
+  /// Requests notification permission only when needed, with a clear explanation.
+  /// Respects the user's choice: if denied or dismissed, does not repeatedly prompt.
+  /// Does NOT force background execution or battery-optimization exemptions.
+  static Future<void> promptRequiredPermissions(BuildContext context, {required String role}) async {
     try {
-      final notifGranted = await Permission.notification.isGranted;
-      final batteryIgnored = await AlarmService.isIgnoringBatteryOptimizations();
-
-      if (notifGranted && batteryIgnored) {
-        return; // All required permissions already active!
-      }
+      final isStudent = role.toLowerCase() == 'student';
+      final prefKey = isStudent ? _prefStudentNotifPrompted : _prefTrainerNotifPrompted;
 
       final prefs = await SharedPreferences.getInstance();
-      final hasPrompted = prefs.getBool(_prefKey) ?? false;
-      if (hasPrompted && notifGranted) {
+      final hasPrompted = prefs.getBool(prefKey) ?? false;
+      if (hasPrompted) {
+        return; // Respect the user's previous choice; do not repeatedly ask!
+      }
+
+      final notifGranted = await Permission.notification.isGranted;
+      if (notifGranted) {
+        await prefs.setBool(prefKey, true);
         return;
       }
 
       if (!context.mounted || _dialogShowing) return;
       _dialogShowing = true;
 
+      final title = isStudent ? 'Class Alerts & Attendance Notifications' : 'Academy Notices & Circulars';
+      final description = isStudent
+          ? 'Enable notifications to receive class completion alerts ("Class is over, hooray hooray!") and daily attendance confirmations from your Guru.'
+          : 'Enable notifications to receive official circulars, student inquiries, and academy announcements from the Director.';
+
       await showDialog<void>(
         context: context,
-        barrierDismissible: false,
+        barrierDismissible: true,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
           titlePadding: const EdgeInsets.fromLTRB(22, 22, 22, 10),
           contentPadding: const EdgeInsets.fromLTRB(22, 10, 22, 16),
           actionsPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.notifications_active_rounded, color: LaasyaColors.primary, size: 26),
-              SizedBox(width: 10),
+              const Icon(Icons.notifications_active_rounded, color: LaasyaColors.primary, size: 24),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Alert Permissions Required',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16.5, color: LaasyaColors.textDark),
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: LaasyaColors.textDark),
                 ),
               ),
             ],
@@ -52,62 +60,57 @@ class PermissionService {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'To guarantee that you receive real-time class conclusion alerts, pickup chimes ("Class is over, hooray hooray!"), and notices even when the app is closed, please grant these permissions:',
-                style: TextStyle(fontSize: 12.5, color: Colors.black87, height: 1.4),
+              Text(
+                description,
+                style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.45),
               ),
-              const SizedBox(height: 16),
-              _permRow(
-                Icons.notifications_active_rounded,
-                'System Notifications & Alarms',
-                'Sounds vocal alert and vibrates when class concludes to notify parents for pickup, even outside the app.',
-                const Color(0xFFC2410C),
-                const Color(0xFFFFEDD5),
-              ),
-              const SizedBox(height: 12),
-              _permRow(
-                Icons.battery_charging_full_rounded,
-                'Background Activity (Unrestricted)',
-                'Allows alert monitoring when the app is closed or device is locked without being killed by Android power saving.',
-                const Color(0xFF0D7446),
-                const Color(0xFFDEF7EC),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF2F8),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.notifications_outlined, size: 20, color: LaasyaColors.primary),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      isStudent
+                          ? 'Pickup chime and attendance confirmation will be shown as heads-up alerts.'
+                          : 'Administrative broadcasts and circulars will be delivered directly.',
+                      style: const TextStyle(fontSize: 11.5, color: Colors.black54, height: 1.35),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           actions: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () async {
-                      Navigator.pop(ctx);
-                      final p = await SharedPreferences.getInstance();
-                      await p.setBool(_prefKey, true);
-                    },
-                    child: const Text('Later', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      Navigator.pop(ctx);
-                      final p = await SharedPreferences.getInstance();
-                      await p.setBool(_prefKey, true);
-                      await _grantAllPermissionsInternal();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: LaasyaColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      elevation: 2,
-                    ),
-                    child: const Text('Allow Permissions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                  ),
-                ),
-              ],
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final p = await SharedPreferences.getInstance();
+                await p.setBool(prefKey, true); // Respect choice: don't ask again!
+              },
+              child: const Text('Not Now', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final p = await SharedPreferences.getInstance();
+                await p.setBool(prefKey, true);
+                await Permission.notification.request();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: LaasyaColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Allow Notifications', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -120,25 +123,8 @@ class PermissionService {
   }
 
   /// Requests all necessary permissions once after install / first launch.
-  static Future<void> requestAppPermissions(BuildContext context) async {
-    await promptRequiredPermissions(context);
-  }
-
-  /// Internal handler that requests clean system permissions natively and via permission_handler
-  static Future<void> _grantAllPermissionsInternal() async {
-    try {
-      // 1. Native Android batch request (POST_NOTIFICATIONS, CAMERA, READ_MEDIA_IMAGES / STORAGE)
-      await AlarmService.requestAllPermissions();
-
-      // 2. Fallback request via permission_handler
-      await [
-        Permission.notification,
-        Permission.camera,
-        Permission.photos,
-      ].request();
-    } catch (e) {
-      debugPrint('Error granting permissions: $e');
-    }
+  static Future<void> requestAppPermissions(BuildContext context, {String role = 'student'}) async {
+    await promptRequiredPermissions(context, role: role);
   }
 
   /// Shows permissions dialog on demand from Settings screen
@@ -165,8 +151,8 @@ class PermissionService {
             const SizedBox(height: 14),
             _permRow(
               Icons.notifications_active_rounded,
-              'Notifications & Alarms',
-              'To sound attention alarms when class concludes and receive attendance updates.',
+              'Notifications',
+              'To receive class conclusion alerts and circulars.',
               const Color(0xFFC2410C),
               const Color(0xFFFFEDD5),
             ),
@@ -188,7 +174,6 @@ class PermissionService {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await _grantAllPermissionsInternal();
               await openAppSettings();
             },
             style: ElevatedButton.styleFrom(

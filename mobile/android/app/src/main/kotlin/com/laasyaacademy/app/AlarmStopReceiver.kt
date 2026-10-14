@@ -7,6 +7,5 @@ import android.content.Intent
 class AlarmStopReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         MainActivity.stopActiveAlarm()
-        LaasyaAlertService.stopActiveAlarm()
     }
 }

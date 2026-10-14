@@ -42,6 +42,7 @@ class MainActivity: FlutterActivity() {
 
         const val NOTIF_ID_ALARM = 1001
         const val NOTIF_ID_ATTENDANCE = 1002
+        const val NOTIF_ID_NOTICE = 1003
 
         var activeInstance: MainActivity? = null
 
@@ -136,7 +137,6 @@ class MainActivity: FlutterActivity() {
                 }
                 "stopAlarmRing" -> {
                     stopAlarm()
-                    LaasyaAlertService.stopActiveAlarm()
                     result.success(true)
                 }
                 "showAttendanceNotification" -> {
@@ -145,6 +145,13 @@ class MainActivity: FlutterActivity() {
                     val isPresent = call.argument<Boolean>("isPresent") ?: true
 
                     showAttendanceNotification(title, message, isPresent)
+                    result.success(true)
+                }
+                "showNoticeNotification" -> {
+                    val title = call.argument<String>("title") ?: "Academy Notice"
+                    val message = call.argument<String>("message") ?: "New announcement published."
+
+                    showNoticeNotification(title, message)
                     result.success(true)
                 }
                 "requestNotificationPermission" -> {
@@ -156,45 +163,15 @@ class MainActivity: FlutterActivity() {
                     result.success(true)
                 }
                 "requestBatteryOptimization" -> {
-                    requestBatteryOptimization()
                     result.success(true)
                 }
                 "isIgnoringBatteryOptimizations" -> {
-                    result.success(isIgnoringBatteryOptimizations())
+                    result.success(true)
                 }
                 "startBackgroundAlertService" -> {
-                    val role = call.argument<String>("role") ?: "student"
-                    val studentId = call.argument<String>("student_id") ?: ""
-                    val rollNumber = call.argument<String>("roll_number") ?: ""
-                    val name = call.argument<String>("name") ?: ""
-                    val phone = call.argument<String>("phone") ?: ""
-                    val batchIds = call.argument<String>("batch_ids") ?: "all"
-
-                    val serviceIntent = Intent(this, LaasyaAlertService::class.java).apply {
-                        action = LaasyaAlertService.ACTION_START_MONITORING
-                        putExtra("role", role)
-                        putExtra("student_id", studentId)
-                        putExtra("roll_number", rollNumber)
-                        putExtra("name", name)
-                        putExtra("phone", phone)
-                        putExtra("batch_ids", batchIds)
-                    }
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            startForegroundService(serviceIntent)
-                        } else {
-                            startService(serviceIntent)
-                        }
-                    } catch (_: Exception) {}
                     result.success(true)
                 }
                 "stopBackgroundAlertService" -> {
-                    val serviceIntent = Intent(this, LaasyaAlertService::class.java).apply {
-                        action = LaasyaAlertService.ACTION_STOP_MONITORING
-                    }
-                    try {
-                        startService(serviceIntent)
-                    } catch (_: Exception) {}
                     result.success(true)
                 }
                 "markAlertProcessed" -> {
@@ -263,37 +240,13 @@ class MainActivity: FlutterActivity() {
         if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), 102)
         }
-
-        requestBatteryOptimization()
     }
 
     private fun requestBatteryOptimization() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
-            if (pm != null && !pm.isIgnoringBatteryOptimizations(packageName)) {
-                try {
-                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = Uri.parse("package:$packageName")
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    startActivity(intent)
-                } catch (_: Exception) {
-                    try {
-                        val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        }
-                        startActivity(intent)
-                    } catch (_: Exception) {}
-                }
-            }
-        }
+        // Battery optimization exemption is not forced or repeatedly requested
     }
 
     private fun isIgnoringBatteryOptimizations(): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
-            return pm?.isIgnoringBatteryOptimizations(packageName) ?: true
-        }
         return true
     }
 
@@ -485,6 +438,38 @@ class MainActivity: FlutterActivity() {
             .build()
 
         nm.notify(NOTIF_ID_ATTENDANCE, notif)
+    }
+
+    private fun showNoticeNotification(title: String, message: String) {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        ensureNotificationChannels(this)
+
+        val appIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("route", "/announcements")
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this, 3, appIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        )
+
+        val logo = try {
+            BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+        } catch (_: Exception) { null }
+
+        val notif = NotificationCompat.Builder(this, CHANNEL_NOTICES)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setLargeIcon(logo)
+            .setColor(0xFF8A064D.toInt())
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        nm.notify(NOTIF_ID_NOTICE, notif)
     }
 
     private fun ensureNotificationChannels(context: Context) {

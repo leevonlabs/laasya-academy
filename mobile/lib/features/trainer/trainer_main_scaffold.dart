@@ -33,12 +33,11 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
   @override
   void initState() {
     super.initState();
-    _startBackgroundAlertService();
     _startNetworkAlertPolling();
     _checkInitialNotificationRoute();
     AlarmService.setNotificationOpenedHandler(_handleNotificationOpened);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) PermissionService.promptRequiredPermissions(context);
+      if (mounted) PermissionService.promptRequiredPermissions(context, role: 'trainer');
     });
   }
 
@@ -46,24 +45,6 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
   void dispose() {
     _alertPollTimer?.cancel();
     super.dispose();
-  }
-
-  Future<void> _startBackgroundAlertService() async {
-    try {
-      final prof = SupabaseService().currentUserProfile;
-      final trainerId = (prof?['id'] ?? prof?['profile_id'] ?? '').toString();
-      final trainerName = (prof?['full_name'] ?? 'Guru').toString();
-      final phone = (prof?['phone'] ?? '').toString();
-
-      await AlarmService.startBackgroundAlertService(
-        role: 'trainer',
-        studentId: trainerId,
-        rollNumber: trainerId,
-        name: trainerName,
-        phone: phone,
-        batchIds: 'all',
-      );
-    } catch (_) {}
   }
 
   void _startNetworkAlertPolling() {
@@ -144,6 +125,8 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
 
     final title = alert['course_title'] ?? alert['title'] ?? 'Academy Notice';
     final msg = alert['message'] ?? 'New administrative circular posted.';
+
+    AlarmService.showNoticeNotification(title: title, message: msg);
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).clearSnackBars();

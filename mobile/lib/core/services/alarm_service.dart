@@ -55,6 +55,19 @@ class AlarmService {
     } catch (_) {}
   }
 
+  /// Shows a high-priority system notification for circulars, notices, and announcements.
+  static Future<void> showNoticeNotification({
+    required String title,
+    required String message,
+  }) async {
+    try {
+      await _channel.invokeMethod('showNoticeNotification', {
+        'title': title,
+        'message': message,
+      });
+    } catch (_) {}
+  }
+
   /// Requests runtime notification permission on Android 13+ (API 33+) and iOS
   static Future<void> requestNotificationPermission() async {
     try {
@@ -62,32 +75,20 @@ class AlarmService {
     } catch (_) {}
   }
 
-  /// Requests all required permissions (Notifications, Camera, Media)
+  /// Requests standard permissions (Notifications, Camera, Media)
   static Future<void> requestAllPermissions() async {
     try {
       await _channel.invokeMethod('requestAllPermissions');
     } catch (_) {}
   }
 
-  /// Prompts user to exempt app from battery optimizations so alarms ring even when app is closed / phone locked
-  static Future<void> requestBatteryOptimization() async {
-    try {
-      await _channel.invokeMethod('requestBatteryOptimization');
-    } catch (_) {}
-  }
+  /// Safe passive check; background battery exemption is not forced on users
+  static Future<void> requestBatteryOptimization() async {}
 
-  /// Checks if battery optimization is currently ignored
   static Future<bool> isIgnoringBatteryOptimizations() async {
-    try {
-      final res = await _channel.invokeMethod<bool>('isIgnoringBatteryOptimizations');
-      return res ?? true;
-    } catch (_) {
-      return true;
-    }
+    return true;
   }
 
-  /// Starts the persistent background alert service (START_STICKY) that monitors
-  /// class completion alerts even when the app is closed, killed, or swiped from recent history.
   static Future<void> startBackgroundAlertService({
     String role = 'student',
     required String studentId,
@@ -95,25 +96,9 @@ class AlarmService {
     required String name,
     required String phone,
     required String batchIds,
-  }) async {
-    try {
-      await _channel.invokeMethod('startBackgroundAlertService', {
-        'role': role,
-        'student_id': studentId,
-        'roll_number': rollNumber,
-        'name': name,
-        'phone': phone,
-        'batch_ids': batchIds,
-      });
-    } catch (_) {}
-  }
+  }) async {}
 
-  /// Stops the background alert service (e.g. upon user sign out)
-  static Future<void> stopBackgroundAlertService() async {
-    try {
-      await _channel.invokeMethod('stopBackgroundAlertService');
-    } catch (_) {}
-  }
+  static Future<void> stopBackgroundAlertService() async {}
 
   /// Marks an alert as processed in the native SharedPreferences so it skips duplicates
   static Future<void> markAlertProcessed(String alertId) async {

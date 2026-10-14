@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
-import '../../core/services/alarm_service.dart';
 import 'trainer_data_store.dart';
 
 class TrainerTakeAttendanceScreen extends StatefulWidget {
@@ -259,9 +258,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // Play custom vocal pickup chime immediately on Guru's device
-              AlarmService.playClassCompletedSound();
-
+              // Broadcast session closure to server so enrolled students & parents are notified
               setState(() {
                 _store.closeClassSession(
                   batchId: _batchId,
