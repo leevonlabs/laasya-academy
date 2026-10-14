@@ -34,6 +34,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
+import MonthPicker from '@/components/common/MonthPicker';
 import { downloadStudentFeeInvoicePdf } from '@/lib/pdf';
 
 interface Props {
@@ -82,7 +83,7 @@ export default function StudentFeesClient({
   const [collectionsSearch, setCollectionsSearch] = useState('');
   const [collectionsStatusFilter, setCollectionsStatusFilter] = useState<'all' | 'pending' | 'partial' | 'paid'>('all');
   const [collectionsYear, setCollectionsYear] = useState<number>(2026);
-  const [collectionsMonth, setCollectionsMonth] = useState<number>(8); // 8 = September (0-indexed)
+  const [collectionsMonth, setCollectionsMonth] = useState<number>(9); // 9 = October (0-indexed)
 
   // -------------------------------------------------------------
   // 3. PAYMENTS PAGE STATE & FILTERS (Searchable Student Dropdown, No Pending Due)
@@ -93,6 +94,7 @@ export default function StudentFeesClient({
   const [isPaymentsStudentDropdownOpen, setIsPaymentsStudentDropdownOpen] = useState(false);
   const [paymentsStudentSearch, setPaymentsStudentSearch] = useState('');
   const paymentsStudentDropdownRef = useRef<HTMLDivElement>(null);
+  const [paymentsMonthLabel, setPaymentsMonthLabel] = useState<string>('All Months & Years');
   const [paymentStartDate, setPaymentStartDate] = useState('');
   const [paymentEndDate, setPaymentEndDate] = useState('');
 
@@ -212,7 +214,7 @@ export default function StudentFeesClient({
   }
 
   const collectionsData = useMemo<StudentCollectionRow[]>(() => {
-    const selectedMonthName = MONTHS[collectionsMonth].full;
+    const selectedMonthName = MONTHS[collectionsMonth].full.toLowerCase();
     const selectedMonthShort = MONTHS[collectionsMonth].short.toLowerCase();
     const selectedYearStr = collectionsYear.toString();
 
@@ -224,8 +226,10 @@ export default function StudentFeesClient({
         if (inv.student_id !== s.id) return false;
         
         const period = (inv.fee_period || '').toLowerCase();
-        if (period.includes(selectedMonthName.toLowerCase()) || 
-           (period.includes(selectedMonthShort) && period.includes(selectedYearStr))) {
+        // Check if fee_period matches BOTH the month AND the year
+        const matchesMonth = period.includes(selectedMonthName) || period.includes(selectedMonthShort);
+        const matchesYear = period.includes(selectedYearStr);
+        if (matchesMonth && matchesYear) {
           return true;
         }
 
@@ -239,7 +243,7 @@ export default function StudentFeesClient({
         return false;
       });
 
-      // Total paid in this selected month
+      // Total paid in this selected month & year
       let totalPaidInMonth = 0;
       if (matchingInvoices.length > 0) {
         totalPaidInMonth = matchingInvoices.reduce((sum, inv) => sum + Number(inv.paid_amount || 0), 0);
@@ -258,13 +262,19 @@ export default function StudentFeesClient({
       let status: 'paid' | 'partial' | 'pending' = 'pending';
       let statusLabel = 'Pending Due';
 
-      if (due <= 0 && (totalPaidInMonth > 0 || advancePaid > 0)) {
-        status = 'paid';
-        statusLabel = due < 0 ? 'Advance Credit' : 'Paid & Settled';
-      } else if (totalPaidInMonth > 0 && due > 0) {
-        status = 'partial';
-        statusLabel = 'Partial Payment';
+      if (matchingInvoices.length > 0) {
+        if (due <= 0 || matchingInvoices.every(i => i.status === 'paid')) {
+          status = 'paid';
+          statusLabel = due < 0 ? 'Advance Credit' : 'Paid & Settled';
+        } else if (totalPaidInMonth > 0) {
+          status = 'partial';
+          statusLabel = 'Partial Payment';
+        } else {
+          status = 'pending';
+          statusLabel = 'Pending Due';
+        }
       } else {
+        // No invoice for this year/month: strictly Pending Due
         status = 'pending';
         statusLabel = 'Pending Due';
       }
@@ -705,65 +715,33 @@ For queries, contact: +91 8151 998 899`;
       {activeTab === 'collections' && (
         <div className="space-y-6">
 
-          {/* Month & Year Selection Filter for Collections Audit */}
-          <div className="bg-white p-4.5 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center shrink-0">
+          {/* Month & Year Selection Filter for Collections Audit (MonthPicker from Reference Image 2) */}
+          <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center shrink-0">
                 <Calendar className="w-5 h-5 text-[#8A064D]" />
               </div>
               <div>
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Collection Period Audit</span>
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base font-black text-[#2D041A]">{MONTHS[collectionsMonth].full} {collectionsYear}</span>
-                  <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-0.5 rounded-full font-bold">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black text-[#2D041A]">{MONTHS[collectionsMonth].full} {collectionsYear}</span>
+                  <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2 py-0.5 rounded-full font-bold">
                     Due: {collectionsMonthDueDate}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Year Navigator */}
-              <div className="flex items-center bg-gray-50 border border-gray-200 rounded-2xl p-1">
-                <button
-                  type="button"
-                  onClick={() => setCollectionsYear(y => y - 1)}
-                  className="px-2.5 py-1 hover:bg-white text-gray-600 rounded-xl transition cursor-pointer font-black text-xs"
-                  title="Previous Year"
-                >
-                  «
-                </button>
-                <span className="px-3.5 text-xs font-black text-[#2D041A]">{collectionsYear}</span>
-                <button
-                  type="button"
-                  onClick={() => setCollectionsYear(y => y + 1)}
-                  className="px-2.5 py-1 hover:bg-white text-gray-600 rounded-xl transition cursor-pointer font-black text-xs"
-                  title="Next Year"
-                >
-                  »
-                </button>
-              </div>
-
-              {/* Month Pills */}
-              <div className="flex items-center gap-1 overflow-x-auto p-1 bg-gray-50 border border-gray-200 rounded-2xl scrollbar-none">
-                {MONTHS.map((m) => {
-                  const isSelected = collectionsMonth === m.num;
-                  return (
-                    <button
-                      key={m.short}
-                      type="button"
-                      onClick={() => setCollectionsMonth(m.num)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#8A064D] text-white shadow-xs'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-white'
-                      }`}
-                    >
-                      {m.short}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="flex items-center gap-2">
+              <MonthPicker
+                value={`${MONTHS[collectionsMonth].full} ${collectionsYear}`}
+                onChange={(monthLabel, yearMonthKey) => {
+                  const [yrStr, moStr] = yearMonthKey.split('-');
+                  setCollectionsYear(parseInt(yrStr, 10));
+                  setCollectionsMonth(parseInt(moStr, 10) - 1);
+                }}
+                align="right"
+              />
             </div>
           </div>
 
@@ -893,24 +871,26 @@ For queries, contact: +91 8151 998 899`;
 
           </div>
 
-          {/* Collections Table (Student Name & ID, Total Monthly Fee, Total Paid Amount, Balance Due, Status, ONLY Collect Button) */}
+          {/* Collections Table (Roll Number, Student Name, Phone Number, Total Monthly Fee, Total Paid Amount, Balance Due, Status, Action) */}
           <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-[#FFF9FB] border-b border-[#F0D5E4] text-[#590231] font-bold text-xs uppercase tracking-wider">
-                    <th className="py-4 px-5">Student Name & ID</th>
-                    <th className="py-4 px-5 text-right">Total Monthly Fee</th>
-                    <th className="py-4 px-5 text-right">Total Paid Amount</th>
-                    <th className="py-4 px-5 text-right">Balance Due</th>
-                    <th className="py-4 px-5 text-center">Status</th>
-                    <th className="py-4 px-5 text-right">Action</th>
+                    <th className="py-3.5 px-4">Roll Number</th>
+                    <th className="py-3.5 px-4">Student Name</th>
+                    <th className="py-3.5 px-4">Phone Number</th>
+                    <th className="py-3.5 px-4 text-right">Total Monthly Fee</th>
+                    <th className="py-3.5 px-4 text-right">Total Paid Amount</th>
+                    <th className="py-3.5 px-4 text-right">Balance Due</th>
+                    <th className="py-3.5 px-4 text-center">Status</th>
+                    <th className="py-3.5 px-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {filteredCollections.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-gray-400">
+                      <td colSpan={8} className="py-12 text-center text-gray-400">
                         <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                         <p className="font-bold text-gray-600">No students match your filter criteria.</p>
                         <p className="text-xs text-gray-400 mt-1">Try switching filters or clearing the search query.</p>
@@ -924,19 +904,23 @@ For queries, contact: +91 8151 998 899`;
                       return (
                         <tr key={row.studentId} className="hover:bg-[#FFFDFC] transition">
                           
-                          {/* 1. Student Name & ID */}
-                          <td className="py-4 px-5">
-                            <div className="flex items-center gap-3">
-                              <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg shrink-0">
-                                {row.rollNumber}
-                              </span>
-                              <div>
-                                <span className="font-bold text-gray-900 block text-sm">{row.studentName}</span>
-                                <span className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
-                                  <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                                  <span>{row.phone}</span>
-                                </span>
-                              </div>
+                          {/* 1. Roll Number */}
+                          <td className="py-3.5 px-4">
+                            <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg shrink-0">
+                              {row.rollNumber}
+                            </span>
+                          </td>
+
+                          {/* 2. Student Name */}
+                          <td className="py-3.5 px-4">
+                            <span className="font-bold text-gray-900 block text-sm">{row.studentName}</span>
+                          </td>
+
+                          {/* 3. Phone Number */}
+                          <td className="py-3.5 px-4 text-xs text-gray-600 font-medium whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>{row.phone || '—'}</span>
                             </div>
                           </td>
 
@@ -1215,21 +1199,21 @@ For queries, contact: +91 8151 998 899`;
                   )}
                 </div>
 
-                {/* Date Range Quick Filter with align="left" to prevent table overlap */}
+                {/* Month & Year Filter using MonthPicker (Reference Image 2) */}
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-gray-700 flex items-center gap-1.5">
                     <CalendarRange className="w-3.5 h-3.5 text-[#8A064D]" />
-                    <span>Payment Period:</span>
+                    <span>Payment Month:</span>
                   </span>
-                  <DateRangeQuickFilter
-                    startDate={paymentStartDate}
-                    endDate={paymentEndDate}
-                    align="left"
-                    onApply={({ startDate, endDate }) => {
-                      setPaymentStartDate(startDate);
-                      setPaymentEndDate(endDate);
+                  <MonthPicker
+                    value={paymentsMonthLabel === 'All Months & Years' ? '' : paymentsMonthLabel}
+                    onChange={(monthLabel, yearMonthKey, sDate, eDate) => {
+                      setPaymentsMonthLabel(monthLabel);
+                      setPaymentStartDate(sDate);
+                      setPaymentEndDate(eDate);
                     }}
-                    placeholder="Select Date Range (All Payments)"
+                    align="left"
+                    placeholder="All Months & Years"
                   />
                 </div>
               </div>
@@ -1238,6 +1222,7 @@ For queries, contact: +91 8151 998 899`;
                 <button
                   type="button"
                   onClick={() => {
+                    setPaymentsMonthLabel('All Months & Years');
                     setPaymentStartDate('');
                     setPaymentEndDate('');
                     setPaymentsStudentFilter('all');
@@ -1251,27 +1236,29 @@ For queries, contact: +91 8151 998 899`;
 
           </div>
 
-          {/* Payments Table (Student Name & ID, Invoice Number, Amount Paid, Due, Status, Actions: Edit, View, Share WhatsApp) */}
+          {/* Payments Table (Roll Number, Student Name, Phone Number, Invoice Number, Amount Paid, Due, Status, Actions) */}
           <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-[#FFF9FB] border-b border-[#F0D5E4] text-[#590231] font-bold text-xs uppercase tracking-wider">
-                    <th className="py-4 px-5">Student Name & ID</th>
-                    <th className="py-4 px-5">Invoice Number</th>
-                    <th className="py-4 px-5 text-right">Amount Paid</th>
-                    <th className="py-4 px-5 text-right">Due</th>
-                    <th className="py-4 px-5 text-center">Status</th>
-                    <th className="py-4 px-5 text-right">Actions</th>
+                    <th className="py-3.5 px-4">Roll Number</th>
+                    <th className="py-3.5 px-4">Student Name</th>
+                    <th className="py-3.5 px-4">Phone Number</th>
+                    <th className="py-3.5 px-4">Invoice Number</th>
+                    <th className="py-3.5 px-4 text-right">Amount Paid</th>
+                    <th className="py-3.5 px-4 text-right">Due</th>
+                    <th className="py-3.5 px-4 text-center">Status</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {filteredInvoices.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-gray-400">
+                      <td colSpan={8} className="py-12 text-center text-gray-400">
                         <Receipt className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                         <p className="font-bold text-gray-600">No payments found matching your filter criteria.</p>
-                        <p className="text-xs text-gray-400 mt-1">Try resetting the student or date range filter.</p>
+                        <p className="text-xs text-gray-400 mt-1">Try resetting the student or month filter.</p>
                       </td>
                     </tr>
                   ) : (
@@ -1282,18 +1269,26 @@ For queries, contact: +91 8151 998 899`;
                       return (
                         <tr key={inv.id} className="hover:bg-[#FFFDFC] transition">
                           
-                          {/* 1. Student Name & ID */}
-                          <td className="py-4 px-5">
-                            <div className="flex items-center gap-3">
-                              <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg shrink-0">
-                                {inv.roll_number}
-                              </span>
-                              <div>
-                                <span className="font-bold text-gray-900 block text-sm">{inv.student_name}</span>
-                                <span className="text-xs text-gray-500 block mt-0.5">
-                                  {inv.course_title}
-                                </span>
-                              </div>
+                          {/* 1. Roll Number */}
+                          <td className="py-3.5 px-4">
+                            <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg shrink-0">
+                              {inv.roll_number}
+                            </span>
+                          </td>
+
+                          {/* 2. Student Name */}
+                          <td className="py-3.5 px-4">
+                            <span className="font-bold text-gray-900 block text-sm">{inv.student_name}</span>
+                            <span className="text-xs text-gray-500 block mt-0.5">
+                              {inv.course_title}
+                            </span>
+                          </td>
+
+                          {/* 3. Phone Number */}
+                          <td className="py-3.5 px-4 text-xs text-gray-600 font-medium whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>{inv.phone || '—'}</span>
                             </div>
                           </td>
 

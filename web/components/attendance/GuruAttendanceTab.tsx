@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { GuruAttendanceAuditRecord, Course, Trainer } from '@/lib/academy';
 import CourseMultiSearchSelect, { CourseOption } from '@/components/common/CourseMultiSearchSelect';
 import BatchMultiSearchSelect, { BatchOption } from '@/components/common/BatchMultiSearchSelect';
+import MonthPicker from '@/components/common/MonthPicker';
 import { 
   GraduationCap, 
   Search, 
@@ -73,6 +74,8 @@ export default function GuruAttendanceTab({
   const [detailSelectedBatchIds, setDetailSelectedBatchIds] = useState<string[]>([]);
   const [detailStatusFilter, setDetailStatusFilter] = useState<'all' | 'present' | 'absent' | 'upcoming'>('all');
   const [detailDatePreset, setDetailDatePreset] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'>('all');
+  const [detailMonthLabel, setDetailMonthLabel] = useState('');
+  const [detailYearMonth, setDetailYearMonth] = useState('');
   const [detailStartDate, setDetailStartDate] = useState('');
   const [detailEndDate, setDetailEndDate] = useState('');
   const [detailSearchQuery, setDetailSearchQuery] = useState('');
@@ -313,9 +316,13 @@ export default function GuruAttendanceTab({
         if (r.guru_status !== detailStatusFilter) return false;
       }
 
-      // 4. Date Range Filter
-      if (detailStartDate && r.session_date < detailStartDate) return false;
-      if (detailEndDate && r.session_date > detailEndDate) return false;
+      // 4. Date Range Filter (via MonthPicker)
+      if (detailYearMonth && r.session_date) {
+        if (!r.session_date.startsWith(detailYearMonth)) return false;
+      } else {
+        if (detailStartDate && r.session_date < detailStartDate) return false;
+        if (detailEndDate && r.session_date > detailEndDate) return false;
+      }
 
       // 5. Search Text
       if (detailSearchQuery.trim()) {
@@ -333,6 +340,7 @@ export default function GuruAttendanceTab({
     detailSelectedCourseIds,
     detailSelectedBatchIds,
     detailStatusFilter,
+    detailYearMonth,
     detailStartDate,
     detailEndDate,
     detailSearchQuery
@@ -407,6 +415,8 @@ export default function GuruAttendanceTab({
     setDetailSelectedBatchIds([]);
     setDetailStatusFilter('all');
     setDetailDatePreset('all');
+    setDetailMonthLabel('');
+    setDetailYearMonth('');
     setDetailStartDate('');
     setDetailEndDate('');
     setDetailSearchQuery('');
@@ -523,52 +533,31 @@ export default function GuruAttendanceTab({
         </div>
 
         {/* 3. Comprehensive Filter Toolbar */}
-        <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs space-y-3">
+        <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
           
-          {/* Top Line: Presets & Reset */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="text-[11px] font-bold text-gray-500 mr-1 flex items-center gap-1">
-                <CalendarIcon className="w-3.5 h-3.5 text-[#8A064D]" />
-                <span>Date Range:</span>
-              </span>
-              {[
-                { id: 'all', label: 'All Dates' },
-                { id: 'today', label: 'Today' },
-                { id: 'yesterday', label: 'Yesterday' },
-                { id: 'week', label: 'Last 7 Days' },
-                { id: 'month', label: 'This Month' },
-              ].map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => applyDatePreset(p.id as any)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    detailDatePreset === p.id
-                      ? 'bg-[#8A064D] text-white shadow-2xs'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
+          {/* Top Line: Title & Reset */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-gray-100">
+            <h4 className="font-bold text-sm text-[#2D041A] flex items-center gap-2">
+              <Filter className="w-4 h-4 text-[#8A064D]" />
+              <span>Filter Faculty Attendance Records</span>
+            </h4>
 
-            {(detailSelectedCourseIds.length > 0 || detailSelectedBatchIds.length > 0 || detailStatusFilter !== 'all' || detailDatePreset !== 'all' || detailSearchQuery) && (
+            {(detailSelectedCourseIds.length > 0 || detailSelectedBatchIds.length > 0 || detailStatusFilter !== 'all' || detailMonthLabel || detailSearchQuery) && (
               <button
                 onClick={resetDetailFilters}
                 className="text-xs text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 cursor-pointer"
               >
-                <RotateCcw className="w-3 h-3" />
+                <RotateCcw className="w-3.5 h-3.5" />
                 <span>Reset Filters</span>
               </button>
             )}
           </div>
 
           {/* Filters Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-2 border-t border-gray-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             {/* 1. Multi-selection Searchable Course Filter */}
             <div>
-              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
                 Course Filter (Multi)
               </label>
               <CourseMultiSearchSelect
@@ -581,7 +570,7 @@ export default function GuruAttendanceTab({
 
             {/* 2. Multi-selection Searchable Batch Filter */}
             <div>
-              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
                 Batch Filter (Multi)
               </label>
               <BatchMultiSearchSelect
@@ -592,49 +581,38 @@ export default function GuruAttendanceTab({
               />
             </div>
 
-            {/* 3. Custom Date Inputs */}
+            {/* 3. Month & Year Filter (MonthPicker from Reference Image 2) */}
             <div>
-              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                From Date
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                Month & Year
               </label>
-              <input
-                type="date"
-                value={detailStartDate}
-                onChange={(e) => {
-                  setDetailStartDate(e.target.value);
-                  setDetailDatePreset('custom');
+              <MonthPicker
+                value={detailMonthLabel}
+                onChange={(label, ym, start, end) => {
+                  setDetailMonthLabel(label);
+                  setDetailYearMonth(ym);
+                  setDetailStartDate(start);
+                  setDetailEndDate(end);
                 }}
-                className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#8A064D]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                To Date
-              </label>
-              <input
-                type="date"
-                value={detailEndDate}
-                onChange={(e) => {
-                  setDetailEndDate(e.target.value);
-                  setDetailDatePreset('custom');
-                }}
-                className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#8A064D]"
+                align="left"
+                className="w-full"
+                triggerClassName="w-full justify-between"
+                placeholder="All Months & Years"
               />
             </div>
 
             {/* 4. Status Filter */}
             <div>
-              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
                 Status
               </label>
               <select
                 value={detailStatusFilter}
                 onChange={(e) => setDetailStatusFilter(e.target.value as any)}
-                className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                className="w-full px-3 py-2 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-[#8A064D] focus:bg-white cursor-pointer transition shadow-2xs"
               >
                 <option value="all">All Verdicts</option>
-                <option value="present">Present (Conducted)</option>
+                <option value="present">Present (Conducted & Closed)</option>
                 <option value="absent">Absent (Missed Roll-call)</option>
                 <option value="upcoming">Upcoming</option>
               </select>
@@ -642,15 +620,20 @@ export default function GuruAttendanceTab({
           </div>
 
           {/* Quick Search */}
-          <div className="relative pt-1">
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-3.5" />
-            <input
-              type="text"
-              placeholder="Search by batch name, hall or room..."
-              value={detailSearchQuery}
-              onChange={(e) => setDetailSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-4 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] font-medium"
-            />
+          <div className="relative pt-2 border-t border-gray-100 flex items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Quick search batch name, course title, hall or room..."
+                value={detailSearchQuery}
+                onChange={(e) => setDetailSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-4 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] font-medium"
+              />
+            </div>
+            <div className="text-xs text-gray-500 font-medium">
+              Showing <strong className="text-[#8A064D] font-bold">{currentGuruFilteredRecords.length}</strong> sessions
+            </div>
           </div>
 
         </div>

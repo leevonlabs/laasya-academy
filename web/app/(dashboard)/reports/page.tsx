@@ -20,7 +20,7 @@ export default async function ReportsPage() {
   ]);
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="w-full">
       <ReportsClient 
         courses={courses}
         batches={batches}

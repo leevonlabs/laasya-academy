@@ -42,6 +42,7 @@ import {
   Eye,
 } from 'lucide-react';
 import AiEnhanceButton from '@/components/common/AiEnhanceButton';
+import MonthPicker from '@/components/common/MonthPicker';
 import {
   CourseWithDetails,
   VideoLibraryItem,
@@ -89,15 +90,15 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
   const [subpageSelectedBatchIds, setSubpageSelectedBatchIds] = useState<string[]>([]);
   const [isSubmittingSubpageShare, setIsSubmittingSubpageShare] = useState(false);
 
-  // Subpage Previous Shared Links Filters (Month, Year, Search)
+  // Subpage Previous Shared Links Filters (Month & Year via MonthPicker, Search)
   const [subpageSearch, setSubpageSearch] = useState('');
-  const [subpageMonthFilter, setSubpageMonthFilter] = useState('all');
-  const [subpageYearFilter, setSubpageYearFilter] = useState('all');
+  const [subpageMonthLabel, setSubpageMonthLabel] = useState('');
+  const [subpageYearMonth, setSubpageYearMonth] = useState('');
 
   // All Videos Tab Filters
   const [allVideosSearch, setAllVideosSearch] = useState('');
-  const [allVideosMonthFilter, setAllVideosMonthFilter] = useState('all');
-  const [allVideosYearFilter, setAllVideosYearFilter] = useState('all');
+  const [allVideosMonthLabel, setAllVideosMonthLabel] = useState('');
+  const [allVideosYearMonth, setAllVideosYearMonth] = useState('');
 
   // Guru Share Tab Filters
   const [guruShareSearch, setGuruShareSearch] = useState('');
@@ -357,21 +358,16 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
         if (!matchTitle && !matchDesc && !matchBatch) return false;
       }
 
-      // Month filter
-      if (subpageMonthFilter !== 'all' && item.event_date) {
-        const m = (new Date(item.event_date).getMonth() + 1).toString();
-        if (m !== subpageMonthFilter) return false;
-      }
-
-      // Year filter
-      if (subpageYearFilter !== 'all' && item.event_date) {
-        const y = new Date(item.event_date).getFullYear().toString();
-        if (y !== subpageYearFilter) return false;
+      // Month & Year filter via MonthPicker
+      if (subpageYearMonth && item.event_date) {
+        const d = new Date(item.event_date);
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (ym !== subpageYearMonth) return false;
       }
 
       return true;
     });
-  }, [items, selectedCourseSubpage, subpageSearch, subpageMonthFilter, subpageYearFilter]);
+  }, [items, selectedCourseSubpage, subpageSearch, subpageYearMonth]);
 
   // All Videos Tab Filtered Items
   const allVideosFilteredItems = useMemo(() => {
@@ -385,19 +381,16 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
         if (!matchTitle && !matchDesc && !matchCourse && !matchBatch) return false;
       }
 
-      if (allVideosMonthFilter !== 'all' && item.event_date) {
-        const m = (new Date(item.event_date).getMonth() + 1).toString();
-        if (m !== allVideosMonthFilter) return false;
-      }
-
-      if (allVideosYearFilter !== 'all' && item.event_date) {
-        const y = new Date(item.event_date).getFullYear().toString();
-        if (y !== allVideosYearFilter) return false;
+      // Month & Year filter via MonthPicker
+      if (allVideosYearMonth && item.event_date) {
+        const d = new Date(item.event_date);
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (ym !== allVideosYearMonth) return false;
       }
 
       return true;
     });
-  }, [items, allVideosSearch, allVideosMonthFilter, allVideosYearFilter]);
+  }, [items, allVideosSearch, allVideosYearMonth]);
 
   // Distinct Gurus who have shared links
   const guruNames = useMemo(() => {
@@ -1349,40 +1342,24 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
 
                 {/* Month Filter */}
                 <div className="flex items-center gap-2">
-                  <select
-                    value={subpageMonthFilter}
-                    onChange={e => setSubpageMonthFilter(e.target.value)}
-                    className="px-3 py-2 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 focus:outline-hidden focus:ring-2 focus:ring-[#8A064D]/20 cursor-pointer"
-                  >
-                    {MONTHS.map(m => (
-                      <option key={`month-${m.value}`} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* Year Filter */}
-                  <select
-                    value={subpageYearFilter}
-                    onChange={e => setSubpageYearFilter(e.target.value)}
-                    className="px-3 py-2 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 focus:outline-hidden focus:ring-2 focus:ring-[#8A064D]/20 cursor-pointer"
-                  >
-                    <option value="all">All Years</option>
-                    {availableYears.filter(y => y !== 'all').map(y => (
-                      <option key={`year-${y}`} value={y}>
-                        Year {y}
-                      </option>
-                    ))}
-                  </select>
+                  <MonthPicker
+                    value={subpageMonthLabel}
+                    onChange={(label, ym) => {
+                      setSubpageMonthLabel(label);
+                      setSubpageYearMonth(ym);
+                    }}
+                    align="right"
+                    placeholder="All Months & Years"
+                  />
 
                   {/* Reset Filters button */}
-                  {(subpageSearch || subpageMonthFilter !== 'all' || subpageYearFilter !== 'all') && (
+                  {(subpageSearch || subpageYearMonth) && (
                     <button
                       type="button"
                       onClick={() => {
                         setSubpageSearch('');
-                        setSubpageMonthFilter('all');
-                        setSubpageYearFilter('all');
+                        setSubpageMonthLabel('');
+                        setSubpageYearMonth('');
                       }}
                       className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition cursor-pointer"
                       title="Reset filters"
@@ -1590,8 +1567,8 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                           setSelectedCourseSubpage(course);
                           setSubpageSelectedBatchIds(course.batches.map(b => b.id));
                           setSubpageSearch('');
-                          setSubpageMonthFilter('all');
-                          setSubpageYearFilter('all');
+                          setSubpageMonthLabel('');
+                          setSubpageYearMonth('');
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                         className="group bg-white rounded-2xl overflow-hidden border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between"
@@ -1732,30 +1709,30 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                   )}
                 </div>
 
-                <select
-                  value={allVideosMonthFilter}
-                  onChange={e => setAllVideosMonthFilter(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer"
-                >
-                  {MONTHS.map(m => (
-                    <option key={`all-month-${m.value}`} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
+                <MonthPicker
+                  value={allVideosMonthLabel}
+                  onChange={(label, ym) => {
+                    setAllVideosMonthLabel(label);
+                    setAllVideosYearMonth(ym);
+                  }}
+                  align="right"
+                  placeholder="All Months & Years"
+                />
 
-                <select
-                  value={allVideosYearFilter}
-                  onChange={e => setAllVideosYearFilter(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-bold text-gray-700 cursor-pointer"
-                >
-                  <option value="all">All Years</option>
-                  {availableYears.filter(y => y !== 'all').map(y => (
-                    <option key={`all-year-${y}`} value={y}>
-                      Year {y}
-                    </option>
-                  ))}
-                </select>
+                {(allVideosSearch || allVideosYearMonth) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAllVideosSearch('');
+                      setAllVideosMonthLabel('');
+                      setAllVideosYearMonth('');
+                    }}
+                    className="p-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition cursor-pointer"
+                    title="Reset filters"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1923,43 +1900,26 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
               </p>
             </div>
 
-            {/* Month & Scrollable All Years Filter */}
+            {/* Month & Year Filter using MonthPicker */}
             <div className="flex items-center gap-2 shrink-0">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-[#FFF9FB] shadow-2xs">
-                <Calendar className="w-4 h-4 text-[#8A064D] shrink-0" />
-                <select
-                  value={complianceMonth}
-                  onChange={(e) => {
-                    const newM = e.target.value;
-                    setComplianceMonth(newM);
-                    fetchComplianceData(newM, complianceYear);
-                  }}
-                  className="bg-transparent text-xs font-bold text-gray-800 focus:outline-hidden cursor-pointer"
-                >
-                  {MONTHS.map((m) => (
-                    <option key={`audit-month-${m.value}`} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={complianceYear}
-                  onChange={(e) => {
-                    const newY = e.target.value;
-                    setComplianceYear(newY);
-                    fetchComplianceData(complianceMonth, newY);
-                  }}
-                  className="bg-transparent text-xs font-bold text-gray-800 focus:outline-hidden cursor-pointer"
-                >
-                  <option value="all">All Years</option>
-                  {availableYears.filter((y) => y !== 'all').map((y) => (
-                    <option key={`audit-year-${y}`} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <MonthPicker
+                value={complianceMonth !== 'all' && complianceYear ? `${MONTHS.find(m => m.value === complianceMonth)?.label || ''} ${complianceYear}` : ''}
+                onChange={(label, ym) => {
+                  if (!ym) {
+                    setComplianceMonth('all');
+                    setComplianceYear('all');
+                    fetchComplianceData('all', 'all');
+                  } else {
+                    const [y, m] = ym.split('-');
+                    const mNum = parseInt(m, 10).toString();
+                    setComplianceMonth(mNum);
+                    setComplianceYear(y);
+                    fetchComplianceData(mNum, y);
+                  }
+                }}
+                align="right"
+                placeholder="Select Month & Year"
+              />
             </div>
           </div>
 

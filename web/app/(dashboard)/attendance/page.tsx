@@ -15,7 +15,7 @@ export default async function AttendancePage() {
   ]);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       <AttendanceListClient 
         initialAuditRecords={auditRecords} 
         initialGuruAuditRecords={guruAuditRecords}

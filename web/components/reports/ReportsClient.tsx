@@ -58,6 +58,16 @@ import StudentMultiSearchSelect from '@/components/common/StudentMultiSearchSele
 import CourseMultiSearchSelect, { CourseOption } from '@/components/common/CourseMultiSearchSelect';
 import BatchMultiSearchSelect, { BatchOption } from '@/components/common/BatchMultiSearchSelect';
 import TrainerSearchSelect, { TrainerOption } from '@/components/common/TrainerSearchSelect';
+import MonthPicker from '@/components/common/MonthPicker';
+
+function formatDisplayDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const m = parseInt(parts[1], 10) - 1;
+  return `${parts[2]} ${months[m] || parts[1]} ${parts[0]}`;
+}
 
 function getCurrentMonthRange() {
   const now = new Date();
@@ -1453,15 +1463,17 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
           </label>
           <div className="w-full sm:max-w-md">
             {activeType === 'attendance' && (attendanceSubView === 'absence' || attendanceSubView === 'batch') ? (
-              <MonthYearRangeFilter
-                startDate={startDate}
-                endDate={endDate}
+              <MonthPicker
+                value={startDate}
+                triggerLabel={startDate && endDate ? `${formatDisplayDate(startDate)} – ${formatDisplayDate(endDate)}` : undefined}
                 align="left"
-                onApply={({ startDate: s, endDate: e }) => {
+                onChange={(_monthLabel, _key, s, e) => {
                   setStartDate(s);
                   setEndDate(e);
                 }}
                 className="w-full"
+                triggerClassName="w-full justify-between py-2.5 px-4"
+                placeholder="Select Month & Year"
               />
             ) : (
               <DateRangeQuickFilter

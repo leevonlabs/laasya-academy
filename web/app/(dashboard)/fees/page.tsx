@@ -22,7 +22,7 @@ export default async function FeesPage() {
   ]);
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="w-full">
       <StudentFeesClient 
         initialInvoices={invoices}
         initialSummary={summary}

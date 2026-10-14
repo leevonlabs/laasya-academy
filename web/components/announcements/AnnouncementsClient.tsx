@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { Announcement } from '@/lib/announcements';
 import AiEnhanceButton from '@/components/common/AiEnhanceButton';
+import MonthPicker from '@/components/common/MonthPicker';
 
 interface Course {
   id: string;
@@ -278,9 +279,12 @@ export default function AnnouncementsClient({
   // -------------------------------------------------------------
   // ADMIN SENT FILTERS STATE (Date Range, Audience, Category, Search)
   // -------------------------------------------------------------
+  // ADMIN SENT FILTERS STATE
+  // -------------------------------------------------------------
   const [adminSearch, setAdminSearch] = useState('');
   const [adminAudience, setAdminAudience] = useState('all');
   const [adminCategory, setAdminCategory] = useState('all');
+  const [adminMonthLabel, setAdminMonthLabel] = useState('October 2026');
   const [adminStartDate, setAdminStartDate] = useState(defaultDates.firstDay);
   const [adminEndDate, setAdminEndDate] = useState(defaultDates.lastDay);
   const [appliedAdminFilters, setAppliedAdminFilters] = useState({
@@ -307,6 +311,7 @@ export default function AnnouncementsClient({
     setAdminSearch('');
     setAdminAudience('all');
     setAdminCategory('all');
+    setAdminMonthLabel('October 2026');
     setAdminStartDate(defaultDates.firstDay);
     setAdminEndDate(defaultDates.lastDay);
     setAppliedAdminFilters({
@@ -325,6 +330,7 @@ export default function AnnouncementsClient({
   const [guruSelectedGurus, setGuruSelectedGurus] = useState<string[]>([]);
   const [guruSelectedBatches, setGuruSelectedBatches] = useState<string[]>([]);
   const [guruSelectedStudents, setGuruSelectedStudents] = useState<string[]>([]);
+  const [guruMonthLabel, setGuruMonthLabel] = useState('October 2026');
   const [guruStartDate, setGuruStartDate] = useState(defaultDates.firstDay);
   const [guruEndDate, setGuruEndDate] = useState(defaultDates.lastDay);
 
@@ -352,6 +358,7 @@ export default function AnnouncementsClient({
     setGuruSelectedGurus([]);
     setGuruSelectedBatches([]);
     setGuruSelectedStudents([]);
+    setGuruMonthLabel('October 2026');
     setGuruStartDate(defaultDates.firstDay);
     setGuruEndDate(defaultDates.lastDay);
     setAppliedGuruFilters({
@@ -948,25 +955,18 @@ export default function AnnouncementsClient({
                 </select>
               </div>
 
-              {/* From Date */}
-              <div>
-                <input
-                  type="date"
-                  value={adminStartDate}
-                  onChange={(e) => setAdminStartDate(e.target.value)}
-                  className="w-full h-9 px-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-[#075E54]"
-                  title="From Date"
-                />
-              </div>
-
-              {/* To Date */}
-              <div>
-                <input
-                  type="date"
-                  value={adminEndDate}
-                  onChange={(e) => setAdminEndDate(e.target.value)}
-                  className="w-full h-9 px-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-[#075E54]"
-                  title="To Date"
+              {/* Month & Year Filter using MonthPicker (Reference Image 2) */}
+              <div className="col-span-2 sm:col-span-1">
+                <MonthPicker
+                  value={adminMonthLabel}
+                  onChange={(label, key, sDate, eDate) => {
+                    setAdminMonthLabel(label);
+                    setAdminStartDate(sDate);
+                    setAdminEndDate(eDate);
+                  }}
+                  align="left"
+                  placeholder="Select Month & Year"
+                  className="w-full"
                 />
               </div>
 
@@ -1206,29 +1206,21 @@ export default function AnnouncementsClient({
                 />
               </div>
 
-              {/* 4. Start Date */}
-              <div>
+              {/* 4. Month & Year Filter using MonthPicker (Reference Image 2) */}
+              <div className="col-span-2 sm:col-span-1">
                 <label className="block text-[10px] font-black text-gray-600 uppercase tracking-wider mb-0.5">
-                  From Date
+                  Month & Year
                 </label>
-                <input
-                  type="date"
-                  value={guruStartDate}
-                  onChange={(e) => setGuruStartDate(e.target.value)}
-                  className="w-full h-9 px-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-[#075E54]"
-                />
-              </div>
-
-              {/* 5. End Date */}
-              <div>
-                <label className="block text-[10px] font-black text-gray-600 uppercase tracking-wider mb-0.5">
-                  To Date
-                </label>
-                <input
-                  type="date"
-                  value={guruEndDate}
-                  onChange={(e) => setGuruEndDate(e.target.value)}
-                  className="w-full h-9 px-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-[#075E54]"
+                <MonthPicker
+                  value={guruMonthLabel}
+                  onChange={(label, key, sDate, eDate) => {
+                    setGuruMonthLabel(label);
+                    setGuruStartDate(sDate);
+                    setGuruEndDate(eDate);
+                  }}
+                  align="left"
+                  placeholder="Select Month & Year"
+                  className="w-full"
                 />
               </div>
 

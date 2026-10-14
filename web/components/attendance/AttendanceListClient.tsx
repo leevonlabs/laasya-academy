@@ -3,7 +3,9 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Course, Batch, AttendanceAuditRecord, Student, GuruAttendanceAuditRecord, Trainer } from '@/lib/academy';
 import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
+import MonthPicker from '@/components/common/MonthPicker';
 import StudentSearchSelect, { StudentOption } from '@/components/common/StudentSearchSelect';
+import StudentMultiSearchSelect from '@/components/common/StudentMultiSearchSelect';
 import CourseMultiSearchSelect, { CourseOption } from '@/components/common/CourseMultiSearchSelect';
 import BatchMultiSearchSelect, { BatchOption } from '@/components/common/BatchMultiSearchSelect';
 import GuruAttendanceTab from './GuruAttendanceTab';
@@ -27,6 +29,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   RefreshCw,
+  RotateCcw,
   MapPin,
   ChevronRight,
   Award,
@@ -190,20 +193,33 @@ export default function AttendanceListClient({
 
   // Batch Attendance Sheet Filters
   const [batchSearchQuery, setBatchSearchQuery] = useState('');
-  const [batchStartDate, setBatchStartDate] = useState<string>(FIRST_DAY_OF_MONTH);
-  const [batchEndDate, setBatchEndDate] = useState<string>(TODAY_STR);
+  const [batchMonthLabel, setBatchMonthLabel] = useState<string>(() => {
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+  });
+  const [batchYearMonth, setBatchYearMonth] = useState<string>(() => {
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [batchStatusFilter, setBatchStatusFilter] = useState<string>('All');
-  const [batchPreset, setBatchPreset] = useState<string>('This Month');
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
+  const [batchSelectedStudentIds, setBatchSelectedStudentIds] = useState<string[]>([]);
 
   // -------------------------------------------------------------
-  // TAB 2: COMPLETE ATTENDANCE STATE (Default to today)
+  // TAB 2: COMPLETE ATTENDANCE STATE
   // -------------------------------------------------------------
-  const [completeStartDate, setCompleteStartDate] = useState<string>(TODAY_STR);
+  const [completeMonthLabel, setCompleteMonthLabel] = useState<string>(() => {
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+  });
+  const [completeYearMonth, setCompleteYearMonth] = useState<string>(() => {
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [completeStartDate, setCompleteStartDate] = useState<string>(FIRST_DAY_OF_MONTH);
   const [completeEndDate, setCompleteEndDate] = useState<string>(TODAY_STR);
   const [completeSearchQuery, setCompleteSearchQuery] = useState<string>('');
   const [completeStatusFilter, setCompleteStatusFilter] = useState<string>('All');
   const [completeStudentId, setCompleteStudentId] = useState<string>('');
-  const [completePreset, setCompletePreset] = useState<string>('Today');
+  const [completePreset, setCompletePreset] = useState<string>('This Month');
 
   // Searchable student options for Tab 2
   const studentOptions: StudentOption[] = useMemo(() => {
@@ -262,25 +278,33 @@ export default function AttendanceListClient({
     return currentCourseBatches.find(b => b.id === selectedBatchId) || currentCourseBatches[0] || null;
   }, [currentCourseBatches, selectedBatchId]);
 
+  // Students options for the selected course
+  const courseStudentOptions: StudentOption[] = useMemo(() => {
+    if (selectedCourseId) {
+      const relevant = students.filter(s => 
+        s.enrolled_batches?.some(eb => eb.course_id === selectedCourseId)
+      );
+      if (relevant.length > 0) {
+        return relevant.map(s => ({
+          id: s.id,
+          full_name: s.full_name,
+          roll_number: s.roll_number || 'N/A'
+        })).sort((a, b) => a.full_name.localeCompare(b.full_name));
+      }
+    }
+    return studentOptions;
+  }, [selectedCourseId, students, studentOptions]);
+
   // Handler when clicking a course in Grid View
   const handleSelectCourse = (courseId: string) => {
     setSelectedCourseId(courseId);
     setSelectedCourseIds([courseId]);
-    // Find batches for this course and select the first batch automatically
-    const courseBatches = batches.filter(b => b.course_id === courseId);
-    if (courseBatches.length > 0) {
-      setSelectedBatchId(courseBatches[0].id);
-      setSelectedBatchIds([courseBatches[0].id]);
-    } else {
-      setSelectedBatchId(null);
-      setSelectedBatchIds([]);
-    }
-    // Reset filters
+    setSelectedBatchFilter('all');
+    setSelectedBatchId(null);
+    setSelectedBatchIds([]);
+    setBatchSelectedStudentIds([]);
     setBatchSearchQuery('');
-    setBatchStartDate('2026-09-01');
-    setBatchEndDate('2026-09-30');
     setBatchStatusFilter('All');
-    setBatchPreset('Last 30 Days');
   };
 
   // Multi-select Course change handler
@@ -290,21 +314,16 @@ export default function AttendanceListClient({
       setSelectedCourseIds([]);
       setSelectedBatchId(null);
       setSelectedBatchIds([]);
+      setSelectedBatchFilter('all');
+      setBatchSelectedStudentIds([]);
       return;
     }
     setSelectedCourseIds(newIds);
     if (!newIds.includes(selectedCourseId || '')) {
       setSelectedCourseId(newIds[0]);
     }
-    const validBatches = batches.filter(b => newIds.includes(b.course_id));
-    const newBatchIds = selectedBatchIds.filter(id => validBatches.some(b => b.id === id));
-    if (newBatchIds.length === 0 && validBatches.length > 0) {
-      setSelectedBatchIds([validBatches[0].id]);
-      setSelectedBatchId(validBatches[0].id);
-    } else {
-      setSelectedBatchIds(newBatchIds);
-      if (newBatchIds.length > 0) setSelectedBatchId(newBatchIds[0]);
-    }
+    setSelectedBatchFilter('all');
+    setBatchSelectedStudentIds([]);
   };
 
   // Multi-select Batch change handler
@@ -312,8 +331,10 @@ export default function AttendanceListClient({
     setSelectedBatchIds(newBatchIds);
     if (newBatchIds.length > 0) {
       setSelectedBatchId(newBatchIds[0]);
+      setSelectedBatchFilter(newBatchIds[0]);
     } else {
       setSelectedBatchId(null);
+      setSelectedBatchFilter('all');
     }
   };
 
@@ -323,6 +344,10 @@ export default function AttendanceListClient({
     setSelectedCourseIds([]);
     setSelectedBatchId(null);
     setSelectedBatchIds([]);
+    setSelectedBatchFilter('all');
+    setBatchSelectedStudentIds([]);
+    setBatchSearchQuery('');
+    setBatchStatusFilter('All');
   };
 
   // Quick preset helper
@@ -347,11 +372,7 @@ export default function AttendanceListClient({
       end = '';
     }
 
-    if (mode === 'batch') {
-      setBatchPreset(preset);
-      setBatchStartDate(start);
-      setBatchEndDate(end);
-    } else {
+    if (mode === 'complete') {
       setCompletePreset(preset);
       setCompleteStartDate(start);
       setCompleteEndDate(end);
@@ -365,32 +386,30 @@ export default function AttendanceListClient({
     if (activeCourseIds.length === 0 && !selectedCourseId) return [];
 
     return allRecords.filter((r) => {
-      // Match course
+      // 1. Match course
       if (activeCourseIds.length > 0 && !activeCourseIds.includes(r.course_id)) {
         return false;
       }
 
-      // Match batch
-      if (selectedBatchIds.length > 0) {
-        const matchesBatchId = selectedBatchIds.includes(r.batch_id);
-        const matchesBatchName = currentBatch 
-          ? (r.batch_name.toLowerCase() === currentBatch.name.toLowerCase() && activeCourseIds.includes(r.course_id))
-          : false;
-        if (!matchesBatchId && !matchesBatchName) return false;
-      } else if (currentBatch) {
-        const matchesBatch = (r.batch_id === currentBatch.id || 
-           (r.batch_name.toLowerCase() === currentBatch.name.toLowerCase() && activeCourseIds.includes(r.course_id)));
-        if (!matchesBatch) return false;
+      // 2. Match batch ('all' or specific batch id)
+      if (selectedBatchFilter !== 'all' && r.batch_id !== selectedBatchFilter) {
+        return false;
       }
 
-      // Date range filter
-      if (batchStartDate && r.session_date < batchStartDate) return false;
-      if (batchEndDate && r.session_date > batchEndDate) return false;
+      // 3. Month & Year filter (via MonthPicker)
+      if (batchYearMonth && r.session_date) {
+        if (!r.session_date.startsWith(batchYearMonth)) return false;
+      }
 
-      // Status filter
+      // 4. Status filter
       if (batchStatusFilter !== 'All' && r.status !== batchStatusFilter) return false;
 
-      // Search student
+      // 5. Multi-selection student filter
+      if (batchSelectedStudentIds.length > 0 && !batchSelectedStudentIds.includes(r.student_id)) {
+        return false;
+      }
+
+      // 6. Free text search
       if (batchSearchQuery.trim()) {
         const q = batchSearchQuery.toLowerCase();
         const matchesName = r.student_name.toLowerCase().includes(q);
@@ -400,7 +419,7 @@ export default function AttendanceListClient({
 
       return true;
     });
-  }, [allRecords, currentBatch, activeCourseIds, selectedBatchIds, selectedCourseId, batchStartDate, batchEndDate, batchStatusFilter, batchSearchQuery]);
+  }, [allRecords, activeCourseIds, selectedCourseId, selectedBatchFilter, batchYearMonth, batchStatusFilter, batchSelectedStudentIds, batchSearchQuery]);
 
   // -------------------------------------------------------------
   // TAB 2 FILTERED RECORDS
@@ -409,9 +428,13 @@ export default function AttendanceListClient({
     return allRecords.filter((r) => {
       // Filter by Student
       if (completeStudentId && r.student_id !== completeStudentId) return false;
-      // Filter by Date Range
-      if (completeStartDate && r.session_date < completeStartDate) return false;
-      if (completeEndDate && r.session_date > completeEndDate) return false;
+      // Filter by Month & Year (MonthPicker)
+      if (completeYearMonth && r.session_date) {
+        if (!r.session_date.startsWith(completeYearMonth)) return false;
+      } else {
+        if (completeStartDate && r.session_date < completeStartDate) return false;
+        if (completeEndDate && r.session_date > completeEndDate) return false;
+      }
       // Filter by Attendance Status
       if (completeStatusFilter !== 'All' && r.status !== completeStatusFilter) return false;
       // Free Text Search
@@ -425,7 +448,7 @@ export default function AttendanceListClient({
       }
       return true;
     });
-  }, [allRecords, completeStudentId, completeStartDate, completeEndDate, completeStatusFilter, completeSearchQuery]);
+  }, [allRecords, completeStudentId, completeYearMonth, completeStartDate, completeEndDate, completeStatusFilter, completeSearchQuery]);
 
   // Stats calculation
   const getStats = (records: AttendanceAuditRecord[]) => {
@@ -704,406 +727,290 @@ export default function AttendanceListClient({
 
             </div>
           ) : (
-            /* LEVEL 2 & 3: COURSE SELECTED -> AVAILABLE BATCHES ON TOP + BATCH ATTENDANCE SHEET */
+            /* LEVEL 2: COURSE SELECTED -> BIG COURSE HEADER + FILTERS BAR (BATCH, MONTH/YEAR, STATUS, STUDENT MULTI) + ATTENDANCE SHEET */
             <div className="space-y-4">
               
-              {/* Course Top Navigation & Multi-Filter Bar */}
-              <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
+              {/* Course Top Navigation & Big Course Title Header */}
+              <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   <button
                     onClick={handleBackToCourses}
-                    className="px-3.5 py-2 bg-gray-100 hover:bg-[#8A064D] hover:text-white rounded-xl text-gray-700 transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
+                    className="self-start px-3.5 py-2 bg-gray-100 hover:bg-[#8A064D] hover:text-white rounded-xl text-gray-700 transition cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-2xs shrink-0"
                     title="Return to Course Grid"
                   >
                     <ArrowLeft className="w-4 h-4" />
                     <span>Back to Courses</span>
                   </button>
 
-                  <div className="h-6 w-px bg-gray-200 hidden sm:block" />
+                  <div className="h-8 w-px bg-gray-200 hidden sm:block" />
 
                   <div>
-                    <div className="flex items-center gap-2">
-                      {activeCourseIds.length <= 1 && currentCourse?.code && (
-                        <span className="text-[10px] font-mono font-bold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2 py-0.5 rounded-md">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      {currentCourse?.code && (
+                        <span className="text-xs font-mono font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-xl shadow-2xs">
                           {currentCourse.code}
                         </span>
                       )}
-                      <h2 className="text-base font-bold text-[#2D041A]">
-                        {activeCourseIds.length > 1 
-                          ? `${activeCourseIds.length} Courses Selected`
-                          : (currentCourse?.title || 'Selected Course')}
+                      <h2 className="text-2xl sm:text-3xl font-black text-[#2D041A] tracking-tight">
+                        {currentCourse?.title || 'Selected Course'}
                       </h2>
-                      {activeCourseIds.length <= 1 && currentCourse?.category && (
-                        <span className="text-xs text-gray-500 font-medium hidden sm:inline-block">
-                          ({currentCourse.category})
+                      {currentCourse?.category && (
+                        <span className="text-xs font-bold text-gray-600 bg-gray-100 border border-gray-200 px-3 py-1 rounded-full">
+                          {currentCourse.category}
                         </span>
                       )}
                     </div>
+                    <div className="text-xs text-gray-500 font-medium mt-1.5 flex flex-wrap items-center gap-2">
+                      <span>Assigned Guru: <strong className="text-gray-900">{currentCourse ? COURSE_GURUS_MAP[currentCourse.title] || 'Senior Faculty Guru' : 'Faculty Guru'}</strong></span>
+                      <span>•</span>
+                      <span>{currentCourseBatches.length} Available Batches</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Multi-Selection Searchable Course & Batch Filters (replaces single switch course dropdown) */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-                  <div className="w-full sm:w-64">
-                    <CourseMultiSearchSelect
-                      courses={courseSelectOptions}
-                      selectedIds={activeCourseIds}
-                      onChange={handleCourseMultiChange}
-                      placeholder="Filter / Select Courses"
+                {/* Export CSV button */}
+                <div className="shrink-0 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleExportCSV(filteredBatchRecords, `${currentCourse?.title || 'Course'}_Attendance`)}
+                    className="px-4 py-2 bg-[#8A064D] hover:bg-[#590231] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Export CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Comprehensive Filter Toolbar Bar */}
+              <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <h4 className="font-bold text-sm text-[#2D041A] flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-[#8A064D]" />
+                    <span>Filter Course Attendance Records</span>
+                  </h4>
+                  {(selectedBatchFilter !== 'all' || batchMonthLabel || batchStatusFilter !== 'All' || batchSelectedStudentIds.length > 0 || batchSearchQuery) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedBatchFilter('all');
+                        setBatchMonthLabel('');
+                        setBatchYearMonth('');
+                        setBatchStatusFilter('All');
+                        setBatchSelectedStudentIds([]);
+                        setBatchSearchQuery('');
+                      }}
+                      className="text-xs text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reset Filters</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                  {/* 1. Batch Filter (All Batches by default) */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                      Batch Filter
+                    </label>
+                    <select
+                      value={selectedBatchFilter}
+                      onChange={(e) => setSelectedBatchFilter(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-[#8A064D] focus:bg-white cursor-pointer transition shadow-2xs"
+                    >
+                      <option value="all">All Batches ({currentCourseBatches.length})</option>
+                      {currentCourseBatches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name} ({b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 2. Month & Year Filter (MonthPicker from Reference Image 2) */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                      Month & Year
+                    </label>
+                    <MonthPicker
+                      value={batchMonthLabel}
+                      onChange={(label, ym) => {
+                        setBatchMonthLabel(label);
+                        setBatchYearMonth(ym);
+                      }}
+                      align="left"
+                      className="w-full"
+                      triggerClassName="w-full justify-between"
+                      placeholder="All Months & Years"
                     />
                   </div>
-                  <div className="w-full sm:w-64">
-                    <BatchMultiSearchSelect
-                      batches={batchSelectOptions}
-                      selectedIds={selectedBatchIds}
-                      onChange={handleBatchMultiChange}
-                      placeholder="Filter / Select Batches"
+
+                  {/* 3. Status Filter */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                      Attendance Status
+                    </label>
+                    <select
+                      value={batchStatusFilter}
+                      onChange={(e) => setBatchStatusFilter(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-[#8A064D] focus:bg-white cursor-pointer transition shadow-2xs"
+                    >
+                      <option value="All">All Statuses</option>
+                      <option value="present">Present Only</option>
+                      <option value="absent">Absent Only</option>
+                    </select>
+                  </div>
+
+                  {/* 4. Student Filter (Multi-selection, Searchable) */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                      Filter Students (Multi)
+                    </label>
+                    <StudentMultiSearchSelect
+                      students={courseStudentOptions}
+                      selectedIds={batchSelectedStudentIds}
+                      onChange={setBatchSelectedStudentIds}
+                      placeholder="All Students (Multi-select)"
+                      className="w-full"
                     />
+                  </div>
+                </div>
+
+                {/* Free Text Quick Search */}
+                <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-3">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Quick search student name, roll number, remarks..."
+                      value={batchSearchQuery}
+                      onChange={(e) => setBatchSearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500 font-medium">
+                    Showing <strong className="text-[#8A064D] font-bold">{filteredBatchRecords.length}</strong> records
                   </div>
                 </div>
               </div>
 
-              {/* ------------------------------------------------------------- */}
-              {/* AVAILABLE BATCHES OF THAT COURSE DISPLAYED ON TOP */}
-              {/* ------------------------------------------------------------- */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5 text-[#8A064D]" />
-                    <span>
-                      Available Batches ({currentCourseBatches.length})
-                    </span>
-                  </h3>
-                  <span className="text-[11px] text-gray-400">
-                    Click any batch card to toggle or view its live attendance sheet
+              {/* Summary Stats Row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
+                  <span className="text-[11px] font-bold text-[#6E3955] uppercase tracking-wider block">Audited Records</span>
+                  <span className="text-2xl font-black text-[#2D041A] mt-0.5 block tabular-nums">{batchStats.total}</span>
+                  <span className="text-[11px] text-[#8C5E77]">{batchMonthLabel || 'All time'}</span>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-xs">
+                  <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">Present</span>
+                  <span className="text-2xl font-black text-emerald-700 mt-0.5 block tabular-nums">{batchStats.present}</span>
+                  <span className="text-[11px] text-emerald-600">Marked present</span>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-red-200 shadow-xs">
+                  <span className="text-[11px] font-bold text-red-800 uppercase tracking-wider block">Absent</span>
+                  <span className="text-2xl font-black text-red-700 mt-0.5 block tabular-nums">{batchStats.absent}</span>
+                  <span className="text-[11px] text-red-600">Unexcused / absent</span>
+                </div>
+
+                <div className="bg-gradient-to-br from-white to-[#FFF9FB] p-4 rounded-2xl border border-[#F9E33A] shadow-xs">
+                  <span className="text-[11px] font-bold text-[#8A064D] uppercase tracking-wider block">Attendance Rate</span>
+                  <span className="text-2xl font-black text-[#590231] mt-0.5 block tabular-nums">{batchStats.rate}%</span>
+                  <span className="text-[11px] text-emerald-700 font-bold">Effective discipline rate</span>
+                </div>
+              </div>
+
+              {/* Attendance Table */}
+              <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
+                <div className="p-4 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ClipboardCheck className="w-4 h-4 text-[#8A064D]" />
+                    <h4 className="font-bold text-sm text-[#2D041A]">
+                      Attendance Sheet ({filteredBatchRecords.length} records)
+                    </h4>
+                  </div>
+                  <span className="text-xs font-semibold text-gray-500">
+                    {batchMonthLabel || 'All Periods'}
                   </span>
                 </div>
 
-                {currentCourseBatches.length === 0 ? (
-                  <div className="bg-white p-5 rounded-2xl border border-gray-200 text-center text-gray-500 text-xs">
-                    No batches currently assigned to the selected course(s).
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {currentCourseBatches.map((b) => {
-                      const isSelected = selectedBatchIds.length > 0
-                        ? selectedBatchIds.includes(b.id)
-                        : (currentBatch?.id === b.id);
-                      const parentCourse = courses.find(c => c.id === b.course_id);
-                      const guruDisplay = b.trainer_name || (parentCourse ? COURSE_GURUS_MAP[parentCourse.title] : 'Faculty Guru');
-                      const timings = `${b.start_time?.substring(0, 5)} - ${b.end_time?.substring(0, 5)}`;
-                      const daysText = (b.days_of_week && b.days_of_week.length > 0) ? b.days_of_week.join(', ') : 'Recurring';
-
-                      return (
-                        <div
-                          key={b.id}
-                          onClick={() => {
-                            if (selectedBatchIds.includes(b.id)) {
-                              if (selectedBatchIds.length > 1) {
-                                setSelectedBatchIds(selectedBatchIds.filter(id => id !== b.id));
-                              } else {
-                                setSelectedBatchIds([]);
-                                setSelectedBatchId(null);
-                              }
-                            } else {
-                              setSelectedBatchIds([b.id]);
-                              setSelectedBatchId(b.id);
-                            }
-                          }}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
-                            isSelected
-                              ? 'bg-[#FFF9FB] border-[#8A064D] shadow-sm ring-2 ring-[#8A064D]/20'
-                              : 'bg-white border-[#F0D5E4] hover:border-[#8A064D]/50 hover:shadow-2xs'
-                          }`}
-                        >
-                          <div>
-                            {/* Batch Header */}
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                                isSelected 
-                                  ? 'bg-[#8A064D] text-white' 
-                                  : 'bg-gray-100 text-gray-600'
-                              }`}>
-                                {isSelected ? '✓ Selected' : 'Batch Slot'}
-                              </span>
-
-                              <div className="flex items-center gap-1 text-[11px] font-semibold text-gray-500">
-                                <MapPin className="w-3 h-3 text-[#8A064D]" />
-                                <span className="truncate">{b.room_or_hall || 'Main Hall'}</span>
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-gray-50/90 text-gray-600 border-b border-gray-200 font-bold uppercase tracking-wider text-[11px]">
+                        <th className="py-3 px-4">Roll Number</th>
+                        <th className="py-3 px-4">Student Name</th>
+                        <th className="py-3 px-4">Course</th>
+                        <th className="py-3 px-4">Batch</th>
+                        <th className="py-3 px-4">Assigned Guru</th>
+                        <th className="py-3 px-4">Date</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4">Verification</th>
+                        <th className="py-3 px-4">Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredBatchRecords.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="py-12 text-center text-gray-400">
+                            <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                            <p className="font-bold text-gray-600 text-sm">No attendance records found matching filters.</p>
+                            <p className="text-xs text-gray-400 mt-1">Try selecting "All Batches" or clearing student and month filters.</p>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredBatchRecords.map((r) => (
+                          <tr key={r.id} className="hover:bg-[#FFFDFC] transition">
+                            <td className="py-3.5 px-4 font-mono font-bold text-gray-700 text-xs">
+                              {r.roll_number || '—'}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="font-bold text-gray-900 text-sm">{r.student_name}</span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="font-bold text-[#8A064D]">{r.course_title}</span>
+                            </td>
+                            <td className="py-3.5 px-4 font-semibold text-gray-800">
+                              {r.batch_name}
+                            </td>
+                            <td className="py-3.5 px-4 text-gray-700">
+                              {r.trainer_name}
+                            </td>
+                            <td className="py-3.5 px-4 font-medium text-gray-900 whitespace-nowrap">
+                              {r.session_date}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              {r.status !== 'absent' ? (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-2xs">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Present</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full shadow-2xs">
+                                  <XCircle className="w-3.5 h-3.5" />
+                                  <span>Absent</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="text-gray-700 font-medium text-xs">
+                                {r.check_in_method === 'trainer_manual' ? 'Guru Verified' :
+                                 r.check_in_method === 'student_code' ? 'PIN Check-in' :
+                                 r.check_in_method === 'student_qr' ? 'QR Scanner' :
+                                 r.check_in_method || 'Verified'}
                               </div>
-                            </div>
-
-                            {/* Batch Name */}
-                            <h4 className={`font-bold text-sm leading-snug ${
-                              isSelected ? 'text-[#8A064D]' : 'text-[#2D041A]'
-                            }`}>
-                              {b.name}
-                            </h4>
-                            {parentCourse && activeCourseIds.length > 1 && (
-                              <div className="text-[10px] text-[#8A064D] font-bold mt-0.5">
-                                {parentCourse.title}
-                              </div>
-                            )}
-
-                            {/* Guru Name */}
-                            <div className="mt-1.5 text-xs flex items-center gap-1.5 text-gray-700">
-                              <User className="w-3.5 h-3.5 text-[#8A064D]" />
-                              <span>Guru: <strong className="text-gray-900">{guruDisplay}</strong></span>
-                            </div>
-
-                            {/* Timings & Days */}
-                            <div className="mt-1 text-xs flex items-center gap-1.5 text-gray-700">
-                              <Clock className="w-3.5 h-3.5 text-[#8A064D]" />
-                              <span>Timings: <strong className="text-gray-900">{timings}</strong></span>
-                            </div>
-                            <div className="mt-0.5 text-[11px] text-gray-500">
-                              Schedule: {daysText}
-                            </div>
-                          </div>
-
-                          {/* Enrollment Bottom */}
-                          <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
-                            <span className="text-gray-500 font-medium">
-                              Enrolled: <strong className="text-gray-900">{b.enrolled_count || 0} / {b.max_capacity}</strong>
-                            </span>
-                            <span className={`text-xs font-bold ${
-                              isSelected ? 'text-[#8A064D]' : 'text-gray-400'
-                            }`}>
-                              {isSelected ? '✓ Viewing Sheet' : 'Click to View →'}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* ------------------------------------------------------------- */}
-              {/* BATCH ATTENDANCE SHEET (Displays when a batch is active) */}
-              {/* ------------------------------------------------------------- */}
-              {(currentBatch || selectedBatchIds.length > 0) && (
-                <div className="space-y-4 pt-1">
-                  
-                  {/* Filter Controls: Date Range, Presets, Search, Status */}
-                  <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs space-y-3">
-                    
-                    {/* Header line for batch sheet */}
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                      <div>
-                        <h4 className="font-bold text-sm text-[#2D041A] flex items-center gap-2">
-                          <ClipboardCheck className="w-4 h-4 text-[#8A064D]" />
-                          <span>
-                            Attendance Sheet: {' '}
-                            <span className="text-[#8A064D]">
-                              {selectedBatchIds.length > 1
-                                ? `${selectedBatchIds.length} Batches Selected`
-                                : (currentBatch?.name || 'All Batches')}
-                            </span>
-                          </span>
-                        </h4>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {selectedBatchIds.length <= 1 && currentBatch?.trainer_name && (
-                            <>Assigned Guru: <strong className="text-gray-800">{currentBatch.trainer_name}</strong> • </>
-                          )}
-                          Showing verified student roll-call records
-                        </p>
-                      </div>
-
-                      {/* Quick Presets */}
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-xs font-semibold text-gray-500 mr-1">Presets:</span>
-                        {['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'All Time'].map((p) => (
-                          <button
-                            key={p}
-                            onClick={() => applyPreset(p, 'batch')}
-                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                              batchPreset === p
-                                ? 'bg-[#8A064D] text-white shadow-2xs'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            {p}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Filter Inputs Grid */}
-                    <div className="pt-2.5 border-t border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-2.5">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-gray-500 mb-1">From Date</label>
-                        <input
-                          type="date"
-                          value={batchStartDate}
-                          onChange={(e) => {
-                            setBatchStartDate(e.target.value);
-                            setBatchPreset('Custom');
-                          }}
-                          className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-gray-500 mb-1">To Date</label>
-                        <input
-                          type="date"
-                          value={batchEndDate}
-                          onChange={(e) => {
-                            setBatchEndDate(e.target.value);
-                            setBatchPreset('Custom');
-                          }}
-                          className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-gray-500 mb-1">Status Filter</label>
-                        <select
-                          value={batchStatusFilter}
-                          onChange={(e) => setBatchStatusFilter(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
-                        >
-                          <option value="All">All Statuses</option>
-                          <option value="present">Present Only</option>
-                          <option value="absent">Absent Only</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-gray-500 mb-1">Search Student</label>
-                        <div className="relative">
-                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
-                          <input
-                            type="text"
-                            placeholder="Student name, roll #..."
-                            value={batchSearchQuery}
-                            onChange={(e) => setBatchSearchQuery(e.target.value)}
-                            className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* Summary Details for this Batch */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-                    <div className="bg-white p-3.5 rounded-2xl border border-[#F0D5E4] shadow-xs">
-                      <span className="text-[11px] font-bold text-[#6E3955] uppercase tracking-wider block">Audited Records</span>
-                      <span className="text-xl font-black text-[#2D041A] mt-0.5 block tabular-nums">{batchStats.total}</span>
-                      <span className="text-[11px] text-[#8C5E77]">In selected date range</span>
-                    </div>
-
-                    <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 shadow-xs">
-                      <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">Present</span>
-                      <span className="text-xl font-black text-emerald-700 mt-0.5 block tabular-nums">{batchStats.present}</span>
-                      <span className="text-[11px] text-emerald-600">Marked present</span>
-                    </div>
-
-                    <div className="bg-white p-3.5 rounded-2xl border border-red-200 shadow-xs">
-                      <span className="text-[11px] font-bold text-red-800 uppercase tracking-wider block">Absent</span>
-                      <span className="text-xl font-black text-red-700 mt-0.5 block tabular-nums">{batchStats.absent}</span>
-                      <span className="text-[11px] text-red-600">Unexcused / absent</span>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-white to-[#FFF9FB] p-3.5 rounded-2xl border border-[#F9E33A] shadow-xs">
-                      <span className="text-[11px] font-bold text-[#8A064D] uppercase tracking-wider block">Batch Rate</span>
-                      <span className="text-xl font-black text-[#590231] mt-0.5 block tabular-nums">{batchStats.rate}%</span>
-                      <span className="text-[11px] text-emerald-700 font-bold">Effective attendance</span>
-                    </div>
-                  </div>
-
-                  {/* Attendance Sheet Table for this Batch */}
-                  <div className="bg-white rounded-2xl border border-[#F0D5E4] shadow-xs overflow-hidden">
-                    <div className="p-3.5 bg-gray-50/60 border-b border-gray-100 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ClipboardCheck className="w-4 h-4 text-[#8A064D]" />
-                        <h4 className="font-bold text-xs text-[#2D041A]">
-                          Attendance Records ({filteredBatchRecords.length})
-                        </h4>
-                      </div>
-                      <span className="text-[11px] text-gray-500">
-                        Date Range: {batchStartDate || 'Start'} to {batchEndDate || 'End'}
-                      </span>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="bg-gray-50/80 text-gray-500 border-b border-gray-100 font-semibold uppercase tracking-wider text-[10px]">
-                            <th className="py-2.5 px-3.5">Student Name & Roll</th>
-                            <th className="py-2.5 px-3.5">Course</th>
-                            <th className="py-2.5 px-3.5">Batch Name</th>
-                            <th className="py-2.5 px-3.5">Assigned Guru</th>
-                            <th className="py-2.5 px-3.5">Attendance Date</th>
-                            <th className="py-2.5 px-3.5">Status</th>
-                            <th className="py-2.5 px-3.5">Verification</th>
-                            <th className="py-2.5 px-3.5">Remarks</th>
+                            </td>
+                            <td className="py-3.5 px-4 text-gray-500 text-xs">
+                              {r.remarks || '—'}
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {filteredBatchRecords.length === 0 ? (
-                            <tr>
-                              <td colSpan={8} className="py-10 text-center text-gray-400">
-                                <AlertTriangle className="w-7 h-7 text-gray-300 mx-auto mb-1.5" />
-                                <p className="font-semibold text-xs">No attendance records found for this batch in the selected date range.</p>
-                                <p className="text-[11px] text-gray-400 mt-0.5">Try expanding the date filter or clearing search.</p>
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredBatchRecords.map((r) => (
-                              <tr key={r.id} className="hover:bg-[#FFFDFC] transition">
-                                <td className="py-3 px-3.5">
-                                  <div className="font-bold text-gray-900">{r.student_name}</div>
-                                  <div className="text-[10px] font-mono text-gray-400">{r.roll_number}</div>
-                                </td>
-                                <td className="py-3 px-3.5">
-                                  <span className="font-medium text-[#8A064D]">{r.course_title}</span>
-                                </td>
-                                <td className="py-3 px-3.5">
-                                  <span className="font-medium text-gray-800">{r.batch_name}</span>
-                                </td>
-                                <td className="py-3 px-3.5 text-gray-700">
-                                  {r.trainer_name}
-                                </td>
-                                <td className="py-3 px-3.5 font-medium text-gray-900 whitespace-nowrap">
-                                  {r.session_date}
-                                </td>
-                                <td className="py-3 px-3.5">
-                                  {r.status !== 'absent' ? (
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                                      <CheckCircle2 className="w-3 h-3" />
-                                      <span>Present</span>
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
-                                      <XCircle className="w-3 h-3" />
-                                      <span>Absent</span>
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-3 px-3.5">
-                                  <div className="text-gray-700 font-medium text-[11px]">
-                                    {r.check_in_method === 'trainer_manual' ? 'Guru Verified' :
-                                     r.check_in_method === 'student_code' ? 'PIN Check-in' :
-                                     r.check_in_method === 'student_qr' ? 'QR Scanner' :
-                                     r.check_in_method || 'Verified'}
-                                  </div>
-                                </td>
-                                <td className="py-3 px-3.5 text-gray-500 text-[11px]">
-                                  {r.remarks || '—'}
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              </div>
 
             </div>
           )}
@@ -1132,18 +1039,18 @@ export default function AttendanceListClient({
                 </p>
               </div>
 
-              {/* Date Range Quick Filter (Reference Image 2) */}
+              {/* Month & Year Filter using MonthPicker */}
               <div className="flex items-center gap-2">
-                <DateRangeQuickFilter
-                  startDate={completeStartDate}
-                  endDate={completeEndDate}
-                  align="right"
-                  onApply={({ startDate, endDate, presetLabel }) => {
-                    setCompleteStartDate(startDate);
-                    setCompleteEndDate(endDate);
-                    setCompletePreset(presetLabel || 'Custom');
+                <MonthPicker
+                  value={completeMonthLabel}
+                  onChange={(label, ym, start, end) => {
+                    setCompleteMonthLabel(label);
+                    setCompleteYearMonth(ym);
+                    setCompleteStartDate(start);
+                    setCompleteEndDate(end);
                   }}
-                  placeholder="Select Date Range"
+                  align="right"
+                  placeholder="Select Month & Year"
                 />
               </div>
             </div>
@@ -1192,7 +1099,7 @@ export default function AttendanceListClient({
               </div>
 
               {/* Reset Button */}
-              {(completeStudentId || completeStatusFilter !== 'All' || completeSearchQuery) && (
+              {(completeStudentId || completeStatusFilter !== 'All' || completeSearchQuery || completeMonthLabel) && (
                 <div className="pb-0.5">
                   <button
                     type="button"
@@ -1200,6 +1107,10 @@ export default function AttendanceListClient({
                       setCompleteStudentId('');
                       setCompleteStatusFilter('All');
                       setCompleteSearchQuery('');
+                      setCompleteMonthLabel('');
+                      setCompleteYearMonth('');
+                      setCompleteStartDate('');
+                      setCompleteEndDate('');
                     }}
                     className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition cursor-pointer"
                   >
@@ -1217,7 +1128,7 @@ export default function AttendanceListClient({
               <span className="text-xs font-bold text-[#6E3955] uppercase tracking-wider block">Total Logs Audited</span>
               <span className="text-2xl font-black text-[#2D041A] mt-1 block tabular-nums">{completeStats.total}</span>
               <span className="text-[11px] text-[#8C5E77]">
-                {completePreset === 'Today' ? "Today's logs" : 'Across filtered dates'}
+                {completeMonthLabel || 'All Periods'}
               </span>
             </div>
 
@@ -1251,21 +1162,17 @@ export default function AttendanceListClient({
                 <span className="text-[11px] font-semibold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2 py-0.5 rounded-full">
                   {filteredCompleteRecords.length} Entries
                 </span>
-                {completePreset === 'Today' && (
-                  <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
-                    Live Today
-                  </span>
-                )}
               </div>
               <span className="text-xs text-gray-500">
-                Range: {completeStartDate || 'All'} to {completeEndDate || 'All'}
+                Period: {completeMonthLabel || 'All Periods'}
               </span>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto w-full">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="bg-[#FFF9FB] text-[#590231] border-b border-[#F0D5E4] font-bold uppercase tracking-wider text-xs">
+                    <th className="py-4 px-5">Roll Number</th>
                     <th className="py-4 px-5">Student Name</th>
                     <th className="py-4 px-5">Course</th>
                     <th className="py-4 px-5">Batch</th>
@@ -1278,18 +1185,20 @@ export default function AttendanceListClient({
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {filteredCompleteRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-gray-400">
+                      <td colSpan={8} className="py-12 text-center text-gray-400">
                         <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                        <p className="font-semibold text-gray-600">No attendance records found for the selected date range.</p>
-                        <p className="text-xs text-gray-400 mt-1">Try selecting "Last 30 Days" or "All Time" to view past records.</p>
+                        <p className="font-semibold text-gray-600">No attendance records found for the selected period.</p>
+                        <p className="text-xs text-gray-400 mt-1">Try selecting a different month or clearing filters.</p>
                       </td>
                     </tr>
                   ) : (
                     filteredCompleteRecords.map((r) => (
                       <tr key={r.id} className="hover:bg-[#FFFDFC] transition">
+                        <td className="py-4 px-5 font-mono font-bold text-gray-700 text-xs">
+                          {r.roll_number || '—'}
+                        </td>
                         <td className="py-4 px-5">
                           <div className="font-bold text-gray-900 text-sm">{r.student_name}</div>
-                          <div className="text-xs font-mono text-gray-500 mt-0.5">{r.roll_number}</div>
                         </td>
                         <td className="py-4 px-5">
                           <span className="font-bold text-[#8A064D] text-sm">{r.course_title}</span>
