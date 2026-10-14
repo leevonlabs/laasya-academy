@@ -324,10 +324,9 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
     { value: '12', label: 'December' },
   ];
 
-  // Available Years: Comprehensive scrollable list of all years
+  // Available Years: Comprehensive scrollable list of all years up to 2040
   const availableYears = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const maxYear = Math.max(currentYear + 2, 2028);
+    const maxYear = 2040;
     const minYear = 2018;
     const list: string[] = ['all'];
     for (let y = maxYear; y >= minYear; y--) {

@@ -41,7 +41,7 @@ class _TrainerStudentCalendarScreenState extends State<TrainerStudentCalendarScr
 
   void _showMonthYearPicker() async {
     final now = DateTime.now();
-    final List<int> years = [now.year - 1, now.year, now.year + 1];
+    final List<int> years = List.generate(2040 - 2020 + 1, (i) => 2020 + i);
     final List<String> monthNames = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
@@ -77,25 +77,28 @@ class _TrainerStudentCalendarScreenState extends State<TrainerStudentCalendarScr
 
               const Text('Academic Year', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 6),
-              Row(
-                children: years.map((yr) {
-                  final isSelected = yr == tempYear;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text('$yr'),
-                      selected: isSelected,
-                      selectedColor: LaasyaColors.primary,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight: FontWeight.bold,
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: years.map((yr) {
+                    final isSelected = yr == tempYear;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text('$yr'),
+                        selected: isSelected,
+                        selectedColor: LaasyaColors.primary,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        onSelected: (val) {
+                          if (val) setModalState(() => tempYear = yr);
+                        },
                       ),
-                      onSelected: (val) {
-                        if (val) setModalState(() => tempYear = yr);
-                      },
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }).toList(),
+                ),
               ),
 
               const SizedBox(height: 14),

@@ -30,7 +30,8 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
   int? _selectedMonth = 10; // Default: October (10), null = All Months
 
   static const List<int> _availableYears = [
-    2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030
+    2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030,
+    2031, 2032, 2033, 2034, 2035, 2036, 2037, 2038, 2039, 2040
   ];
 
   static const List<String> _monthNames = [
