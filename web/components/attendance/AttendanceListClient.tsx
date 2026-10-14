@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Course, Batch, AttendanceAuditRecord, Student } from '@/lib/academy';
+import { Course, Batch, AttendanceAuditRecord, Student, GuruAttendanceAuditRecord, Trainer } from '@/lib/academy';
 import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
 import StudentSearchSelect, { StudentOption } from '@/components/common/StudentSearchSelect';
+import GuruAttendanceTab from './GuruAttendanceTab';
 import { 
   ClipboardCheck, 
   Search, 
@@ -25,14 +26,19 @@ import {
   AlertTriangle,
   RefreshCw,
   MapPin,
-  ChevronRight
+  ChevronRight,
+  Award,
+  Eye,
+  CheckCircle
 } from 'lucide-react';
 
 interface Props {
   initialAuditRecords: AttendanceAuditRecord[];
+  initialGuruAuditRecords?: GuruAttendanceAuditRecord[];
   courses: Course[];
   batches: Batch[];
   students?: Student[];
+  trainers?: Trainer[];
 }
 
 const COURSE_GURUS_MAP: Record<string, string> = {
@@ -56,11 +62,18 @@ const COURSE_GURUS_MAP: Record<string, string> = {
   'Chess': 'Coach Sai Krishna (State Medalist)',
 };
 
-export default function AttendanceListClient({ initialAuditRecords, courses, batches, students = [] }: Props) {
+export default function AttendanceListClient({ 
+  initialAuditRecords, 
+  initialGuruAuditRecords = [], 
+  courses, 
+  batches, 
+  students = [], 
+  trainers = [] 
+}: Props) {
   // -------------------------------------------------------------
-  // TOP NAVIGATION TABS: Tab 1 = Course-Wise, Tab 2 = Complete
+  // TOP NAVIGATION TABS: Tab 1 = Course-Wise, Tab 2 = Complete, Tab 3 = Guru Attendance
   // -------------------------------------------------------------
-  const [activeTab, setActiveTab] = useState<'course_wise' | 'complete'>('course_wise');
+  const [activeTab, setActiveTab] = useState<'course_wise' | 'complete' | 'guru_attendance'>('course_wise');
 
   // Base Records from database with Live Realtime Sync
   const [allRecords, setAllRecords] = useState<AttendanceAuditRecord[]>(initialAuditRecords);
@@ -88,6 +101,37 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
     const timer = setInterval(fetchLatestAuditRecords, 4000);
     return () => clearInterval(timer);
   }, [fetchLatestAuditRecords]);
+
+  // -------------------------------------------------------------
+  // TAB 3: GURU ATTENDANCE STATE & SYNC
+  // -------------------------------------------------------------
+  const [guruRecords, setGuruRecords] = useState<GuruAttendanceAuditRecord[]>(initialGuruAuditRecords);
+  const [isGuruSyncing, setIsGuruSyncing] = useState<boolean>(false);
+
+  const fetchLatestGuruAuditRecords = useCallback(async () => {
+    try {
+      setIsGuruSyncing(true);
+      const res = await fetch('/api/attendance?guruAudit=true');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.records)) {
+          setGuruRecords(json.records);
+        }
+      }
+    } catch (err) {
+      console.warn('Guru attendance sync notice:', err);
+    } finally {
+      setIsGuruSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'guru_attendance') {
+      fetchLatestGuruAuditRecords();
+      const guruTimer = setInterval(fetchLatestGuruAuditRecords, 5000);
+      return () => clearInterval(guruTimer);
+    }
+  }, [activeTab, fetchLatestGuruAuditRecords]);
 
   // -------------------------------------------------------------
   // TAB 1: COURSE-WISE DRILL-DOWN STATE
@@ -363,56 +407,84 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => handleExportCSV(
-              activeTab === 'course_wise' ? filteredBatchRecords : filteredCompleteRecords,
-              activeTab === 'course_wise' 
-                ? `batch_audit_${currentBatch?.name || currentCourse?.title || 'records'}`
-                : 'academy_complete_audit'
-            )}
-            className="bg-[#590231] hover:bg-[#780442] text-white border border-[#EBB128] px-4 py-2.5 rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-[#F9E33A]" />
-            <span>Download CSV Audit</span>
-          </button>
+          {activeTab !== 'guru_attendance' ? (
+            <button
+              onClick={() => handleExportCSV(
+                activeTab === 'course_wise' ? filteredBatchRecords : filteredCompleteRecords,
+                activeTab === 'course_wise' 
+                  ? `batch_audit_${currentBatch?.name || currentCourse?.title || 'records'}`
+                  : 'academy_complete_audit'
+              )}
+              className="bg-[#590231] hover:bg-[#780442] text-white border border-[#EBB128] px-4 py-2.5 rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer"
+            >
+              <Download className="w-4 h-4 text-[#F9E33A]" />
+              <span>Download CSV Audit</span>
+            </button>
+          ) : (
+            <button
+              onClick={fetchLatestGuruAuditRecords}
+              disabled={isGuruSyncing}
+              className="bg-[#590231] hover:bg-[#780442] text-white border border-[#EBB128] px-4 py-2.5 rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-60"
+            >
+              <RefreshCw className={`w-4 h-4 text-[#F9E33A] ${isGuruSyncing ? 'animate-spin' : ''}`} />
+              <span>{isGuruSyncing ? 'Refreshing...' : 'Live Sync'}</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* =================================================================== */}
       {/* 2. TOP TABS SWITCHER */}
       {/* =================================================================== */}
-      <div className="bg-white p-2 rounded-2xl border border-[#F0D5E4] shadow-xs flex items-center gap-2.5">
+      <div className="bg-white p-2 rounded-2xl border border-[#F0D5E4] shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
         <button
           onClick={() => setActiveTab('course_wise')}
-          className={`flex-1 py-3.5 px-5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2.5 cursor-pointer ${
+          className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
             activeTab === 'course_wise'
               ? 'bg-[#8A064D] text-white shadow-md'
               : 'text-gray-600 hover:text-[#8A064D] hover:bg-gray-50'
           }`}
         >
-          <BookOpen className="w-4.5 h-4.5" />
-          <span>Course-Wise Attendance</span>
-          <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+          <BookOpen className="w-4 h-4" />
+          <span>Course-Wise</span>
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold hidden md:inline-block ${
             activeTab === 'course_wise' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
           }`}>
-            Course & Batch Drill-down
+            Batch Drill-down
           </span>
         </button>
 
         <button
           onClick={() => setActiveTab('complete')}
-          className={`flex-1 py-3.5 px-5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2.5 cursor-pointer ${
+          className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
             activeTab === 'complete'
               ? 'bg-[#8A064D] text-white shadow-md'
               : 'text-gray-600 hover:text-[#8A064D] hover:bg-gray-50'
           }`}
         >
-          <Layers className="w-4.5 h-4.5" />
-          <span>Complete Attendance Audit</span>
-          <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+          <Layers className="w-4 h-4" />
+          <span>Complete Audit</span>
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold hidden md:inline-block ${
             activeTab === 'complete' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
           }`}>
-            All Students Across Academy
+            All Disciples
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('guru_attendance')}
+          className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+            activeTab === 'guru_attendance'
+              ? 'bg-[#8A064D] text-white shadow-md'
+              : 'text-gray-600 hover:text-[#8A064D] hover:bg-gray-50'
+          }`}
+        >
+          <GraduationCap className="w-4 h-4" />
+          <span>Guru Attendance</span>
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold hidden md:inline-block ${
+            activeTab === 'guru_attendance' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+          }`}>
+            Roll-Call & Close Class
           </span>
         </button>
       </div>
@@ -1130,6 +1202,19 @@ export default function AttendanceListClient({ initialAuditRecords, courses, bat
           </div>
 
         </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* SECTION 3: TAB 3 — GURU ATTENDANCE AUDIT */}
+      {/* =================================================================== */}
+      {activeTab === 'guru_attendance' && (
+        <GuruAttendanceTab
+          initialRecords={guruRecords}
+          trainers={trainers}
+          courses={courses}
+          isLiveSyncing={isGuruSyncing}
+          onRefresh={fetchLatestGuruAuditRecords}
+        />
       )}
 
     </div>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAttendanceAuditRecords } from '@/lib/academy';
+import { getAttendanceAuditRecords, getGuruAttendanceAuditRecords } from '@/lib/academy';
 import { query, queryOne } from '@/lib/db';
 
 const corsHeaders = {
@@ -67,7 +67,29 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, history: formatted }, { headers: corsHeaders });
     }
 
-    // 2. Default audit view for admin portal
+    // 2. Guru Attendance Audit for admin portal
+    const isGuruAudit = searchParams.get('guruAudit') === 'true' || searchParams.get('type') === 'guru';
+    if (isGuruAudit) {
+      const trainerId = searchParams.get('trainerId') || undefined;
+      const courseId = searchParams.get('courseId') || searchParams.get('course_id') || undefined;
+      const startDate = searchParams.get('startDate') || searchParams.get('start_date') || undefined;
+      const endDate = searchParams.get('endDate') || searchParams.get('end_date') || undefined;
+      const dateFilter = searchParams.get('dateFilter') || searchParams.get('date') || undefined;
+      const status = searchParams.get('status') || undefined;
+
+      const guruRecords = await getGuruAttendanceAuditRecords({
+        trainerId,
+        courseId,
+        startDate,
+        endDate,
+        dateFilter,
+        status,
+      });
+
+      return NextResponse.json({ success: true, records: guruRecords }, { headers: corsHeaders });
+    }
+
+    // 3. Default student audit view for admin portal
     const courseId = searchParams.get('courseId') || searchParams.get('course_id') || undefined;
     const startDate = searchParams.get('startDate') || searchParams.get('start_date') || undefined;
     const endDate = searchParams.get('endDate') || searchParams.get('end_date') || undefined;

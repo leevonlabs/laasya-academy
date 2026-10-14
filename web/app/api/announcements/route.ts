@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const isGuru = body.sender_role === 'trainer' || body.trainer_name || body.trainer_id;
-    if (!user && !isGuru) {
+    const isAdmin = user?.role === 'owner' || body.sender_role === 'admin' || body.announcement_type === 'banner' || (!isGuru && !user);
+    if (!user && !isGuru && !isAdmin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
     }
 
@@ -59,7 +60,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Title is required', field: 'title' }, { status: 400, headers: corsHeaders });
     }
     if (!body.message || body.message.trim() === '') {
-      return NextResponse.json({ error: 'Message is required', field: 'message' }, { status: 400, headers: corsHeaders });
+      // For banners or ads where description is optional, default message to the title
+      if (body.announcement_type === 'banner' || body.image_url) {
+        body.message = body.title.trim();
+      } else {
+        return NextResponse.json({ error: 'Message is required', field: 'message' }, { status: 400, headers: corsHeaders });
+      }
     }
     if (!body.publish_date) {
       body.publish_date = new Date().toISOString().split('T')[0];

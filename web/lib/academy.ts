@@ -1351,3 +1351,119 @@ export async function getAttendanceAuditRecords(options?: {
   const rows = await query<AttendanceAuditRecord>(sql, params);
   return JSON.parse(JSON.stringify(rows));
 }
+
+export interface GuruAttendanceAuditRecord {
+  session_id: string;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  session_status: string;
+  batch_id: string;
+  batch_name: string;
+  room_or_hall: string;
+  course_id: string;
+  course_title: string;
+  trainer_id: string;
+  trainer_name: string;
+  trainer_title: string;
+  specializations: string[] | null;
+  marked_students_count: number;
+  present_students_count: number;
+  absent_students_count: number;
+  total_enrolled: number;
+  guru_status: 'present' | 'absent' | 'upcoming';
+}
+
+export async function getGuruAttendanceAuditRecords(options?: {
+  trainerId?: string;
+  courseId?: string;
+  startDate?: string;
+  endDate?: string;
+  dateFilter?: string;
+  status?: string;
+}): Promise<GuruAttendanceAuditRecord[]> {
+  let sql = `
+    SELECT 
+      cs.id as session_id,
+      TO_CHAR(cs.session_date, 'YYYY-MM-DD') as session_date,
+      cs.start_time::text as start_time,
+      cs.end_time::text as end_time,
+      cs.status as session_status,
+      b.id as batch_id,
+      b.name as batch_name,
+      COALESCE(b.room_or_hall, 'Mandapam') as room_or_hall,
+      c.id as course_id,
+      c.title as course_title,
+      t.id as trainer_id,
+      COALESCE(p.full_name, 'Assigned Guru') as trainer_name,
+      COALESCE(t.display_title, 'Faculty Guru') as trainer_title,
+      t.specializations,
+      COALESCE(att_stats.marked_count, 0) as marked_students_count,
+      COALESCE(att_stats.present_count, 0) as present_students_count,
+      COALESCE(att_stats.absent_count, 0) as absent_students_count,
+      COALESCE(enr_stats.enrolled_count, 0) as total_enrolled,
+      CASE 
+        WHEN cs.session_date > CURRENT_DATE THEN 'upcoming'
+        WHEN (cs.status = 'completed' OR COALESCE(alert_check.has_alert, false) = true) AND COALESCE(att_stats.marked_count, 0) > 0 THEN 'present'
+        ELSE 'absent'
+      END as guru_status
+    FROM public.class_sessions cs
+    JOIN public.batches b ON cs.batch_id = b.id
+    JOIN public.courses c ON b.course_id = c.id
+    LEFT JOIN public.trainers t ON cs.trainer_id = t.id OR b.trainer_id = t.id
+    LEFT JOIN public.profiles p ON t.profile_id = p.id
+    LEFT JOIN LATERAL (
+      SELECT 
+        count(*)::int as marked_count,
+        count(*) FILTER (WHERE a.status = 'present')::int as present_count,
+        count(*) FILTER (WHERE a.status = 'absent')::int as absent_count
+      FROM public.attendance a
+      WHERE a.session_id = cs.id
+    ) att_stats ON true
+    LEFT JOIN LATERAL (
+      SELECT count(*)::int as enrolled_count
+      FROM public.batch_enrollments be
+      WHERE be.batch_id = cs.batch_id AND be.status = 'active'
+    ) enr_stats ON true
+    LEFT JOIN LATERAL (
+      SELECT true as has_alert
+      FROM public.session_alerts sa
+      WHERE (sa.batch_id = cs.batch_id::text OR sa.batch_name = b.name)
+        AND sa.alert_type = 'class_closed'
+        AND sa.created_at::date = cs.session_date
+      LIMIT 1
+    ) alert_check ON true
+    WHERE 1=1
+  `;
+  const params: any[] = [];
+  if (options?.trainerId && options.trainerId !== 'all') {
+    params.push(options.trainerId);
+    sql += ` AND t.id = $${params.length}`;
+  }
+  if (options?.courseId && options.courseId !== 'all') {
+    params.push(options.courseId);
+    sql += ` AND c.id = $${params.length}`;
+  }
+  if (options?.dateFilter) {
+    params.push(options.dateFilter);
+    sql += ` AND cs.session_date = $${params.length}`;
+  }
+  if (options?.startDate) {
+    params.push(options.startDate);
+    sql += ` AND cs.session_date >= $${params.length}`;
+  }
+  if (options?.endDate) {
+    params.push(options.endDate);
+    sql += ` AND cs.session_date <= $${params.length}`;
+  }
+
+  sql += ` ORDER BY cs.session_date DESC, cs.start_time DESC;`;
+
+  const rows = await query<GuruAttendanceAuditRecord>(sql, params);
+  
+  if (options?.status && options.status !== 'all') {
+    return rows.filter(r => r.guru_status === options.status);
+  }
+  return rows;
+}
+

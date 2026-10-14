@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/widgets/laasya_avatar.dart';
 import '../auth/portal_landing_screen.dart';
 import '../student/student_messages_screen.dart';
 import '../student/student_video_library_screen.dart';
@@ -154,50 +155,11 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
   }
 
   Widget _buildAvatarWidget(String? avatarUrl, {double size = 60, VoidCallback? onTap}) {
-    Widget imageContent;
-    if (avatarUrl != null && avatarUrl.trim().isNotEmpty) {
-      final trimmed = avatarUrl.trim();
-      if (trimmed.startsWith('data:image')) {
-        try {
-          final bytes = base64Decode(trimmed.split(',').last);
-          imageContent = Image.memory(bytes, fit: BoxFit.cover, width: size, height: size);
-        } catch (_) {
-          imageContent = Image.asset('assets/images/crest_logo.png', fit: BoxFit.cover, width: size, height: size);
-        }
-      } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-        imageContent = Image.network(
-          trimmed,
-          fit: BoxFit.cover,
-          width: size,
-          height: size,
-          errorBuilder: (_, __, ___) => Image.asset('assets/images/crest_logo.png', fit: BoxFit.cover, width: size, height: size),
-        );
-      } else if (trimmed.startsWith('assets/')) {
-        imageContent = Image.asset(trimmed, fit: BoxFit.cover, width: size, height: size);
-      } else {
-        imageContent = Image.asset('assets/images/crest_logo.png', fit: BoxFit.cover, width: size, height: size);
-      }
-    } else {
-      imageContent = Image.asset('assets/images/crest_logo.png', fit: BoxFit.cover, width: size, height: size);
-    }
-
-    final avatarCircle = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: LaasyaColors.accentGold, width: 2),
-      ),
-      child: ClipOval(child: imageContent),
+    return LaasyaAvatar(
+      avatarUrl: avatarUrl,
+      size: size,
+      onTap: onTap,
     );
-
-    if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        child: avatarCircle,
-      );
-    }
-    return avatarCircle;
   }
 
   void _showFullPhotoDialog(BuildContext context, String? avatarUrl, String name, String subtitle) {

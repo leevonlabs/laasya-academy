@@ -218,9 +218,12 @@ class SupabaseService {
   // ---------------------------------------------------------------------------
   // AUTH & PROFILES
   // ---------------------------------------------------------------------------
+  // AUTHENTICATION & LOGIN
+  // ---------------------------------------------------------------------------
   Future<Map<String, dynamic>?> signInWithPassword({
     required String email,
     required String password,
+    String? role,
   }) async {
     final identifier = email.trim();
 
@@ -233,17 +236,22 @@ class SupabaseService {
         body: jsonEncode({
           'identifier': identifier,
           'password': password,
+          if (role != null) 'role': role,
         }),
       ).timeout(const Duration(seconds: 15));
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['profile'] != null) {
-          _cachedProfile = Map<String, dynamic>.from(decoded['profile']);
+          final prof = Map<String, dynamic>.from(decoded['profile']);
+          if (role != null && prof['role'] != role) {
+            throw Exception('Access Denied: This account is not registered as a $role.');
+          }
+          _cachedProfile = prof;
           await _saveProfileToPrefs(_cachedProfile!);
           return _cachedProfile;
         }
-      } else if (res.statusCode == 401 || res.statusCode == 400 || res.statusCode == 404) {
+      } else if (res.statusCode == 401 || res.statusCode == 400 || res.statusCode == 403 || res.statusCode == 404) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['error'] != null) {
           throw Exception(decoded['error']);
@@ -297,12 +305,21 @@ class SupabaseService {
         'avatar_url': null,
         'monthly_salary': 40000,
         'salary_payment_status': 'paid',
+        'display_title': 'Director & Instrument Maestro',
+        'title_name': 'Director & Instrument Maestro',
+        'course_name': 'Instrument Classes',
+        'primary_course': 'Instrument Classes',
         'specialization': 'Violin, Guitar, Keyboard & Western Music',
         'designation': 'Director & Multi-Instrumentalist (Trinity / RSL Topper)',
         'assigned_room': 'Saraswathi Nilayam (Hall 2)',
         'assigned_batches_count': 4,
         'total_students_count': 52,
       };
+      if (role != null && role != 'trainer') {
+        _cachedProfile = null;
+        throw Exception('Access Denied: This account belongs to a Revered Guru. Please log in via the Guru Login screen.');
+      }
+      if (_cachedProfile != null) await _saveProfileToPrefs(_cachedProfile!);
       return _cachedProfile;
     } else if (identifier.contains('manikandan') || identifier.contains('vocal')) {
       _cachedProfile = {
@@ -316,12 +333,21 @@ class SupabaseService {
         'avatar_url': null,
         'monthly_salary': 38000,
         'salary_payment_status': 'paid',
+        'display_title': 'Carnatic Vocal Master',
+        'title_name': 'Carnatic Vocal Master',
+        'course_name': 'Carnatic Music',
+        'primary_course': 'Carnatic Music',
         'specialization': 'Carnatic Vocal & Classical Music',
         'designation': 'Title "Sangeetha Acharya" • 15+ Yrs Palakkad Disciple',
         'assigned_room': 'Sangeetha Shala (Room 102)',
         'assigned_batches_count': 3,
         'total_students_count': 35,
       };
+      if (role != null && role != 'trainer') {
+        _cachedProfile = null;
+        throw Exception('Access Denied: This account belongs to a Revered Guru. Please log in via the Guru Login screen.');
+      }
+      if (_cachedProfile != null) await _saveProfileToPrefs(_cachedProfile!);
       return _cachedProfile;
     } else if (identifier.contains('vijay') || identifier.contains('karatte') || identifier.contains('martial')) {
       _cachedProfile = {
@@ -335,12 +361,21 @@ class SupabaseService {
         'avatar_url': null,
         'monthly_salary': 32000,
         'salary_payment_status': 'pending',
+        'display_title': 'Karate Sensei (2nd Dan)',
+        'title_name': 'Karate Sensei (2nd Dan)',
+        'course_name': 'Karate',
+        'primary_course': 'Karate',
         'specialization': 'Karatte & Self Defense Disciplines',
         'designation': 'Sensei (2nd Dan Black Belt)',
         'assigned_room': 'Veera Kalari Koodam',
         'assigned_batches_count': 2,
         'total_students_count': 28,
       };
+      if (role != null && role != 'trainer') {
+        _cachedProfile = null;
+        throw Exception('Access Denied: This account belongs to a Revered Guru. Please log in via the Guru Login screen.');
+      }
+      if (_cachedProfile != null) await _saveProfileToPrefs(_cachedProfile!);
       return _cachedProfile;
     } else if (identifier.contains('guru') || identifier.contains('anusha') || identifier.contains('trainer') || identifier.contains('11111') || identifier.contains('dance') || identifier.contains('radhika')) {
       _cachedProfile = {
@@ -354,12 +389,21 @@ class SupabaseService {
         'avatar_url': null,
         'monthly_salary': 45000,
         'salary_payment_status': 'paid',
+        'display_title': 'Founder & Head Guru',
+        'title_name': 'Founder & Head Guru',
+        'course_name': 'Bharatanatyam',
+        'primary_course': 'Bharatanatyam',
         'specialization': 'Bharatanatyam Classical Dance',
         'designation': 'Founder & Head Guru (Guruvayoor Arangetram)',
         'assigned_room': 'Natya Mandapam (Room 101)',
         'assigned_batches_count': 4,
         'total_students_count': 42,
       };
+      if (role != null && role != 'trainer') {
+        _cachedProfile = null;
+        throw Exception('Access Denied: This account belongs to a Revered Guru. Please log in via the Guru Login screen.');
+      }
+      if (_cachedProfile != null) await _saveProfileToPrefs(_cachedProfile!);
       return _cachedProfile;
     }
 
@@ -496,7 +540,13 @@ class SupabaseService {
         'due_date': '10th Oct 2026',
         'next_due_date': '10th Nov 2026',
       };
-      if (_cachedProfile != null) await _saveProfileToPrefs(_cachedProfile!);
+      if (_cachedProfile != null) {
+        if (role != null && _cachedProfile!['role'] != role) {
+          _cachedProfile = null;
+          throw Exception('Access Denied: This account belongs to a Student. Please log in via the Student Login screen.');
+        }
+        await _saveProfileToPrefs(_cachedProfile!);
+      }
       return _cachedProfile;
     }
   }
@@ -558,9 +608,18 @@ class SupabaseService {
             if (role == 'trainer') {
               final trainer = await _client!.from('trainers').select().eq('profile_id', user.id).maybeSingle();
               if (trainer != null) {
+                final displayTitle = trainer['display_title'] ?? 'Revered Faculty Guru';
+                profileData['display_title'] = displayTitle;
+                profileData['title_name'] = displayTitle;
+                final specs = trainer['specializations'];
+                final courseName = (specs is List && specs.isNotEmpty)
+                    ? specs.first.toString()
+                    : 'Classical Arts';
+                profileData['course_name'] = courseName;
+                profileData['primary_course'] = courseName;
                 profileData['monthly_salary'] = trainer['monthly_salary'];
                 profileData['salary_payment_status'] = trainer['salary_payment_status'] ?? 'paid';
-                profileData['specialization'] = trainer['display_title'] ?? trainer['bio'];
+                profileData['specialization'] = trainer['display_title'] ?? trainer['bio'] ?? courseName;
                 profileData['age'] = trainer['age'] ?? profileData['age'];
                 profileData['gender'] = trainer['gender'] ?? profileData['gender'];
                 profileData['avatar_url'] = trainer['avatar_url'] ?? profileData['avatar_url'];

@@ -207,9 +207,9 @@ export async function createAnnouncement(data: {
   if (!data.title || data.title.trim() === '') {
     throw new Error('Title is required');
   }
-  if (!data.message || data.message.trim() === '') {
-    throw new Error('Message is required');
-  }
+  const effectiveMessage = (data.message && data.message.trim() !== '')
+    ? data.message.trim()
+    : (data.title ? data.title.trim() : 'Academy Announcement');
   if (!data.publish_date) {
     throw new Error('Publish date is required');
   }
@@ -288,7 +288,7 @@ export async function createAnnouncement(data: {
       updated_at::text as updated_at;
   `, [
     data.title.trim(),
-    data.message.trim(),
+    effectiveMessage,
     data.audience,
     validCourseId,
     data.target_course_title || null,
@@ -317,9 +317,9 @@ export async function createAnnouncement(data: {
     const alertCourseTitle = isGuru
       ? `New Announcement from Guru: ${data.title.trim()}`
       : `New Announcement from Admin: ${data.title.trim()}`;
-    const previewMessage = data.message.trim().length > 140 
-      ? `${data.message.trim().substring(0, 137)}...` 
-      : data.message.trim();
+    const previewMessage = effectiveMessage.length > 140 
+      ? `${effectiveMessage.substring(0, 137)}...` 
+      : effectiveMessage;
     const alertMessage = `${previewMessage} (Shared by ${senderFullName} [${senderRoleName}])`;
 
     await query(`
@@ -365,9 +365,9 @@ export async function updateAnnouncement(
   if (!data.title || data.title.trim() === '') {
     throw new Error('Title is required');
   }
-  if (!data.message || data.message.trim() === '') {
-    throw new Error('Message is required');
-  }
+  const effectiveMessage = (data.message && data.message.trim() !== '')
+    ? data.message.trim()
+    : (data.title ? data.title.trim() : 'Academy Announcement');
 
   const status = data.status || 'Published';
   const deliveryStatus = status === 'Draft' 
@@ -375,6 +375,9 @@ export async function updateAnnouncement(
     : status === 'Scheduled' 
       ? 'Queued for Scheduled Dispatch' 
       : 'System verified (Delivered)';
+
+  const validCourseId = isValidUuid(data.target_course_id) ? data.target_course_id : null;
+  const validBatchId = isValidUuid(data.target_batch_id) ? data.target_batch_id : null;
 
   const [updated] = await query<Announcement>(`
     UPDATE public.announcements
@@ -421,11 +424,11 @@ export async function updateAnnouncement(
   `, [
     id,
     data.title.trim(),
-    data.message.trim(),
+    effectiveMessage,
     data.audience,
-    data.target_course_id || null,
+    validCourseId,
     data.target_course_title || null,
-    data.target_batch_id || null,
+    validBatchId,
     data.target_batch_name || null,
     data.type_tag,
     data.publish_date,

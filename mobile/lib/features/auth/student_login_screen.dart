@@ -43,10 +43,16 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
       final profile = await SupabaseService().signInWithPassword(
         email: input,
         password: password,
+        role: 'student',
       );
 
       if (profile == null) {
         throw Exception('Failed to sign in. Please verify your credentials.');
+      }
+
+      if (profile['role'] != 'student') {
+        await SupabaseService().signOut();
+        throw Exception('Access Denied: This login portal is strictly reserved for Disciples & Students. Revered Gurus must log in through the Guru Login portal.');
       }
 
       if (!mounted) return;

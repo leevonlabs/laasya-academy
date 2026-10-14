@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/widgets/laasya_avatar.dart';
 import 'student_messages_screen.dart';
 import 'student_video_library_screen.dart';
 
@@ -442,72 +443,11 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
   }
 
   Widget _buildAvatarWidget(String? avatarUrl, {double size = 58, VoidCallback? onTap}) {
-    Widget imageContent;
-    if (avatarUrl != null && avatarUrl.trim().isNotEmpty) {
-      final trimmed = avatarUrl.trim();
-      if (trimmed.startsWith('data:image')) {
-        try {
-          final bytes = base64Decode(trimmed.split(',').last);
-          imageContent = Image.memory(bytes, fit: BoxFit.cover, width: size, height: size);
-        } catch (_) {
-          imageContent = CircleAvatar(
-            backgroundColor: const Color(0xFFD4AF37),
-            radius: size / 2,
-            child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
-          );
-        }
-      } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-        imageContent = Image.network(
-          trimmed,
-          fit: BoxFit.cover,
-          width: size,
-          height: size,
-          errorBuilder: (_, __, ___) => CircleAvatar(
-            backgroundColor: const Color(0xFFD4AF37),
-            radius: size / 2,
-            child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
-          ),
-        );
-      } else if (trimmed.startsWith('assets/')) {
-        imageContent = Image.asset(trimmed, fit: BoxFit.cover, width: size, height: size);
-      } else {
-        imageContent = CircleAvatar(
-          backgroundColor: const Color(0xFFD4AF37),
-          radius: size / 2,
-          child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
-        );
-      }
-    } else {
-      imageContent = CircleAvatar(
-        backgroundColor: const Color(0xFFD4AF37),
-        radius: size / 2,
-        child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
-      );
-    }
-
-    final avatarCircle = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: LaasyaColors.accentGold, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 6,
-          ),
-        ],
-      ),
-      child: ClipOval(child: imageContent),
+    return LaasyaAvatar(
+      avatarUrl: avatarUrl,
+      size: size,
+      onTap: onTap,
     );
-
-    if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        child: avatarCircle,
-      );
-    }
-    return avatarCircle;
   }
 
   void _showFullPhotoDialog(BuildContext context, String? avatarUrl, String name, String subtitle) {
@@ -603,12 +543,13 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
       if (trimmed.startsWith('data:image')) {
         try {
           final bytes = base64Decode(trimmed.split(',').last);
-          return Image.memory(bytes, fit: BoxFit.contain);
+          return Image.memory(bytes, fit: BoxFit.contain, gaplessPlayback: true);
         } catch (_) {}
       } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
         return Image.network(
           trimmed,
           fit: BoxFit.contain,
+          gaplessPlayback: true,
           loadingBuilder: (context, child, progress) {
             if (progress == null) return child;
             return const Center(child: CircularProgressIndicator(color: LaasyaColors.accentGold));
@@ -616,7 +557,7 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
           errorBuilder: (_, __, ___) => _buildPlaceholderPhoto(),
         );
       } else if (trimmed.startsWith('assets/')) {
-        return Image.asset(trimmed, fit: BoxFit.contain);
+        return Image.asset(trimmed, fit: BoxFit.contain, gaplessPlayback: true);
       }
     }
     return _buildPlaceholderPhoto();

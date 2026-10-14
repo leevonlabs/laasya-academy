@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/widgets/laasya_avatar.dart';
 import '../student/student_video_library_screen.dart';
 import 'trainer_salaries_screen.dart';
 import 'trainer_announcements_screen.dart';
@@ -435,74 +436,11 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
   }
 
   Widget _buildAvatarWidget(String? avatarUrl, {double size = 58, VoidCallback? onTap}) {
-    Widget imageContent;
-    if (avatarUrl != null && avatarUrl.trim().isNotEmpty) {
-      final trimmed = avatarUrl.trim();
-      if (trimmed.startsWith('data:image')) {
-        try {
-          final bytes = base64Decode(trimmed.split(',').last);
-          imageContent = Image.memory(bytes, fit: BoxFit.cover, width: size, height: size);
-        } catch (_) {
-          imageContent = CircleAvatar(
-            backgroundColor: const Color(0xFFD4AF37),
-            radius: size / 2,
-            child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
-          );
-        }
-      } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-        imageContent = Image.network(
-          trimmed,
-          fit: BoxFit.cover,
-          width: size,
-          height: size,
-          errorBuilder: (_, __, ___) => CircleAvatar(
-            backgroundColor: const Color(0xFFD4AF37),
-            radius: size / 2,
-            child: Icon(Icons.person, size: size * 0.6, color: Colors.white),
-          ),
-        );
-      } else if (trimmed.startsWith('assets/')) {
-        imageContent = Image.asset(trimmed, fit: BoxFit.cover, width: size, height: size);
-      } else {
-        imageContent = Image.asset(
-          'assets/images/crest_logo.png',
-          fit: BoxFit.cover,
-          width: size,
-          height: size,
-        );
-      }
-    } else {
-      imageContent = Image.asset(
-        'assets/images/crest_logo.png',
-        fit: BoxFit.cover,
-        width: size,
-        height: size,
-      );
-    }
-
-    final avatarCircle = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: LaasyaColors.accentGold, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 6,
-          ),
-        ],
-      ),
-      child: ClipOval(child: imageContent),
+    return LaasyaAvatar(
+      avatarUrl: avatarUrl,
+      size: size,
+      onTap: onTap,
     );
-
-    if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        child: avatarCircle,
-      );
-    }
-    return avatarCircle;
   }
 
   void _showFullPhotoDialog(BuildContext context, String? avatarUrl, String name, String subtitle) {
@@ -598,12 +536,13 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
       if (trimmed.startsWith('data:image')) {
         try {
           final bytes = base64Decode(trimmed.split(',').last);
-          return Image.memory(bytes, fit: BoxFit.contain);
+          return Image.memory(bytes, fit: BoxFit.contain, gaplessPlayback: true);
         } catch (_) {}
       } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
         return Image.network(
           trimmed,
           fit: BoxFit.contain,
+          gaplessPlayback: true,
           loadingBuilder: (context, child, progress) {
             if (progress == null) return child;
             return const Center(child: CircularProgressIndicator(color: LaasyaColors.accentGold));
@@ -611,7 +550,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
           errorBuilder: (_, __, ___) => _buildPlaceholderPhoto(),
         );
       } else if (trimmed.startsWith('assets/')) {
-        return Image.asset(trimmed, fit: BoxFit.contain);
+        return Image.asset(trimmed, fit: BoxFit.contain, gaplessPlayback: true);
       }
     }
     return _buildPlaceholderPhoto();
@@ -634,8 +573,9 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
     }
 
     final name = _profile?['full_name'] ?? 'Smt. Anusha Sumesh';
-    final designation = _profile?['designation'] ?? 'Head Guru & Choreographer';
-    final specialization = _profile?['specialization'] ?? 'Bharatanatyam Classical Dance';
+    final guruTitle = _profile?['display_title'] ?? _profile?['title_name'] ?? _profile?['designation'] ?? 'Revered Faculty Guru';
+    final courseName = _profile?['course_name'] ?? _profile?['primary_course'] ?? _profile?['specialization'] ?? 'Classical Discipline';
+    final specialization = _profile?['specialization'] ?? courseName;
     final avatarUrl = _profile?['avatar_url'] as String? ?? _profile?['photo_url'] as String? ?? _profile?['image_url'] as String?;
     final monthlySalary = _profile?['monthly_salary'] ?? 45000;
     final salaryPaymentStatus = (_profile?['salary_payment_status'] ?? 'paid').toString().toLowerCase();
@@ -680,7 +620,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                       // Avatar with golden border (Tap to view full length photo)
                       _buildAvatarWidget(
                         avatarUrl,
-                        onTap: () => _showFullPhotoDialog(context, avatarUrl, name, '$designation • $specialization'),
+                        onTap: () => _showFullPhotoDialog(context, avatarUrl, name, '$guruTitle • $courseName'),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -729,11 +669,12 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              '$designation • $specialization',
+                              '$guruTitle • $courseName',
                               style: const TextStyle(
                                 color: LaasyaColors.accentGold,
-                                fontSize: 11,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
+                                letterSpacing: 0.3,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,

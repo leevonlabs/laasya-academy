@@ -963,13 +963,6 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
             >
               <BookOpen className="w-4 h-4" />
               <span>Course-Wise</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                activeTab === 'course_wise'
-                  ? 'bg-[#2D041A] text-[#F9E33A]'
-                  : 'bg-white/20 text-white'
-              }`}>
-                {courses.length} Courses
-              </span>
             </button>
 
             <button
@@ -986,13 +979,6 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
             >
               <Video className="w-4 h-4" />
               <span>All Videos</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                activeTab === 'all_videos'
-                  ? 'bg-[#2D041A] text-[#F9E33A]'
-                  : 'bg-white/20 text-white'
-              }`}>
-                {items.length} Links
-              </span>
             </button>
 
             {/* 3. Guru Share Tab */}
@@ -1010,13 +996,6 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
             >
               <Users className="w-4 h-4" />
               <span>Guru Share</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                activeTab === 'guru_share'
-                  ? 'bg-[#2D041A] text-[#F9E33A]'
-                  : 'bg-white/20 text-white'
-              }`}>
-                {guruSharedItems.length} Shared
-              </span>
             </button>
           </div>
 
@@ -1725,7 +1704,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
               <div>
                 <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <Video className="w-5 h-5 text-[#8A064D]" />
-                  <span>All Active Event Media Folders ({allVideosFilteredItems.length})</span>
+                  <span>All Active Event Media Folders</span>
                 </h2>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Complete history of event folders and video links shared across academy disciplines

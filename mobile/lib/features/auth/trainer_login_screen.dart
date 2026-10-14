@@ -43,10 +43,16 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
       final profile = await SupabaseService().signInWithPassword(
         email: input,
         password: password,
+        role: 'trainer',
       );
 
       if (profile == null) {
         throw Exception('Failed to sign in. Please verify your faculty credentials.');
+      }
+
+      if (profile['role'] != 'trainer') {
+        await SupabaseService().signOut();
+        throw Exception('Access Denied: This login portal is strictly reserved for Revered Gurus & Faculty. Disciples & Students must log in through the Student Login portal.');
       }
 
       if (!mounted) return;

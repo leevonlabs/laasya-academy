@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
         SELECT 
           t.id as trainer_id,
           t.profile_id,
+          t.display_title,
           t.specializations,
           t.is_active,
           p.full_name,
@@ -84,16 +85,21 @@ export async function POST(request: NextRequest) {
         const isPasswordValid = passCheck?.verified || trimmedPass === '123456';
 
         if (isPasswordValid) {
-          // Fetch trainer batches count and student count
+          // Fetch trainer batches count, student count, and primary course title
           const batchStats = await queryOne<any>(`
             SELECT 
               count(distinct b.id)::int as assigned_batches_count,
               count(distinct be.student_id)::int as total_students_count,
-              COALESCE(min(b.room_or_hall), 'Mandapam') as assigned_room
+              COALESCE(min(b.room_or_hall), 'Mandapam') as assigned_room,
+              COALESCE(min(c.title), 'Classical Arts') as primary_course_title
             FROM public.batches b
+            LEFT JOIN public.courses c ON c.id = b.course_id
             LEFT JOIN public.batch_enrollments be ON be.batch_id = b.id AND be.status = 'active'
             WHERE b.trainer_id = $1
           `, [trainer.trainer_id]);
+
+          const guruDisplayTitle = trainer.display_title || 'Revered Faculty Guru';
+          const guruCourseName = batchStats?.primary_course_title || (Array.isArray(trainer.specializations) && trainer.specializations.length > 0 ? trainer.specializations[0] : 'Classical Arts');
 
           const profile = {
             id: trainer.trainer_id,
@@ -105,7 +111,11 @@ export async function POST(request: NextRequest) {
             avatar_url: trainer.avatar_url,
             age: trainer.age || 35,
             gender: trainer.gender || 'Not specified',
-            specialization: Array.isArray(trainer.specializations) ? trainer.specializations.join(', ') : 'Classical Arts',
+            display_title: guruDisplayTitle,
+            title_name: guruDisplayTitle,
+            course_name: guruCourseName,
+            primary_course: guruCourseName,
+            specialization: Array.isArray(trainer.specializations) ? trainer.specializations.join(', ') : guruCourseName,
             assigned_room: batchStats?.assigned_room || 'Natya Mandapam',
             assigned_batches_count: batchStats?.assigned_batches_count || 1,
             total_students_count: batchStats?.total_students_count || 20,
@@ -118,6 +128,31 @@ export async function POST(request: NextRequest) {
             { status: 401, headers: corsHeaders }
           );
         }
+      } else if (targetRole === 'trainer') {
+        // Check if user is actually a student trying to log into Guru portal
+        const studentCheck = await queryOne<any>(`
+          SELECT s.id, p.full_name FROM public.students s
+          JOIN public.profiles p ON s.profile_id = p.id
+          WHERE (
+            (LENGTH($1) >= 8 AND regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
+            OR (LENGTH($1) >= 8 AND regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
+            OR LOWER(s.roll_number) = LOWER($2)
+            OR LOWER(p.email) = LOWER($2)
+            OR LOWER(p.full_name) = LOWER($2)
+          ) LIMIT 1
+        `, [cleanDigits, rawInput]);
+
+        if (studentCheck) {
+          return NextResponse.json(
+            { success: false, error: `Access Denied: The account for "${studentCheck.full_name}" is a Student account. Please log in via the Disciple / Student Login portal.` },
+            { status: 403, headers: corsHeaders }
+          );
+        }
+
+        return NextResponse.json(
+          { success: false, error: 'No Guru or Faculty account found with these credentials. Please check your registered mobile or contact administration.' },
+          { status: 404, headers: corsHeaders }
+        );
       }
     }
 
@@ -277,6 +312,29 @@ export async function POST(request: NextRequest) {
             { status: 401, headers: corsHeaders }
           );
         }
+      } else if (targetRole === 'student') {
+        // Check if user is actually a Guru trying to log into Student portal
+        const guruCheck = await queryOne<any>(`
+          SELECT t.id, p.full_name FROM public.trainers t
+          JOIN public.profiles p ON t.profile_id = p.id
+          WHERE (
+            (LENGTH($1) >= 8 AND regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
+            OR LOWER(p.email) = LOWER($2)
+            OR LOWER(p.full_name) = LOWER($2)
+          ) LIMIT 1
+        `, [cleanDigits, rawInput]);
+
+        if (guruCheck) {
+          return NextResponse.json(
+            { success: false, error: `Access Denied: The account for "${guruCheck.full_name}" is a Revered Guru / Faculty account. Please log in via the Guru Login portal.` },
+            { status: 403, headers: corsHeaders }
+          );
+        }
+
+        return NextResponse.json(
+          { success: false, error: 'No Student account found matching this identifier. Please verify your registered contact number or Roll Number.' },
+          { status: 404, headers: corsHeaders }
+        );
       }
     }
 

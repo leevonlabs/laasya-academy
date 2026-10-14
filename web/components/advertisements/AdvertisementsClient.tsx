@@ -268,12 +268,17 @@ export default function AdvertisementsClient({ initialAnnouncements, courses, ba
         : formData.publish_date;
 
       const cleanActionLinks = formData.action_links.filter(l => l.title.trim() && l.url.trim());
+      const effectiveMessage = formData.message.trim() || formData.title.trim();
 
       const res = await fetch('/api/announcements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           ...formData,
+          message: effectiveMessage,
+          sender_role: 'admin',
+          created_by: 'Academy Director',
           publish_date: effectivePublishDate,
           announcement_type: 'banner',
           action_links: cleanActionLinks,
@@ -323,12 +328,17 @@ export default function AdvertisementsClient({ initialAnnouncements, courses, ba
         : formData.publish_date;
 
       const cleanActionLinks = formData.action_links.filter(l => l.title.trim() && l.url.trim());
+      const effectiveMessage = formData.message.trim() || formData.title.trim();
 
       const res = await fetch(`/api/announcements/${editingAnnouncement.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           ...formData,
+          message: effectiveMessage,
+          sender_role: 'admin',
+          created_by: 'Academy Director',
           publish_date: effectivePublishDate,
           announcement_type: 'banner',
           action_links: cleanActionLinks,
