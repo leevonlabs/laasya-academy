@@ -84,28 +84,41 @@ export async function sendFcmMessages({
   }
 
   // 2. If Firebase Admin Service Account credentials are provided:
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  let saData: any = null;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    try {
+      saData = typeof process.env.FIREBASE_SERVICE_ACCOUNT_KEY === 'string'
+        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
+        : process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    } catch (_) {}
+  }
 
-  if (serviceAccountJson || (privateKey && clientEmail)) {
+  if (!saData && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+    saData = {
+      projectId: process.env.FIREBASE_PROJECT_ID || 'laasya-academy',
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    };
+  }
+
+  if (!saData) {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const p = path.join(process.cwd(), 'firebase-service-account.json');
+      if (fs.existsSync(p)) {
+        saData = JSON.parse(fs.readFileSync(p, 'utf8'));
+      }
+    } catch (_) {}
+  }
+
+  if (saData) {
     try {
       const { getApps, initializeApp, cert } = await import('firebase-admin/app');
       const { getMessaging } = await import('firebase-admin/messaging');
 
       if (!getApps().length) {
-        let credential;
-        if (serviceAccountJson) {
-          const parsed = typeof serviceAccountJson === 'string' ? JSON.parse(serviceAccountJson) : serviceAccountJson;
-          credential = cert(parsed);
-        } else {
-          credential = cert({
-            projectId,
-            clientEmail: clientEmail!,
-            privateKey: privateKey!.replace(/\\n/g, '\n'),
-          });
-        }
-        initializeApp({ credential });
+        initializeApp({ credential: cert(saData) });
       }
 
       const messaging = getMessaging();
