@@ -28,7 +28,6 @@ class AlarmService {
         'message': message,
       });
     } catch (_) {
-      // Fallback
       SystemSound.play(SystemSoundType.alert);
       HapticFeedback.heavyImpact();
     }
@@ -70,8 +69,27 @@ class AlarmService {
     } catch (_) {}
   }
 
-  /// Saves student configuration for battery-friendly periodic background check when closed
+  /// Prompts user to exempt app from battery optimizations so alarms ring even when app is closed / phone locked
+  static Future<void> requestBatteryOptimization() async {
+    try {
+      await _channel.invokeMethod('requestBatteryOptimization');
+    } catch (_) {}
+  }
+
+  /// Checks if battery optimization is currently ignored
+  static Future<bool> isIgnoringBatteryOptimizations() async {
+    try {
+      final res = await _channel.invokeMethod<bool>('isIgnoringBatteryOptimizations');
+      return res ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Starts the persistent background alert service (START_STICKY) that monitors
+  /// class completion alerts even when the app is closed, killed, or swiped from recent history.
   static Future<void> startBackgroundAlertService({
+    String role = 'student',
     required String studentId,
     required String rollNumber,
     required String name,
@@ -80,6 +98,7 @@ class AlarmService {
   }) async {
     try {
       await _channel.invokeMethod('startBackgroundAlertService', {
+        'role': role,
         'student_id': studentId,
         'roll_number': rollNumber,
         'name': name,
@@ -89,7 +108,7 @@ class AlarmService {
     } catch (_) {}
   }
 
-  /// Stops the background check (e.g. upon student sign out)
+  /// Stops the background alert service (e.g. upon user sign out)
   static Future<void> stopBackgroundAlertService() async {
     try {
       await _channel.invokeMethod('stopBackgroundAlertService');

@@ -88,11 +88,16 @@ export async function GET(request: NextRequest) {
       LIMIT 50;
     `, [windowSeconds]);
 
+    const roleParam = (searchParams.get('role') || 'student').toLowerCase();
+    const isTrainer = roleParam === 'trainer' || roleParam === 'guru' || roleParam === 'faculty';
+
     // Resolve student identifiers and batch enrollments from DB if student info provided
     const studentDbIds: string[] = [];
     const studentBatchIds: string[] = [];
     const studentRolls: string[] = [];
     const studentNames: string[] = [];
+    const studentBatchNames: string[] = [];
+    const studentCourseTitles: string[] = [];
 
     const cleanPhone = (phoneParam || '').replace(/\D/g, '');
     const matchCriteria = [studentIdParam, rollParam].filter(Boolean) as string[];
@@ -100,10 +105,13 @@ export async function GET(request: NextRequest) {
     if (matchCriteria.length > 0 || cleanPhone.length >= 8) {
       try {
         const studentRows = await query<any>(`
-          SELECT s.id, s.profile_id, s.roll_number, p.full_name, be.batch_id
+          SELECT s.id, s.profile_id, s.roll_number, p.full_name, be.batch_id,
+                 b.name AS batch_name, c.title AS course_title, c.short_title
           FROM public.students s
           JOIN public.profiles p ON s.profile_id = p.id
           LEFT JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
+          LEFT JOIN public.batches b ON b.id = be.batch_id
+          LEFT JOIN public.courses c ON c.id = b.course_id
           WHERE s.id::text = ANY($1::text[]) 
              OR s.profile_id::text = ANY($1::text[]) 
              OR LOWER(s.roll_number) = ANY(SELECT LOWER(x) FROM unnest($1::text[]) x)
@@ -119,6 +127,9 @@ export async function GET(request: NextRequest) {
           }
           if (r.full_name) studentNames.push(r.full_name.toLowerCase());
           if (r.batch_id) studentBatchIds.push(r.batch_id.toLowerCase());
+          if (r.batch_name) studentBatchNames.push(r.batch_name.toLowerCase());
+          if (r.course_title) studentCourseTitles.push(r.course_title.toLowerCase());
+          if (r.short_title) studentCourseTitles.push(r.short_title.toLowerCase());
         });
       } catch (dbErr) {
         console.warn('Error querying student enrollment context for alerts:', dbErr);
@@ -135,7 +146,18 @@ export async function GET(request: NextRequest) {
       const targetRoll = (a.target_roll_number || '').toLowerCase();
       const targetRollDigits = targetRoll.replace(/\D/g, '');
       const targetName = (a.target_student_name || '').toLowerCase();
+      const aCourse = (a.course_title || '').toLowerCase();
+      const aBatch = (a.batch_name || '').toLowerCase();
 
+      // Guru/Trainer role: receives admin announcements, notices, and messages
+      if (isTrainer) {
+        if (a.alert_type === 'message' || a.alert_type === 'announcement' || a.alert_type === 'admin_alert') {
+          return true;
+        }
+        return false;
+      }
+
+      // Student role:
       if (a.alert_type === 'attendance_marked') {
         // Attendance alert is STRICTLY PERSONAL - ONLY match if targeted to this disciple!
         // 1. Direct ID match
@@ -156,20 +178,40 @@ export async function GET(request: NextRequest) {
       if (a.alert_type === 'message' || a.alert_type === 'announcement') {
         const isGuruSender = a.trainer_name && !a.trainer_name.toLowerCase().includes('director') && !a.trainer_name.toLowerCase().includes('admin');
         if (isGuruSender) {
-          if (bId && bId !== 'all') {
-            return allowedBatchIds.includes(bId) || studentBatchIds.includes(bId);
-          }
-          return allowedBatchIds.includes(bId) || studentBatchIds.includes(bId);
+          if (!bId || bId === 'all') return true;
+          return allowedBatchIds.includes(bId) || studentBatchIds.includes(bId) || studentBatchNames.some(bn => bn.includes(aBatch) || aBatch.includes(bn));
         }
+        // Broadcasts from Admin / Academy Director
         if (!bId || bId === 'all') return true;
         if (allowedBatchIds.includes(bId) || studentBatchIds.includes(bId)) return true;
-        return false;
+        if (studentBatchNames.some(bn => bn.includes(aBatch) || aBatch.includes(bn))) return true;
+        if (studentCourseTitles.some(ct => ct.includes(aCourse) || aCourse.includes(ct))) return true;
+        return true; // General announcements are visible to disciples
       }
 
-      // Class closed alert: matches if disciple is enrolled in this batch or all batches allowed
-      if (allowedBatchIds.length === 0 && studentBatchIds.length === 0) return true; // 'all'
-      if (allowedBatchIds.length > 0 && allowedBatchIds.includes(bId)) return true;
-      if (studentBatchIds.length > 0 && studentBatchIds.includes(bId)) return true;
+      // Class closed alert:
+      if (a.alert_type === 'class_closed') {
+        // If client requested 'all' batches or client batches are empty
+        if (!batchIdsParam || batchIdsParam.toLowerCase() === 'all' || allowedBatchIds.length === 0) {
+          // If we have student's course or batch enrollments from DB, check if they overlap
+          if (studentCourseTitles.length > 0 || studentBatchNames.length > 0 || studentBatchIds.length > 0) {
+            const courseMatch = studentCourseTitles.some(ct => ct && (aCourse.includes(ct) || ct.includes(aCourse)));
+            const batchMatch = studentBatchNames.some(bn => bn && (aBatch.includes(bn) || bn.includes(aBatch)));
+            const idMatch = bId === 'all' || (bId && (studentBatchIds.includes(bId) || allowedBatchIds.includes(bId)));
+            if (courseMatch || batchMatch || idMatch) return true;
+          }
+          // Default allow if query did not specify narrow batchIds
+          return true;
+        }
+
+        if (bId === 'all') return true;
+        if (allowedBatchIds.includes(bId)) return true;
+        if (studentBatchIds.includes(bId)) return true;
+        if (studentBatchNames.some(bn => bn && (aBatch.includes(bn) || bn.includes(aBatch)))) return true;
+        if (studentCourseTitles.some(ct => ct && (aCourse.includes(ct) || ct.includes(aCourse)))) return true;
+
+        return false;
+      }
 
       return false;
     });

@@ -8,18 +8,26 @@ class PermissionService {
   static const String _prefKey = 'laasya_permissions_prompted_v3';
   static bool _dialogShowing = false;
 
-  /// Requests all necessary permissions once after install / first launch.
-  /// Uses SharedPreferences to ensure the user is NOT repeatedly prompted on every app launch.
-  static Future<void> requestAppPermissions(BuildContext context) async {
+  /// Proactively prompts the user if critical notifications or background battery exemption are missing.
+  /// Called upon login into StudentMainScaffold or TrainerMainScaffold.
+  static Future<void> promptRequiredPermissions(BuildContext context) async {
     try {
+      final notifGranted = await Permission.notification.isGranted;
+      final batteryIgnored = await AlarmService.isIgnoringBatteryOptimizations();
+
+      if (notifGranted && batteryIgnored) {
+        return; // All required permissions already active!
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final hasPrompted = prefs.getBool(_prefKey) ?? false;
-      if (hasPrompted) return;
+      if (hasPrompted && notifGranted) {
+        return;
+      }
 
       if (!context.mounted || _dialogShowing) return;
       _dialogShowing = true;
 
-      // Show clean, essential permissions dialog
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -30,11 +38,11 @@ class PermissionService {
           actionsPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
           title: const Row(
             children: [
-              Icon(Icons.verified_user_rounded, color: LaasyaColors.primary, size: 26),
+              Icon(Icons.notifications_active_rounded, color: LaasyaColors.primary, size: 26),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Permissions Required',
+                  'Alert Permissions Required',
                   style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16.5, color: LaasyaColors.textDark),
                 ),
               ),
@@ -45,24 +53,24 @@ class PermissionService {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'To receive real-time class completion alarms, attendance updates, and media features, please grant the following permissions:',
+                'To guarantee that you receive real-time class conclusion alerts, pickup chimes ("Class is over, hooray hooray!"), and notices even when the app is closed, please grant these permissions:',
                 style: TextStyle(fontSize: 12.5, color: Colors.black87, height: 1.4),
               ),
               const SizedBox(height: 16),
               _permRow(
                 Icons.notifications_active_rounded,
-                'Notifications & Attention Alerts',
-                'Sounds 10-second alert and vibrates when class concludes to notify parents for pickup.',
+                'System Notifications & Alarms',
+                'Sounds vocal alert and vibrates when class concludes to notify parents for pickup, even outside the app.',
                 const Color(0xFFC2410C),
                 const Color(0xFFFFEDD5),
               ),
               const SizedBox(height: 12),
               _permRow(
-                Icons.camera_alt_rounded,
-                'Camera & Photos',
-                'To capture and upload profile pictures and academy media.',
-                const Color(0xFF1E429F),
-                const Color(0xFFE1EFFE),
+                Icons.battery_charging_full_rounded,
+                'Background Activity (Unrestricted)',
+                'Allows alert monitoring when the app is closed or device is locked without being killed by Android power saving.',
+                const Color(0xFF0D7446),
+                const Color(0xFFDEF7EC),
               ),
             ],
           ),
@@ -96,7 +104,7 @@ class PermissionService {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 2,
                     ),
-                    child: const Text('Grant Permissions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                    child: const Text('Allow Permissions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
                   ),
                 ),
               ],
@@ -105,10 +113,15 @@ class PermissionService {
         ),
       );
     } catch (e) {
-      debugPrint('Permission request error: $e');
+      debugPrint('Permission prompt error: $e');
     } finally {
       _dialogShowing = false;
     }
+  }
+
+  /// Requests all necessary permissions once after install / first launch.
+  static Future<void> requestAppPermissions(BuildContext context) async {
+    await promptRequiredPermissions(context);
   }
 
   /// Internal handler that requests clean system permissions natively and via permission_handler

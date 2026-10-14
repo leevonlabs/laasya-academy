@@ -7,6 +7,7 @@ import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/alarm_service.dart';
+import '../../core/services/permission_service.dart';
 import '../trainer/trainer_data_store.dart';
 import 'student_dashboard_tab.dart';
 import 'student_courses_tab.dart';
@@ -39,6 +40,9 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     _startNetworkAlertPolling();
     _checkInitialNotificationRoute();
     AlarmService.setNotificationOpenedHandler(_handleNotificationOpened);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) PermissionService.promptRequiredPermissions(context);
+    });
   }
 
   void _handleNotificationOpened(Map<String, dynamic> data) {
@@ -86,6 +90,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
       }
 
       await AlarmService.startBackgroundAlertService(
+        role: 'student',
         studentId: studentId,
         rollNumber: rollNumber,
         name: studentName,
@@ -147,15 +152,18 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
 
           if (_isFirstPoll) {
             _isFirstPoll = false;
-            // On startup, mark all historical alerts as seen so past alerts NEVER ring on opening the app
+            final nowMs = DateTime.now().millisecondsSinceEpoch;
+            // On startup, mark historical alerts (older than 3 minutes) as processed,
+            // but preserve fresh alerts created recently so they sound when the app opens!
             for (var a in alerts) {
               final alertId = a['id']?.toString() ?? '';
-              if (alertId.isNotEmpty) {
+              final createdAtMs = int.tryParse(a['created_at_ms']?.toString() ?? '') ?? 0;
+              final isRecent = createdAtMs > 0 && (nowMs - createdAtMs).abs() < 180000;
+              if (alertId.isNotEmpty && !isRecent) {
                 _globalProcessedAlertIds.add(alertId);
                 AlarmService.markAlertProcessed(alertId);
               }
             }
-            return; // Never trigger alarms on initial app launch!
           }
 
           // Filter strictly fresh alerts not yet handled by Flutter or background service

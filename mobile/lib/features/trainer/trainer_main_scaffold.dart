@@ -1,5 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
+import '../../core/services/supabase_service.dart';
+import '../../core/services/permission_service.dart';
 import 'trainer_dashboard_tab.dart';
 import 'trainer_classes_tab.dart';
 import 'trainer_students_tab.dart';
@@ -18,12 +25,183 @@ class TrainerMainScaffold extends StatefulWidget {
 
 class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
   int _currentIndex = 0;
+  Timer? _alertPollTimer;
+  static final Set<String> _globalProcessedAlertIds = {};
+  bool _isFirstPoll = true;
+  bool _isPolling = false;
 
   @override
   void initState() {
     super.initState();
+    _startBackgroundAlertService();
+    _startNetworkAlertPolling();
     _checkInitialNotificationRoute();
     AlarmService.setNotificationOpenedHandler(_handleNotificationOpened);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) PermissionService.promptRequiredPermissions(context);
+    });
+  }
+
+  @override
+  void dispose() {
+    _alertPollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _startBackgroundAlertService() async {
+    try {
+      final prof = SupabaseService().currentUserProfile;
+      final trainerId = (prof?['id'] ?? prof?['profile_id'] ?? '').toString();
+      final trainerName = (prof?['full_name'] ?? 'Guru').toString();
+      final phone = (prof?['phone'] ?? '').toString();
+
+      await AlarmService.startBackgroundAlertService(
+        role: 'trainer',
+        studentId: trainerId,
+        rollNumber: trainerId,
+        name: trainerName,
+        phone: phone,
+        batchIds: 'all',
+      );
+    } catch (_) {}
+  }
+
+  void _startNetworkAlertPolling() {
+    _alertPollTimer?.cancel();
+    // Poll every 3 seconds for live circulars and administrative alerts
+    _alertPollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollSessionAlerts());
+  }
+
+  Future<void> _pollSessionAlerts() async {
+    if (_isPolling || !mounted) return;
+    _isPolling = true;
+    try {
+      final prof = SupabaseService().currentUserProfile;
+      final trainerId = (prof?['id'] ?? prof?['profile_id'] ?? '').toString();
+      final trainerName = (prof?['full_name'] ?? 'Guru').toString();
+      final phone = (prof?['phone'] ?? '').toString();
+
+      final idEnc = Uri.encodeComponent(trainerId);
+      final nameEnc = Uri.encodeComponent(trainerName);
+      final phoneEnc = Uri.encodeComponent(phone);
+
+      final uri = Uri.parse(
+        '${ApiConstants.baseUrl}/api/sessions/alerts?batchIds=all&studentId=$idEnc&rollNumber=$idEnc&name=$nameEnc&phone=$phoneEnc&role=trainer&sinceSeconds=1800'
+      );
+      final res = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['success'] == true && decoded['alerts'] is List) {
+          final alerts = List<Map<String, dynamic>>.from(decoded['alerts']);
+
+          if (_isFirstPoll) {
+            _isFirstPoll = false;
+            final nowMs = DateTime.now().millisecondsSinceEpoch;
+            for (var a in alerts) {
+              final alertId = a['id']?.toString() ?? '';
+              final createdAtMs = int.tryParse(a['created_at_ms']?.toString() ?? '') ?? 0;
+              final isRecent = createdAtMs > 0 && (nowMs - createdAtMs).abs() < 180000;
+              if (alertId.isNotEmpty && !isRecent) {
+                _globalProcessedAlertIds.add(alertId);
+                AlarmService.markAlertProcessed(alertId);
+              }
+            }
+          }
+
+          final List<Map<String, dynamic>> freshAlerts = [];
+          for (var a in alerts) {
+            final id = a['id']?.toString() ?? '';
+            if (id.isEmpty) continue;
+            if (_globalProcessedAlertIds.contains(id)) continue;
+
+            final isProcessedInService = await AlarmService.isAlertProcessed(id);
+            if (isProcessedInService) {
+              _globalProcessedAlertIds.add(id);
+              continue;
+            }
+
+            _globalProcessedAlertIds.add(id);
+            AlarmService.markAlertProcessed(id);
+            freshAlerts.add(a);
+          }
+
+          if (freshAlerts.isNotEmpty && mounted) {
+            for (var alert in freshAlerts) {
+              _showTrainerNoticeSnackBar(alert);
+            }
+          }
+        }
+      }
+    } catch (_) {
+    } finally {
+      _isPolling = false;
+    }
+  }
+
+  void _showTrainerNoticeSnackBar(Map<String, dynamic> alert) {
+    SystemSound.play(SystemSoundType.alert);
+    HapticFeedback.mediumImpact();
+
+    final title = alert['course_title'] ?? alert['title'] ?? 'Academy Notice';
+    final msg = alert['message'] ?? 'New administrative circular posted.';
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: LaasyaColors.primaryDark,
+        duration: const Duration(seconds: 6),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: LaasyaColors.accentGold, width: 1.5),
+        ),
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: LaasyaColors.accentGold.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.campaign_rounded, color: LaasyaColors.accentGold, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    msg,
+                    style: const TextStyle(fontSize: 11, color: Colors.white70),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        action: SnackBarAction(
+          label: 'VIEW',
+          textColor: LaasyaColors.accentGold,
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen()),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   void _handleNotificationOpened(Map<String, dynamic> data) {

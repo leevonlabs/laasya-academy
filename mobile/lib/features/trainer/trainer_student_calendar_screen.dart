@@ -40,7 +40,6 @@ class _TrainerStudentCalendarScreenState extends State<TrainerStudentCalendarScr
   }
 
   void _showMonthYearPicker() async {
-    final now = DateTime.now();
     final List<int> years = List.generate(2040 - 2020 + 1, (i) => 2020 + i);
     final List<String> monthNames = [
       'January', 'February', 'March', 'April', 'May', 'June',

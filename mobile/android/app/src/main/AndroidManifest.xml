@@ -7,6 +7,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
@@ -34,13 +38,26 @@
             </intent-filter>
         </activity>
 
-        <!-- Standard Google Play compliant JobService for periodic background check when closed (no permanent foreground service) -->
+        <!-- Background Alert Service: Monitors class completion alarms & notifications when app is closed / killed -->
         <service
-            android:name=".LaasyaBackgroundSyncJob"
-            android:permission="android.permission.BIND_JOB_SERVICE"
-            android:exported="false" />
+            android:name=".LaasyaAlertService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
-        <!-- Broadcast receiver to stop alarm ring from notification action button -->
+        <!-- Auto-restart background monitoring after phone reboot -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Broadcast receiver to stop alarm chime from notification action button -->
         <receiver
             android:name=".AlarmStopReceiver"
             android:enabled="true"
