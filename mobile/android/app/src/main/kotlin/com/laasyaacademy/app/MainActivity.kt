@@ -4,26 +4,26 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.job.JobInfo
+import android.app.job.JobScheduler
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
-import android.media.Ringtone
-import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
-import android.provider.Settings
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.graphics.BitmapFactory
 import androidx.annotation.NonNull
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -33,11 +33,105 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
-    private val CHANNEL = "com.laasyaacademy.app/alarm"
-    private val ACTION_STOP_ALARM = "com.laasyaacademy.app.ACTION_STOP_ALARM"
+    companion object {
+        const val CHANNEL_NAME = "com.laasyaacademy.app/alarm"
+        const val ACTION_STOP_ALARM = "com.laasyaacademy.app.ACTION_STOP_ALARM"
+
+        const val CHANNEL_CLASS_ALERTS = "laasya_class_completed_chime_v2"
+        const val CHANNEL_ATTENDANCE = "laasya_attendance_channel_v2"
+
+        const val NOTIF_ID_ALARM = 1001
+        const val NOTIF_ID_ATTENDANCE = 1002
+        const val JOB_ID_SYNC = 8801
+
+        var activeInstance: MainActivity? = null
+
+        fun stopActiveAlarm() {
+            activeInstance?.stopAlarm()
+        }
+
+        fun postClassCompletedNotification(context: Context, title: String, message: String) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            ensureNotificationChannels(context)
+
+            val appIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("route", "/attendance")
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                context, 0, appIntent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+            )
+
+            val stopIntent = Intent(context, AlarmStopReceiver::class.java)
+            val stopPendingIntent = PendingIntent.getBroadcast(
+                context, 1, stopIntent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+            )
+
+            val logo = try {
+                BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)
+            } catch (_: Exception) { null }
+
+            val soundUri = Uri.parse("android.resource://${context.packageName}/raw/class_completed")
+
+            val notif = NotificationCompat.Builder(context, CHANNEL_CLASS_ALERTS)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setLargeIcon(logo)
+                .setColor(0xFF8A064D.toInt())
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setSound(soundUri)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "DISMISS", stopPendingIntent)
+                .build()
+
+            nm.notify(NOTIF_ID_ALARM, notif)
+        }
+
+        fun ensureNotificationChannels(context: Context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+                val soundUri = Uri.parse("android.resource://${context.packageName}/raw/class_completed")
+                val audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+
+                // 1. Channel for Class Completed with custom child pickup chime
+                val alertChannel = NotificationChannel(
+                    CHANNEL_CLASS_ALERTS,
+                    "Class Conclusion & Pickup Chimes",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Plays custom vocal chime ('Class is over') when class concludes for child pickup"
+                    enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 500, 200, 500, 200, 500)
+                    setSound(soundUri, audioAttributes)
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                }
+                nm.createNotificationChannel(alertChannel)
+
+                // 2. Channel for Live Attendance
+                val attChannel = NotificationChannel(
+                    CHANNEL_ATTENDANCE,
+                    "Attendance Notifications",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Live attendance status marked by Gurus"
+                    enableVibration(true)
+                }
+                nm.createNotificationChannel(attChannel)
+            }
+        }
+    }
 
     private var mediaPlayer: MediaPlayer? = null
-    private var ringtone: Ringtone? = null
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -53,6 +147,9 @@ class MainActivity: FlutterActivity() {
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
+        activeInstance = this
+        ensureNotificationChannels(this)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -67,6 +164,15 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    override fun onDestroy() {
+        stopAlarm()
+        if (activeInstance == this) activeInstance = null
+        try {
+            unregisterReceiver(stopAlarmReceiver)
+        } catch (_: Exception) {}
+        super.onDestroy()
+    }
+
     override fun onNewIntent(newIntent: Intent) {
         super.onNewIntent(newIntent)
         setIntent(newIntent)
@@ -78,7 +184,7 @@ class MainActivity: FlutterActivity() {
                 "message" to (newIntent.getStringExtra("message") ?: "")
             )
             newIntent.removeExtra("route")
-            MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL)
+            MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL_NAME)
                 .invokeMethod("onNotificationOpened", payload)
         }
     }
@@ -97,19 +203,22 @@ class MainActivity: FlutterActivity() {
         // Auto-request notification permissions on Android 13+
         requestNotificationPermission()
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME).setMethodCallHandler { call, result ->
             when (call.method) {
                 "startAlarmRing" -> {
-                    val durationSec = call.argument<Int>("duration") ?: 10
+                    val durationSec = call.argument<Int>("duration") ?: 11
                     val title = call.argument<String>("title") ?: "CLASS COMPLETED!"
                     val message = call.argument<String>("message") ?: "Class has concluded. Please take your child back."
 
                     startAlarm(durationSec, title, message)
                     result.success(true)
                 }
+                "playClassCompletedSound" -> {
+                    playClassCompletedAudioOnce()
+                    result.success(true)
+                }
                 "stopAlarmRing" -> {
                     stopAlarm()
-                    LaasyaAlertService.stopActiveAlarm()
                     result.success(true)
                 }
                 "showAttendanceNotification" -> {
@@ -129,39 +238,33 @@ class MainActivity: FlutterActivity() {
                     result.success(true)
                 }
                 "requestBatteryOptimization" -> {
-                    requestBatteryOptimization()
                     result.success(true)
                 }
                 "isIgnoringBatteryOptimizations" -> {
-                    result.success(isIgnoringBatteryOptimizations())
+                    result.success(true)
+                }
+                "saveStudentAlertConfig" -> {
+                    val studentId = call.argument<String>("student_id") ?: ""
+                    val rollNumber = call.argument<String>("roll_number") ?: ""
+                    val batchIds = call.argument<String>("batch_ids") ?: "all"
+
+                    saveStudentConfigAndScheduleJob(studentId, rollNumber, batchIds)
+                    result.success(true)
+                }
+                "scheduleBackgroundAlertCheck" -> {
+                    schedulePeriodicBackgroundJob()
+                    result.success(true)
                 }
                 "startBackgroundAlertService" -> {
                     val studentId = call.argument<String>("student_id") ?: ""
                     val rollNumber = call.argument<String>("roll_number") ?: ""
-                    val name = call.argument<String>("name") ?: ""
-                    val phone = call.argument<String>("phone") ?: ""
                     val batchIds = call.argument<String>("batch_ids") ?: "all"
 
-                    val serviceIntent = Intent(this, LaasyaAlertService::class.java).apply {
-                        action = LaasyaAlertService.ACTION_START_MONITORING
-                        putExtra("student_id", studentId)
-                        putExtra("roll_number", rollNumber)
-                        putExtra("name", name)
-                        putExtra("phone", phone)
-                        putExtra("batch_ids", batchIds)
-                    }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        startForegroundService(serviceIntent)
-                    } else {
-                        startService(serviceIntent)
-                    }
+                    saveStudentConfigAndScheduleJob(studentId, rollNumber, batchIds)
                     result.success(true)
                 }
                 "stopBackgroundAlertService" -> {
-                    val serviceIntent = Intent(this, LaasyaAlertService::class.java).apply {
-                        action = LaasyaAlertService.ACTION_STOP_MONITORING
-                    }
-                    startService(serviceIntent)
+                    cancelPeriodicBackgroundJob()
                     result.success(true)
                 }
                 "markAlertProcessed" -> {
@@ -207,19 +310,16 @@ class MainActivity: FlutterActivity() {
     private fun requestAllPermissions() {
         val permissionsToRequest = mutableListOf<String>()
 
-        // 1. Notification Permission (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
 
-        // 2. Camera Permission
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.CAMERA)
         }
 
-        // 3. Media / Storage Permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(Manifest.permission.READ_MEDIA_IMAGES)
@@ -235,72 +335,38 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    private fun requestBatteryOptimization() {
-        // No-op: Do not prompt user for battery optimization exemption to avoid battery drain warnings
-    }
-
-    private fun isIgnoringBatteryOptimizations(): Boolean {
-        return true
-    }
-
     private fun startAlarm(durationSec: Int, title: String, message: String) {
-        stopAlarm() // Clean up any active sound/vibration/wakelock
+        stopAlarm()
 
         try {
-            // 1. Wake screen and acquire WakeLock so alarm sounds even when screen is locked/off
+            // 1. Wake screen briefly
             val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
             wakeLock = powerManager?.newWakeLock(
-                PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
                 "laasya:alarm_wake"
             )
             wakeLock?.acquire((durationSec + 2) * 1000L)
 
-            // 2. Resolve Alarm Ringtone URI
-            var alarmUri: Uri? = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            if (alarmUri == null) {
-                alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-            }
-            if (alarmUri == null) {
-                alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-            }
-
-            // 3. Play looping audible sound at USAGE_ALARM stream
-            if (alarmUri != null) {
-                try {
-                    mediaPlayer = MediaPlayer().apply {
-                        setAudioAttributes(
-                            AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_ALARM)
-                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                                .build()
-                        )
-                        setDataSource(applicationContext, alarmUri)
-                        isLooping = true
-                        prepare()
-                        start()
-                    }
-                } catch (mpErr: Exception) {
-                    // Fallback to RingtoneManager
-                    ringtone = RingtoneManager.getRingtone(applicationContext, alarmUri)
-                    ringtone?.let {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                            it.audioAttributes = AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_ALARM)
-                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                                .build()
-                        } else {
-                            @Suppress("DEPRECATION")
-                            it.streamType = AudioManager.STREAM_ALARM
-                        }
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                            it.isLooping = true
-                        }
-                        it.play()
-                    }
+            // 2. Play custom vocal chime sound (R.raw.class_completed)
+            val soundUri = Uri.parse("android.resource://${packageName}/raw/class_completed")
+            try {
+                mediaPlayer = MediaPlayer().apply {
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    setDataSource(applicationContext, soundUri)
+                    isLooping = false
+                    prepare()
+                    start()
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
 
-            // 4. Vibrate device with urgent alarm cadence
+            // 3. Vibrate device with rhythmic cadence
             vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 vibratorManager?.defaultVibrator
@@ -309,18 +375,18 @@ class MainActivity: FlutterActivity() {
                 getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
             }
 
-            val pattern = longArrayOf(0, 800, 200, 800, 200, 800, 200, 800)
+            val pattern = longArrayOf(0, 500, 200, 500, 200, 500, 200, 500)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
+                vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator?.vibrate(pattern, 0)
+                vibrator?.vibrate(pattern, -1)
             }
 
-            // 5. Fire high-priority Heads-Up Notification with "STOP RINGING" Action
-            showAlarmNotification(title, message, alarmUri)
+            // 4. Fire high-priority Heads-Up Notification
+            postClassCompletedNotification(this, title, message)
 
-            // 6. Automatically stop alarm after specified duration (10 seconds)
+            // 5. Automatically stop alarm after duration
             stopRunnable = Runnable {
                 stopAlarm()
             }
@@ -331,25 +397,40 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    private fun stopAlarm() {
+    private fun playClassCompletedAudioOnce() {
+        try {
+            mediaPlayer?.let {
+                if (it.isPlaying) it.stop()
+                it.release()
+            }
+            val soundUri = Uri.parse("android.resource://${packageName}/raw/class_completed")
+            mediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                setDataSource(applicationContext, soundUri)
+                isLooping = false
+                prepare()
+                start()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun stopAlarm() {
         try {
             stopRunnable?.let { handler.removeCallbacks(it) }
             stopRunnable = null
 
             mediaPlayer?.let {
-                if (it.isPlaying) {
-                    it.stop()
-                }
+                if (it.isPlaying) it.stop()
                 it.release()
             }
             mediaPlayer = null
-
-            ringtone?.let {
-                if (it.isPlaying) {
-                    it.stop()
-                }
-            }
-            ringtone = null
 
             vibrator?.cancel()
             vibrator = null
@@ -359,133 +440,74 @@ class MainActivity: FlutterActivity() {
             }
             wakeLock = null
 
-            // Dismiss the active ringing alarm notification
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.cancel(1001)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun showAlarmNotification(title: String, message: String, soundUri: Uri?) {
-        try {
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val channelId = "laasya_class_alerts_channel"
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val channel = NotificationChannel(
-                    channelId,
-                    "Class Closure Alerts",
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "Urgent attention ring alerts when class session ends"
-                    enableVibration(true)
-                    vibrationPattern = longArrayOf(0, 800, 200, 800)
-                    soundUri?.let {
-                        setSound(it, AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build())
-                    }
-                }
-                notificationManager.createNotificationChannel(channel)
-            }
-
-            val appIntent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
-            val pendingAppIntent = PendingIntent.getActivity(
-                this, 0, appIntent,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
-            )
-
-            // Stop Action PendingIntent directly on the notification
-            val stopIntent = Intent(ACTION_STOP_ALARM)
-            val pendingStopIntent = PendingIntent.getBroadcast(
-                this, 1, stopIntent,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
-            )
-
-            val appLogoBitmap = try {
-                BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
-            } catch (_: Exception) {
-                null
-            }
-
-            val builder = NotificationCompat.Builder(this, channelId)
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setLargeIcon(appLogoBitmap)
-                .setColor(0xFF800020.toInt())
-                .setContentTitle(title)
-                .setContentText(message)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-                .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setCategory(NotificationCompat.CATEGORY_ALARM)
-                .setAutoCancel(true)
-                .setContentIntent(pendingAppIntent)
-                .setFullScreenIntent(pendingAppIntent, true)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "STOP RINGING", pendingStopIntent)
-
-            notificationManager.notify(1001, builder.build())
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(NOTIF_ID_ALARM)
+        } catch (_: Exception) {}
     }
 
     private fun showAttendanceNotification(title: String, message: String, isPresent: Boolean) {
-        try {
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val channelId = "laasya_attendance_channel"
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        ensureNotificationChannels(this)
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val channel = NotificationChannel(
-                    channelId,
-                    "Attendance Notifications",
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "Daily attendance records marked by Gurus"
-                    enableVibration(true)
-                }
-                notificationManager.createNotificationChannel(channel)
-            }
-
-            val intent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
-            val pendingIntent = PendingIntent.getActivity(
-                this, 0, intent,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
-            )
-
-            val appLogoBitmap = try {
-                BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
-            } catch (_: Exception) {
-                null
-            }
-
-            val builder = NotificationCompat.Builder(this, channelId)
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setLargeIcon(appLogoBitmap)
-                .setColor(if (isPresent) 0xFF059669.toInt() else 0xFFDC2626.toInt())
-                .setContentTitle(title)
-                .setContentText(message)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .setContentIntent(pendingIntent)
-
-            val notifId = (System.currentTimeMillis() % 10000).toInt() + 2000
-            notificationManager.notify(notifId, builder.build())
-        } catch (e: Exception) {
-            e.printStackTrace()
+        val appIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("route", "/attendance")
         }
+        val pendingIntent = PendingIntent.getActivity(
+            this, 2, appIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        )
+
+        val logo = try {
+            BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+        } catch (_: Exception) { null }
+
+        val notif = NotificationCompat.Builder(this, CHANNEL_ATTENDANCE)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setLargeIcon(logo)
+            .setColor(if (isPresent) 0xFF0D7446.toInt() else 0xFFDC2626.toInt())
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        nm.notify(NOTIF_ID_ATTENDANCE, notif)
     }
 
-    override fun onDestroy() {
-        stopAlarm()
+    private fun saveStudentConfigAndScheduleJob(studentId: String, rollNumber: String, batchIds: String) {
+        val prefs = getSharedPreferences("laasya_monitoring", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("student_id", studentId)
+            .putString("roll_number", rollNumber)
+            .putString("batch_ids", batchIds)
+            .putBoolean("is_active", true)
+            .apply()
+
+        schedulePeriodicBackgroundJob()
+    }
+
+    private fun schedulePeriodicBackgroundJob() {
         try {
-            unregisterReceiver(stopAlarmReceiver)
+            val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+            val componentName = ComponentName(this, LaasyaBackgroundSyncJob::class.java)
+            val jobInfo = JobInfo.Builder(JOB_ID_SYNC, componentName)
+                .setPeriodic(15 * 60 * 1000) // Standard 15-min periodic check
+                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                .setPersisted(true)
+                .build()
+            jobScheduler.schedule(jobInfo)
         } catch (_: Exception) {}
-        super.onDestroy()
+    }
+
+    private fun cancelPeriodicBackgroundJob() {
+        try {
+            val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+            jobScheduler.cancel(JOB_ID_SYNC)
+            val prefs = getSharedPreferences("laasya_monitoring", Context.MODE_PRIVATE)
+            prefs.edit().clear().apply()
+        } catch (_: Exception) {}
     }
 }

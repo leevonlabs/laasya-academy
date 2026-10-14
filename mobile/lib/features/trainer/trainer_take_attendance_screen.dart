@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/alarm_service.dart';
 import 'trainer_data_store.dart';
 
 class TrainerTakeAttendanceScreen extends StatefulWidget {
@@ -213,7 +214,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Close Class Session?',
+                'Class Completed • Close Session?',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
               ),
             ),
@@ -224,7 +225,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Closing the session for ${widget.classInfo['course_short_title']} (${widget.classInfo['batch_name']}) will trigger an attention alarm ring for 10 seconds on student and parent mobile devices notifying them that class is complete and to take their child back.',
+              'Closing the session for ${widget.classInfo['course_short_title']} (${widget.classInfo['batch_name']}) will sound the custom pickup chime ("Class is over, hooray hooray!") and notify relevant students and parents for child pickup.',
               style: const TextStyle(fontSize: 13, height: 1.45, color: Colors.black87),
             ),
             const SizedBox(height: 12),
@@ -237,11 +238,11 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.ring_volume_rounded, size: 16, color: Color(0xFF8A064D)),
+                  Icon(Icons.music_note_rounded, size: 18, color: Color(0xFF8A064D)),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '10-second attention alarm with "Stop Ringing" button will play on parents\' phones.',
+                      'Vocal child pickup chime will play and alert parents to collect their children.',
                       style: TextStyle(fontSize: 11, color: Color(0xFF8A064D), fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -258,6 +259,9 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
+              // Play custom vocal pickup chime immediately on Guru's device
+              AlarmService.playClassCompletedSound();
+
               setState(() {
                 _store.closeClassSession(
                   batchId: _batchId,
@@ -268,9 +272,9 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
               });
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Class session closed! Attention chime sent to all parents.'),
+                  content: Text('Class Completed! Pickup vocal chime broadcasted to parents.'),
                   backgroundColor: Color(0xFF03543F),
-                  duration: Duration(seconds: 3),
+                  duration: Duration(seconds: 4),
                 ),
               );
             },
@@ -279,7 +283,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Confirm & Close Class', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text('Class Completed (Alert Parents)', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -587,7 +591,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                           ),
                           icon: const Icon(Icons.notifications_active_rounded, size: 18),
                           label: const Text(
-                            'Close Class & Alert Parents',
+                            'Class Completed • Alert Parents',
                             style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
                           ),
                         ),

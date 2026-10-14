@@ -3,10 +3,21 @@ import 'package:flutter/services.dart';
 class AlarmService {
   static const MethodChannel _channel = MethodChannel('com.laasyaacademy.app/alarm');
 
-  /// Starts the device's native loud alarm ringtone & vibrations for 10 seconds.
-  /// Also fires a heads-up system notification with a "STOP RINGING" action button so it alerts even when the user is not live on the screen.
+  /// Plays the custom vocal pickup chime ("Class is over, hooray hooray! Parents come and pick us today...")
+  /// Fired on Guru's phone upon pressing "Class Completed", and on student/parent devices.
+  static Future<void> playClassCompletedSound() async {
+    try {
+      await _channel.invokeMethod('playClassCompletedSound');
+    } catch (_) {
+      SystemSound.play(SystemSoundType.alert);
+      HapticFeedback.mediumImpact();
+    }
+  }
+
+  /// Starts the custom vocal pickup chime ("Class is over...") & vibration.
+  /// Also fires a heads-up system notification with a "DISMISS" action button.
   static Future<void> startAlarmRing({
-    int durationSeconds = 10,
+    int durationSeconds = 11,
     String title = 'CLASS COMPLETED!',
     String message = 'Class session has concluded. Please come and take your child back safely.',
   }) async {
@@ -30,8 +41,7 @@ class AlarmService {
     } catch (_) {}
   }
 
-  /// Shows a high-priority Android system notification for attendance status.
-  /// Appears in the system status bar even when the app is minimized or phone is locked.
+  /// Shows a high-priority system notification for attendance status.
   static Future<void> showAttendanceNotification({
     required String title,
     required String message,
@@ -46,39 +56,21 @@ class AlarmService {
     } catch (_) {}
   }
 
-  /// Requests runtime notification permission on Android 13+ (API 33+)
+  /// Requests runtime notification permission on Android 13+ (API 33+) and iOS
   static Future<void> requestNotificationPermission() async {
     try {
       await _channel.invokeMethod('requestNotificationPermission');
     } catch (_) {}
   }
 
-  /// Requests all permissions (Notifications, Camera, Photos/Media) via native Android
+  /// Requests all required permissions (Notifications, Camera, Media)
   static Future<void> requestAllPermissions() async {
     try {
       await _channel.invokeMethod('requestAllPermissions');
     } catch (_) {}
   }
 
-  /// Requests battery optimization exemption so alarms trigger even when app is closed / screen is locked
-  static Future<void> requestBatteryOptimization() async {
-    try {
-      await _channel.invokeMethod('requestBatteryOptimization');
-    } catch (_) {}
-  }
-
-  /// Checks if battery optimization is currently ignored
-  static Future<bool> isIgnoringBatteryOptimizations() async {
-    try {
-      final res = await _channel.invokeMethod<bool>('isIgnoringBatteryOptimizations');
-      return res ?? true;
-    } catch (_) {
-      return true;
-    }
-  }
-
-  /// Starts the persistent background foreground service (START_STICKY) that monitors
-  /// class completion alerts even when the app is closed, killed, or swiped from recent history.
+  /// Saves student configuration for battery-friendly periodic background check when closed
   static Future<void> startBackgroundAlertService({
     required String studentId,
     required String rollNumber,
@@ -97,21 +89,21 @@ class AlarmService {
     } catch (_) {}
   }
 
-  /// Stops the background foreground alert service (e.g. upon student sign out)
+  /// Stops the background check (e.g. upon student sign out)
   static Future<void> stopBackgroundAlertService() async {
     try {
       await _channel.invokeMethod('stopBackgroundAlertService');
     } catch (_) {}
   }
 
-  /// Marks an alert as processed in the native SharedPreferences so the background service skips it
+  /// Marks an alert as processed in the native SharedPreferences so it skips duplicates
   static Future<void> markAlertProcessed(String alertId) async {
     try {
       await _channel.invokeMethod('markAlertProcessed', {'alert_id': alertId});
     } catch (_) {}
   }
 
-  /// Checks if an alert was already processed by the native service
+  /// Checks if an alert was already processed
   static Future<bool> isAlertProcessed(String alertId) async {
     try {
       final res = await _channel.invokeMethod<bool>('isAlertProcessed', {'alert_id': alertId});

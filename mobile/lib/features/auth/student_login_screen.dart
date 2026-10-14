@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/widgets/laasya_policy_dialog.dart';
 import '../student/student_main_scaffold.dart';
 
 class StudentLoginScreen extends StatefulWidget {
@@ -323,6 +324,46 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                                   Icon(Icons.arrow_forward_rounded, size: 18, color: LaasyaColors.accentGold),
                                 ],
                               ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Privacy Policy & Terms Links
+                    Center(
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          const Text(
+                            'By signing in, you agree to our ',
+                            style: TextStyle(fontSize: 11, color: Colors.black54),
+                          ),
+                          GestureDetector(
+                            onTap: () => LaasyaPolicyDialog.showTerms(context),
+                            child: const Text(
+                              'Terms of Service',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: LaasyaColors.primary,
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                          const Text(' & ', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                          GestureDetector(
+                            onTap: () => LaasyaPolicyDialog.showPrivacy(context),
+                            child: const Text(
+                              'Privacy Policy',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: LaasyaColors.primary,
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

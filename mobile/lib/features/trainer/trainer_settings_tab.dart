@@ -12,6 +12,7 @@ import 'trainer_salaries_screen.dart';
 import 'trainer_share_video_screen.dart';
 import '../../core/services/alarm_service.dart';
 import '../../core/services/permission_service.dart';
+import '../../core/widgets/laasya_policy_dialog.dart';
 
 class TrainerSettingsTab extends StatefulWidget {
   const TrainerSettingsTab({super.key});
@@ -596,6 +597,28 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                     title: 'Change Password',
                     subtitle: 'Update your faculty account login credentials',
                     onTap: _showChangePasswordDialog,
+                  ),
+                  const Divider(height: 1, indent: 64),
+
+                  // 3. Privacy Policy Option
+                  _settingsTile(
+                    icon: Icons.privacy_tip_rounded,
+                    iconBg: const Color(0xFFF3E8FF),
+                    iconColor: const Color(0xFF6B21A8),
+                    title: 'Privacy Policy',
+                    subtitle: 'Child safety, data protection & pickup chimes disclosure',
+                    onTap: () => LaasyaPolicyDialog.showPrivacy(context),
+                  ),
+                  const Divider(height: 1, indent: 64),
+
+                  // 4. Terms & Conditions Option
+                  _settingsTile(
+                    icon: Icons.gavel_rounded,
+                    iconBg: const Color(0xFFFEF3C7),
+                    iconColor: const Color(0xFF92400E),
+                    title: 'Terms & Conditions',
+                    subtitle: 'Faculty guidelines, attendance policies & academy rules',
+                    onTap: () => LaasyaPolicyDialog.showTerms(context),
                   ),
                 ],
               ),
