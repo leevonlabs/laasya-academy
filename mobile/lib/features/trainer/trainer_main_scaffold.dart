@@ -15,6 +15,7 @@ import 'trainer_settings_tab.dart';
 import 'trainer_notifications_screen.dart';
 import 'trainer_announcements_screen.dart';
 import '../../core/services/alarm_service.dart';
+import '../../core/services/push_notification_service.dart';
 
 class TrainerMainScaffold extends StatefulWidget {
   const TrainerMainScaffold({super.key});
@@ -36,8 +37,17 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
     _startNetworkAlertPolling();
     _checkInitialNotificationRoute();
     AlarmService.setNotificationOpenedHandler(_handleNotificationOpened);
+    PushNotificationService.setNotificationOpenedHandler(_handleNotificationOpened);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) PermissionService.promptRequiredPermissions(context, role: 'trainer');
+      if (mounted) {
+        PermissionService.promptRequiredPermissions(context, role: 'trainer');
+        final prof = SupabaseService().currentUserProfile;
+        final tId = (prof?['id'] ?? prof?['profile_id'])?.toString();
+        PushNotificationService.registerDeviceToken(
+          role: 'trainer',
+          userId: tId,
+        );
+      }
     });
   }
 

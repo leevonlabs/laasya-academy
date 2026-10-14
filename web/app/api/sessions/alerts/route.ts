@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
+import { sendClassCompletedPush } from '@/lib/fcm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,6 +56,19 @@ export async function POST(request: NextRequest) {
       ]);
     } catch (annError) {
       console.warn('Could not insert alert announcement copy:', annError);
+    }
+
+    // 3. Dispatch Cloud Push Notification (FCM / APNs) to wake closed/backgrounded student devices
+    try {
+      await sendClassCompletedPush({
+        batchId: batch_id,
+        batchName: batch_name,
+        courseTitle: course_title,
+        trainerName: trainer_name || 'Assigned Guru',
+        message: alertMessage,
+      });
+    } catch (pushError) {
+      console.warn('Could not dispatch class completed push:', pushError);
     }
 
     return NextResponse.json({ success: true, alert }, { headers: corsHeaders });

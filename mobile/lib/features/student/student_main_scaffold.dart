@@ -8,6 +8,7 @@ import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/alarm_service.dart';
 import '../../core/services/permission_service.dart';
+import '../../core/services/push_notification_service.dart';
 import '../trainer/trainer_data_store.dart';
 import 'student_dashboard_tab.dart';
 import 'student_courses_tab.dart';
@@ -40,9 +41,30 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     _startNetworkAlertPolling();
     _checkInitialNotificationRoute();
     AlarmService.setNotificationOpenedHandler(_handleNotificationOpened);
+    PushNotificationService.setNotificationOpenedHandler(_handleNotificationOpened);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) PermissionService.promptRequiredPermissions(context, role: 'student');
+      if (mounted) {
+        PermissionService.promptRequiredPermissions(context, role: 'student');
+        _registerPushNotifications();
+      }
     });
+  }
+
+  void _registerPushNotifications() {
+    final prof = SupabaseService().currentUserProfile;
+    final sId = (prof?['id'] ?? prof?['profile_id'])?.toString();
+    List<String> bIds = [];
+    if (prof?['enrolled_courses'] is List) {
+      bIds = (prof!['enrolled_courses'] as List)
+          .map((e) => e is Map ? e['batch_id']?.toString() : null)
+          .whereType<String>()
+          .toList();
+    }
+    PushNotificationService.registerDeviceToken(
+      role: 'student',
+      userId: sId,
+      batchIds: bIds,
+    );
   }
 
   void _handleNotificationOpened(Map<String, dynamic> data) {
