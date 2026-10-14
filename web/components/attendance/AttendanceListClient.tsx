@@ -4,6 +4,8 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Course, Batch, AttendanceAuditRecord, Student, GuruAttendanceAuditRecord, Trainer } from '@/lib/academy';
 import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
 import StudentSearchSelect, { StudentOption } from '@/components/common/StudentSearchSelect';
+import CourseMultiSearchSelect, { CourseOption } from '@/components/common/CourseMultiSearchSelect';
+import BatchMultiSearchSelect, { BatchOption } from '@/components/common/BatchMultiSearchSelect';
 import GuruAttendanceTab from './GuruAttendanceTab';
 import { 
   ClipboardCheck, 
@@ -136,9 +138,46 @@ export default function AttendanceListClient({
   // -------------------------------------------------------------
   // TAB 1: COURSE-WISE DRILL-DOWN STATE
   // -------------------------------------------------------------
+  // TAB 1: COURSE-WISE DRILL-DOWN STATE
+  // -------------------------------------------------------------
   // selectedCourseId: null means grid of courses is displayed
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+
+  // Multi-selection state for courses and batches
+  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+
+  // Active courses: either from multi-select or single selected course
+  const activeCourseIds = useMemo(() => {
+    if (selectedCourseIds.length > 0) return selectedCourseIds;
+    return selectedCourseId ? [selectedCourseId] : [];
+  }, [selectedCourseIds, selectedCourseId]);
+
+  // Searchable course options for dropdown
+  const courseSelectOptions: CourseOption[] = useMemo(() => {
+    return courses.map(c => ({
+      id: c.id,
+      title: c.title,
+      category: c.category
+    }));
+  }, [courses]);
+
+  // Searchable batch options for dropdown (filtered by active courses if any)
+  const batchSelectOptions: BatchOption[] = useMemo(() => {
+    const list = activeCourseIds.length > 0
+      ? batches.filter(b => activeCourseIds.includes(b.course_id))
+      : batches;
+    return list.map(b => {
+      const parentCourse = courses.find(c => c.id === b.course_id);
+      return {
+        id: b.id,
+        name: b.name,
+        course_id: b.course_id,
+        course_title: parentCourse?.title || ''
+      };
+    });
+  }, [batches, courses, activeCourseIds]);
 
   // Course Grid Filters
   const [gridSearchQuery, setGridSearchQuery] = useState('');
@@ -211,11 +250,11 @@ export default function AttendanceListClient({
     return courses.find(c => c.id === selectedCourseId) || null;
   }, [courses, selectedCourseId]);
 
-  // Available batches for current selected course
+  // Available batches for current selected course(s)
   const currentCourseBatches = useMemo(() => {
-    if (!selectedCourseId) return [];
-    return batches.filter(b => b.course_id === selectedCourseId);
-  }, [batches, selectedCourseId]);
+    if (activeCourseIds.length === 0) return [];
+    return batches.filter(b => activeCourseIds.includes(b.course_id));
+  }, [batches, activeCourseIds]);
 
   // Current selected batch object
   const currentBatch = useMemo(() => {
@@ -226,12 +265,15 @@ export default function AttendanceListClient({
   // Handler when clicking a course in Grid View
   const handleSelectCourse = (courseId: string) => {
     setSelectedCourseId(courseId);
+    setSelectedCourseIds([courseId]);
     // Find batches for this course and select the first batch automatically
     const courseBatches = batches.filter(b => b.course_id === courseId);
     if (courseBatches.length > 0) {
       setSelectedBatchId(courseBatches[0].id);
+      setSelectedBatchIds([courseBatches[0].id]);
     } else {
       setSelectedBatchId(null);
+      setSelectedBatchIds([]);
     }
     // Reset filters
     setBatchSearchQuery('');
@@ -239,6 +281,48 @@ export default function AttendanceListClient({
     setBatchEndDate('2026-09-30');
     setBatchStatusFilter('All');
     setBatchPreset('Last 30 Days');
+  };
+
+  // Multi-select Course change handler
+  const handleCourseMultiChange = (newIds: string[]) => {
+    if (newIds.length === 0) {
+      setSelectedCourseId(null);
+      setSelectedCourseIds([]);
+      setSelectedBatchId(null);
+      setSelectedBatchIds([]);
+      return;
+    }
+    setSelectedCourseIds(newIds);
+    if (!newIds.includes(selectedCourseId || '')) {
+      setSelectedCourseId(newIds[0]);
+    }
+    const validBatches = batches.filter(b => newIds.includes(b.course_id));
+    const newBatchIds = selectedBatchIds.filter(id => validBatches.some(b => b.id === id));
+    if (newBatchIds.length === 0 && validBatches.length > 0) {
+      setSelectedBatchIds([validBatches[0].id]);
+      setSelectedBatchId(validBatches[0].id);
+    } else {
+      setSelectedBatchIds(newBatchIds);
+      if (newBatchIds.length > 0) setSelectedBatchId(newBatchIds[0]);
+    }
+  };
+
+  // Multi-select Batch change handler
+  const handleBatchMultiChange = (newBatchIds: string[]) => {
+    setSelectedBatchIds(newBatchIds);
+    if (newBatchIds.length > 0) {
+      setSelectedBatchId(newBatchIds[0]);
+    } else {
+      setSelectedBatchId(null);
+    }
+  };
+
+  // Return to all courses grid
+  const handleBackToCourses = () => {
+    setSelectedCourseId(null);
+    setSelectedCourseIds([]);
+    setSelectedBatchId(null);
+    setSelectedBatchIds([]);
   };
 
   // Quick preset helper
@@ -278,16 +362,26 @@ export default function AttendanceListClient({
   // TAB 1 BATCH FILTERED ATTENDANCE RECORDS
   // -------------------------------------------------------------
   const filteredBatchRecords = useMemo(() => {
-    if (!currentBatch && !selectedCourseId) return [];
+    if (activeCourseIds.length === 0 && !selectedCourseId) return [];
 
     return allRecords.filter((r) => {
-      // Match batch (by id or by batch name + course)
-      const matchesBatch = currentBatch 
-        ? (r.batch_id === currentBatch.id || 
-           (r.batch_name.toLowerCase() === currentBatch.name.toLowerCase() && r.course_id === selectedCourseId))
-        : (r.course_id === selectedCourseId);
+      // Match course
+      if (activeCourseIds.length > 0 && !activeCourseIds.includes(r.course_id)) {
+        return false;
+      }
 
-      if (!matchesBatch) return false;
+      // Match batch
+      if (selectedBatchIds.length > 0) {
+        const matchesBatchId = selectedBatchIds.includes(r.batch_id);
+        const matchesBatchName = currentBatch 
+          ? (r.batch_name.toLowerCase() === currentBatch.name.toLowerCase() && activeCourseIds.includes(r.course_id))
+          : false;
+        if (!matchesBatchId && !matchesBatchName) return false;
+      } else if (currentBatch) {
+        const matchesBatch = (r.batch_id === currentBatch.id || 
+           (r.batch_name.toLowerCase() === currentBatch.name.toLowerCase() && activeCourseIds.includes(r.course_id)));
+        if (!matchesBatch) return false;
+      }
 
       // Date range filter
       if (batchStartDate && r.session_date < batchStartDate) return false;
@@ -306,7 +400,7 @@ export default function AttendanceListClient({
 
       return true;
     });
-  }, [allRecords, currentBatch, selectedCourseId, batchStartDate, batchEndDate, batchStatusFilter, batchSearchQuery]);
+  }, [allRecords, currentBatch, activeCourseIds, selectedBatchIds, selectedCourseId, batchStartDate, batchEndDate, batchStatusFilter, batchSearchQuery]);
 
   // -------------------------------------------------------------
   // TAB 2 FILTERED RECORDS
@@ -434,57 +528,63 @@ export default function AttendanceListClient({
       </div>
 
       {/* =================================================================== */}
-      {/* 2. TOP TABS SWITCHER */}
+      {/* 2. TOP TABS SWITCHER: EQUAL SIZED 3 COLUMNS */}
       {/* =================================================================== */}
-      <div className="bg-white p-2 rounded-2xl border border-[#F0D5E4] shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+      <div className="bg-white p-2 rounded-2xl border border-[#F0D5E4] shadow-xs grid grid-cols-1 md:grid-cols-3 gap-2.5">
         <button
           onClick={() => setActiveTab('course_wise')}
-          className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+          className={`w-full min-h-[58px] py-2.5 px-3 rounded-xl transition flex flex-col items-center justify-center text-center cursor-pointer ${
             activeTab === 'course_wise'
               ? 'bg-[#8A064D] text-white shadow-md'
-              : 'text-gray-600 hover:text-[#8A064D] hover:bg-gray-50'
+              : 'text-gray-600 hover:text-[#8A064D] hover:bg-[#FFF2F8]/60 border border-transparent hover:border-pink-200'
           }`}
         >
-          <BookOpen className="w-4 h-4" />
-          <span>Course-Wise</span>
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold hidden md:inline-block ${
-            activeTab === 'course_wise' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+          <div className="flex items-center gap-1.5 text-sm font-bold">
+            <BookOpen className="w-4 h-4 shrink-0" />
+            <span>Course-Wise</span>
+          </div>
+          <span className={`text-[11px] font-medium mt-0.5 ${
+            activeTab === 'course_wise' ? 'text-pink-100' : 'text-gray-500'
           }`}>
-            Batch Drill-down
+            [Students attendance course-wise]
           </span>
         </button>
 
         <button
           onClick={() => setActiveTab('complete')}
-          className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+          className={`w-full min-h-[58px] py-2.5 px-3 rounded-xl transition flex flex-col items-center justify-center text-center cursor-pointer ${
             activeTab === 'complete'
               ? 'bg-[#8A064D] text-white shadow-md'
-              : 'text-gray-600 hover:text-[#8A064D] hover:bg-gray-50'
+              : 'text-gray-600 hover:text-[#8A064D] hover:bg-[#FFF2F8]/60 border border-transparent hover:border-pink-200'
           }`}
         >
-          <Layers className="w-4 h-4" />
-          <span>Complete Audit</span>
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold hidden md:inline-block ${
-            activeTab === 'complete' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+          <div className="flex items-center gap-1.5 text-sm font-bold">
+            <Layers className="w-4 h-4 shrink-0" />
+            <span>Complete Audit</span>
+          </div>
+          <span className={`text-[11px] font-medium mt-0.5 ${
+            activeTab === 'complete' ? 'text-pink-100' : 'text-gray-500'
           }`}>
-            All Disciples
+            [For all students only]
           </span>
         </button>
 
         <button
           onClick={() => setActiveTab('guru_attendance')}
-          className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+          className={`w-full min-h-[58px] py-2.5 px-3 rounded-xl transition flex flex-col items-center justify-center text-center cursor-pointer ${
             activeTab === 'guru_attendance'
               ? 'bg-[#8A064D] text-white shadow-md'
-              : 'text-gray-600 hover:text-[#8A064D] hover:bg-gray-50'
+              : 'text-gray-600 hover:text-[#8A064D] hover:bg-[#FFF2F8]/60 border border-transparent hover:border-pink-200'
           }`}
         >
-          <GraduationCap className="w-4 h-4" />
-          <span>Guru Attendance</span>
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold hidden md:inline-block ${
-            activeTab === 'guru_attendance' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+          <div className="flex items-center gap-1.5 text-sm font-bold">
+            <GraduationCap className="w-4 h-4 shrink-0" />
+            <span>Guru Attendance</span>
+          </div>
+          <span className={`text-[11px] font-medium mt-0.5 ${
+            activeTab === 'guru_attendance' ? 'text-pink-100' : 'text-gray-500'
           }`}>
-            Roll-Call & Close Class
+            [Only for gurus]
           </span>
         </button>
       </div>
@@ -605,100 +705,126 @@ export default function AttendanceListClient({
             </div>
           ) : (
             /* LEVEL 2 & 3: COURSE SELECTED -> AVAILABLE BATCHES ON TOP + BATCH ATTENDANCE SHEET */
-            <div className="space-y-6">
+            <div className="space-y-4">
               
-              {/* Course Top Navigation & Breadcrumb */}
-              <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              {/* Course Top Navigation & Multi-Filter Bar */}
+              <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => {
-                      setSelectedCourseId(null);
-                      setSelectedBatchId(null);
-                    }}
-                    className="p-2.5 bg-gray-100 hover:bg-[#8A064D] hover:text-white rounded-2xl text-gray-700 transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                    onClick={handleBackToCourses}
+                    className="px-3.5 py-2 bg-gray-100 hover:bg-[#8A064D] hover:text-white rounded-xl text-gray-700 transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
                     title="Return to Course Grid"
                   >
                     <ArrowLeft className="w-4 h-4" />
                     <span>Back to Courses</span>
                   </button>
 
-                  <div className="h-6 w-px bg-gray-200" />
+                  <div className="h-6 w-px bg-gray-200 hidden sm:block" />
 
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono font-bold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2 py-0.5 rounded-md">
-                        {currentCourse?.code}
-                      </span>
-                      <h2 className="text-lg font-bold text-[#2D041A]">
-                        {currentCourse?.title}
+                      {activeCourseIds.length <= 1 && currentCourse?.code && (
+                        <span className="text-[10px] font-mono font-bold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2 py-0.5 rounded-md">
+                          {currentCourse.code}
+                        </span>
+                      )}
+                      <h2 className="text-base font-bold text-[#2D041A]">
+                        {activeCourseIds.length > 1 
+                          ? `${activeCourseIds.length} Courses Selected`
+                          : (currentCourse?.title || 'Selected Course')}
                       </h2>
-                      <span className="text-xs text-gray-500 font-medium">
-                        ({currentCourse?.category})
-                      </span>
+                      {activeCourseIds.length <= 1 && currentCourse?.category && (
+                        <span className="text-xs text-gray-500 font-medium hidden sm:inline-block">
+                          ({currentCourse.category})
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Course Switcher Dropdown */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 font-semibold">Switch Course:</span>
-                  <select
-                    value={selectedCourseId}
-                    onChange={(e) => handleSelectCourse(e.target.value)}
-                    className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
-                  >
-                    {courses.map(c => (
-                      <option key={c.id} value={c.id}>{c.title} ({c.code})</option>
-                    ))}
-                  </select>
+                {/* Multi-Selection Searchable Course & Batch Filters (replaces single switch course dropdown) */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                  <div className="w-full sm:w-64">
+                    <CourseMultiSearchSelect
+                      courses={courseSelectOptions}
+                      selectedIds={activeCourseIds}
+                      onChange={handleCourseMultiChange}
+                      placeholder="Filter / Select Courses"
+                    />
+                  </div>
+                  <div className="w-full sm:w-64">
+                    <BatchMultiSearchSelect
+                      batches={batchSelectOptions}
+                      selectedIds={selectedBatchIds}
+                      onChange={handleBatchMultiChange}
+                      placeholder="Filter / Select Batches"
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* ------------------------------------------------------------- */}
               {/* AVAILABLE BATCHES OF THAT COURSE DISPLAYED ON TOP */}
               {/* ------------------------------------------------------------- */}
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-[#8A064D]" />
-                    <span>Available Batches for {currentCourse?.title} ({currentCourseBatches.length})</span>
+                    <span>
+                      Available Batches ({currentCourseBatches.length})
+                    </span>
                   </h3>
                   <span className="text-[11px] text-gray-400">
-                    Click any batch to view its live attendance sheet
+                    Click any batch card to toggle or view its live attendance sheet
                   </span>
                 </div>
 
                 {currentCourseBatches.length === 0 ? (
-                  <div className="bg-white p-6 rounded-2xl border border-gray-200 text-center text-gray-500 text-xs">
-                    No batches currently assigned to this course.
+                  <div className="bg-white p-5 rounded-2xl border border-gray-200 text-center text-gray-500 text-xs">
+                    No batches currently assigned to the selected course(s).
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {currentCourseBatches.map((b) => {
-                      const isSelected = (currentBatch?.id === b.id);
-                      const guruDisplay = b.trainer_name || (currentCourse ? COURSE_GURUS_MAP[currentCourse.title] : 'Faculty Guru');
+                      const isSelected = selectedBatchIds.length > 0
+                        ? selectedBatchIds.includes(b.id)
+                        : (currentBatch?.id === b.id);
+                      const parentCourse = courses.find(c => c.id === b.course_id);
+                      const guruDisplay = b.trainer_name || (parentCourse ? COURSE_GURUS_MAP[parentCourse.title] : 'Faculty Guru');
                       const timings = `${b.start_time?.substring(0, 5)} - ${b.end_time?.substring(0, 5)}`;
                       const daysText = (b.days_of_week && b.days_of_week.length > 0) ? b.days_of_week.join(', ') : 'Recurring';
 
                       return (
                         <div
                           key={b.id}
-                          onClick={() => setSelectedBatchId(b.id)}
-                          className={`p-4 rounded-3xl border transition-all cursor-pointer flex flex-col justify-between ${
+                          onClick={() => {
+                            if (selectedBatchIds.includes(b.id)) {
+                              if (selectedBatchIds.length > 1) {
+                                setSelectedBatchIds(selectedBatchIds.filter(id => id !== b.id));
+                              } else {
+                                setSelectedBatchIds([]);
+                                setSelectedBatchId(null);
+                              }
+                            } else {
+                              setSelectedBatchIds([b.id]);
+                              setSelectedBatchId(b.id);
+                            }
+                          }}
+                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
                             isSelected
-                              ? 'bg-[#FFF9FB] border-[#8A064D] shadow-md ring-2 ring-[#8A064D]/30'
-                              : 'bg-white border-[#F0D5E4] hover:border-[#8A064D]/50 hover:shadow-xs'
+                              ? 'bg-[#FFF9FB] border-[#8A064D] shadow-sm ring-2 ring-[#8A064D]/20'
+                              : 'bg-white border-[#F0D5E4] hover:border-[#8A064D]/50 hover:shadow-2xs'
                           }`}
                         >
                           <div>
                             {/* Batch Header */}
-                            <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center justify-between mb-1.5">
                               <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
                                 isSelected 
                                   ? 'bg-[#8A064D] text-white' 
                                   : 'bg-gray-100 text-gray-600'
                               }`}>
-                                {isSelected ? 'Selected Batch' : 'Batch Slot'}
+                                {isSelected ? '✓ Selected' : 'Batch Slot'}
                               </span>
 
                               <div className="flex items-center gap-1 text-[11px] font-semibold text-gray-500">
@@ -713,9 +839,14 @@ export default function AttendanceListClient({
                             }`}>
                               {b.name}
                             </h4>
+                            {parentCourse && activeCourseIds.length > 1 && (
+                              <div className="text-[10px] text-[#8A064D] font-bold mt-0.5">
+                                {parentCourse.title}
+                              </div>
+                            )}
 
                             {/* Guru Name */}
-                            <div className="mt-2 text-xs flex items-center gap-1.5 text-gray-700">
+                            <div className="mt-1.5 text-xs flex items-center gap-1.5 text-gray-700">
                               <User className="w-3.5 h-3.5 text-[#8A064D]" />
                               <span>Guru: <strong className="text-gray-900">{guruDisplay}</strong></span>
                             </div>
@@ -725,13 +856,13 @@ export default function AttendanceListClient({
                               <Clock className="w-3.5 h-3.5 text-[#8A064D]" />
                               <span>Timings: <strong className="text-gray-900">{timings}</strong></span>
                             </div>
-                            <div className="mt-1 text-[11px] text-gray-500">
+                            <div className="mt-0.5 text-[11px] text-gray-500">
                               Schedule: {daysText}
                             </div>
                           </div>
 
                           {/* Enrollment Bottom */}
-                          <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between text-xs">
+                          <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
                             <span className="text-gray-500 font-medium">
                               Enrolled: <strong className="text-gray-900">{b.enrolled_count || 0} / {b.max_capacity}</strong>
                             </span>
@@ -751,21 +882,31 @@ export default function AttendanceListClient({
               {/* ------------------------------------------------------------- */}
               {/* BATCH ATTENDANCE SHEET (Displays when a batch is active) */}
               {/* ------------------------------------------------------------- */}
-              {currentBatch && (
-                <div className="space-y-5 pt-2">
+              {(currentBatch || selectedBatchIds.length > 0) && (
+                <div className="space-y-4 pt-1">
                   
                   {/* Filter Controls: Date Range, Presets, Search, Status */}
-                  <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+                  <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs space-y-3">
                     
                     {/* Header line for batch sheet */}
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                       <div>
                         <h4 className="font-bold text-sm text-[#2D041A] flex items-center gap-2">
                           <ClipboardCheck className="w-4 h-4 text-[#8A064D]" />
-                          <span>Attendance Sheet: <span className="text-[#8A064D]">{currentBatch.name}</span></span>
+                          <span>
+                            Attendance Sheet: {' '}
+                            <span className="text-[#8A064D]">
+                              {selectedBatchIds.length > 1
+                                ? `${selectedBatchIds.length} Batches Selected`
+                                : (currentBatch?.name || 'All Batches')}
+                            </span>
+                          </span>
                         </h4>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          Assigned Guru: <strong className="text-gray-800">{currentBatch.trainer_name}</strong> • Timings: {currentBatch.start_time?.substring(0, 5)} - {currentBatch.end_time?.substring(0, 5)}
+                          {selectedBatchIds.length <= 1 && currentBatch?.trainer_name && (
+                            <>Assigned Guru: <strong className="text-gray-800">{currentBatch.trainer_name}</strong> • </>
+                          )}
+                          Showing verified student roll-call records
                         </p>
                       </div>
 
@@ -789,7 +930,7 @@ export default function AttendanceListClient({
                     </div>
 
                     {/* Filter Inputs Grid */}
-                    <div className="pt-3 border-t border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="pt-2.5 border-t border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-2.5">
                       <div>
                         <label className="block text-[11px] font-semibold text-gray-500 mb-1">From Date</label>
                         <input
@@ -847,45 +988,42 @@ export default function AttendanceListClient({
                   </div>
 
                   {/* Summary Details for this Batch */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
-                      <span className="text-xs font-bold text-[#6E3955] uppercase tracking-wider block">Audited Records</span>
-                      <span className="text-2xl font-black text-[#2D041A] mt-1 block tabular-nums">{batchStats.total}</span>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                    <div className="bg-white p-3.5 rounded-2xl border border-[#F0D5E4] shadow-xs">
+                      <span className="text-[11px] font-bold text-[#6E3955] uppercase tracking-wider block">Audited Records</span>
+                      <span className="text-xl font-black text-[#2D041A] mt-0.5 block tabular-nums">{batchStats.total}</span>
                       <span className="text-[11px] text-[#8C5E77]">In selected date range</span>
                     </div>
 
-                    <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-xs">
-                      <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block">Present</span>
-                      <span className="text-2xl font-black text-emerald-700 mt-1 block tabular-nums">{batchStats.present}</span>
+                    <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 shadow-xs">
+                      <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">Present</span>
+                      <span className="text-xl font-black text-emerald-700 mt-0.5 block tabular-nums">{batchStats.present}</span>
                       <span className="text-[11px] text-emerald-600">Marked present</span>
                     </div>
 
-                    <div className="bg-white p-4 rounded-2xl border border-red-200 shadow-xs">
-                      <span className="text-xs font-bold text-red-800 uppercase tracking-wider block">Absent</span>
-                      <span className="text-2xl font-black text-red-700 mt-1 block tabular-nums">{batchStats.absent}</span>
+                    <div className="bg-white p-3.5 rounded-2xl border border-red-200 shadow-xs">
+                      <span className="text-[11px] font-bold text-red-800 uppercase tracking-wider block">Absent</span>
+                      <span className="text-xl font-black text-red-700 mt-0.5 block tabular-nums">{batchStats.absent}</span>
                       <span className="text-[11px] text-red-600">Unexcused / absent</span>
                     </div>
 
-                    <div className="bg-gradient-to-br from-white to-[#FFF9FB] p-4 rounded-2xl border border-[#F9E33A] shadow-xs">
-                      <span className="text-xs font-bold text-[#8A064D] uppercase tracking-wider block">Batch Rate</span>
-                      <span className="text-2xl font-black text-[#590231] mt-1 block tabular-nums">{batchStats.rate}%</span>
+                    <div className="bg-gradient-to-br from-white to-[#FFF9FB] p-3.5 rounded-2xl border border-[#F9E33A] shadow-xs">
+                      <span className="text-[11px] font-bold text-[#8A064D] uppercase tracking-wider block">Batch Rate</span>
+                      <span className="text-xl font-black text-[#590231] mt-0.5 block tabular-nums">{batchStats.rate}%</span>
                       <span className="text-[11px] text-emerald-700 font-bold">Effective attendance</span>
                     </div>
                   </div>
 
                   {/* Attendance Sheet Table for this Batch */}
-                  <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
-                    <div className="p-4 bg-gray-50/60 border-b border-gray-100 flex items-center justify-between">
+                  <div className="bg-white rounded-2xl border border-[#F0D5E4] shadow-xs overflow-hidden">
+                    <div className="p-3.5 bg-gray-50/60 border-b border-gray-100 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <ClipboardCheck className="w-4 h-4 text-[#8A064D]" />
                         <h4 className="font-bold text-xs text-[#2D041A]">
-                          Attendance Records for {currentBatch.name}
+                          Attendance Records ({filteredBatchRecords.length})
                         </h4>
-                        <span className="text-[11px] font-semibold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-2 py-0.5 rounded-full">
-                          {filteredBatchRecords.length} Entries
-                        </span>
                       </div>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-[11px] text-gray-500">
                         Date Range: {batchStartDate || 'Start'} to {batchEndDate || 'End'}
                       </span>
                     </div>
@@ -894,67 +1032,66 @@ export default function AttendanceListClient({
                       <table className="w-full text-left text-xs">
                         <thead>
                           <tr className="bg-gray-50/80 text-gray-500 border-b border-gray-100 font-semibold uppercase tracking-wider text-[10px]">
-                            <th className="py-3 px-4">Student Name & Roll</th>
-                            <th className="py-3 px-4">Batch Name</th>
-                            <th className="py-3 px-4">Assigned Guru</th>
-                            <th className="py-3 px-4">Attendance Date</th>
-                            <th className="py-3 px-4">Status</th>
-                            <th className="py-3 px-4">Check-in Verification</th>
-                            <th className="py-3 px-4">Remarks</th>
+                            <th className="py-2.5 px-3.5">Student Name & Roll</th>
+                            <th className="py-2.5 px-3.5">Course</th>
+                            <th className="py-2.5 px-3.5">Batch Name</th>
+                            <th className="py-2.5 px-3.5">Assigned Guru</th>
+                            <th className="py-2.5 px-3.5">Attendance Date</th>
+                            <th className="py-2.5 px-3.5">Status</th>
+                            <th className="py-2.5 px-3.5">Verification</th>
+                            <th className="py-2.5 px-3.5">Remarks</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {filteredBatchRecords.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="py-12 text-center text-gray-400">
-                                <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                                <p className="font-semibold">No attendance records found for this batch in the selected date range.</p>
-                                <p className="text-[11px] text-gray-400 mt-1">Try expanding the date filter or clearing search.</p>
+                              <td colSpan={8} className="py-10 text-center text-gray-400">
+                                <AlertTriangle className="w-7 h-7 text-gray-300 mx-auto mb-1.5" />
+                                <p className="font-semibold text-xs">No attendance records found for this batch in the selected date range.</p>
+                                <p className="text-[11px] text-gray-400 mt-0.5">Try expanding the date filter or clearing search.</p>
                               </td>
                             </tr>
                           ) : (
                             filteredBatchRecords.map((r) => (
                               <tr key={r.id} className="hover:bg-[#FFFDFC] transition">
-                                <td className="py-3.5 px-4">
+                                <td className="py-3 px-3.5">
                                   <div className="font-bold text-gray-900">{r.student_name}</div>
                                   <div className="text-[10px] font-mono text-gray-400">{r.roll_number}</div>
                                 </td>
-                                <td className="py-3.5 px-4">
+                                <td className="py-3 px-3.5">
+                                  <span className="font-medium text-[#8A064D]">{r.course_title}</span>
+                                </td>
+                                <td className="py-3 px-3.5">
                                   <span className="font-medium text-gray-800">{r.batch_name}</span>
                                 </td>
-                                <td className="py-3.5 px-4 text-gray-700">
+                                <td className="py-3 px-3.5 text-gray-700">
                                   {r.trainer_name}
                                 </td>
-                                <td className="py-3.5 px-4 font-medium text-gray-900 whitespace-nowrap">
+                                <td className="py-3 px-3.5 font-medium text-gray-900 whitespace-nowrap">
                                   {r.session_date}
                                 </td>
-                                <td className="py-3.5 px-4">
+                                <td className="py-3 px-3.5">
                                   {r.status !== 'absent' ? (
                                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <CheckCircle2 className="w-3 h-3" />
                                       <span>Present</span>
                                     </span>
                                   ) : (
                                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
-                                      <XCircle className="w-3.5 h-3.5" />
+                                      <XCircle className="w-3 h-3" />
                                       <span>Absent</span>
                                     </span>
                                   )}
                                 </td>
-                                <td className="py-3.5 px-4">
+                                <td className="py-3 px-3.5">
                                   <div className="text-gray-700 font-medium text-[11px]">
                                     {r.check_in_method === 'trainer_manual' ? 'Guru Verified' :
                                      r.check_in_method === 'student_code' ? 'PIN Check-in' :
                                      r.check_in_method === 'student_qr' ? 'QR Scanner' :
                                      r.check_in_method || 'Verified'}
                                   </div>
-                                  {r.check_in_time && (
-                                    <div className="text-[10px] text-gray-400 font-mono">
-                                      {r.check_in_time.substring(11, 16)} IST
-                                    </div>
-                                  )}
                                 </td>
-                                <td className="py-3.5 px-4 text-gray-500 text-[11px]">
+                                <td className="py-3 px-3.5 text-gray-500 text-[11px]">
                                   {r.remarks || '—'}
                                 </td>
                               </tr>
