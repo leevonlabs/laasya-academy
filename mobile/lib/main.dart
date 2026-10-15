@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/supabase_service.dart';
 import 'core/services/permission_service.dart';
-import 'core/services/push_notification_service.dart';
+import 'core/services/notification_service.dart';
 import 'features/auth/portal_landing_screen.dart';
 import 'features/trainer/trainer_main_scaffold.dart';
 import 'features/student/student_main_scaffold.dart';
@@ -10,7 +10,7 @@ import 'features/student/student_main_scaffold.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService().initialize();
-  await PushNotificationService.initialize();
+  NotificationService.initialize();
   runApp(const LaasyaAcademyApp());
 }
 

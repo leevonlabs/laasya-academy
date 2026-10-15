@@ -552,7 +552,7 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
                     iconBg: const Color(0xFFDEF7EC),
                     iconColor: const Color(0xFF03543F),
                     title: 'App Permissions',
-                    subtitle: 'Notifications, alarms, battery & camera access',
+                    subtitle: 'Notifications and camera access',
                     onTap: () => PermissionService.showPermissionsDialog(context),
                   ),
                   const Divider(height: 1, indent: 64),

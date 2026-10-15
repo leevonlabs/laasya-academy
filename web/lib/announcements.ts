@@ -333,21 +333,6 @@ export async function createAnnouncement(data: {
       senderFullName,
       alertMessage
     ]);
-
-    try {
-      const { sendAnnouncementPush } = await import('./fcm');
-      await sendAnnouncementPush({
-        title: data.title.trim(),
-        message: effectiveMessage,
-        audience: data.audience,
-        targetBatchName: data.target_batch_name || undefined,
-        targetCourseTitle: data.target_course_title || undefined,
-        senderRole: data.sender_role,
-        senderName: senderFullName,
-      });
-    } catch (pushErr) {
-      console.warn('Could not dispatch announcement push:', pushErr);
-    }
   } catch (alertErr) {
     console.warn('Could not insert session_alert copy for announcement:', alertErr);
   }

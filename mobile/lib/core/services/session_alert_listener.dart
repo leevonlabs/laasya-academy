@@ -155,11 +155,11 @@ class SessionAlertListener with WidgetsBindingObserver {
       final message = alert['message']?.toString() ??
           'Today\'s class for $courseTitle ($batchName) has concluded. Please come and collect your child.';
 
-      // Sound the vocal chime ("Class is over, hooray hooray!") and display notification
-      await AlarmService.startAlarmRing(
-        title: 'CLASS COMPLETED: $courseTitle',
+      // Normal phone system notification for class completion
+      await AlarmService.showClassCompletedNotification(
+        courseTitle: courseTitle,
+        batchName: batchName,
         message: message,
-        durationSeconds: 11,
       );
     } else if (alertType == 'attendance_marked') {
       final targetRoll = (alert['target_roll_number']?.toString() ?? '').toLowerCase();

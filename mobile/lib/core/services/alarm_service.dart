@@ -1,69 +1,84 @@
+import 'dart:async';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+/// Clean System Notification Service for Laasya Cultural Academy.
+/// Uses standard phone OS notifications with default ringtones and vibration.
+/// All alarms, looping sounds, and custom MP3 chimes have been completely removed.
 class AlarmService {
-  static const MethodChannel _channel = MethodChannel('com.laasyaacademy.app/alarm');
+  static const MethodChannel _channel = MethodChannel('com.laasyaacademy.app/notifications');
+  static bool _handlerInstalled = false;
+  static Function(Map<String, dynamic>)? _notificationOpenedCallback;
 
-  /// Plays the custom vocal pickup chime ("Class is over, hooray hooray! Parents come and pick us today...")
-  /// Fired on Guru's phone upon pressing "Class Completed", and on student/parent devices.
-  static Future<void> playClassCompletedSound() async {
-    try {
-      await _channel.invokeMethod('playClassCompletedSound');
-    } catch (_) {
-      SystemSound.play(SystemSoundType.alert);
-      HapticFeedback.mediumImpact();
-    }
-  }
-
-  /// Starts the custom vocal pickup chime ("Class is over...") & vibration.
-  /// Also fires a heads-up system notification with a "DISMISS" action button.
-  static Future<void> startAlarmRing({
-    int durationSeconds = 10,
-    String title = 'CLASS COMPLETED!',
-    String message = 'Class session has concluded. Please come and take your child back safely.',
+  /// Shows a normal system notification for class completion (Students only)
+  static Future<void> showClassCompletedNotification({
+    required String courseTitle,
+    required String batchName,
+    required String message,
   }) async {
     try {
-      await _channel.invokeMethod('startAlarmRing', {
-        'duration': durationSeconds,
-        'title': title,
+      await _channel.invokeMethod('showNotification', {
+        'id': 2001,
+        'title': 'CLASS COMPLETED: $courseTitle',
         'message': message,
+        'channelId': 'laasya_classes',
+        'route': '/attendance',
       });
-    } catch (_) {
-      SystemSound.play(SystemSoundType.alert);
-      HapticFeedback.heavyImpact();
-    }
-  }
-
-  /// Stops the alarm ring and vibration immediately.
-  static Future<void> stopAlarmRing() async {
-    try {
-      await _channel.invokeMethod('stopAlarmRing');
     } catch (_) {}
   }
 
-  /// Shows a high-priority system notification for attendance status.
+  /// Backward-compatible alias that fires a normal phone system notification (NO ALARM)
+  static Future<void> startAlarmRing({
+    int durationSeconds = 10,
+    String title = 'CLASS COMPLETED!',
+    String message = 'Class session has concluded. Please come and pick up your child safely.',
+  }) async {
+    try {
+      await _channel.invokeMethod('showNotification', {
+        'id': 2001,
+        'title': title,
+        'message': message,
+        'channelId': 'laasya_classes',
+        'route': '/attendance',
+      });
+    } catch (_) {}
+  }
+
+  /// No-op: Alarms have been completely removed
+  static Future<void> stopAlarmRing() async {}
+
+  /// No-op: Audio alarms have been completely removed
+  static Future<void> playClassCompletedSound() async {}
+
+  /// Shows a normal phone system notification for attendance status
   static Future<void> showAttendanceNotification({
     required String title,
     required String message,
     required bool isPresent,
   }) async {
     try {
-      await _channel.invokeMethod('showAttendanceNotification', {
+      await _channel.invokeMethod('showNotification', {
+        'id': 2002,
         'title': title,
         'message': message,
-        'isPresent': isPresent,
+        'channelId': 'laasya_classes',
+        'route': '/attendance',
       });
     } catch (_) {}
   }
 
-  /// Shows a high-priority system notification for circulars, notices, and announcements.
+  /// Shows a normal phone system notification for circulars, notices, and announcements
   static Future<void> showNoticeNotification({
     required String title,
     required String message,
   }) async {
     try {
-      await _channel.invokeMethod('showNoticeNotification', {
+      await _channel.invokeMethod('showNotification', {
+        'id': 2003,
         'title': title,
         'message': message,
+        'channelId': 'laasya_announcements',
+        'route': '/messages',
       });
     } catch (_) {}
   }
@@ -75,20 +90,14 @@ class AlarmService {
     } catch (_) {}
   }
 
-  /// Requests standard permissions (Notifications, Camera, Media)
   static Future<void> requestAllPermissions() async {
     try {
-      await _channel.invokeMethod('requestAllPermissions');
+      await _channel.invokeMethod('requestNotificationPermission');
     } catch (_) {}
   }
 
-  /// Safe passive check; background battery exemption is not forced on users
   static Future<void> requestBatteryOptimization() async {}
-
-  static Future<bool> isIgnoringBatteryOptimizations() async {
-    return true;
-  }
-
+  static Future<bool> isIgnoringBatteryOptimizations() async => true;
   static Future<void> startBackgroundAlertService({
     String role = 'student',
     required String studentId,
@@ -97,21 +106,21 @@ class AlarmService {
     required String phone,
     required String batchIds,
   }) async {}
-
   static Future<void> stopBackgroundAlertService() async {}
 
-  /// Marks an alert as processed in the native SharedPreferences so it skips duplicates
+  /// Marks an alert as processed in SharedPreferences to prevent duplicate notifications
   static Future<void> markAlertProcessed(String alertId) async {
     try {
-      await _channel.invokeMethod('markAlertProcessed', {'alert_id': alertId});
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('laasya_alert_seen_$alertId', true);
     } catch (_) {}
   }
 
   /// Checks if an alert was already processed
   static Future<bool> isAlertProcessed(String alertId) async {
     try {
-      final res = await _channel.invokeMethod<bool>('isAlertProcessed', {'alert_id': alertId});
-      return res ?? false;
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool('laasya_alert_seen_$alertId') ?? false;
     } catch (_) {
       return false;
     }
@@ -132,10 +141,17 @@ class AlarmService {
 
   /// Sets a listener for notification taps when the app is already open
   static void setNotificationOpenedHandler(Function(Map<String, dynamic>) handler) {
-    _channel.setMethodCallHandler((call) async {
-      if (call.method == 'onNotificationOpened' && call.arguments is Map) {
-        handler(Map<String, dynamic>.from(call.arguments));
-      }
-    });
+    _notificationOpenedCallback = handler;
+    if (!_handlerInstalled) {
+      _handlerInstalled = true;
+      _channel.setMethodCallHandler((call) async {
+        if (call.method == 'onNotificationOpened' && call.arguments is Map) {
+          final payload = Map<String, dynamic>.from(call.arguments);
+          if (_notificationOpenedCallback != null) {
+            _notificationOpenedCallback!(payload);
+          }
+        }
+      });
+    }
   }
 }

@@ -8,7 +8,6 @@ import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/alarm_service.dart';
 import '../../core/services/permission_service.dart';
-import '../../core/services/push_notification_service.dart';
 import '../trainer/trainer_data_store.dart';
 import 'student_dashboard_tab.dart';
 import 'student_courses_tab.dart';
@@ -41,49 +40,23 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     _startNetworkAlertPolling();
     _checkInitialNotificationRoute();
     AlarmService.setNotificationOpenedHandler(_handleNotificationOpened);
-    PushNotificationService.setNotificationOpenedHandler(_handleNotificationOpened);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         PermissionService.promptRequiredPermissions(context, role: 'student');
-        _registerPushNotifications();
       }
     });
   }
 
-  void _registerPushNotifications() {
-    final prof = SupabaseService().currentUserProfile;
-    final sId = (prof?['id'] ?? prof?['profile_id'])?.toString();
-    List<String> bIds = [];
-    if (prof?['enrolled_courses'] is List) {
-      bIds = (prof!['enrolled_courses'] as List)
-          .map((e) => e is Map ? e['batch_id']?.toString() : null)
-          .whereType<String>()
-          .toList();
-    }
-    PushNotificationService.registerDeviceToken(
-      role: 'student',
-      userId: sId,
-      batchIds: bIds,
-    );
-  }
-
   void _handleNotificationOpened(Map<String, dynamic> data) {
     if (!mounted) return;
-    final route = (data['route'] ?? '').toString().toLowerCase().replaceAll('/', '').trim();
-    final alertType = (data['alert_type'] ?? '').toString().toLowerCase();
-
-    debugPrint('Student scaffold handling notification tap: route=$route, alertType=$alertType, data=$data');
-
-    if (route == 'messages' || route == 'announcements' || alertType == 'announcement' || alertType == 'message') {
+    final route = data['route']?.toString().toLowerCase();
+    if (route == 'messages' || route == '/messages' || route == 'announcements') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const StudentMessagesScreen()),
       );
-    } else if (route == 'attendance' || route == 'alarm' || alertType == 'class_closed' || alertType == 'attendance_marked') {
+    } else if (route == 'attendance' || route == '/attendance' || route == 'alarm') {
       setState(() => _currentIndex = 3);
-      if (alertType == 'class_closed' || route == 'alarm') {
-        _showClassClosedAttentionAlarm(data);
-      }
     }
   }
 
@@ -244,10 +217,11 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
             if (classClosedAlert != null) {
               final courseTitle = classClosedAlert['course_title'] ?? 'Class Session';
               final batchName = classClosedAlert['batch_name'] ?? 'Batch';
-              AlarmService.startAlarmRing(
-                durationSeconds: 10,
-                title: 'CLASS COMPLETED: $courseTitle',
-                message: 'The $courseTitle ($batchName) session has concluded. Please come and pick up your child safely.',
+              final alertMsg = classClosedAlert['message'] ?? 'The $courseTitle ($batchName) session has concluded. Please come and pick up your child safely.';
+              AlarmService.showClassCompletedNotification(
+                courseTitle: courseTitle,
+                batchName: batchName,
+                message: alertMsg,
               );
               _showClassClosedBannerNotification(classClosedAlert);
             }
@@ -399,10 +373,9 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     final msg = (alertData['message'] ?? 'New circular announcement received.').toString();
 
     // 1. Fire native Android System Notification
-    AlarmService.showAttendanceNotification(
+    AlarmService.showNoticeNotification(
       title: title,
       message: msg,
-      isPresent: true,
     );
 
     // 2. Sound & Haptic
@@ -493,10 +466,18 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     final alertData = TrainerDataStore.classClosedAlertNotifier.value;
     if (alertData == null || !mounted) return;
 
-    // Reset notifier value so subsequent alarms trigger properly
+    // Reset notifier value so subsequent notifications trigger properly
     TrainerDataStore.classClosedAlertNotifier.value = null;
 
-    _showClassClosedAttentionAlarm(alertData);
+    final courseTitle = alertData['course_title'] ?? 'Class Session';
+    final batchName = alertData['batch_name'] ?? 'Batch';
+    final alertMsg = alertData['message'] ?? 'The $courseTitle ($batchName) session has concluded. Please come and pick up your child safely.';
+    AlarmService.showClassCompletedNotification(
+      courseTitle: courseTitle,
+      batchName: batchName,
+      message: alertMsg,
+    );
+    _showClassClosedBannerNotification(alertData);
   }
 
   void _showClassClosedBannerNotification(Map<String, dynamic> alertData) {
@@ -511,12 +492,11 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
         padding: EdgeInsets.zero,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-        duration: const Duration(seconds: 10),
+        duration: const Duration(seconds: 8),
         content: GestureDetector(
           onTap: () {
             ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            AlarmService.stopAlarmRing();
-            _showClassClosedAttentionAlarm(alertData);
+            setState(() => _currentIndex = 3);
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -567,7 +547,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
                       ),
                       const SizedBox(height: 2),
                       const Text(
-                        'Tap to view pickup details',
+                        'Tap to view attendance & sessions',
                         style: TextStyle(fontSize: 11, color: Colors.white70),
                       ),
                     ],
@@ -579,193 +559,6 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
         ),
       ),
     );
-  }
-
-  void _showClassClosedAttentionAlarm(Map<String, dynamic> alertData) {
-    final prof = SupabaseService().currentUserProfile;
-    if (prof?['role'] != 'student') return;
-    final courseTitle = alertData['course_title'] ?? 'Classical Dance';
-    final batchName = alertData['batch_name'] ?? 'Class Session';
-
-    int secondsRemaining = 10;
-    Timer? ringTimer;
-
-    // Trigger Android hardware ALARM stream ringtone, alarm vibration pattern, and heads-up notification
-    AlarmService.startAlarmRing(
-      durationSeconds: 10,
-      title: 'CLASS COMPLETED: $courseTitle',
-      message: 'The $courseTitle ($batchName) session has concluded. Please come and take your child back safely.',
-    );
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            ringTimer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
-              if (secondsRemaining > 1) {
-                if (ctx.mounted) {
-                  setDialogState(() {
-                    secondsRemaining--;
-                  });
-                }
-              } else {
-                timer.cancel();
-                AlarmService.stopAlarmRing();
-                if (ctx.mounted && Navigator.canPop(ctx)) {
-                  Navigator.pop(ctx);
-                }
-              }
-            });
-
-            return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              elevation: 16,
-              child: Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFFF7ED), Colors.white],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                  border: Border.all(color: const Color(0xFFF97316), width: 2),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Ringing Bell Icon with pulsing effect
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFED7AA),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFF97316).withOpacity(0.35),
-                            blurRadius: 16,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.notifications_active_rounded,
-                        color: Color(0xFFC2410C),
-                        size: 44,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Title
-                    const Text(
-                      'CLASS COMPLETED!',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF9A3412),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Countdown Ringing Notice
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFEDD5),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFFDBA74)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.ring_volume_rounded, size: 14, color: Color(0xFFC2410C)),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Attention Alarm Ringing: ${secondsRemaining}s',
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF9A3412),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Detailed Message for Parents
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFFED7AA)),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            'The $courseTitle ($batchName) session has concluded.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.bold,
-                              color: LaasyaColors.textDark,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'Please come and take your child back from the academy hall safely.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: Colors.black87,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Stop Ringing Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          ringTimer?.cancel();
-                          AlarmService.stopAlarmRing();
-                          if (Navigator.canPop(ctx)) {
-                            Navigator.pop(ctx);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFC2410C),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          elevation: 3,
-                        ),
-                        icon: const Icon(Icons.volume_off_rounded, size: 20),
-                        label: const Text(
-                          'Stop Ringing',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    ).then((_) {
-      ringTimer?.cancel();
-      AlarmService.stopAlarmRing();
-    });
   }
 
   @override
@@ -844,9 +637,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
               if (result is Map && mounted) {
                 if (result['action'] == 'switch_tab' && result['index'] is int) {
                   setState(() => _currentIndex = result['index']);
-                } else if (result['action'] == 'alarm' && result['data'] is Map) {
-                  _showClassClosedAttentionAlarm(Map<String, dynamic>.from(result['data']));
-                }
+                } else if (result['action'] == 'alarm') { setState(() => _currentIndex = 3); }
               }
             },
           ),

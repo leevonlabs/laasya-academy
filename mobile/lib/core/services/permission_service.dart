@@ -33,7 +33,7 @@ class PermissionService {
 
       final title = isStudent ? 'Class Alerts & Attendance Notifications' : 'Academy Notices & Circulars';
       final description = isStudent
-          ? 'Enable notifications to receive class completion alerts ("Class is over, hooray hooray!") and daily attendance confirmations from your Guru.'
+          ? 'Enable notifications to receive class completion alerts and daily attendance confirmations from your Guru.'
           : 'Enable notifications to receive official circulars, student inquiries, and academy announcements from the Director.';
 
       await showDialog<void>(
@@ -80,7 +80,7 @@ class PermissionService {
                   Expanded(
                     child: Text(
                       isStudent
-                          ? 'Pickup chime and attendance confirmation will be shown as heads-up alerts.'
+                          ? 'Class conclusion and attendance notifications will be delivered directly.'
                           : 'Administrative broadcasts and circulars will be delivered directly.',
                       style: const TextStyle(fontSize: 11.5, color: Colors.black54, height: 1.35),
                     ),
