@@ -199,13 +199,17 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
 
   void _handleNotificationOpened(Map<String, dynamic> data) {
     if (!mounted) return;
-    final route = data['route']?.toString().toLowerCase();
-    if (route == 'messages' || route == 'announcements') {
+    final route = (data['route'] ?? '').toString().toLowerCase().replaceAll('/', '').trim();
+    final alertType = (data['alert_type'] ?? '').toString().toLowerCase();
+
+    debugPrint('Trainer scaffold handling notification tap: route=$route, alertType=$alertType, data=$data');
+
+    if (route == 'messages' || route == 'announcements' || alertType == 'announcement' || alertType == 'message') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen()),
       );
-    } else if (route == 'attendance') {
+    } else if (route == 'attendance' || alertType == 'attendance_marked') {
       setState(() => _currentIndex = 3);
     }
   }

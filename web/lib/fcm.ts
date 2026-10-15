@@ -1,4 +1,4 @@
-import { query } from './db';
+import { query, queryOne } from './db';
 
 interface PushTarget {
   fcm_token: string;
@@ -6,18 +6,80 @@ interface PushTarget {
   user_id?: string;
 }
 
+let _cachedServiceAccount: any = null;
+
+async function getFirebaseServiceAccount(): Promise<any> {
+  if (_cachedServiceAccount) return _cachedServiceAccount;
+
+  // 1. From environment variable (FIREBASE_SERVICE_ACCOUNT_KEY)
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    try {
+      const parsed = typeof process.env.FIREBASE_SERVICE_ACCOUNT_KEY === 'string'
+        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
+        : process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+      if (parsed?.project_id && parsed?.client_email) {
+        _cachedServiceAccount = parsed;
+        return _cachedServiceAccount;
+      }
+    } catch (_) {}
+  }
+
+  // 2. From individual environment variables
+  if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+    _cachedServiceAccount = {
+      projectId: process.env.FIREBASE_PROJECT_ID || 'laasya-academy',
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    };
+    return _cachedServiceAccount;
+  }
+
+  // 3. From local file on disk if present
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const p = path.join(process.cwd(), 'firebase-service-account.json');
+    if (fs.existsSync(p)) {
+      const sa = JSON.parse(fs.readFileSync(p, 'utf8'));
+      if (sa?.project_id && sa?.client_email) {
+        _cachedServiceAccount = sa;
+        return _cachedServiceAccount;
+      }
+    }
+  } catch (_) {}
+
+  // 4. From PostgreSQL database table public.app_config (Ensures Vercel production ALWAYS has credentials!)
+  try {
+    const row = await queryOne<{ config_value: any }>(
+      `SELECT config_value FROM public.app_config WHERE config_key = 'firebase_service_account' LIMIT 1;`
+    );
+    if (row?.config_value) {
+      const sa = typeof row.config_value === 'string'
+        ? JSON.parse(row.config_value)
+        : row.config_value;
+      if (sa?.project_id && sa?.client_email) {
+        _cachedServiceAccount = sa;
+        return _cachedServiceAccount;
+      }
+    }
+  } catch (dbErr) {
+    console.warn('Could not query app_config for firebase credentials:', dbErr);
+  }
+
+  return null;
+}
+
 /**
  * Dispatches Push Notifications to Google Play Services (FCM) and Apple (APNs).
- * Supports standard HTTP v1 / REST delivery.
  */
 export async function sendFcmMessages({
   tokens,
   title,
   body,
   data,
-  androidChannelId,
-  androidSound,
-  iosSound,
+  androidChannelId = 'laasya_class_alerts_v5',
+  androidSound = 'default',
+  iosSound = 'default',
 }: {
   tokens: string[];
   title: string;
@@ -29,88 +91,13 @@ export async function sendFcmMessages({
 }) {
   if (!tokens || tokens.length === 0) return { successCount: 0, failureCount: 0 };
 
-  const fcmServerKey = process.env.FCM_SERVER_KEY || process.env.FIREBASE_SERVER_KEY;
-  const projectId = process.env.FIREBASE_PROJECT_ID || 'laasya-academy';
+  const uniqueTokens = Array.from(new Set(tokens.filter(t => Boolean(t && t.trim()))));
+  if (uniqueTokens.length === 0) return { successCount: 0, failureCount: 0 };
 
   let successCount = 0;
   let failureCount = 0;
 
-  // 1. If FCM Legacy Server Key is configured in environment:
-  if (fcmServerKey) {
-    try {
-      const payload = {
-        registration_ids: tokens,
-        priority: 'high',
-        notification: {
-          title,
-          body,
-          sound: androidSound || 'default',
-          android_channel_id: androidChannelId || 'laasya_notices_channel_v4',
-        },
-        data: {
-          ...data,
-          title,
-          body,
-        },
-      };
-
-      const res = await fetch('https://fcm.googleapis.com/fcm/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `key=${fcmServerKey}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const json = await res.json();
-      successCount = json.success || 0;
-      failureCount = json.failure || 0;
-
-      // Clean up stale/invalid tokens
-      if (Array.isArray(json.results)) {
-        for (let i = 0; i < json.results.length; i++) {
-          const err = json.results[i]?.error;
-          if (err === 'NotRegistered' || err === 'InvalidRegistration') {
-            const badToken = tokens[i];
-            await query(`DELETE FROM public.device_tokens WHERE fcm_token = $1`, [badToken]).catch(() => {});
-          }
-        }
-      }
-      return { successCount, failureCount };
-    } catch (err) {
-      console.error('Error sending legacy FCM push:', err);
-    }
-  }
-
-  // 2. If Firebase Admin Service Account credentials are provided:
-  let saData: any = null;
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    try {
-      saData = typeof process.env.FIREBASE_SERVICE_ACCOUNT_KEY === 'string'
-        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
-        : process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    } catch (_) {}
-  }
-
-  if (!saData && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-    saData = {
-      projectId: process.env.FIREBASE_PROJECT_ID || 'laasya-academy',
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    };
-  }
-
-  if (!saData) {
-    try {
-      const fs = await import('fs');
-      const path = await import('path');
-      const p = path.join(process.cwd(), 'firebase-service-account.json');
-      if (fs.existsSync(p)) {
-        saData = JSON.parse(fs.readFileSync(p, 'utf8'));
-      }
-    } catch (_) {}
-  }
+  const saData = await getFirebaseServiceAccount();
 
   if (saData) {
     try {
@@ -123,24 +110,31 @@ export async function sendFcmMessages({
 
       const messaging = getMessaging();
       const messagePayload = {
-        notification: { title, body },
+        notification: {
+          title,
+          body,
+        },
         data: {
           ...data,
+          title,
+          body,
           click_action: 'FLUTTER_NOTIFICATION_CLICK',
         },
         android: {
           priority: 'high' as const,
           notification: {
-            channelId: androidChannelId || 'laasya_notices_channel_v4',
-            sound: androidSound || 'default',
+            channelId: androidChannelId,
+            sound: androidSound,
             priority: 'max' as const,
             defaultVibrateTimings: true,
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
           },
         },
         apns: {
           payload: {
             aps: {
-              sound: iosSound || 'default',
+              alert: { title, body },
+              sound: iosSound,
               badge: 1,
               contentAvailable: true,
             },
@@ -149,21 +143,23 @@ export async function sendFcmMessages({
       };
 
       const response = await messaging.sendEachForMulticast({
-        tokens,
+        tokens: uniqueTokens,
         ...messagePayload,
       });
 
       successCount = response.successCount;
       failureCount = response.failureCount;
 
-      // Clean up stale tokens
+      console.log(`[FCM Multicast] Sent to ${uniqueTokens.length} devices -> Success: ${successCount}, Fail: ${failureCount}`);
+
+      // Clean up stale or unregistered tokens
       if (response.responses.length > 0) {
         for (let i = 0; i < response.responses.length; i++) {
           const resp = response.responses[i];
           if (!resp.success && resp.error) {
             const code = resp.error.code;
             if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
-              const badToken = tokens[i];
+              const badToken = uniqueTokens[i];
               await query(`DELETE FROM public.device_tokens WHERE fcm_token = $1`, [badToken]).catch(() => {});
             }
           }
@@ -176,13 +172,13 @@ export async function sendFcmMessages({
     }
   }
 
-  console.log(`[FCM Push Log] Dispatch prepared for ${tokens.length} devices: "${title}" - Channel: ${androidChannelId || 'default'}`);
+  console.log(`[FCM Push Log] Dispatch prepared for ${uniqueTokens.length} devices: "${title}" - Channel: ${androidChannelId}`);
   return { successCount, failureCount };
 }
 
 /**
  * Sends Class Completed Push Alert ONLY to enrolled Students.
- * Gurus NEVER receive the student pickup ringtone or class-closed alert.
+ * Gurus NEVER receive student pickup ringtones or class-closed alerts.
  */
 export async function sendClassCompletedPush({
   batchId,
@@ -198,9 +194,8 @@ export async function sendClassCompletedPush({
   message?: string;
 }) {
   try {
-    // 1. Query device tokens strictly for STUDENTS enrolled in this batch (or all students if batch is 'all')
     const rows = await query<PushTarget>(`
-      SELECT fcm_token, platform, user_id
+      SELECT DISTINCT fcm_token, platform, user_id
       FROM public.device_tokens
       WHERE role = 'student'
         AND (
@@ -208,8 +203,13 @@ export async function sendClassCompletedPush({
           OR batch_ids = '[]'::jsonb
           OR jsonb_array_length(batch_ids) = 0
           OR $2 = 'all'
+          OR user_id IN (
+            SELECT s.profile_id FROM public.students s
+            WHERE s.batch_id::text = $2
+               OR s.batch_id::text IN (SELECT id::text FROM public.batches WHERE name ILIKE '%' || $3 || '%')
+          )
         );
-    `, [JSON.stringify([batchId]), batchId]);
+    `, [JSON.stringify([batchId]), batchId, batchName || '']);
 
     if (!rows || rows.length === 0) {
       console.log(`[Class Completed Push] No student devices registered for batch ${batchId}.`);
@@ -233,12 +233,11 @@ export async function sendClassCompletedPush({
         message: body,
         route: '/attendance',
       },
-      androidChannelId: 'laasya_class_completed_chime_v4',
-      androidSound: 'class_completed',
-      iosSound: 'class_completed.caf',
+      androidChannelId: 'laasya_class_alerts_v5',
+      androidSound: 'default',
+      iosSound: 'default',
     });
 
-    console.log(`[Class Completed Push] Dispatched to ${tokens.length} students (Success: ${result.successCount}).`);
     return { sent: tokens.length, ...result };
   } catch (err) {
     console.error('Error dispatching class completed push:', err);
@@ -247,7 +246,7 @@ export async function sendClassCompletedPush({
 }
 
 /**
- * Sends Announcements and Circulars to Gurus and/or Students with standard tone.
+ * Sends Announcements and Circulars to Gurus and/or Students with default alert sound.
  */
 export async function sendAnnouncementPush({
   title,
@@ -277,7 +276,7 @@ export async function sendAnnouncementPush({
     }
 
     const rows = await query<PushTarget>(`
-      SELECT fcm_token, platform, user_id
+      SELECT DISTINCT fcm_token, platform, user_id
       FROM public.device_tokens
       WHERE ${roleFilter};
     `);
@@ -302,7 +301,7 @@ export async function sendAnnouncementPush({
         sender_role: senderRole || 'admin',
         route: '/announcements',
       },
-      androidChannelId: 'laasya_notices_channel_v4',
+      androidChannelId: 'laasya_notices_channel_v5',
       androidSound: 'default',
       iosSound: 'default',
     });
@@ -310,6 +309,71 @@ export async function sendAnnouncementPush({
     return { sent: tokens.length, ...result };
   } catch (err) {
     console.error('Error dispatching announcement push:', err);
+    return { sent: 0, error: err };
+  }
+}
+
+/**
+ * Sends Live Attendance push alerts to relevant students.
+ */
+export async function sendAttendancePush({
+  studentId,
+  studentName,
+  courseTitle,
+  batchName,
+  status,
+  guruName,
+}: {
+  studentId: string;
+  studentName: string;
+  courseTitle: string;
+  batchName: string;
+  status: string;
+  guruName: string;
+}) {
+  try {
+    const rows = await query<PushTarget>(`
+      SELECT DISTINCT dt.fcm_token, dt.platform, dt.user_id
+      FROM public.device_tokens dt
+      WHERE dt.role = 'student'
+        AND (
+          dt.user_id::text = $1
+          OR dt.user_id IN (
+            SELECT s.profile_id FROM public.students s 
+            WHERE s.id::text = $1 OR s.profile_id::text = $1 OR LOWER(s.roll_number) = LOWER($1)
+          )
+        );
+    `, [studentId]);
+
+    if (!rows || rows.length === 0) return { sent: 0 };
+
+    const statusUpper = status.toUpperCase();
+    const isPresent = statusUpper === 'PRESENT';
+    const tokens = rows.map(r => r.fcm_token).filter(Boolean);
+    const title = isPresent ? 'Attendance Confirmed: PRESENT' : 'Attendance Alert: ABSENT';
+    const body = `${studentName} was marked ${statusUpper} for ${courseTitle} (${batchName}) by Guru ${guruName}.`;
+
+    const result = await sendFcmMessages({
+      tokens,
+      title,
+      body,
+      data: {
+        alert_type: 'attendance_marked',
+        student_id: studentId,
+        student_name: studentName,
+        course_title: courseTitle,
+        batch_name: batchName,
+        student_status: statusUpper,
+        route: '/attendance',
+      },
+      androidChannelId: 'laasya_attendance_channel_v5',
+      androidSound: 'default',
+      iosSound: 'default',
+    });
+
+    return { sent: tokens.length, ...result };
+  } catch (err) {
+    console.error('Error dispatching attendance push:', err);
     return { sent: 0, error: err };
   }
 }

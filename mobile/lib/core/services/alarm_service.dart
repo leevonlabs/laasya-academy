@@ -17,7 +17,7 @@ class AlarmService {
   /// Starts the custom vocal pickup chime ("Class is over...") & vibration.
   /// Also fires a heads-up system notification with a "DISMISS" action button.
   static Future<void> startAlarmRing({
-    int durationSeconds = 11,
+    int durationSeconds = 10,
     String title = 'CLASS COMPLETED!',
     String message = 'Class session has concluded. Please come and take your child back safely.',
   }) async {

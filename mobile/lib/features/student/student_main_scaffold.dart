@@ -69,16 +69,21 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
 
   void _handleNotificationOpened(Map<String, dynamic> data) {
     if (!mounted) return;
-    final route = data['route']?.toString().toLowerCase();
-    if (route == 'messages') {
+    final route = (data['route'] ?? '').toString().toLowerCase().replaceAll('/', '').trim();
+    final alertType = (data['alert_type'] ?? '').toString().toLowerCase();
+
+    debugPrint('Student scaffold handling notification tap: route=$route, alertType=$alertType, data=$data');
+
+    if (route == 'messages' || route == 'announcements' || alertType == 'announcement' || alertType == 'message') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const StudentMessagesScreen()),
       );
-    } else if (route == 'attendance') {
+    } else if (route == 'attendance' || route == 'alarm' || alertType == 'class_closed' || alertType == 'attendance_marked') {
       setState(() => _currentIndex = 3);
-    } else if (route == 'alarm') {
-      _showClassClosedAttentionAlarm(data);
+      if (alertType == 'class_closed' || route == 'alarm') {
+        _showClassClosedAttentionAlarm(data);
+      }
     }
   }
 

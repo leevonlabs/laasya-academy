@@ -56,14 +56,28 @@ class PushNotificationService {
     }
   }
 
+  static Map<String, dynamic>? _pendingNotificationData;
+
   static void setNotificationOpenedHandler(Function(Map<String, dynamic>) handler) {
     onNotificationOpenedCallback = handler;
+    if (_pendingNotificationData != null) {
+      final pending = _pendingNotificationData!;
+      _pendingNotificationData = null;
+      Future.delayed(const Duration(milliseconds: 350), () => handler(pending));
+    }
+    FirebaseMessaging.instance.getInitialMessage().then((msg) {
+      if (msg != null && msg.data.isNotEmpty) {
+        Future.delayed(const Duration(milliseconds: 350), () => handler(msg.data));
+      }
+    });
   }
 
   static void _handleNotificationTapped(Map<String, dynamic> data) {
     debugPrint('Push notification tapped with data: $data');
     if (onNotificationOpenedCallback != null) {
       onNotificationOpenedCallback!(data);
+    } else {
+      _pendingNotificationData = data;
     }
   }
 

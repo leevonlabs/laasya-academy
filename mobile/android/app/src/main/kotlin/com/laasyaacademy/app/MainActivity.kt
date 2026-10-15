@@ -14,6 +14,7 @@ import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -36,9 +37,9 @@ class MainActivity: FlutterActivity() {
         const val CHANNEL_NAME = "com.laasyaacademy.app/alarm"
         const val ACTION_STOP_ALARM = "com.laasyaacademy.app.ACTION_STOP_ALARM"
 
-        const val CHANNEL_CLASS_ALERTS = "laasya_class_completed_chime_v4"
-        const val CHANNEL_ATTENDANCE = "laasya_attendance_channel_v4"
-        const val CHANNEL_NOTICES = "laasya_notices_channel_v4"
+        const val CHANNEL_CLASS_ALERTS = LaasyaApplication.CHANNEL_CLASS_ALERTS
+        const val CHANNEL_ATTENDANCE = LaasyaApplication.CHANNEL_ATTENDANCE
+        const val CHANNEL_NOTICES = LaasyaApplication.CHANNEL_NOTICES
 
         const val NOTIF_ID_ALARM = 1001
         const val NOTIF_ID_ATTENDANCE = 1002
@@ -97,13 +98,17 @@ class MainActivity: FlutterActivity() {
         super.onNewIntent(newIntent)
         setIntent(newIntent)
         val route = newIntent.getStringExtra("route")
-        if (route != null && flutterEngine != null) {
-            val payload = mapOf(
-                "route" to route,
-                "title" to (newIntent.getStringExtra("title") ?: ""),
-                "message" to (newIntent.getStringExtra("message") ?: "")
-            )
+        val alertType = newIntent.getStringExtra("alert_type")
+        if ((route != null || alertType != null) && flutterEngine != null) {
+            val payload = mutableMapOf<String, Any>()
+            val extras = newIntent.extras
+            if (extras != null) {
+                for (key in extras.keySet()) {
+                    extras.get(key)?.let { payload[key] = it.toString() }
+                }
+            }
             newIntent.removeExtra("route")
+            newIntent.removeExtra("alert_type")
             MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL_NAME)
                 .invokeMethod("onNotificationOpened", payload)
         }
@@ -124,7 +129,7 @@ class MainActivity: FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME).setMethodCallHandler { call, result ->
             when (call.method) {
                 "startAlarmRing" -> {
-                    val durationSec = call.argument<Int>("duration") ?: 11
+                    val durationSec = call.argument<Int>("duration") ?: 10
                     val title = call.argument<String>("title") ?: "CLASS COMPLETED!"
                     val message = call.argument<String>("message") ?: "Class has concluded. Please take your child back."
 
@@ -189,14 +194,21 @@ class MainActivity: FlutterActivity() {
                 }
                 "getPendingNotificationRoute" -> {
                     val route = intent?.getStringExtra("route")
-                    val data = if (route != null) {
-                        mapOf(
-                            "route" to route,
-                            "title" to (intent?.getStringExtra("title") ?: ""),
-                            "message" to (intent?.getStringExtra("message") ?: "")
-                        )
+                    val alertType = intent?.getStringExtra("alert_type")
+                    val data = if (route != null || alertType != null) {
+                        val map = mutableMapOf<String, Any>()
+                        intent?.extras?.let { extras ->
+                            for (key in extras.keySet()) {
+                                extras.get(key)?.let { map[key] = it.toString() }
+                            }
+                        }
+                        if (!map.containsKey("route") && route != null) {
+                            map["route"] = route
+                        }
+                        map
                     } else null
                     intent?.removeExtra("route")
+                    intent?.removeExtra("alert_type")
                     result.success(data)
                 }
                 else -> {
@@ -262,23 +274,28 @@ class MainActivity: FlutterActivity() {
             )
             wakeLock?.acquire((durationSec + 2) * 1000L)
 
-            // 2. Play custom vocal pickup chime using MediaPlayer with USAGE_ALARM
+            // 2. Play alert sound (default notification tone or vocal chime) for 10 seconds using USAGE_ALARM
             try {
+                val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+
                 val audioAttributes = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build()
 
                 mediaPlayer = try {
-                    MediaPlayer.create(applicationContext, R.raw.class_completed, audioAttributes, 0)?.apply {
-                        setVolume(1.0f, 1.0f)
-                        isLooping = false
+                    MediaPlayer().apply {
+                        setDataSource(applicationContext, soundUri)
+                        setAudioAttributes(audioAttributes)
+                        isLooping = true
+                        prepare()
                         start()
                     }
                 } catch (_: Exception) {
-                    MediaPlayer.create(applicationContext, R.raw.class_completed)?.apply {
+                    MediaPlayer.create(applicationContext, R.raw.class_completed, audioAttributes, 0)?.apply {
                         setVolume(1.0f, 1.0f)
-                        isLooping = false
+                        isLooping = true
                         start()
                     }
                 }
@@ -286,7 +303,7 @@ class MainActivity: FlutterActivity() {
                 e.printStackTrace()
             }
 
-            // 3. Vibrate device with rhythmic cadence
+            // 3. Vibrate device with 10-second rhythmic pattern
             vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 vm?.defaultVibrator
@@ -295,7 +312,7 @@ class MainActivity: FlutterActivity() {
                 getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
             }
 
-            val pattern = longArrayOf(0, 500, 200, 500, 200, 500, 200, 500)
+            val pattern = longArrayOf(0, 1000, 400, 1000, 400, 1000, 400, 1000, 400, 1000, 400, 1000, 400, 1000)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
             } else {
@@ -387,7 +404,8 @@ class MainActivity: FlutterActivity() {
             BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
         } catch (_: Exception) { null }
 
-        val soundUri = Uri.parse("${ContentResolver.SCHEME_ANDROID_RESOURCE}://${packageName}/${R.raw.class_completed}")
+        val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
 
         val notif = NotificationCompat.Builder(this, CHANNEL_CLASS_ALERTS)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -398,7 +416,7 @@ class MainActivity: FlutterActivity() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setSound(soundUri)
+            .setSound(defaultSoundUri)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "DISMISS", stopPendingIntent)
@@ -473,50 +491,6 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun ensureNotificationChannels(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-            val soundUri = Uri.parse("${ContentResolver.SCHEME_ANDROID_RESOURCE}://${context.packageName}/${R.raw.class_completed}")
-            val audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
-
-            // 1. Channel for Class Completed with custom pickup chime
-            val alertChannel = NotificationChannel(
-                CHANNEL_CLASS_ALERTS,
-                "Class Conclusion Pickup Alerts",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Plays custom vocal chime ('Class is over, hooray hooray!') when class concludes"
-                enableVibration(true)
-                vibrationPattern = longArrayOf(0, 500, 200, 500, 200, 500, 200, 500)
-                setSound(soundUri, audioAttributes)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            }
-            nm.createNotificationChannel(alertChannel)
-
-            // 2. Channel for Live Attendance
-            val attChannel = NotificationChannel(
-                CHANNEL_ATTENDANCE,
-                "Attendance Updates",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Live attendance status marked by Gurus"
-                enableVibration(true)
-            }
-            nm.createNotificationChannel(attChannel)
-
-            // 3. Channel for Notices
-            val noticeChannel = NotificationChannel(
-                CHANNEL_NOTICES,
-                "Academy Circulars & Notices",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Official broadcasts and messages from Academy Administration"
-                enableVibration(true)
-            }
-            nm.createNotificationChannel(noticeChannel)
-        }
+        LaasyaApplication.ensureNotificationChannels(context)
     }
 }

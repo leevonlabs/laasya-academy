@@ -241,6 +241,23 @@ export async function POST(req: NextRequest) {
           batch_id, batch_name, course_title, trainer_name, message, alert_type, target_student_id, student_status, target_roll_number, target_student_name, created_at
         ) VALUES ${alertValuesSql.join(', ')};
       `, alertParams);
+
+      // 3e. Dispatch FCM push notifications to marked students
+      try {
+        const { sendAttendancePush } = await import('@/lib/fcm');
+        for (const rec of resolvedRecords) {
+          sendAttendancePush({
+            studentId: rec.student_id,
+            studentName: rec.name,
+            courseTitle: cTitle,
+            batchName: bName,
+            status: rec.status,
+            guruName,
+          }).catch(() => {});
+        }
+      } catch (fcmErr) {
+        console.warn('Could not dispatch attendance push notifications:', fcmErr);
+      }
     }
 
     // 4. Single consolidated session announcement for Notifications feed
