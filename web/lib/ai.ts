@@ -103,7 +103,7 @@ export async function enhanceTextWithAi(
   } else if (context.includes('subject') || context.includes('title')) {
     contextGuidance = 'This is an announcement notice subject. Make it clear, formal, and attention-grabbing.';
   } else if (context.includes('message') || context.includes('content') || context.includes('announcement')) {
-    contextGuidance = 'This is an announcement message body for disciples, gurus, and parents. Ensure respectful, warm, professional, and culturally appropriate academy tone.';
+    contextGuidance = 'This is an announcement message body for students, gurus, and parents. Ensure respectful, warm, professional, and culturally appropriate academy tone.';
   } else if (context.includes('course')) {
     contextGuidance = 'This is a classical arts course description. Highlight curriculum, discipline, artistic heritage, and learning outcomes elegantly.';
   } else if (context.includes('bio') || context.includes('guru')) {

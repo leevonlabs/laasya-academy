@@ -53,7 +53,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
 
       if (profile['role'] != 'student') {
         await SupabaseService().signOut();
-        throw Exception('Access Denied: This login portal is strictly reserved for Disciples & Students. Revered Gurus must log in through the Guru Login portal.');
+        throw Exception('Access Denied: This login portal is strictly reserved for Students & Parents. Revered Gurus must log in through the Guru Login portal.');
       }
 
       if (!mounted) return;

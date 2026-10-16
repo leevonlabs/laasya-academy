@@ -130,7 +130,7 @@ class SupabaseService {
     {
       'id': 'msg-1',
       'title': 'Navaratri & Vijayadashami Special Holiday Schedule',
-      'message': 'Dear Disciples & Respected Parents,\n\nPlease note that regular classes will remain suspended from Oct 11 to Oct 13 in observance of Vijayadashami & Saraswathi Pooja.\n\n✨ Special Maha Pooja & Vidhyarambham will be celebrated on Saturday, Oct 12 at 09:00 AM at Natya Mandapam (Room 101). All disciples, parents, and art lovers are cordially invited to seek the blessings of the Gurus.\n\nPranaams,\nAcademy Administration',
+      'message': 'Dear Students & Respected Parents,\n\nPlease note that regular classes will remain suspended from Oct 11 to Oct 13 in observance of Vijayadashami & Saraswathi Pooja.\n\n✨ Special Maha Pooja & Vidhyarambham will be celebrated on Saturday, Oct 12 at 09:00 AM at Natya Mandapam (Room 101). All students, parents, and art lovers are cordially invited to seek the blessings of the Gurus.\n\nPranaams,\nAcademy Administration',
       'type': 'message',
       'announcement_type': 'message',
       'type_tag': 'Holiday',
@@ -170,7 +170,7 @@ class SupabaseService {
     {
       'id': 'msg-3',
       'title': 'Weekend Batch Timing Alignment for Stage Rehearsals',
-      'message': 'Attention Bharathanatyam (Batch A & Batch B) Students:\n\nStarting this Saturday, morning batch timings will begin 30 minutes earlier at 08:30 AM to accommodate stage lighting & blocking rehearsals for our upcoming Annual Cultural Samarpanam 2026.\n\nDisciples are advised to arrive 10 minutes in advance wearing standard academy dance attire and ghungroos.\n\nGuru Smt. Anusha Sumesh\nHead of Classical Dance',
+      'message': 'Attention Bharathanatyam (Batch A & Batch B) Students:\n\nStarting this Saturday, morning batch timings will begin 30 minutes earlier at 08:30 AM to accommodate stage lighting & blocking rehearsals for our upcoming Annual Cultural Samarpanam 2026.\n\nStudents are advised to arrive 10 minutes in advance wearing standard academy dance attire and ghungroos.\n\nGuru Smt. Anusha Sumesh\nHead of Classical Dance',
       'type': 'message',
       'announcement_type': 'message',
       'type_tag': 'Schedule change',
@@ -227,6 +227,30 @@ class SupabaseService {
         final decoded = jsonDecode(savedMessagesJson);
         if (decoded is List) {
           _cachedMessageAnnouncements = decoded.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+        }
+      }
+
+      final savedNotifsJson = prefs.getString('laasya_cached_notifications');
+      if (savedNotifsJson != null && savedNotifsJson.isNotEmpty) {
+        final decoded = jsonDecode(savedNotifsJson);
+        if (decoded is List) {
+          _cachedNotifications = decoded.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+        }
+      }
+
+      final savedSalariesJson = prefs.getString('laasya_cached_trainer_salaries');
+      if (savedSalariesJson != null && savedSalariesJson.isNotEmpty) {
+        final decoded = jsonDecode(savedSalariesJson);
+        if (decoded is List) {
+          _cachedSalaries = decoded.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+        }
+      }
+
+      final savedPaymentsJson = prefs.getString('laasya_cached_student_payments');
+      if (savedPaymentsJson != null && savedPaymentsJson.isNotEmpty) {
+        final decoded = jsonDecode(savedPaymentsJson);
+        if (decoded is List) {
+          _cachedPayments = decoded.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
         }
       }
     } catch (e) {
@@ -1665,6 +1689,15 @@ class SupabaseService {
     _saveReadVideos();
   }
 
+  List<Map<String, dynamic>> getCachedNotifications() => List<Map<String, dynamic>>.from(_cachedNotifications);
+
+  Future<void> _saveNotificationsToPrefs(List<Map<String, dynamic>> notifs) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('laasya_cached_notifications', jsonEncode(notifs));
+    } catch (_) {}
+  }
+
   Future<List<Map<String, dynamic>>> getNotifications() async {
     // 1. If cached notifications exist, return immediately (<1ms) to eliminate loading spinners and lag
     if (_cachedNotifications.isNotEmpty) {
@@ -1836,6 +1869,7 @@ class SupabaseService {
       }
 
       _cachedNotifications = notifs;
+      _saveNotificationsToPrefs(notifs);
     } catch (e) {
       debugPrint('Notification parallel fetch notice: $e');
       if (_cachedNotifications.isEmpty) {
@@ -1846,6 +1880,7 @@ class SupabaseService {
           notifs.add(Map<String, dynamic>.from(b));
         }
         _cachedNotifications = notifs;
+        _saveNotificationsToPrefs(notifs);
       }
     }
 
@@ -1867,17 +1902,34 @@ class SupabaseService {
   // ---------------------------------------------------------------------------
   List<Map<String, dynamic>> _cachedEventFolders = [];
 
+  List<Map<String, dynamic>> getCachedStudentEventFolders() => List<Map<String, dynamic>>.from(_cachedEventFolders);
+
   Future<List<Map<String, dynamic>>> getStudentEventFolders({String? courseTitle, String? batchName}) async {
+    if (_cachedEventFolders.isNotEmpty) {
+      _refreshEventFoldersInBackground();
+      return List<Map<String, dynamic>>.from(_cachedEventFolders);
+    }
+
+    await _fetchLiveEventFolders();
+    return List<Map<String, dynamic>>.from(_cachedEventFolders);
+  }
+
+  void _refreshEventFoldersInBackground() {
+    _fetchLiveEventFolders().catchError((_) => <Map<String, dynamic>>[]);
+  }
+
+  Future<void> _fetchLiveEventFolders() async {
     // 1. Live fetch from web backend API
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/video-library');
-      final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['items'] is List) {
           final liveItems = List<Map<String, dynamic>>.from(decoded['items']);
           if (liveItems.isNotEmpty) {
             _cachedEventFolders = liveItems;
+            return;
           }
         }
       }
@@ -1914,7 +1966,7 @@ class SupabaseService {
           'target_course_title': 'Bharathanatyam',
           'target_batch_name': 'All Batches',
           'drive_url': 'https://drive.google.com/drive/folders/1kZbRN-inNyTmJD_HblU7BunbwySyY796?usp=sharing',
-          'description': 'Official shoot drive folder uploaded for Bharathanatyam disciples.',
+          'description': 'Official shoot drive folder uploaded for Bharathanatyam students.',
           'access_level': 'Course',
           'created_by': 'Academy Owner',
         },
@@ -1942,7 +1994,7 @@ class SupabaseService {
           'target_course_title': 'All 18 Courses',
           'target_batch_name': 'All Batches',
           'drive_url': 'https://drive.google.com/drive/folders/1laasya_annual_day_2026_media_vault?usp=sharing',
-          'description': 'High-resolution photo gallery and backstage video recordings from the 2026 Annual Cultural Showcase for all academy disciples.',
+          'description': 'High-resolution photo gallery and backstage video recordings from the 2026 Annual Cultural Showcase for all academy students.',
           'access_level': 'All Students',
           'created_by': 'Academy Owner',
         },
@@ -1956,7 +2008,7 @@ class SupabaseService {
           'target_course_title': 'Bharathanatyam',
           'target_batch_name': 'Batch A (Beginners)',
           'drive_url': 'https://drive.google.com/drive/folders/1laasya_natya_mandapam_4k_footage?usp=sharing',
-          'description': 'Raw and edited performance clips sorted by batch and raga for all participating disciples and parents.',
+          'description': 'Raw and edited performance clips sorted by batch and raga for all participating students and parents.',
           'access_level': 'Batch',
           'created_by': 'Academy Owner',
         },
@@ -1976,8 +2028,6 @@ class SupabaseService {
         },
       ];
     }
-
-    return List<Map<String, dynamic>>.from(_cachedEventFolders);
   }
 
   // ---------------------------------------------------------------------------
@@ -1985,17 +2035,42 @@ class SupabaseService {
   // ---------------------------------------------------------------------------
   List<Map<String, dynamic>> _cachedPayments = [];
 
+  List<Map<String, dynamic>> getCachedPayments() => List<Map<String, dynamic>>.from(_cachedPayments);
+
+  Future<void> _savePaymentsToPrefs(List<Map<String, dynamic>> payments) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('laasya_cached_student_payments', jsonEncode(payments));
+    } catch (_) {}
+  }
+
   Future<List<Map<String, dynamic>>> getStudentPayments({String? studentId, String? rollNumber}) async {
-    // 1. Live fetch from local / web backend API
+    // Return cached immediately if available (<1ms) to eliminate loading spinners
+    if (_cachedPayments.isNotEmpty) {
+      _refreshStudentPaymentsInBackground();
+      return List<Map<String, dynamic>>.from(_cachedPayments);
+    }
+
+    await _fetchLiveStudentPayments();
+    return List<Map<String, dynamic>>.from(_cachedPayments);
+  }
+
+  void _refreshStudentPaymentsInBackground() {
+    _fetchLiveStudentPayments().catchError((_) => <Map<String, dynamic>>[]);
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchLiveStudentPayments() async {
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/student-payments');
-      final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['payments'] is List) {
           final livePayments = List<Map<String, dynamic>>.from(decoded['payments']);
           if (livePayments.isNotEmpty) {
             _cachedPayments = livePayments;
+            _savePaymentsToPrefs(livePayments);
+            return livePayments;
           }
         }
       }
@@ -2126,19 +2201,45 @@ class SupabaseService {
   // ---------------------------------------------------------------------------
   List<Map<String, dynamic>> _cachedSalaries = [];
 
+  List<Map<String, dynamic>> getCachedSalaries() => List<Map<String, dynamic>>.from(_cachedSalaries);
+
+  Future<void> _saveSalariesToPrefs(List<Map<String, dynamic>> salaries) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('laasya_cached_trainer_salaries', jsonEncode(salaries));
+    } catch (_) {}
+  }
+
   Future<List<Map<String, dynamic>>> getTrainerSalaryPayouts({String? trainerId}) async {
-    // 1. Live fetch from local / web backend API
+    // Return cached immediately (<1ms) to eliminate loading spinners and freeze
+    if (_cachedSalaries.isNotEmpty) {
+      _refreshSalariesInBackground(trainerId);
+      return List<Map<String, dynamic>>.from(_cachedSalaries);
+    }
+
+    await _fetchLiveSalaries(trainerId);
+    return List<Map<String, dynamic>>.from(_cachedSalaries);
+  }
+
+  void _refreshSalariesInBackground(String? trainerId) {
+    _fetchLiveSalaries(trainerId).catchError((_) => <Map<String, dynamic>>[]);
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchLiveSalaries(String? trainerId) async {
     try {
       final prof = _cachedProfile ?? await getCurrentUserProfile();
       final id = (trainerId ?? prof?['id'] ?? prof?['trainer_id'] ?? prof?['profile_id'] ?? '').toString().trim();
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/trainer-salaries${id.isNotEmpty ? "?trainerId=${Uri.encodeComponent(id)}" : ""}');
-      final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['salaries'] is List) {
           final liveSalaries = List<Map<String, dynamic>>.from(decoded['salaries']);
-          _cachedSalaries = liveSalaries;
-          return liveSalaries;
+          if (liveSalaries.isNotEmpty) {
+            _cachedSalaries = liveSalaries;
+            _saveSalariesToPrefs(liveSalaries);
+            return liveSalaries;
+          }
         }
       }
     } catch (e) {

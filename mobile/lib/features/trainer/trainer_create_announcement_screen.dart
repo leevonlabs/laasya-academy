@@ -35,7 +35,7 @@ class _TrainerCreateAnnouncementScreenState
   String _selectedBatchOption = 'all'; // 'all' or batch.id
   String _selectedBatchName = 'All Batches in Course';
 
-  // Disciples / Student Selection State
+  // Student Selection State
   List<Map<String, dynamic>> _availableStudents = [];
   final Set<String> _selectedStudentIds = {};
   final TextEditingController _studentSearchController = TextEditingController();
@@ -204,7 +204,7 @@ class _TrainerCreateAnnouncementScreenState
     if (_selectedStudentIds.isEmpty && _availableStudents.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select at least one disciple to receive this broadcast.'),
+          content: Text('Please select at least one student to receive this broadcast.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -256,7 +256,7 @@ class _TrainerCreateAnnouncementScreenState
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Message successfully shared with disciples!'),
+            content: Text('Message successfully shared with students!'),
             backgroundColor: Color(0xFF03543F),
             duration: Duration(seconds: 3),
           ),
@@ -352,7 +352,7 @@ class _TrainerCreateAnnouncementScreenState
                               ),
                               const SizedBox(height: 2),
                               const Text(
-                                'Broadcast instant notifications to your enrolled disciples',
+                                'Broadcast instant notifications to your enrolled students',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: Color(0xFF6B7280),
@@ -459,7 +459,7 @@ class _TrainerCreateAnnouncementScreenState
                             return DropdownMenuItem<String>(
                               value: b['id'],
                               child: Text(
-                                '${b['name']} (${b['enrolled_count'] ?? 0} Disciples)',
+                                '${b['name']} (${b['enrolled_count'] ?? 0} Students)',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: Color(0xFF1E1E1E),
@@ -513,7 +513,7 @@ class _TrainerCreateAnnouncementScreenState
                                 ),
                                 SizedBox(width: 6),
                                 Text(
-                                  'FILTER DISCIPLES',
+                                  'FILTER STUDENTS',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
@@ -555,7 +555,7 @@ class _TrainerCreateAnnouncementScreenState
                                     setState(() => _studentFilterText = val),
                                 style: const TextStyle(fontSize: 12.5),
                                 decoration: InputDecoration(
-                                  hintText: 'Search by disciple name or roll no...',
+                                  hintText: 'Search by student name or roll no...',
                                   hintStyle: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey.shade400,
@@ -622,7 +622,7 @@ class _TrainerCreateAnnouncementScreenState
                             padding: const EdgeInsets.all(16),
                             alignment: Alignment.center,
                             child: const Text(
-                              'No disciples enrolled in this batch yet.',
+                              'No students enrolled in this batch yet.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey,
@@ -863,7 +863,7 @@ class _TrainerCreateAnnouncementScreenState
                     style: const TextStyle(fontSize: 13.5),
                     decoration: InputDecoration(
                       hintText:
-                          'Dear disciples, please note that tomorrow we will conduct stage choreography practice. Kindly arrive in practice attire with ghungroos on time...',
+                          'Dear students, please note that tomorrow we will conduct stage choreography practice. Kindly arrive in practice attire with ghungroos on time...',
                       hintStyle: TextStyle(
                         fontSize: 12.5,
                         color: Colors.grey.shade400,

@@ -120,7 +120,7 @@ class _StudentCoursesTabState extends State<StudentCoursesTab> {
               _detailRow(Icons.access_time_rounded, 'Timings & Days', course['timings'] ?? 'Regular Schedule'),
               _detailRow(Icons.room_rounded, 'Hall / Location', course['room'] ?? 'Academy Hall'),
               _detailRow(Icons.payments_rounded, 'Monthly Course Fee', course['fee'] ?? '₹2,000 / month'),
-              _detailRow(Icons.check_circle_outline_rounded, 'Enrollment Status', 'Active Registered Disciple'),
+              _detailRow(Icons.check_circle_outline_rounded, 'Enrollment Status', 'Active Registered Student'),
 
               const SizedBox(height: 24),
               SizedBox(

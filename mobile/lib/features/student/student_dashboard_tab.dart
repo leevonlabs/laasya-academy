@@ -596,7 +596,7 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
           ),
           SizedBox(height: 12),
           Text(
-            'Official Academy Disciple Profile',
+            'Official Academy Student Profile',
             style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
           ),
         ],
@@ -703,7 +703,7 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: const Text(
-                                    'ACTIVE DISCIPLE',
+                                    'ACTIVE STUDENT',
                                     style: TextStyle(
                                       color: Color(0xFF03543F),
                                       fontSize: 9,

@@ -62,7 +62,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('All disciples marked as ${status.toUpperCase()}'),
+        content: Text('All students marked as ${status.toUpperCase()}'),
         backgroundColor: status == 'present' ? const Color(0xFF03543F) : const Color(0xFF991B1B),
         duration: const Duration(seconds: 2),
       ),
@@ -241,7 +241,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Parents and disciples will receive instant class conclusion notifications on their mobile phones.',
+                      'Parents and students will receive instant class conclusion notifications on their mobile phones.',
                       style: TextStyle(fontSize: 11, color: Color(0xFF8A064D), fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -269,7 +269,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
               });
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Class Completed! Parents and disciples have been notified.'),
+                  content: Text('Class Completed! Parents and students have been notified.'),
                   backgroundColor: Color(0xFF03543F),
                   duration: Duration(seconds: 4),
                 ),
@@ -493,7 +493,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${_students.length} disciples enrolled in this batch for today\'s session. Tap below to start taking attendance.',
+                      '${_students.length} students enrolled in this batch for today\'s session. Tap below to start taking attendance.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 12.5, color: Colors.black54),
                     ),
@@ -619,7 +619,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                             ),
                             SizedBox(height: 2),
                             Text(
-                              'Class completion notifications were sent to parents and disciples.',
+                              'Class completion notifications were sent to parents and students.',
                               style: TextStyle(fontSize: 11, color: Color(0xFF03543F)),
                             ),
                           ],
@@ -634,7 +634,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
 
               // Read-only roster view with option to edit
               const Text(
-                'Recorded Disciples Roster',
+                'Recorded Students Roster',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
               ),
               const SizedBox(height: 8),
@@ -810,7 +810,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
               TextField(
                 onChanged: (val) => setState(() => _searchQuery = val),
                 decoration: InputDecoration(
-                  hintText: 'Search disciple by name or roll number...',
+                  hintText: 'Search student by name or roll number...',
                   hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey.shade500),
                   prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Colors.grey),
                   suffixIcon: _searchQuery.isNotEmpty
@@ -839,12 +839,12 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
 
               const SizedBox(height: 14),
 
-              // Disciples List Header
+              // Students List Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Mark Attendance (${filteredStudents.length} Disciples)',
+                    'Mark Attendance (${filteredStudents.length} Students)',
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
                   ),
                   TextButton.icon(
@@ -859,7 +859,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
               ),
               const SizedBox(height: 6),
 
-              // Disciples List (NO LATE STATUS!)
+              // Students List (NO LATE STATUS!)
               ...filteredStudents.map((stu) {
                 final sId = stu['id'];
                 final status = _store.getStudentStatus(_batchId, sId);
@@ -939,7 +939,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                         ),
                       ),
 
-                      // 2-Way Toggle: P (Present) & A (Absent) ONLY. Unmarked disciples have neither selected.
+                      // 2-Way Toggle: P (Present) & A (Absent) ONLY. Unmarked students have neither selected.
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

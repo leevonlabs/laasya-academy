@@ -27,9 +27,11 @@ class LaasyaAlertService : Service() {
 
     companion object {
         const val PREFS_NAME = "FlutterSharedPreferences"
+        const val NOTIF_CHANNEL_SERVICE = "laasya_service"
         const val NOTIF_CHANNEL_CLASSES = "laasya_classes"
         const val NOTIF_CHANNEL_ANNOUNCEMENTS = "laasya_announcements"
 
+        const val NOTIF_ID_FOREGROUND = 1001
         const val NOTIF_ID_CLASS_COMPLETED = 2001
         const val NOTIF_ID_ATTENDANCE = 2002
         const val NOTIF_ID_ANNOUNCEMENT = 2003
@@ -49,11 +51,14 @@ class LaasyaAlertService : Service() {
     override fun onCreate() {
         super.onCreate()
         ensureNotificationChannels()
+        startForegroundNotification()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startForegroundNotification()
+
         if (intent != null) {
             role = intent.getStringExtra("role") ?: role
             studentId = intent.getStringExtra("studentId") ?: studentId
@@ -96,11 +101,53 @@ class LaasyaAlertService : Service() {
         return START_STICKY
     }
 
+    private fun startForegroundNotification() {
+        ensureNotificationChannels()
+        val appIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            1001,
+            appIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val builder = NotificationCompat.Builder(this, NOTIF_CHANNEL_SERVICE)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("Laasya Academy")
+            .setContentText("Connected for live attendance & notifications")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setSilent(true)
+
+        try {
+            startForeground(NOTIF_ID_FOREGROUND, builder.build())
+        } catch (_: Exception) {}
+    }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
         // Reschedule wake-up via LaasyaNotificationReceiver so notifications survive being swiped away from slides
         super.onTaskRemoved(rootIntent)
         try {
             LaasyaNotificationReceiver.scheduleNextPoll(applicationContext, 2000L)
+        } catch (_: Exception) {}
+        try {
+            val restartIntent = Intent(applicationContext, LaasyaAlertService::class.java).apply {
+                putExtra("role", role)
+                putExtra("studentId", studentId)
+                putExtra("rollNumber", rollNumber)
+                putExtra("name", name)
+                putExtra("phone", phone)
+                putExtra("batchIds", batchIds)
+                putExtra("baseUrl", baseUrl)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                androidx.core.content.ContextCompat.startForegroundService(applicationContext, restartIntent)
+            } else {
+                startService(restartIntent)
+            }
         } catch (_: Exception) {}
         startPollingLoop()
     }
@@ -279,6 +326,18 @@ class LaasyaAlertService : Service() {
                 enableLights(true)
             }
             nm.createNotificationChannel(noticeChannel)
+
+            val serviceChannel = NotificationChannel(
+                NOTIF_CHANNEL_SERVICE,
+                "Laasya Academy Live Service",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Background sync for real-time attendance and announcements"
+                setShowBadge(false)
+                enableVibration(false)
+                setSound(null, null)
+            }
+            nm.createNotificationChannel(serviceChannel)
         }
     }
 

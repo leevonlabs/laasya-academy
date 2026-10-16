@@ -68,11 +68,15 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
     super.initState();
     SupabaseService().markAllVideosAsRead();
     _unreadCount = 0;
+    _folders = SupabaseService().getCachedStudentEventFolders();
+    _isLoading = _folders.isEmpty;
     _loadEventFolders();
   }
 
   Future<void> _loadEventFolders() async {
-    setState(() => _isLoading = true);
+    if (_folders.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     final data = await SupabaseService().getStudentEventFolders(
       courseTitle: widget.studentCourse,
       batchName: widget.studentBatch,

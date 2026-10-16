@@ -585,7 +585,7 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
                     iconBg: const Color(0xFFFEF3C7),
                     iconColor: const Color(0xFF92400E),
                     title: 'Terms & Conditions',
-                    subtitle: 'Academy rules, attendance policies & disciple guidelines',
+                    subtitle: 'Academy rules, attendance policies & student guidelines',
                     onTap: () => LaasyaPolicyDialog.showTerms(context),
                   ),
                 ],

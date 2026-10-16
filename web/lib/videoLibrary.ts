@@ -754,21 +754,52 @@ export async function getGuruComplianceData(options?: {
       const courses = Array.from(courseMap.values());
 
       const enrolledStudentRows = allEnrollments.filter((e: any) => batchIds.includes(e.batch_id));
-      const studentMap = new Map<string, any>();
+      
+      // Group student enrollments across all batches under this Guru
+      const studentEnrollmentMap = new Map<string, {
+        student_id: string;
+        roll_number: string;
+        student_name: string;
+        avatar_url?: string | null;
+        parent_name?: string | null;
+        parent_phone?: string | null;
+        batches: Array<{
+          batch_id: string;
+          batch_name: string;
+          course_id: string;
+          course_title: string;
+        }>;
+      }>();
+
       enrolledStudentRows.forEach((row: any) => {
-        if (!studentMap.has(row.student_id)) {
-          const batch = assignedBatches.find((b: any) => b.batch_id === row.batch_id);
-          studentMap.set(row.student_id, {
-            ...row,
-            course_id: batch?.course_id || null,
-            course_title: batch?.course_title || 'Course',
-            batch_name: batch?.batch_name || 'Batch',
+        const batch = assignedBatches.find((b: any) => b.batch_id === row.batch_id);
+        if (!studentEnrollmentMap.has(row.student_id)) {
+          studentEnrollmentMap.set(row.student_id, {
+            student_id: row.student_id,
+            roll_number: row.roll_number,
+            student_name: row.student_name,
+            avatar_url: row.avatar_url,
+            parent_name: row.parent_name,
+            parent_phone: row.parent_phone,
+            batches: [],
           });
         }
+        if (batch) {
+          const entry = studentEnrollmentMap.get(row.student_id)!;
+          if (!entry.batches.some(b => b.batch_id === batch.batch_id)) {
+            entry.batches.push({
+              batch_id: batch.batch_id,
+              batch_name: batch.batch_name || 'Batch',
+              course_id: batch.course_id || '',
+              course_title: batch.course_title || 'Course',
+            });
+          }
+        }
       });
-      const assignedStudents = Array.from(studentMap.values());
+
+      const assignedStudents = Array.from(studentEnrollmentMap.values());
       const trainerAllVideos = filteredVideos.filter((v: any) => isVideoByTrainer(v, trainer));
-      // Compliance requirement: Every disciple must receive at least 1 individual performance video (not general)
+      // Compliance requirement: Every student must receive at least 1 individual performance video for EACH enrolled batch
       const trainerPerformanceVideos = trainerAllVideos.filter((v: any) => 
         (v.category === 'performance' || v.category === 'student_performance')
       );
@@ -776,31 +807,48 @@ export async function getGuruComplianceData(options?: {
       const receivedDisciples: GuruComplianceDisciple[] = [];
       const missingDisciples: GuruComplianceDisciple[] = [];
 
-      assignedStudents.forEach((student: any) => {
-        const matchingVideos = trainerPerformanceVideos.filter((v: any) => isStudentTargeted(v, student));
+      assignedStudents.forEach((student) => {
+        const pendingBatches: Array<{ batch_id: string; batch_name: string; course_id: string; course_title: string }> = [];
+        const coveredBatches: Array<{ batch_id: string; batch_name: string; course_id: string; course_title: string }> = [];
 
-        if (matchingVideos.length > 0) {
-          const primaryVideo = matchingVideos[0];
+        student.batches.forEach((b) => {
+          const isCovered = trainerPerformanceVideos.some((v: any) => {
+            if (!isStudentTargeted(v, student)) return false;
+            // Matches if target_batch_id is null, 'all', or equals this batch_id
+            return !v.target_batch_id || v.target_batch_id === 'all' || v.target_batch_id === b.batch_id;
+          });
+          if (isCovered) {
+            coveredBatches.push(b);
+          } else {
+            pendingBatches.push(b);
+          }
+        });
+
+        const allStudentMatchingVideos = trainerPerformanceVideos.filter((v: any) => isStudentTargeted(v, student));
+
+        if (pendingBatches.length === 0 && student.batches.length > 0) {
+          // Fully compliant student
+          const primaryVideo = allStudentMatchingVideos[0];
           receivedDisciples.push({
             student_id: student.student_id,
             roll_number: student.roll_number,
             student_name: student.student_name,
             avatar_url: student.avatar_url,
-            batch_id: student.batch_id,
-            batch_name: student.batch_name,
-            course_id: student.course_id,
-            course_title: student.course_title,
+            batch_id: student.batches[0]?.batch_id || '',
+            batch_name: student.batches.map(b => b.batch_name).join(', '),
+            course_id: student.batches[0]?.course_id || '',
+            course_title: Array.from(new Set(student.batches.map(b => b.course_title))).join(', '),
             parent_name: student.parent_name,
             parent_phone: student.parent_phone,
-            video_id: primaryVideo.id,
-            video_title: primaryVideo.title,
-            drive_url: primaryVideo.drive_url,
-            youtube_url: primaryVideo.youtube_url,
-            event_date: primaryVideo.event_date,
-            created_at: primaryVideo.created_at,
-            category: primaryVideo.category,
-            description: primaryVideo.description,
-            all_matching_videos: matchingVideos.map((mv: any) => ({
+            video_id: primaryVideo?.id,
+            video_title: primaryVideo?.title,
+            drive_url: primaryVideo?.drive_url,
+            youtube_url: primaryVideo?.youtube_url,
+            event_date: primaryVideo?.event_date,
+            created_at: primaryVideo?.created_at,
+            category: primaryVideo?.category,
+            description: primaryVideo?.description,
+            all_matching_videos: allStudentMatchingVideos.map((mv: any) => ({
               id: mv.id,
               title: mv.title,
               drive_url: mv.drive_url,
@@ -810,15 +858,16 @@ export async function getGuruComplianceData(options?: {
             })),
           });
         } else {
+          // Student is still pending at least one batch
           missingDisciples.push({
             student_id: student.student_id,
             roll_number: student.roll_number,
             student_name: student.student_name,
             avatar_url: student.avatar_url,
-            batch_id: student.batch_id,
-            batch_name: student.batch_name,
-            course_id: student.course_id,
-            course_title: student.course_title,
+            batch_id: pendingBatches[0]?.batch_id || '',
+            batch_name: pendingBatches.map(b => b.batch_name).join(', '),
+            course_id: pendingBatches[0]?.course_id || '',
+            course_title: Array.from(new Set(pendingBatches.map(b => b.course_title))).join(', '),
             parent_name: student.parent_name,
             parent_phone: student.parent_phone,
           });

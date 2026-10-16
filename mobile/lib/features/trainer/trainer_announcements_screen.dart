@@ -36,6 +36,11 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
   void initState() {
     super.initState();
     SupabaseService().markAllMessagesAsRead();
+    final cached = SupabaseService().getCachedMessageAnnouncements();
+    if (cached.isNotEmpty) {
+      _announcements = List<Map<String, dynamic>>.from(cached);
+      _isLoading = false;
+    }
     _loadData();
   }
 

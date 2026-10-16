@@ -24,8 +24,22 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
   List<Map<String, dynamic>> _mySharedItems = [];
   List<Map<String, dynamic>> _myCourses = [];
   List<Map<String, dynamic>> _myBatches = [];
-  String _searchQuery = '';
-  String _activeTab = 'missing'; // 'missing' or 'shared'
+
+  // Active tab: 'performance' or 'shared'
+  String _activeTab = 'performance';
+
+  // Filters for Performance tab
+  String _perfCourseFilter = 'all';
+  String _perfBatchFilter = 'all';
+  final Set<String> _perfSelectedStudentIds = {};
+  String _perfSearchQuery = '';
+
+  // Filters for Shared tab
+  String _sharedMonthFilter = 'all'; // 'all' or '1'..'12'
+  String _sharedYearFilter = 'all';  // 'all' or '2026', etc.
+  String _sharedCourseFilter = 'all';
+  String _sharedBatchFilter = 'all';
+  String _sharedSearchQuery = '';
 
   String get _trainerName =>
       widget.trainerProfile?['full_name'] ?? 'Faculty Guru';
@@ -34,119 +48,23 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
   String get _trainerId =>
       widget.trainerProfile?['id'] ?? '';
 
+  static const List<String> _monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
   String get _currentMonthName {
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
     final now = DateTime.now();
-    return '${months[now.month - 1]} ${now.year}';
+    return '${_monthNames[now.month - 1]} ${now.year}';
   }
-
-  List<Map<String, dynamic>> get _allAssignedDisciples {
-    final Map<String, Map<String, dynamic>> disciplesMap = {};
-    for (final b in _myBatches) {
-      final students = b['students'];
-      if (students is List) {
-        for (final s in students) {
-          if (s is Map && s['id'] != null) {
-            final sId = s['id'].toString();
-            if (!disciplesMap.containsKey(sId)) {
-              disciplesMap[sId] = {
-                ...Map<String, dynamic>.from(s),
-                'batch_id': b['id'],
-                'batch_name': b['name'] ?? 'Batch',
-                'course_id': b['course_id'],
-                'course_title': b['course_title'] ?? 'Course',
-              };
-            }
-          }
-        }
-      }
-    }
-    return disciplesMap.values.toList();
-  }
-
-  List<Map<String, dynamic>> get _thisMonthSharedVideos {
-    final now = DateTime.now();
-    return _mySharedItems.where((item) {
-      final cat = (item['category'] ?? '').toString().toLowerCase();
-      // Only individual performance videos count towards the monthly requirement!
-      if (cat != 'performance' && cat != 'student_performance') {
-        return false;
-      }
-      final dateVal = item['event_date'] ?? item['created_at'];
-      if (dateVal == null) return false;
-      try {
-        final dt = DateTime.parse(
-          dateVal.toString().contains('T')
-              ? dateVal.toString()
-              : '${dateVal.toString()} 00:00:00',
-        );
-        return dt.month == now.month && dt.year == now.year;
-      } catch (_) {
-        return false;
-      }
-    }).toList();
-  }
-
-  Set<String> get _thisMonthCompletedStudentIds {
-    final Set<String> set = {};
-    for (final v in _thisMonthSharedVideos) {
-      if (v['target_student_id'] != null &&
-          v['target_student_id'].toString().isNotEmpty) {
-        set.add(v['target_student_id'].toString());
-      }
-      final tsList = v['target_students'];
-      if (tsList is List) {
-        for (final ts in tsList) {
-          if (ts is Map && ts['id'] != null) {
-            set.add(ts['id'].toString());
-          }
-        }
-      }
-    }
-    return set;
-  }
-
-  List<Map<String, dynamic>> get _missingDisciplesThisMonth {
-    final completedIds = _thisMonthCompletedStudentIds;
-    return _allAssignedDisciples
-        .where((d) => !completedIds.contains(d['id'].toString()))
-        .toList();
-  }
-
-  List<Map<String, dynamic>> get _completedDisciplesThisMonth {
-    final completedIds = _thisMonthCompletedStudentIds;
-    return _allAssignedDisciples
-        .where((d) => completedIds.contains(d['id'].toString()))
-        .toList();
-  }
-
-  Future<void> _shareForDisciple(Map<String, dynamic> disciple) async {
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TrainerCreateShareVideoScreen(
-          trainerProfile: widget.trainerProfile,
-          initialCourses: _myCourses,
-          initialBatches: _myBatches,
-          preselectedStudent: disciple,
-          preselectedCourseId: disciple['course_id']?.toString(),
-          preselectedBatchId: disciple['batch_id']?.toString(),
-        ),
-      ),
-    );
-
-    if (result == true && mounted) {
-      _loadData();
-    }
-  }
-
 
   @override
   void initState() {
     super.initState();
+    // Default shared month & year to current month
+    final now = DateTime.now();
+    _sharedMonthFilter = now.month.toString();
+    _sharedYearFilter = now.year.toString();
     _loadData();
   }
 
@@ -211,6 +129,472 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     }
   }
 
+  // --- MULTI-BATCH PENDING COMPUTATION ---
+  // A student can be enrolled in multiple batches. They must receive at least 1 video for EACH batch in the current month!
+  // If a student is enrolled in 2 batches but only received 1, they remain in [Pending].
+  List<Map<String, dynamic>> _computeStudentComplianceList() {
+    final now = DateTime.now();
+
+    // 1. Gather this month's performance videos
+    final thisMonthPerfVideos = _mySharedItems.where((item) {
+      final cat = (item['category'] ?? '').toString().toLowerCase();
+      if (cat != 'performance' && cat != 'student_performance') return false;
+      final dateVal = item['event_date'] ?? item['created_at'];
+      if (dateVal == null) return false;
+      try {
+        final dt = DateTime.parse(
+          dateVal.toString().contains('T') ? dateVal.toString() : '${dateVal.toString()} 00:00:00',
+        );
+        return dt.month == now.month && dt.year == now.year;
+      } catch (_) {
+        return false;
+      }
+    }).toList();
+
+    // 2. Map all assigned students with all their enrolled batches
+    final Map<String, Map<String, dynamic>> studentMap = {};
+    for (final b in _myBatches) {
+      final students = b['students'];
+      if (students is List) {
+        for (final s in students) {
+          if (s is Map && s['id'] != null) {
+            final sId = s['id'].toString();
+            if (!studentMap.containsKey(sId)) {
+              studentMap[sId] = {
+                'id': sId,
+                'name': s['name'] ?? s['full_name'] ?? 'Student',
+                'roll_number': s['roll_number'] ?? s['roll'] ?? '',
+                'avatar_url': s['avatar_url'],
+                'phone': s['phone'],
+                'batches': <Map<String, dynamic>>[],
+              };
+            }
+            final bList = studentMap[sId]!['batches'] as List<Map<String, dynamic>>;
+            final bId = b['id'].toString();
+            if (!bList.any((existing) => existing['id'].toString() == bId)) {
+              bList.add({
+                'id': bId,
+                'name': b['name'] ?? 'Batch',
+                'course_id': b['course_id']?.toString(),
+                'course_title': b['course_title'] ?? 'Course',
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // 3. For each student, check which batches are covered
+    final List<Map<String, dynamic>> result = [];
+    for (final s in studentMap.values) {
+      final sId = s['id'].toString();
+      final enrolledBatches = s['batches'] as List<Map<String, dynamic>>;
+
+      final List<Map<String, dynamic>> pendingBatches = [];
+      final List<Map<String, dynamic>> completedBatches = [];
+
+      for (final batch in enrolledBatches) {
+        final batchId = batch['id'].toString();
+        // Check if there is any performance video for this student in this batch this month
+        final isCovered = thisMonthPerfVideos.any((v) {
+          final targetStudentId = v['target_student_id']?.toString();
+          bool matchesStudent = targetStudentId == sId;
+          if (!matchesStudent && v['target_students'] is List) {
+            matchesStudent = (v['target_students'] as List).any((ts) => ts is Map && ts['id']?.toString() == sId);
+          }
+          if (!matchesStudent) return false;
+
+          final vBatchId = v['target_batch_id']?.toString();
+          // Matches if video was batch-specific for this batch or course-wide/all batches
+          return vBatchId == null || vBatchId == 'all' || vBatchId == batchId;
+        });
+
+        if (isCovered) {
+          completedBatches.add(batch);
+        } else {
+          pendingBatches.add(batch);
+        }
+      }
+
+      final isPending = pendingBatches.isNotEmpty;
+      result.add({
+        ...s,
+        'is_pending': isPending,
+        'pending_batches': pendingBatches,
+        'completed_batches': completedBatches,
+        'total_batches_count': enrolledBatches.length,
+      });
+    }
+
+    return result;
+  }
+
+  // Pending students for current month
+  List<Map<String, dynamic>> get _pendingStudentsThisMonth {
+    return _computeStudentComplianceList().where((s) => s['is_pending'] == true).toList();
+  }
+
+  // Filtered pending students based on course, batch, student multi-select, and search bar
+  List<Map<String, dynamic>> get _filteredPendingStudents {
+    return _pendingStudentsThisMonth.where((s) {
+      // 1. Course Filter
+      if (_perfCourseFilter != 'all') {
+        final batches = s['batches'] as List<Map<String, dynamic>>;
+        final inCourse = batches.any((b) => b['course_id'] == _perfCourseFilter);
+        if (!inCourse) return false;
+      }
+
+      // 2. Batch Filter
+      if (_perfBatchFilter != 'all') {
+        final batches = s['batches'] as List<Map<String, dynamic>>;
+        final inBatch = batches.any((b) => b['id'] == _perfBatchFilter);
+        if (!inBatch) return false;
+      }
+
+      // 3. Multi-selection student filter
+      if (_perfSelectedStudentIds.isNotEmpty) {
+        if (!_perfSelectedStudentIds.contains(s['id'].toString())) {
+          return false;
+        }
+      }
+
+      // 4. Search bar (name or roll)
+      if (_perfSearchQuery.trim().isNotEmpty) {
+        final q = _perfSearchQuery.toLowerCase().trim();
+        final name = (s['name'] ?? '').toString().toLowerCase();
+        final roll = (s['roll_number'] ?? '').toString().toLowerCase();
+        final phone = (s['phone'] ?? '').toString().toLowerCase();
+        final batches = s['batches'] as List<Map<String, dynamic>>;
+        final matchBatch = batches.any((b) => (b['name'] ?? '').toString().toLowerCase().contains(q));
+        if (!name.contains(q) && !roll.contains(q) && !phone.contains(q) && !matchBatch) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+  }
+
+  // Filtered shared videos
+  List<Map<String, dynamic>> get _filteredSharedVideos {
+    return _mySharedItems.where((item) {
+      // 1. Month filter
+      if (_sharedMonthFilter != 'all') {
+        final dateVal = item['event_date'] ?? item['created_at'];
+        if (dateVal != null) {
+          try {
+            final dt = DateTime.parse(
+              dateVal.toString().contains('T') ? dateVal.toString() : '${dateVal.toString()} 00:00:00',
+            );
+            if (dt.month.toString() != _sharedMonthFilter) return false;
+          } catch (_) {
+            return false;
+          }
+        }
+      }
+
+      // 2. Year filter
+      if (_sharedYearFilter != 'all') {
+        final dateVal = item['event_date'] ?? item['created_at'];
+        if (dateVal != null) {
+          try {
+            final dt = DateTime.parse(
+              dateVal.toString().contains('T') ? dateVal.toString() : '${dateVal.toString()} 00:00:00',
+            );
+            if (dt.year.toString() != _sharedYearFilter) return false;
+          } catch (_) {
+            return false;
+          }
+        }
+      }
+
+      // 3. Course filter
+      if (_sharedCourseFilter != 'all') {
+        final cId = item['target_course_id']?.toString();
+        if (cId != _sharedCourseFilter) return false;
+      }
+
+      // 4. Batch filter
+      if (_sharedBatchFilter != 'all') {
+        final bId = item['target_batch_id']?.toString();
+        if (bId != _sharedBatchFilter) return false;
+      }
+
+      // 5. Search bar
+      if (_sharedSearchQuery.trim().isNotEmpty) {
+        final q = _sharedSearchQuery.toLowerCase().trim();
+        final title = (item['title'] ?? '').toString().toLowerCase();
+        final desc = (item['description'] ?? '').toString().toLowerCase();
+        final course = (item['target_course_title'] ?? '').toString().toLowerCase();
+        final batch = (item['target_batch_name'] ?? '').toString().toLowerCase();
+        final student = (item['target_student_name'] ?? '').toString().toLowerCase();
+        if (!title.contains(q) && !desc.contains(q) && !course.contains(q) && !batch.contains(q) && !student.contains(q)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+  }
+
+  // --- ACTIONS ---
+
+  // Opens form for a specific pending student
+  Future<void> _shareForStudent(Map<String, dynamic> student) async {
+    final pendingBatches = student['pending_batches'] as List<Map<String, dynamic>>? ?? [];
+    final firstPendingBatch = pendingBatches.isNotEmpty ? pendingBatches.first : null;
+
+    final studentDataForForm = {
+      'id': student['id'],
+      'name': student['name'],
+      'roll_number': student['roll_number'],
+      'phone': student['phone'],
+      'batch_name': firstPendingBatch?['name'] ?? '',
+      'course_title': firstPendingBatch?['course_title'] ?? '',
+    };
+
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TrainerCreateShareVideoScreen(
+          trainerProfile: widget.trainerProfile,
+          initialCourses: _myCourses,
+          initialBatches: _myBatches,
+          preselectedStudent: studentDataForForm,
+          preselectedCourseId: firstPendingBatch?['course_id'],
+          preselectedBatchId: firstPendingBatch?['id'],
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      _loadData();
+    }
+  }
+
+  // Opens form for General Video Share (via top button)
+  Future<void> _openGeneralShare() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TrainerCreateShareVideoScreen(
+          trainerProfile: widget.trainerProfile,
+          initialCourses: _myCourses,
+          initialBatches: _myBatches,
+          isGeneralShare: true,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      _loadData();
+    }
+  }
+
+  // Opens prefilled form to View Details, Edit or Delete
+  Future<void> _openDetails(Map<String, dynamic> item) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TrainerCreateShareVideoScreen(
+          trainerProfile: widget.trainerProfile,
+          initialCourses: _myCourses,
+          initialBatches: _myBatches,
+          editingItem: item,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      _loadData();
+    }
+  }
+
+  // Modal to select multiple students searchably
+  void _openStudentFilterModal() {
+    final allStudents = _computeStudentComplianceList();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        String modalSearch = '';
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final filtered = allStudents.where((s) {
+              if (modalSearch.isEmpty) return true;
+              final q = modalSearch.toLowerCase();
+              final name = (s['name'] ?? '').toString().toLowerCase();
+              final roll = (s['roll_number'] ?? '').toString().toLowerCase();
+              return name.contains(q) || roll.contains(q);
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.75,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  // Handle
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(top: 10, bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Filter by Students',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2D041A),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setModalState(() {
+                              _perfSelectedStudentIds.clear();
+                            });
+                            setState(() {});
+                          },
+                          child: const Text('Clear Filter', style: TextStyle(color: Color(0xFF8A064D))),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Search Box
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                    child: TextField(
+                      onChanged: (val) => setModalState(() => modalSearch = val),
+                      decoration: InputDecoration(
+                        hintText: 'Search student name or roll...',
+                        prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Colors.grey),
+                        filled: true,
+                        fillColor: const Color(0xFFF9FAFB),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade200),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Student list with checkboxes
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
+                      itemBuilder: (ctx, idx) {
+                        final stu = filtered[idx];
+                        final sId = stu['id'].toString();
+                        final isChecked = _perfSelectedStudentIds.contains(sId);
+                        final sName = stu['name'] ?? 'Student';
+                        final sRoll = stu['roll_number'] ?? '';
+                        final isPending = stu['is_pending'] == true;
+
+                        return CheckboxListTile(
+                          value: isChecked,
+                          activeColor: const Color(0xFF590231),
+                          dense: true,
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  sName,
+                                  style: TextStyle(
+                                    fontWeight: isChecked ? FontWeight.bold : FontWeight.w600,
+                                    color: const Color(0xFF1E1E1E),
+                                  ),
+                                ),
+                              ),
+                              if (isPending)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade50,
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: Colors.red.shade200),
+                                  ),
+                                  child: Text(
+                                    'Pending',
+                                    style: TextStyle(
+                                      color: Colors.red.shade700,
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          subtitle: sRoll.isNotEmpty ? Text('Roll: $sRoll', style: const TextStyle(fontSize: 11)) : null,
+                          onChanged: (val) {
+                            setModalState(() {
+                              if (val == true) {
+                                _perfSelectedStudentIds.add(sId);
+                              } else {
+                                _perfSelectedStudentIds.remove(sId);
+                              }
+                            });
+                            setState(() {});
+                          },
+                        );
+                      },
+                    ),
+                  ),
+
+                  // Bottom Apply Button
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF590231),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => Navigator.pop(modalCtx),
+                        child: Text(
+                          _perfSelectedStudentIds.isEmpty
+                              ? 'Show All Students'
+                              : 'Apply (${_perfSelectedStudentIds.length} Selected)',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _launchExternalUrl(String url) async {
     final cleanUrl = url.trim();
     if (cleanUrl.isEmpty) return;
@@ -231,56 +615,6 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     }
   }
 
-  void _copyToClipboard(String url, String label) {
-    Clipboard.setData(ClipboardData(text: url.trim()));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$label copied to clipboard!'),
-        backgroundColor: const Color(0xFF03543F),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  Future<void> _deleteItem(String id) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Shared Link', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text('Are you sure you want to delete this shared video link? Students in this batch will no longer see it.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        final res = await http.delete(Uri.parse('${ApiConstants.baseUrl}/api/video-library/$id'));
-        if (res.statusCode == 200) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Video link removed successfully')),
-            );
-            _loadSharedVideos();
-          }
-        }
-      } catch (e) {
-        debugPrint('Delete error: $e');
-      }
-    }
-  }
-
   String _formatDate(dynamic dateVal) {
     if (dateVal == null) return '--';
     final s = dateVal.toString();
@@ -294,53 +628,17 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     }
   }
 
-  Future<void> _openShareVideoSheet() async {
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TrainerCreateShareVideoScreen(
-          trainerProfile: widget.trainerProfile,
-          initialCourses: _myCourses,
-          initialBatches: _myBatches,
-        ),
-      ),
-    );
-
-    if (result == true && mounted) {
-      _loadData();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final int totalDisciples = _allAssignedDisciples.length;
-    final int completedDisciples = _completedDisciplesThisMonth.length;
-    final int missingDisciplesCount = _missingDisciplesThisMonth.length;
-    final double complianceRate =
-        totalDisciples > 0 ? (completedDisciples / totalDisciples) : 1.0;
+    final allAssigned = _computeStudentComplianceList();
+    final totalStudents = allAssigned.length;
+    final pendingCount = _pendingStudentsThisMonth.length;
+    final completedCount = totalStudents - pendingCount;
+    final double complianceRate = totalStudents > 0 ? (completedCount / totalStudents) : 1.0;
     final int compliancePercent = (complianceRate * 100).round();
 
-    // Filter shared items
-    final filteredShared = _mySharedItems.where((item) {
-      if (_searchQuery.isEmpty) return true;
-      final q = _searchQuery.toLowerCase();
-      final title = (item['title'] ?? '').toString().toLowerCase();
-      final desc = (item['description'] ?? '').toString().toLowerCase();
-      final course = (item['target_course_title'] ?? '').toString().toLowerCase();
-      final batch = (item['target_batch_name'] ?? '').toString().toLowerCase();
-      return title.contains(q) || desc.contains(q) || course.contains(q) || batch.contains(q);
-    }).toList();
-
-    // Filter missing disciples
-    final filteredMissing = _missingDisciplesThisMonth.where((d) {
-      if (_searchQuery.isEmpty) return true;
-      final q = _searchQuery.toLowerCase();
-      final name = (d['name'] ?? '').toString().toLowerCase();
-      final roll = (d['roll_number'] ?? d['roll'] ?? '').toString().toLowerCase();
-      final course = (d['course_title'] ?? '').toString().toLowerCase();
-      final batch = (d['batch_name'] ?? '').toString().toLowerCase();
-      return name.contains(q) || roll.contains(q) || course.contains(q) || batch.contains(q);
-    }).toList();
+    final filteredPending = _filteredPendingStudents;
+    final filteredShared = _filteredSharedVideos;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8FA),
@@ -373,7 +671,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // TOP MONTHLY PERFORMANCE VIDEO TRACKER BANNER
+                    // TOP BANNER WITH CURRENT MONTH NAME & QUICK GENERAL SHARE BUTTON
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -402,7 +700,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                   color: Colors.white.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: const Icon(Icons.verified_rounded, color: Color(0xFFF9E33A), size: 22),
+                                child: const Icon(Icons.stars_rounded, color: Color(0xFFF9E33A), size: 24),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -410,16 +708,16 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '$_currentMonthName Videos',
+                                      '$_currentMonthName Performance',
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 15,
+                                        fontSize: 15.5,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    const SizedBox(height: 1),
+                                    const SizedBox(height: 2),
                                     const Text(
-                                      'Share at least 1 performance video per disciple/month',
+                                      'Each student must receive at least 1 video for every enrolled batch',
                                       style: TextStyle(color: Colors.white70, fontSize: 10.5),
                                     ),
                                   ],
@@ -428,15 +726,15 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: missingDisciplesCount == 0
+                                  color: pendingCount == 0
                                       ? const Color(0xFF03543F)
-                                      : const Color(0xFFD4AF37),
+                                      : const Color(0xFFE02424),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
-                                  missingDisciplesCount == 0 ? '100% Done' : '$missingDisciplesCount Pending',
-                                  style: TextStyle(
-                                    color: missingDisciplesCount == 0 ? Colors.white : const Color(0xFF4A0025),
+                                  pendingCount == 0 ? '100% Done' : '$pendingCount Pending',
+                                  style: const TextStyle(
+                                    color: Colors.white,
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -451,7 +749,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                '$completedDisciples / $totalDisciples Disciples Completed',
+                                '$completedCount / $totalStudents Students Covered',
                                 style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                               ),
                               Text(
@@ -468,17 +766,17 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                               minHeight: 8,
                               backgroundColor: Colors.white.withOpacity(0.2),
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                missingDisciplesCount == 0 ? const Color(0xFF31C48D) : const Color(0xFFF9E33A),
+                                pendingCount == 0 ? const Color(0xFF31C48D) : const Color(0xFFF9E33A),
                               ),
                             ),
                           ),
                           const SizedBox(height: 14),
 
-                          // Quick Action Button
+                          // Floating/Main Share New Video Link Button (General Video Share)
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
-                              onPressed: _openShareVideoSheet,
+                              onPressed: _openGeneralShare,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFD4AF37),
                                 foregroundColor: const Color(0xFF4A0025),
@@ -498,7 +796,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // SEGMENTED TAB SWITCHER
+                    // TAB SWITCHER: Performance vs Shared Videos
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
@@ -510,12 +808,12 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                         children: [
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => setState(() => _activeTab = 'missing'),
+                              onTap: () => setState(() => _activeTab = 'performance'),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: _activeTab == 'missing'
-                                      ? (missingDisciplesCount > 0 ? const Color(0xFFE53E3E) : const Color(0xFF590231))
+                                  color: _activeTab == 'performance'
+                                      ? (pendingCount > 0 ? const Color(0xFFE53E3E) : const Color(0xFF590231))
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -523,17 +821,17 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
-                                      missingDisciplesCount > 0 ? Icons.error_outline_rounded : Icons.check_circle_rounded,
+                                      pendingCount > 0 ? Icons.error_outline_rounded : Icons.check_circle_rounded,
                                       size: 16,
-                                      color: _activeTab == 'missing' ? Colors.white : Colors.grey.shade700,
+                                      color: _activeTab == 'performance' ? Colors.white : Colors.grey.shade700,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      'Missing This Month ($missingDisciplesCount)',
+                                      'Performance ($pendingCount)',
                                       style: TextStyle(
-                                        fontSize: 12,
+                                        fontSize: 12.5,
                                         fontWeight: FontWeight.bold,
-                                        color: _activeTab == 'missing' ? Colors.white : Colors.grey.shade700,
+                                        color: _activeTab == 'performance' ? Colors.white : Colors.grey.shade700,
                                       ),
                                     ),
                                   ],
@@ -562,7 +860,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                     Text(
                                       'Shared Videos (${_mySharedItems.length})',
                                       style: TextStyle(
-                                        fontSize: 12,
+                                        fontSize: 12.5,
                                         fontWeight: FontWeight.bold,
                                         color: _activeTab == 'shared' ? Colors.white : Colors.grey.shade700,
                                       ),
@@ -577,44 +875,147 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Search Bar
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFF0D5E4)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.02),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
+                    // ==============================================================
+                    // TAB 1: PERFORMANCE (Current Month Pending Students)
+                    // ==============================================================
+                    if (_activeTab == 'performance') ...[
+                      // Performance Filters Bar: Course, Batch, Student Multi-select
+                      Row(
+                        children: [
+                          // Course filter
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE5D4DE)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: _perfCourseFilter,
+                                  items: [
+                                    const DropdownMenuItem(value: 'all', child: Text('All Courses', style: TextStyle(fontSize: 11.5))),
+                                    ..._myCourses.map((c) => DropdownMenuItem(
+                                      value: c['id'].toString(),
+                                      child: Text(c['title'] ?? 'Course', style: const TextStyle(fontSize: 11.5), overflow: TextOverflow.ellipsis),
+                                    )),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _perfCourseFilter = val;
+                                        _perfBatchFilter = 'all';
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+
+                          // Batch filter
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE5D4DE)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: _perfBatchFilter,
+                                  items: [
+                                    const DropdownMenuItem(value: 'all', child: Text('All Batches', style: TextStyle(fontSize: 11.5))),
+                                    ..._myBatches
+                                        .where((b) => _perfCourseFilter == 'all' || b['course_id']?.toString() == _perfCourseFilter)
+                                        .map((b) => DropdownMenuItem(
+                                          value: b['id'].toString(),
+                                          child: Text(b['name'] ?? 'Batch', style: const TextStyle(fontSize: 11.5), overflow: TextOverflow.ellipsis),
+                                        )),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() => _perfBatchFilter = val);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+
+                          // Searchable Multi-selection Student Filter Button
+                          InkWell(
+                            onTap: _openStudentFilterModal,
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+                              decoration: BoxDecoration(
+                                color: _perfSelectedStudentIds.isNotEmpty ? const Color(0xFF590231) : Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _perfSelectedStudentIds.isNotEmpty ? const Color(0xFF590231) : const Color(0xFFE5D4DE),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.people_alt_rounded,
+                                    size: 16,
+                                    color: _perfSelectedStudentIds.isNotEmpty ? Colors.white : const Color(0xFF8A064D),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _perfSelectedStudentIds.isEmpty
+                                        ? 'Students'
+                                        : '${_perfSelectedStudentIds.length}',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: _perfSelectedStudentIds.isNotEmpty ? Colors.white : const Color(0xFF8A064D),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      child: TextField(
-                        onChanged: (val) => setState(() => _searchQuery = val),
-                        decoration: InputDecoration(
-                          icon: const Icon(Icons.search_rounded, color: Colors.grey, size: 20),
-                          border: InputBorder.none,
-                          hintText: _activeTab == 'missing'
-                              ? 'Search pending disciples by name or roll...'
-                              : 'Search shared video links...',
-                          hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 18, color: Colors.grey),
-                                  onPressed: () => setState(() => _searchQuery = ''),
-                                )
-                              : null,
+                      const SizedBox(height: 10),
+
+                      // Search bar
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFF0D5E4)),
+                        ),
+                        child: TextField(
+                          onChanged: (val) => setState(() => _perfSearchQuery = val),
+                          decoration: InputDecoration(
+                            icon: const Icon(Icons.search_rounded, color: Colors.grey, size: 20),
+                            border: InputBorder.none,
+                            hintText: 'Search pending students by name or student ID...',
+                            hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
+                            suffixIcon: _perfSearchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear_rounded, size: 18, color: Colors.grey),
+                                    onPressed: () => setState(() => _perfSearchQuery = ''),
+                                  )
+                                : null,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
+                      const SizedBox(height: 14),
 
-                    // TAB 1: MISSING DISCIPLES THIS MONTH
-                    if (_activeTab == 'missing') ...[
-                      if (missingDisciplesCount == 0)
+                      // List of pending students
+                      if (pendingCount == 0)
                         Container(
                           padding: const EdgeInsets.all(28),
                           width: double.infinity,
@@ -628,7 +1029,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                               const Icon(Icons.celebration_rounded, size: 44, color: Color(0xFF03543F)),
                               const SizedBox(height: 10),
                               const Text(
-                                'All Disciples Completed! 🎉',
+                                'All Students Completed! 🎉',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
@@ -637,14 +1038,14 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Every one of your $totalDisciples assigned disciples has received their monthly performance video for $_currentMonthName.',
+                                'Every one of your $totalStudents assigned students has received their performance video for all enrolled batches this month.',
                                 style: const TextStyle(fontSize: 12, color: Color(0xFF03543F)),
                                 textAlign: TextAlign.center,
                               ),
                             ],
                           ),
                         )
-                      else if (filteredMissing.isEmpty)
+                      else if (filteredPending.isEmpty)
                         Container(
                           padding: const EdgeInsets.all(28),
                           width: double.infinity,
@@ -653,63 +1054,35 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                             borderRadius: BorderRadius.circular(18),
                             border: Border.all(color: const Color(0xFFF0D5E4)),
                           ),
-                          child: Center(
+                          child: const Center(
                             child: Text(
-                              'No pending disciples match "$_searchQuery"',
-                              style: const TextStyle(fontSize: 13, color: Colors.grey),
+                              'No pending students match the selected filters.',
+                              style: TextStyle(fontSize: 13, color: Colors.grey),
                             ),
                           ),
                         )
-                      else ...[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Disciples Missing $_currentMonthName Video (${filteredMissing.length})',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: LaasyaColors.textDark,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade50,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'Action Required',
-                                style: TextStyle(
-                                  color: Colors.red.shade700,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
+                      else
                         ListView.separated(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: filteredMissing.length,
+                          itemCount: filteredPending.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 10),
                           itemBuilder: (context, idx) {
-                            final disciple = filteredMissing[idx];
-                            final name = (disciple['name'] ?? 'Disciple').toString();
-                            final roll = (disciple['roll_number'] ?? disciple['roll'] ?? 'LCA').toString();
-                            final course = (disciple['course_title'] ?? 'Course').toString();
-                            final batch = (disciple['batch_name'] ?? 'Batch').toString();
-                            final avatarUrl = disciple['avatar_url']?.toString();
-                            final initials = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'D';
+                            final student = filteredPending[idx];
+                            final name = (student['name'] ?? 'Student').toString();
+                            final roll = (student['roll_number'] ?? student['roll'] ?? student['id'] ?? 'N/A').toString();
+                            final avatarUrl = student['avatar_url']?.toString();
+                            final initials = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'S';
+
+                            final pendingBatches = student['pending_batches'] as List<Map<String, dynamic>>? ?? [];
+                            final completedBatches = student['completed_batches'] as List<Map<String, dynamic>>? ?? [];
 
                             return Container(
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: const Color(0xFFF8B4B4)),
+                                border: Border.all(color: const Color(0xFFF8B4B4), width: 1.2),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withOpacity(0.02),
@@ -719,9 +1092,10 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                 ],
                               ),
                               child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   CircleAvatar(
-                                    radius: 20,
+                                    radius: 22,
                                     backgroundColor: const Color(0xFFFFF2F8),
                                     backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
                                         ? NetworkImage(avatarUrl)
@@ -731,6 +1105,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                             initials,
                                             style: const TextStyle(
                                               fontWeight: FontWeight.bold,
+                                              fontSize: 15,
                                               color: Color(0xFF8A064D),
                                             ),
                                           )
@@ -741,65 +1116,104 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                            color: Color(0xFF2D041A),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '$roll • $course ($batch)',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.black54,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 5),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFFDE8E8),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: const Color(0xFFF8B4B4)),
-                                          ),
-                                          child: const Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.warning_amber_rounded, size: 12, color: Color(0xFF9B1C1C)),
-                                              SizedBox(width: 4),
-                                              Text(
-                                                "Didn't receive performance video",
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                name,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14.5,
+                                                  color: Color(0xFF2D041A),
+                                                ),
+                                              ),
+                                            ),
+                                            // Red [Pending] Status
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFDE8E8),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: const Color(0xFFF8B4B4)),
+                                              ),
+                                              child: const Text(
+                                                '[Pending]',
                                                 style: TextStyle(
-                                                  color: Color(0xFF9B1C1C),
+                                                  color: Color(0xFFE02424),
+                                                  fontSize: 10.5,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          'Student ID: $roll',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            color: Colors.grey.shade700,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+
+                                        // Display pending batch badges
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: [
+                                            ...pendingBatches.map((b) => Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFFF1F2),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: const Color(0xFFFECDD3)),
+                                              ),
+                                              child: Text(
+                                                '${b['name']} (Missing)',
+                                                style: const TextStyle(
+                                                  color: Color(0xFFBE123C),
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
-                                            ],
-                                          ),
+                                            )),
+                                            ...completedBatches.map((b) => Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF0FDF4),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                '${b['name']} (Done)',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF15803D),
+                                                  fontSize: 10,
+                                                ),
+                                              ),
+                                            )),
+                                          ],
                                         ),
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 10),
+
+                                  // Action Button Named just 'Share'
                                   ElevatedButton.icon(
-                                    onPressed: () => _shareForDisciple(disciple),
+                                    onPressed: () => _shareForStudent(student),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFD4AF37),
-                                      foregroundColor: const Color(0xFF4A0025),
+                                      backgroundColor: const Color(0xFF590231),
+                                      foregroundColor: Colors.white,
                                       elevation: 0,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     ),
-                                    icon: const Icon(Icons.stars_rounded, size: 16),
+                                    icon: const Icon(Icons.share_rounded, size: 14),
                                     label: const Text(
-                                      'Share Video',
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                      'Share',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 ],
@@ -807,41 +1221,135 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                             );
                           },
                         ),
-                      ],
                     ],
 
+                    // ==============================================================
                     // TAB 2: SHARED VIDEOS LIST
+                    // ==============================================================
                     if (_activeTab == 'shared') ...[
+                      // Shared Videos Filters: Month, Year, Course, Batch
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Your Shared Media (${filteredShared.length})',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: LaasyaColors.textDark,
+                          // Month Filter
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE5D4DE)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: _sharedMonthFilter,
+                                  items: [
+                                    const DropdownMenuItem(value: 'all', child: Text('All Months', style: TextStyle(fontSize: 11))),
+                                    ...List.generate(12, (i) => DropdownMenuItem(
+                                      value: (i + 1).toString(),
+                                      child: Text(_monthNames[i], style: const TextStyle(fontSize: 11)),
+                                    )),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _sharedMonthFilter = val);
+                                  },
+                                ),
+                              ),
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFDEF7EC),
-                              borderRadius: BorderRadius.circular(6),
+                          const SizedBox(width: 6),
+
+                          // Year Filter
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE5D4DE)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: _sharedYearFilter,
+                                  items: const [
+                                    DropdownMenuItem(value: 'all', child: Text('All Years', style: TextStyle(fontSize: 11))),
+                                    DropdownMenuItem(value: '2025', child: Text('2025', style: TextStyle(fontSize: 11))),
+                                    DropdownMenuItem(value: '2026', child: Text('2026', style: TextStyle(fontSize: 11))),
+                                    DropdownMenuItem(value: '2027', child: Text('2027', style: TextStyle(fontSize: 11))),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _sharedYearFilter = val);
+                                  },
+                                ),
+                              ),
                             ),
-                            child: const Text(
-                              'Synced with Admin',
-                              style: TextStyle(
-                                color: Color(0xFF03543F),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                          ),
+                          const SizedBox(width: 6),
+
+                          // Course Filter
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE5D4DE)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: _sharedCourseFilter,
+                                  items: [
+                                    const DropdownMenuItem(value: 'all', child: Text('All Courses', style: TextStyle(fontSize: 11))),
+                                    ..._myCourses.map((c) => DropdownMenuItem(
+                                      value: c['id'].toString(),
+                                      child: Text(c['title'] ?? 'Course', style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis),
+                                    )),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _sharedCourseFilter = val;
+                                        _sharedBatchFilter = 'all';
+                                      });
+                                    }
+                                  },
+                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
 
+                      // Search bar for Shared Videos
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFF0D5E4)),
+                        ),
+                        child: TextField(
+                          onChanged: (val) => setState(() => _sharedSearchQuery = val),
+                          decoration: InputDecoration(
+                            icon: const Icon(Icons.search_rounded, color: Colors.grey, size: 20),
+                            border: InputBorder.none,
+                            hintText: 'Search video titles, notes, courses...',
+                            hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
+                            suffixIcon: _sharedSearchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear_rounded, size: 18, color: Colors.grey),
+                                    onPressed: () => setState(() => _sharedSearchQuery = ''),
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Shared Videos Grid / List
                       if (filteredShared.isEmpty)
                         Container(
                           padding: const EdgeInsets.all(28),
@@ -855,15 +1363,13 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                             children: [
                               Icon(Icons.video_collection_outlined, size: 44, color: Colors.grey.shade400),
                               const SizedBox(height: 10),
-                              Text(
-                                _searchQuery.isNotEmpty
-                                    ? 'No shared links matching "$_searchQuery"'
-                                    : 'No video links shared yet',
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                              const Text(
+                                'No shared videos match the selected filters',
+                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Use the button above to share Google Drive or YouTube links with your enrolled disciples.',
+                                'Use the "+ Share New Video Link" button above to share videos with students.',
                                 style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
                                 textAlign: TextAlign.center,
                               ),
@@ -878,19 +1384,19 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                           separatorBuilder: (_, __) => const SizedBox(height: 14),
                           itemBuilder: (context, idx) {
                             final item = filteredShared[idx];
-                            final id = (item['id'] ?? '').toString();
-                            final title = (item['title'] ?? 'Shared Media').toString();
+                            final title = (item['title'] ?? 'Shared Video').toString();
                             final desc = (item['description'] ?? '').toString();
                             final course = (item['target_course_title'] ?? 'Assigned Course').toString();
                             final batch = (item['target_batch_name'] ?? 'All Batches').toString();
                             final dateStr = _formatDate(item['event_date'] ?? item['created_at']);
                             final driveUrl = (item['drive_url'] ?? '').toString().trim();
                             final youtubeUrl = (item['youtube_url'] ?? '').toString().trim();
-                            final targetNames = (item['target_student_names'] ?? item['target_student_name'] ?? '').toString();
+                            final targetStudentName = (item['target_student_name'] ?? '').toString();
                             final hasDrive = driveUrl.isNotEmpty;
                             final hasYoutube = youtubeUrl.isNotEmpty;
+
                             final cat = (item['category'] ?? '').toString().toLowerCase();
-                            final isPerf = cat == 'performance' || cat == 'student_performance';
+                            final isPerformance = cat == 'performance' || cat == 'student_performance';
 
                             return Container(
                               decoration: BoxDecoration(
@@ -910,6 +1416,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    // Header: Status Badge (Blue for General, Green for Performance) & Date
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
@@ -917,8 +1424,40 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                           spacing: 6,
                                           crossAxisAlignment: WrapCrossAlignment.center,
                                           children: [
+                                            // General (Blue) vs Performance (Green) Tag
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                              decoration: BoxDecoration(
+                                                color: isPerformance ? const Color(0xFFDEF7EC) : const Color(0xFFEBF5FF),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: isPerformance ? const Color(0xFF31C48D) : const Color(0xFFA4CAFE),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    isPerformance ? Icons.stars_rounded : Icons.group_work_rounded,
+                                                    size: 13,
+                                                    color: isPerformance ? const Color(0xFF03543F) : const Color(0xFF1E429F),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    isPerformance ? 'Performance' : 'General',
+                                                    style: TextStyle(
+                                                      color: isPerformance ? const Color(0xFF03543F) : const Color(0xFF1E429F),
+                                                      fontSize: 10.5,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            // Course and Batch Name
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                                               decoration: BoxDecoration(
                                                 color: const Color(0xFFF3E8EE),
                                                 borderRadius: BorderRadius.circular(6),
@@ -932,68 +1471,47 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                                 ),
                                               ),
                                             ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                              decoration: BoxDecoration(
-                                                color: isPerf ? const Color(0xFFF3E8FF) : const Color(0xFFEBF5FF),
-                                                borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(
-                                                  color: isPerf ? const Color(0xFFD8B4FE) : const Color(0xFFA4CAFE),
-                                                ),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    isPerf ? Icons.stars_rounded : Icons.group_work_rounded,
-                                                    size: 11,
-                                                    color: isPerf ? const Color(0xFF6B21A8) : const Color(0xFF1E429F),
-                                                  ),
-                                                  const SizedBox(width: 3),
-                                                  Text(
-                                                    isPerf ? 'Performance' : 'General',
-                                                    style: TextStyle(
-                                                      color: isPerf ? const Color(0xFF6B21A8) : const Color(0xFF1E429F),
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
                                           ],
                                         ),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              dateStr,
-                                              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.grey),
-                                              padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(),
-                                              onPressed: () => _deleteItem(id),
-                                            ),
-                                          ],
+
+                                        // Date
+                                        Text(
+                                          dateStr,
+                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                                         ),
                                       ],
                                     ),
-                                    if (targetNames.isNotEmpty) ...[
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        'Disciples: $targetNames',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Color(0xFF03543F),
-                                          fontWeight: FontWeight.bold,
+
+                                    // For Performance: Highlighted Student Name pill!
+                                    // For General: Do not display students on main grid (as requested)!
+                                    if (isPerformance && targetStudentName.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFDEF7EC),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFF31C48D).withOpacity(0.5)),
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.person_pin_rounded, size: 14, color: Color(0xFF03543F)),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              'Student: $targetStudentName',
+                                              style: const TextStyle(
+                                                fontSize: 11.5,
+                                                color: Color(0xFF03543F),
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ],
-                                    const SizedBox(height: 8),
+
+                                    const SizedBox(height: 10),
                                     Text(
                                       title,
                                       style: const TextStyle(
@@ -1013,10 +1531,10 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                     ],
                                     const SizedBox(height: 12),
 
-                                    // Action buttons for YouTube and Drive
-                                    if (hasDrive) ...[
-                                      Row(
-                                        children: [
+                                    // Action Buttons: Open Drive / YouTube and "Details" button
+                                    Row(
+                                      children: [
+                                        if (hasDrive) ...[
                                           Expanded(
                                             child: ElevatedButton.icon(
                                               onPressed: () => _launchExternalUrl(driveUrl),
@@ -1024,33 +1542,16 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                                 backgroundColor: const Color(0xFF03543F),
                                                 foregroundColor: Colors.white,
                                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                                padding: const EdgeInsets.symmetric(vertical: 8),
                                                 elevation: 0,
                                               ),
                                               icon: const Icon(Icons.open_in_new_rounded, size: 14),
-                                              label: const Text('Open Drive', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                              label: const Text('Drive', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                                             ),
                                           ),
                                           const SizedBox(width: 8),
-                                          OutlinedButton.icon(
-                                            onPressed: () => _copyToClipboard(driveUrl, 'Drive link'),
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: const Color(0xFF03543F),
-                                              side: const BorderSide(color: Color(0xFF03543F)),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                                            ),
-                                            icon: const Icon(Icons.copy_rounded, size: 14),
-                                            label: const Text('Copy', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                          ),
                                         ],
-                                      ),
-                                      if (hasYoutube) const SizedBox(height: 8),
-                                    ],
-
-                                    if (hasYoutube) ...[
-                                      Row(
-                                        children: [
+                                        if (hasYoutube) ...[
                                           Expanded(
                                             child: ElevatedButton.icon(
                                               onPressed: () => _launchExternalUrl(youtubeUrl),
@@ -1058,28 +1559,30 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                                 backgroundColor: const Color(0xFFE53E3E),
                                                 foregroundColor: Colors.white,
                                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                                padding: const EdgeInsets.symmetric(vertical: 8),
                                                 elevation: 0,
                                               ),
-                                              icon: const Icon(Icons.play_arrow_rounded, size: 16),
-                                              label: const Text('Open YouTube', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                              icon: const Icon(Icons.play_arrow_rounded, size: 15),
+                                              label: const Text('YouTube', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                                             ),
                                           ),
                                           const SizedBox(width: 8),
-                                          OutlinedButton.icon(
-                                            onPressed: () => _copyToClipboard(youtubeUrl, 'YouTube link'),
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: const Color(0xFFE53E3E),
-                                              side: const BorderSide(color: Color(0xFFE53E3E)),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                                            ),
-                                            icon: const Icon(Icons.copy_rounded, size: 14),
-                                            label: const Text('Copy', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                          ),
                                         ],
-                                      ),
-                                    ],
+
+                                        // Details Button (Opens prefilled edit/delete view)
+                                        OutlinedButton.icon(
+                                          onPressed: () => _openDetails(item),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: const Color(0xFF590231),
+                                            side: const BorderSide(color: Color(0xFFD8B4E2), width: 1.2),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          ),
+                                          icon: const Icon(Icons.tune_rounded, size: 14),
+                                          label: const Text('Details', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ),
@@ -1094,4 +1597,3 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     );
   }
 }
-

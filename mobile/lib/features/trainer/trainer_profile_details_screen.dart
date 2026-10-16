@@ -255,7 +255,7 @@ class _TrainerProfileDetailsScreenState extends State<TrainerProfileDetailsScree
               title: 'Artistic Credentials & Profile Bio',
               children: [
                 Text(
-                  'Renowned practitioner and revered guru of $specialization. Conducts foundational adavus, abhinaya masterclasses, and stage choreographies for disciples across beginner, intermediate, and advanced arangetram batches.',
+                  'Renowned practitioner and revered guru of $specialization. Conducts foundational adavus, abhinaya masterclasses, and stage choreographies for students across beginner, intermediate, and advanced arangetram batches.',
                   style: const TextStyle(fontSize: 12.5, color: Colors.black87, height: 1.45),
                 ),
               ],

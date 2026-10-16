@@ -210,7 +210,7 @@ class _PolicySheetWidgetState extends State<_PolicySheetWidget> {
 
         _sectionTitle('1. Introduction & Institutional Scope'),
         _paragraph(
-          'Laasya Cultural Academy ("we", "our", or "the Academy") is dedicated to classical performing arts and music education. This Privacy Policy governs our data handling practices for disciples, parents/guardians, and revered faculty across our mobile applications (Android and iOS) and web management systems.',
+          'Laasya Cultural Academy ("we", "our", or "the Academy") is dedicated to classical performing arts and music education. This Privacy Policy governs our data handling practices for students, parents/guardians, and revered faculty across our mobile applications (Android and iOS) and web management systems.',
         ),
 
         _sectionTitle('2. Class Completion Audio Alerts & Notifications'),
@@ -222,11 +222,11 @@ class _PolicySheetWidgetState extends State<_PolicySheetWidget> {
           '• Notifications do NOT require continuous foreground services or background battery-draining polling. The application respects OS notification and background execution limits set by Google Play and Apple App Store.',
         ),
 
-        _sectionTitle('3. Child & Minor Disciple Privacy (COPPA & GDPR-K Compliance)'),
+        _sectionTitle('3. Child & Minor Student Privacy (COPPA & GDPR-K Compliance)'),
         _paragraph(
-          'A significant portion of our classical arts disciples are children under 18 years of age:\n'
-          '• Accounts for minor disciples are provisioned exclusively through authorized academy admission and registered parent/guardian telephone numbers.\n'
-          '• Disciple personal details (full name, roll number, guardian phone, attendance timestamps, batch enrollment) are stored strictly for educational management and campus safety.\n'
+          'A significant portion of our classical arts students are children under 18 years of age:\n'
+          '• Accounts for minor students are provisioned exclusively through authorized academy admission and registered parent/guardian telephone numbers.\n'
+          '• Student personal details (full name, roll number, guardian phone, attendance timestamps, batch enrollment) are stored strictly for educational management and campus safety.\n'
           '• We do NOT sell, rent, license, or monetize any child or user data.\n'
           '• We do NOT engage in behavioral advertising, third-party user profiling, or ad tracking.',
         ),
@@ -234,7 +234,7 @@ class _PolicySheetWidgetState extends State<_PolicySheetWidget> {
         _sectionTitle('4. Information We Collect'),
         _paragraph(
           '• Credentials: Registered phone number or student roll number and secure access passwords.\n'
-          '• Disciple Profile: Name, guardian contact number, age, enrolled discipline (Bharatanatyam, Kuchipudi, Carnatic Vocal, etc.), and assigned batch.\n'
+          '• Student Profile: Name, guardian contact number, age, enrolled discipline (Bharatanatyam, Kuchipudi, Carnatic Vocal, etc.), and assigned batch.\n'
           '• Attendance Logs: Class date, session status (Present/Absent), and roll call timestamps recorded by Gurus.\n'
           '• Profile Avatars: Optional photos uploaded by users for academy identification cards.',
         ),
@@ -250,12 +250,12 @@ class _PolicySheetWidgetState extends State<_PolicySheetWidget> {
 
         _sectionTitle('6. Security & Data Protection'),
         _paragraph(
-          'All communications between our mobile clients and database servers are protected with industry-standard TLS/SSL encryption in transit and AES-256 encryption at rest. Strict role-based row-level security (RLS) ensures disciples and parents only access records belonging to their registered family account.',
+          'All communications between our mobile clients and database servers are protected with industry-standard TLS/SSL encryption in transit and AES-256 encryption at rest. Strict role-based row-level security (RLS) ensures students and parents only access records belonging to their registered family account.',
         ),
 
         _sectionTitle('7. Data Retention & Account Deletion'),
         _paragraph(
-          'Parents and disciples retain the right to inspect, correct, or request complete deletion of their account records upon graduating or leaving the academy. To request data deletion, contact the Academy Office.',
+          'Parents and students retain the right to inspect, correct, or request complete deletion of their account records upon graduating or leaving the academy. To request data deletion, contact the Academy Office.',
         ),
 
         _sectionTitle('8. Grievance Officer & Contact'),
@@ -287,12 +287,12 @@ class _PolicySheetWidgetState extends State<_PolicySheetWidget> {
 
         _sectionTitle('1. Acceptance of Terms'),
         _paragraph(
-          'By logging into the Laasya Academy mobile application or web portal as a Disciple, Parent, or Guru, you agree to be bound by these Terms and Conditions and our Privacy Policy.',
+          'By logging into the Laasya Academy mobile application or web portal as a Student, Parent, or Guru, you agree to be bound by these Terms and Conditions and our Privacy Policy.',
         ),
 
         _sectionTitle('2. Role-Based Access & Authentication'),
         _paragraph(
-          '• Disciple / Student Portal: Dedicated solely to enrolled students and parents to view class schedules, attendance records, circulars, fee receipts, and receive pickup alerts.\n'
+          '• Student Portal: Dedicated solely to enrolled students and parents to view class schedules, attendance records, circulars, fee receipts, and receive pickup alerts.\n'
           '• Guru / Trainer Portal: Strictly restricted to verified faculty members for taking roll calls, managing batch schedules, and publishing class completion alerts.\n'
           '• Sharing credentials or attempting unauthorized cross-role access is prohibited.',
         ),
@@ -317,7 +317,7 @@ class _PolicySheetWidgetState extends State<_PolicySheetWidget> {
 
         _sectionTitle('6. Code of Conduct & Revisions'),
         _paragraph(
-          'Disciples and faculty members are expected to maintain the utmost reverence, discipline, and respect inherent in classical arts traditions. The Academy reserves the right to update these terms as needed.',
+          'Students and faculty members are expected to maintain the utmost reverence, discipline, and respect inherent in classical arts traditions. The Academy reserves the right to update these terms as needed.',
         ),
       ],
     );

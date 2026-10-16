@@ -236,7 +236,7 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                                                       ),
                                                     ),
                                                     Text(
-                                                      '${batch['timings']} • $stuCount Disciples',
+                                                      '${batch['timings']} • $stuCount Students',
                                                       style: const TextStyle(fontSize: 10.5, color: Colors.grey),
                                                     ),
                                                   ],
@@ -305,7 +305,7 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
     if (rawAvatar == null || rawAvatar.isEmpty || rawAvatar.contains('unsplash.com')) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No photo uploaded in system for ${stu['name'] ?? 'this disciple'}.'),
+          content: Text('No photo uploaded in system for ${stu['name'] ?? 'this student'}.'),
           duration: const Duration(seconds: 2),
           backgroundColor: LaasyaColors.primary,
         ),
@@ -313,7 +313,7 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
       return;
     }
     final avatarUrl = rawAvatar;
-    final name = stu['name']?.toString() ?? 'Disciple';
+    final name = stu['name']?.toString() ?? 'Student';
     final roll = stu['roll']?.toString() ?? '';
 
     showDialog(
@@ -357,7 +357,7 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                         ),
                         if (roll.isNotEmpty)
                           Text(
-                            'Disciple ID: $roll',
+                            'Student ID: $roll',
                             style: const TextStyle(
                               color: LaasyaColors.accentGold,
                               fontSize: 12,
@@ -517,7 +517,7 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
             ),
             const Divider(height: 24),
 
-            _infoRow(Icons.person_outline_rounded, 'Student Name', stu['name']?.toString() ?? 'Disciple'),
+            _infoRow(Icons.person_outline_rounded, 'Student Name', stu['name']?.toString() ?? 'Student'),
             _infoRow(Icons.cake_outlined, 'Age', '${stu['age'] ?? 16} Years'),
             _infoRow(Icons.face_retouching_natural_rounded, 'Gender', (stu['gender']?.toString() ?? 'Not Specified').toUpperCase()),
             _infoRow(Icons.family_restroom_rounded, 'Parent Name', stu['parent_name']?.toString() ?? 'Parent / Guardian'),
@@ -684,7 +684,7 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                     Expanded(
                       child: TextField(
                         decoration: InputDecoration(
-                          hintText: 'Search disciple name, ID...',
+                          hintText: 'Search student name, ID...',
                           hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey.shade500),
                           prefixIcon: const Icon(Icons.search_rounded, color: LaasyaColors.primary, size: 20),
                           suffixIcon: _searchQuery.isNotEmpty
@@ -754,7 +754,7 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Showing ${filtered.length} of ${uniqueStudents.length} Disciples',
+                      'Showing ${filtered.length} of ${uniqueStudents.length} Students',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
                     ),
                     if (_selectedBatchIds.length < 9)
@@ -787,7 +787,7 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                         Icon(Icons.person_search_rounded, size: 54, color: Colors.grey.shade400),
                         const SizedBox(height: 12),
                         const Text(
-                          'No matching disciples found.',
+                          'No matching students found.',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.grey),
                         ),
                         const SizedBox(height: 4),

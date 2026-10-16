@@ -85,7 +85,7 @@ class TrainerDataStore {
           studentList.add({
             'id': s['id']?.toString() ?? '',
             'roll': s['roll']?.toString() ?? s['roll_number']?.toString() ?? 'LCA',
-            'name': s['name']?.toString() ?? 'Disciple',
+            'name': s['name']?.toString() ?? 'Student',
             'age': s['age'] ?? 16,
             'gender': s['gender']?.toString() ?? 'Not Specified',
             'parent_name': s['parent_name']?.toString() ?? 'Parent / Guardian',
@@ -281,7 +281,7 @@ class TrainerDataStore {
     if (batchMap != null && batchMap.containsKey(studentId)) {
       return batchMap[studentId]!;
     }
-    return ''; // Disciples start UNMARKED until Guru explicitly marks them!
+    return ''; // Students start UNMARKED until Guru explicitly marks them!
   }
 
   void setStudentStatus(String batchId, String studentId, String status) {

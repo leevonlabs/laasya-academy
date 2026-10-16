@@ -69,7 +69,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'This will send instant class completion notifications to parents and disciples.',
+                      'This will send instant class completion notifications to parents and students.',
                       style: TextStyle(fontSize: 11.5, color: Color(0xFF590231), height: 1.35),
                     ),
                   ),
@@ -539,7 +539,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                                                   border: Border.all(color: const Color(0xFFF0D5E4)),
                                                 ),
                                                 child: Text(
-                                                  '${students.length} Disciples',
+                                                  '${students.length} Students',
                                                   style: const TextStyle(
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.bold,

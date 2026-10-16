@@ -7,7 +7,7 @@ import '../constants/api_constants.dart';
 import 'alarm_service.dart';
 
 /// Real-time and background-resilient listener for Class Completed pickup chimes
-/// and live attendance alerts for Disciples & Parents.
+/// and live attendance alerts for Students & Parents.
 class SessionAlertListener with WidgetsBindingObserver {
   static final SessionAlertListener _instance = SessionAlertListener._internal();
   factory SessionAlertListener() => _instance;

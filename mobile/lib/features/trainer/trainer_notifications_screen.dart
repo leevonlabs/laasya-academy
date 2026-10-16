@@ -20,6 +20,8 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
   @override
   void initState() {
     super.initState();
+    _notifications = SupabaseService().getCachedNotifications();
+    _isLoading = _notifications.isEmpty;
     _load();
   }
 

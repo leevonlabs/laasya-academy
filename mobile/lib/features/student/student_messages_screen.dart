@@ -23,6 +23,11 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
     super.initState();
     SupabaseService().markAllMessagesAsRead();
     _unreadCount = 0;
+    final cached = SupabaseService().getCachedMessageAnnouncements();
+    if (cached.isNotEmpty) {
+      _messages = List<Map<String, dynamic>>.from(cached);
+      _isLoading = false;
+    }
     _loadMessages();
   }
 
@@ -33,8 +38,10 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
   }
 
   Future<void> _loadMessages() async {
-    setState(() => _isLoading = true);
-    final msgs = await SupabaseService().getMessageAnnouncements(forceRefresh: true);
+    if (_messages.isEmpty) {
+      setState(() => _isLoading = true);
+    }
+    final msgs = await SupabaseService().getMessageAnnouncements(forceRefresh: _messages.isEmpty);
     if (mounted) {
       final now = DateTime.now();
       // Enforce 30-day lifespan rule: Automatically clear messages older than 30 days

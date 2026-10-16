@@ -123,7 +123,11 @@ class MainActivity: FlutterActivity() {
                         putExtra("baseUrl", baseUrl)
                     }
                     try {
-                        startService(sIntent)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            ContextCompat.startForegroundService(this, sIntent)
+                        } else {
+                            startService(sIntent)
+                        }
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }

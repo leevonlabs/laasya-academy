@@ -20,6 +20,8 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
   @override
   void initState() {
     super.initState();
+    _notifications = SupabaseService().getCachedNotifications();
+    _isLoading = _notifications.isEmpty;
     _loadNotifications();
   }
 

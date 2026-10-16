@@ -446,7 +446,7 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                     iconBg: const Color(0xFFE8F5E9),
                     iconColor: const Color(0xFF2E7D32),
                     title: 'Announcements',
-                    subtitle: 'Broadcast notices & circulars to your enrolled disciples',
+                    subtitle: 'Broadcast notices & circulars to your enrolled students',
                     badgeText: 'BROADCAST',
                     onTap: () {
                       Navigator.push(

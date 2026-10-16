@@ -264,7 +264,7 @@ export default function SettingsClient({
           <p className="text-xs text-gray-500 mt-0.5">
             {activeSection === 'admin-profile'
               ? 'Administrator records, official contact number, executive authority privileges, and password security.'
-              : 'Manage, reset, and set passwords for disciples and faculty Gurus with single-click default credentials.'}
+              : 'Manage, reset, and set passwords for students and faculty Gurus with single-click default credentials.'}
           </p>
         </div>
 
@@ -431,7 +431,7 @@ export default function SettingsClient({
                   {[
                     'Master Course & Timetable Management',
                     'Guru / Faculty Assignment & Timings',
-                    '300 Disciples Database & Batch Assignments',
+                    '300 Students Database & Batch Assignments',
                     'Real-time Fee Collection & Ledger Audit',
                     'Attendance Registers & Batch Attendance Reports',
                     'Video Library & Guru Drive Links Moderation',
@@ -585,7 +585,7 @@ export default function SettingsClient({
                   }`}
                 >
                   <GraduationCap className="w-4 h-4" />
-                  <span>Students / Disciples</span>
+                  <span>Students</span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                     activeTab === 'students' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
                   }`}>
@@ -642,7 +642,7 @@ export default function SettingsClient({
                   <thead>
                     <tr className="bg-[#FFF9FB] text-gray-500 font-bold border-b border-[#F0D5E4]/80 text-[11px] uppercase tracking-wider">
                       <th className="py-3.5 px-5">Roll No / ID</th>
-                      <th className="py-3.5 px-5">Disciple Name</th>
+                      <th className="py-3.5 px-5">Student Name</th>
                       <th className="py-3.5 px-5">Registered Contact Number</th>
                       <th className="py-3.5 px-5">Account Status</th>
                       <th className="py-3.5 px-5 text-right">Access Action</th>
@@ -673,7 +673,7 @@ export default function SettingsClient({
                               <a
                                 href={s.phone ? `tel:${s.phone}` : undefined}
                                 className="font-mono text-gray-800 hover:text-[#8A064D] hover:underline flex items-center gap-1.5"
-                                title="Click to call disciple"
+                                title="Click to call student"
                               >
                                 <Phone className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
                                 <span>{s.phone || 'No phone registered'}</span>
@@ -719,7 +719,7 @@ export default function SettingsClient({
                       <tr>
                         <td colSpan={5} className="py-12 text-center text-gray-400">
                           <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                          <p className="font-bold text-gray-600">No disciples found matching &quot;{search}&quot;</p>
+                          <p className="font-bold text-gray-600">No students found matching &quot;{search}&quot;</p>
                           <p className="text-xs text-gray-400 mt-0.5">Try searching with roll number or registered phone.</p>
                         </td>
                       </tr>
@@ -826,7 +826,7 @@ export default function SettingsClient({
             {/* Footer info */}
             <div className="p-3.5 bg-gray-50/50 border-t border-gray-100 text-[11px] text-gray-400 flex flex-col sm:flex-row items-center justify-between gap-2">
               <span>Showing {activeTab === 'students' ? filteredStudents.length : filteredGurus.length} registered accounts</span>
-              <span>Students log in with disciple phone; Gurus log in with primary contact</span>
+              <span>Students log in with registered phone; Gurus log in with primary contact</span>
             </div>
           </div>
         </div>

@@ -22,11 +22,15 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
   @override
   void initState() {
     super.initState();
+    _payments = SupabaseService().getCachedPayments();
+    _isLoading = _payments.isEmpty;
     _loadPayments();
   }
 
   Future<void> _loadPayments() async {
-    setState(() => _isLoading = true);
+    if (_payments.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     final data = await SupabaseService().getStudentPayments();
     if (mounted) {
       setState(() {

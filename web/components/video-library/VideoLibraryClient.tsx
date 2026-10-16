@@ -133,7 +133,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
   }));
   const [isLoadingCompliance, setIsLoadingCompliance] = useState(false);
   const [selectedGuruForModal, setSelectedGuruForModal] = useState<GuruComplianceItem | null>(null);
-  const [guruModalActiveTab, setGuruModalActiveTab] = useState<'received' | 'missing' | 'all_videos'>('received');
+  const [guruModalActiveTab, setGuruModalActiveTab] = useState<'received' | 'missing'>('received');
   const [guruModalBatchFilter, setGuruModalBatchFilter] = useState<string>('all');
   const [guruModalStudentSearch, setGuruModalStudentSearch] = useState<string>('');
   const [guruModalSelectedStudentIds, setGuruModalSelectedStudentIds] = useState<string[]>([]);
@@ -944,7 +944,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
               Event Video Library & Drive Links
             </h1>
             <p className="text-sm md:text-base text-rose-100/90 max-w-2xl leading-relaxed">
-              Share Google Drive event shoot folders directly with participating disciples across courses and batches. Disciples receive real-time access on their mobile profile.
+              Share Google Drive event shoot folders directly with participating students across courses and batches. Students receive real-time access on their mobile profile.
             </p>
           </div>
 
@@ -1107,7 +1107,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                         <span>Share Event Media Link • {selectedCourseSubpage.title}</span>
                       </h3>
                       <p className="text-xs text-rose-100 mt-0.5">
-                        Broadcast Google Drive and/or YouTube performance links to disciples in this course
+                        Broadcast Google Drive and/or YouTube performance links to students in this course
                       </p>
                     </div>
                     <button
@@ -1173,7 +1173,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                       </div>
                     </div>
                     <p className="text-[11px] text-gray-500 -mt-2">
-                      Provide either a Google Drive folder link, a YouTube link, or both. Disciples will see the corresponding platforms directly in their mobile app.
+                      Provide either a Google Drive folder link, a YouTube link, or both. Students will see the corresponding platforms directly in their mobile app.
                     </p>
 
                     {/* Date & Category */}
@@ -1204,7 +1204,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                          DESCRIPTION / INSTRUCTIONS FOR DISCIPLES
+                          DESCRIPTION / INSTRUCTIONS FOR STUDENTS
                         </label>
                         <AiEnhanceButton
                           value={subpageShareDesc}
@@ -1649,7 +1649,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                               </span>
                             </div>
                             <div className="bg-[#FFF9FB] p-2 rounded-xl border border-[#F0D5E4]/60">
-                              <span className="text-[10px] text-gray-500 block font-medium">Disciples</span>
+                              <span className="text-[10px] text-gray-500 block font-medium">Students</span>
                               <span className="font-bold text-gray-800 text-xs flex items-center gap-1 mt-0.5">
                                 <Users className="w-3 h-3 text-[#8A064D]" />
                                 {course.student_count} Enrolled
@@ -1927,7 +1927,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                 <span>Guru Share Hub</span>
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Audit monthly disciple performance compliance (1 video/student/month) or browse general group video links
+                Audit monthly student performance compliance (1 video/student/month) or browse general group video links
               </p>
             </div>
 
@@ -2005,10 +2005,10 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
               </div>
             </div>
 
-            {/* Card 2: Total Disciples */}
+            {/* Card 2: Total Students */}
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#F0D5E4] shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Enrolled Disciples</span>
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Enrolled Students</span>
                 <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
                   <Users className="w-4 h-4" />
                 </div>
@@ -2043,7 +2043,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
               </div>
             </div>
 
-            {/* Card 4: Missing Disciples */}
+            {/* Card 4: Missing Students */}
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#F0D5E4] shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Missing This Month</span>
@@ -2054,13 +2054,13 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
               <div className="mt-2">
                 <span className="text-2xl sm:text-3xl font-black text-rose-600">{complianceData.summary.total_missing}</span>
                 <span className="text-xs text-rose-700 font-bold block mt-0.5">
-                  {complianceData.summary.total_missing === 0 ? 'All Disciples Completed!' : 'Pending Performance Videos'}
+                  {complianceData.summary.total_missing === 0 ? 'All Students Completed!' : 'Pending Performance Videos'}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* FACULTY DISCIPLES COMPLIANCE DIRECTORY */}
+          {/* FACULTY STUDENTS COMPLIANCE DIRECTORY */}
           <div className="space-y-4">
               {/* Filter Pills & Search Bar */}
               <div className="bg-white rounded-2xl p-4 border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -2069,7 +2069,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                   <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Search Guru name, course, batch, or disciple..."
+                    placeholder="Search Guru name, course, batch, or student..."
                     value={complianceSearch}
                     onChange={(e) => setComplianceSearch(e.target.value)}
                     className="w-full pl-10 pr-8 py-2 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-medium text-gray-900 focus:outline-hidden focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
@@ -2197,7 +2197,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                             {/* Compliance Badge */}
                             {noStudents ? (
                               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 shrink-0">
-                                No Disciples
+                                No Students
                               </span>
                             ) : isFullyCompliant ? (
                               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#DEF7EC] text-[#03543F] border border-emerald-300 flex items-center gap-1 shrink-0">
@@ -2279,7 +2279,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                           className="w-full py-2.5 px-4 rounded-xl bg-[#590231] hover:bg-[#740340] active:scale-98 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                         >
                           <Eye className="w-4 h-4 text-[#D4AF37]" />
-                          <span>Audit Disciples & Video Links</span>
+                          <span>Audit Students & Video Links</span>
                         </button>
                       </div>
                     );
@@ -2516,17 +2516,10 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                                 <Calendar className="w-3 h-3 text-gray-400" />
                                 {formattedDate}
                               </span>
-                              <button
-                                onClick={() => handleDeleteItem(item.id)}
-                                title="Delete Link"
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
                             </div>
                           </div>
 
-                          {/* Course Details Pill (NO disciple name rendered!) */}
+                          {/* Course Details Pill (NO student name rendered!) */}
                           {item.target_course_title && (
                             <div className="text-[11.5px] font-semibold text-gray-600 flex items-center gap-1.5">
                               <BookOpen className="w-3.5 h-3.5 text-[#8A064D]" />
@@ -2695,20 +2688,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                       }`}
                     >
                       <AlertCircle className="w-3.5 h-3.5" />
-                      <span>Missing Disciples ({modalFilteredMissing.length})</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setGuruModalActiveTab('all_videos')}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                        guruModalActiveTab === 'all_videos'
-                          ? 'bg-[#590231] text-white shadow-xs'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      <Video className="w-3.5 h-3.5" />
-                      <span>All Media ({selectedGuruForModal.shared_videos_count})</span>
+                      <span>Missing Students ({modalFilteredMissing.length})</span>
                     </button>
                   </div>
 
@@ -2756,7 +2736,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                         <Users className="w-3.5 h-3.5" />
                         <span>
                           {guruModalSelectedStudentIds.length === 0
-                            ? `All Disciples (${disciplesForFilterList.length})`
+                            ? `All Students (${disciplesForFilterList.length})`
                             : `${guruModalSelectedStudentIds.length} Selected`}
                         </span>
                         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isGuruModalStudentDropdownOpen ? 'rotate-180' : ''}`} />
@@ -2770,7 +2750,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                             <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                             <input
                               type="text"
-                              placeholder="Search disciple name or roll..."
+                              placeholder="Search student name or roll..."
                               value={guruModalStudentSearch}
                               onChange={(e) => setGuruModalStudentSearch(e.target.value)}
                               className="w-full pl-8 pr-7 py-1.5 rounded-xl border border-gray-200 text-xs bg-[#FFF9FB] text-gray-800 focus:outline-hidden focus:ring-1 focus:ring-[#8A064D]"
@@ -2790,7 +2770,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                           {/* Quick Actions: Select All / Clear */}
                           <div className="flex items-center justify-between text-[11px] px-1 py-0.5 border-b border-gray-100">
                             <span className="text-gray-500 font-semibold">
-                              {disciplesForFilterList.length} Disciples
+                              {disciplesForFilterList.length} Students
                             </span>
                             <div className="flex items-center gap-2">
                               <button
@@ -2817,7 +2797,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                           <div className="max-h-52 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
                             {disciplesForFilterList.length === 0 ? (
                               <div className="p-4 text-center text-xs text-gray-400">
-                                No disciples match search
+                                No students match search
                               </div>
                             ) : (
                               disciplesForFilterList.map((disciple) => {
@@ -2908,8 +2888,8 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                           </h4>
                           <p className="text-xs text-gray-500 mt-1">
                             {guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch
-                              ? 'Try adjusting your batch filter or disciple selection above.'
-                              : `Disciples will appear here once ${stripGuruPrefix(selectedGuruForModal.full_name)} shares their monthly performance recordings.`}
+                              ? 'Try adjusting your batch filter or student selection above.'
+                              : `Students will appear here once ${stripGuruPrefix(selectedGuruForModal.full_name)} shares their monthly performance recordings.`}
                           </p>
                         </div>
                       ) : (
@@ -3022,7 +3002,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                     </div>
                   )}
 
-                  {/* TAB B: MISSING DISCIPLES */}
+                  {/* TAB B: MISSING STUDENTS */}
                   {guruModalActiveTab === 'missing' && (
                     <div className="space-y-4">
                       {modalFilteredMissing.length === 0 ? (
@@ -3030,13 +3010,13 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                           <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
                           <h4 className="text-sm font-bold text-emerald-900">
                             {guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch
-                              ? 'No missing disciples match the selected filters'
-                              : 'All Disciples Completed!'}
+                              ? 'No missing students match the selected filters'
+                              : 'All Students Completed!'}
                           </h4>
                           <p className="text-xs text-emerald-700 mt-1">
                             {guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch
-                              ? 'Try adjusting your batch filter or disciple selection above.'
-                              : `${stripGuruPrefix(selectedGuruForModal.full_name)} has shared a monthly performance video for every assigned disciple in this period.`}
+                              ? 'Try adjusting your batch filter or student selection above.'
+                              : `${stripGuruPrefix(selectedGuruForModal.full_name)} has shared a monthly performance video for every assigned student in this period.`}
                           </p>
                         </div>
                       ) : (
@@ -3044,7 +3024,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                           <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 flex items-center gap-3">
                             <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
                             <p className="text-xs text-rose-900 font-medium">
-                              <strong>{modalFilteredMissing.length} disciples</strong> are currently missing their monthly performance video link. Follow up with {stripGuruPrefix(selectedGuruForModal.full_name)} to ensure every disciple receives their performance video.
+                              <strong>{modalFilteredMissing.length} students</strong> are currently missing their monthly performance video link. Follow up with {stripGuruPrefix(selectedGuruForModal.full_name)} to ensure every student receives their performance video.
                             </p>
                           </div>
 
@@ -3071,11 +3051,16 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                                   </span>
                                 </div>
 
-                                <div className="text-xs text-gray-600 bg-[#FFF9FB] p-2.5 rounded-xl border border-[#F0D5E4]/60 space-y-1">
-                                  <div className="text-[11px] text-gray-500">
-                                    Course: <strong className="text-gray-800 font-bold">{disciple.course_title}</strong>
+                                <div className="text-xs text-gray-700 bg-[#FFF9FB] p-3 rounded-xl border border-[#F0D5E4]/80 space-y-2">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11.5px]">
+                                    <span className="text-gray-600">
+                                      Course: <strong className="text-gray-900 font-bold">{disciple.course_title || 'Enrolled Course'}</strong>
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[10.5px]">
+                                      Pending Batch: {disciple.batch_name}
+                                    </span>
                                   </div>
-                                  <div className="text-[11px] text-gray-500 flex items-center justify-between">
+                                  <div className="text-[11px] text-gray-500 flex items-center justify-between pt-1.5 border-t border-rose-100/60">
                                     <span>Parent: <strong className="text-gray-800 font-semibold">{disciple.parent_name || 'Parent'}</strong></span>
                                     {disciple.parent_phone && (
                                       <a
@@ -3095,118 +3080,6 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                       )}
                     </div>
                   )}
-
-                  {/* TAB C: ALL SHARED VIDEOS BY THIS GURU */}
-                  {guruModalActiveTab === 'all_videos' && (() => {
-                    const filteredSharedVideos = selectedGuruForModal.shared_videos.filter((vid) => {
-                      if (guruModalBatchFilter !== 'all' && vid.target_batch_id !== guruModalBatchFilter) return false;
-                      if (guruModalStudentSearch.trim()) {
-                        const q = guruModalStudentSearch.toLowerCase();
-                        const matchTitle = (vid.title || '').toLowerCase().includes(q);
-                        const matchDesc = (vid.description || '').toLowerCase().includes(q);
-                        const matchCourse = (vid.target_course_title || '').toLowerCase().includes(q);
-                        const matchBatch = (vid.target_batch_name || '').toLowerCase().includes(q);
-                        if (!matchTitle && !matchDesc && !matchCourse && !matchBatch) return false;
-                      }
-                      return true;
-                    });
-
-                    return (
-                      <div className="space-y-4">
-                        {filteredSharedVideos.length === 0 ? (
-                          <div className="p-8 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
-                            <Video className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                            <h4 className="text-sm font-bold text-gray-700">
-                              {guruModalBatchFilter !== 'all' || guruModalStudentSearch
-                                ? 'No media links match the selected filter'
-                                : 'No media links recorded yet'}
-                            </h4>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {filteredSharedVideos.map((vid, idx) => (
-                              <div
-                                key={`guru-modal-vid-${vid.id}-${idx}`}
-                                className="p-4 bg-white rounded-2xl border border-[#F0D5E4] shadow-2xs space-y-2.5"
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <h5 className="font-bold text-sm text-[#2D041A]">{vid.title}</h5>
-                                      {vid.category === 'performance' || vid.category === 'student_performance' ? (
-                                        <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-[#F3E8FF] text-[#6B21A8] border border-purple-200 flex items-center gap-1">
-                                          <Sparkles className="w-2.5 h-2.5" />
-                                          <span>Student Performance</span>
-                                        </span>
-                                      ) : (
-                                        <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
-                                          <Users className="w-2.5 h-2.5" />
-                                          <span>General Video</span>
-                                        </span>
-                                      )}
-                                    </div>
-                                    {(vid.category === 'performance' || vid.category === 'student_performance') && (vid.target_student_names || vid.target_student_name) && (
-                                      <div className="text-[11px] font-bold text-purple-900 bg-[#F3E8FF] px-2 py-0.5 rounded-md inline-flex items-center gap-1 border border-purple-200 mt-1">
-                                        <Sparkles className="w-2.5 h-2.5 text-[#6B21A8]" />
-                                        <span>Disciple: {vid.target_student_names || vid.target_student_name}</span>
-                                      </div>
-                                    )}
-                                    <div className="flex items-center gap-2 text-[11px] text-gray-500 mt-0.5">
-                                      <span className="font-semibold text-[#8A064D]">{vid.target_course_title}</span>
-                                      <span>•</span>
-                                      <span>{vid.target_batch_name}</span>
-                                    </div>
-                                  </div>
-                                  {vid.event_date && (
-                                    <span className="text-[11px] text-gray-400 font-medium">
-                                      {new Date(vid.event_date).toLocaleDateString('en-GB', {
-                                        day: '2-digit',
-                                        month: 'short',
-                                        year: 'numeric',
-                                      })}
-                                    </span>
-                                  )}
-                                </div>
-
-                                {vid.description && (
-                                  <p className="text-xs text-gray-600 bg-[#FFF9FB] p-2 rounded-xl border border-[#F0D5E4]/60">
-                                    {vid.description}
-                                  </p>
-                                )}
-
-                                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100">
-                                  {vid.drive_url && (
-                                    <a
-                                      href={vid.drive_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="px-3 py-1.5 rounded-xl bg-[#03543F] hover:bg-[#023e2f] text-white text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                                    >
-                                      <LinkIcon className="w-3.5 h-3.5" />
-                                      <span>Open Google Drive</span>
-                                      <ExternalLink className="w-3 h-3" />
-                                    </a>
-                                  )}
-                                  {vid.youtube_url && (
-                                    <a
-                                      href={vid.youtube_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                                    >
-                                      <Video className="w-3.5 h-3.5" />
-                                      <span>Open YouTube</span>
-                                      <ExternalLink className="w-3 h-3" />
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
                 </div>
               </div>
             </div>
@@ -3296,7 +3169,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                 </div>
               </div>
               <p className="text-[11px] text-gray-500 -mt-2">
-                Provide either a Google Drive folder link, a YouTube link, or both. Disciples will see the corresponding platforms directly in their mobile app.
+                Provide either a Google Drive folder link, a YouTube link, or both. Students will see the corresponding platforms directly in their mobile app.
               </p>
 
               {/* Event Date */}
@@ -3327,7 +3200,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Description / Instructions for Disciples
+                    Description / Instructions for Students
                   </label>
                   <AiEnhanceButton
                     value={universalDesc}
@@ -3451,7 +3324,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                   <span>Edit Shared Video / Drive Link</span>
                 </h3>
                 <p className="text-xs text-rose-100">
-                  Update link titles, URLs, shoot date, and disciple instructions
+                  Update link titles, URLs, shoot date, and student instructions
                 </p>
               </div>
               <button
@@ -3534,7 +3407,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Description / Instructions for Disciples
+                    Description / Instructions for Students
                   </label>
                   <AiEnhanceButton
                     value={editDesc}
@@ -3603,7 +3476,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                     {activeCourse.category}
                   </span>
                   <span className="text-xs text-rose-200">
-                    {activeCourse.batches.length} Batches • {activeCourse.student_count} Enrolled Disciples
+                    {activeCourse.batches.length} Batches • {activeCourse.student_count} Enrolled Students
                   </span>
                 </div>
                 <h3 className="text-xl md:text-2xl font-bold">{activeCourse.title}</h3>
@@ -3943,10 +3816,10 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                   <div>
                     <h4 className="font-bold text-sm text-gray-900 flex items-center gap-2">
                       <Users className="w-4 h-4 text-[#8A064D]" />
-                      <span>Enrolled Disciples in {activeCourse.title}</span>
+                      <span>Enrolled Students in {activeCourse.title}</span>
                     </h4>
                     <p className="text-xs text-gray-500">
-                      Disciples who automatically receive Drive link access in their mobile app
+                      Students who automatically receive Drive link access in their mobile app
                     </p>
                   </div>
 
@@ -4048,7 +3921,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
             {/* Modal Footer */}
             <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500">
               <span>
-                Total Disciples in view: <strong className="text-gray-900">{displayedStudents.length}</strong>
+                Total Students in view: <strong className="text-gray-900">{displayedStudents.length}</strong>
               </span>
               <button
                 type="button"

@@ -22,11 +22,15 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
   @override
   void initState() {
     super.initState();
+    _salaries = SupabaseService().getCachedSalaries();
+    _isLoading = _salaries.isEmpty;
     _loadSalaries();
   }
 
   Future<void> _loadSalaries() async {
-    setState(() => _isLoading = true);
+    if (_salaries.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     final data = await SupabaseService().getTrainerSalaryPayouts();
     if (mounted) {
       setState(() {
