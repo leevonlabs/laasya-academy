@@ -25,7 +25,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
   }
 
   Future<void> _syncData() async {
-    final prof = SupabaseService().currentUserProfile;
+    final prof = SupabaseService().currentUserProfile ?? await SupabaseService().getCurrentUserProfile();
     await _store.syncFromApi(
       trainerName: prof?['full_name'],
       phone: prof?['phone'],

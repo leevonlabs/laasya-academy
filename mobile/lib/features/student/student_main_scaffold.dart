@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/alarm_service.dart';
 import '../../core/services/permission_service.dart';
@@ -27,6 +28,7 @@ class StudentMainScaffold extends StatefulWidget {
 class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   int _currentIndex = 0;
   Timer? _alertPollTimer;
+  RealtimeChannel? _realtimeChannel;
   // Global static set to ensure alerts are NEVER triggered repeatedly across rebuilds/polls
   static final Set<String> _globalProcessedAlertIds = {};
   bool _isFirstPoll = true;
@@ -36,6 +38,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   void initState() {
     super.initState();
     _startBackgroundAlertService();
+    _subscribeSupabaseRealtime();
     TrainerDataStore.classClosedAlertNotifier.addListener(_onClassClosedAlert);
     _startNetworkAlertPolling();
     _checkInitialNotificationRoute();
@@ -102,10 +105,100 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
 
   @override
   void dispose() {
+    _realtimeChannel?.unsubscribe();
     _alertPollTimer?.cancel();
     AlarmService.stopAlarmRing();
     TrainerDataStore.classClosedAlertNotifier.removeListener(_onClassClosedAlert);
     super.dispose();
+  }
+
+  void _subscribeSupabaseRealtime() {
+    try {
+      _realtimeChannel?.unsubscribe();
+      _realtimeChannel = SupabaseService().client
+          .channel('public:student_session_alerts_feed')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'session_alerts',
+            callback: (payload) {
+              final newRecord = payload.newRecord;
+              if (newRecord.isNotEmpty && mounted) {
+                _processIncomingRealtimeAlert(Map<String, dynamic>.from(newRecord));
+              }
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('Student Realtime subscription notice: $e');
+    }
+  }
+
+  void _processIncomingRealtimeAlert(Map<String, dynamic> alert) {
+    final id = alert['id']?.toString() ?? '';
+    if (id.isNotEmpty && _globalProcessedAlertIds.contains(id)) return;
+
+    final alertType = alert['alert_type']?.toString() ?? 'class_closed';
+
+    if (alertType == 'class_closed') {
+      final batchId = (alert['batch_id']?.toString() ?? '').toLowerCase();
+      final prof = SupabaseService().currentUserProfile;
+      final enrolled = prof?['enrolled_courses'];
+      List<String> studentBatchIds = [];
+      if (enrolled is List) {
+        for (var e in enrolled) {
+          if (e is Map && e['batch_id'] != null) {
+            studentBatchIds.add(e['batch_id'].toString().toLowerCase());
+          }
+        }
+      }
+      final matchesBatch = batchId == 'all' || studentBatchIds.isEmpty || studentBatchIds.contains(batchId);
+      if (!matchesBatch) return;
+
+      if (id.isNotEmpty) {
+        _globalProcessedAlertIds.add(id);
+        AlarmService.markAlertProcessed(id);
+      }
+
+      final courseTitle = alert['course_title'] ?? 'Class Session';
+      final batchName = alert['batch_name'] ?? 'Batch';
+      final alertMsg = alert['message'] ?? 'The $courseTitle ($batchName) session has concluded. Please come and pick up your child safely.';
+      AlarmService.showClassCompletedNotification(
+        courseTitle: courseTitle,
+        batchName: batchName,
+        message: alertMsg,
+      );
+      _showClassClosedBannerNotification(alert);
+    } else if (alertType == 'attendance_marked') {
+      final prof = SupabaseService().currentUserProfile;
+      final myId = (prof?['id'] ?? prof?['profile_id'] ?? '').toString().toLowerCase();
+      final myRoll = (prof?['roll_number'] ?? '').toString().toLowerCase();
+      final myName = (prof?['full_name'] ?? '').toString().toLowerCase();
+      final targetId = (alert['target_student_id'] ?? '').toString().toLowerCase();
+      final targetRoll = (alert['target_roll_number'] ?? '').toString().toLowerCase();
+      final targetName = (alert['target_student_name'] ?? '').toString().toLowerCase();
+
+      final matchesMe = (myId.isNotEmpty && targetId == myId) || 
+                        (myRoll.isNotEmpty && targetRoll == myRoll) ||
+                        (myName.isNotEmpty && targetName.contains(myName));
+      if (!matchesMe) return;
+
+      if (id.isNotEmpty) {
+        _globalProcessedAlertIds.add(id);
+        AlarmService.markAlertProcessed(id);
+      }
+
+      SupabaseService().refreshNotifications();
+      SupabaseService().notifyAttendanceUpdated();
+      _showAttendanceStatusNotification(alert);
+    } else if (alertType == 'message' || alertType == 'announcement') {
+      if (id.isNotEmpty) {
+        _globalProcessedAlertIds.add(id);
+        AlarmService.markAlertProcessed(id);
+      }
+      SupabaseService().refreshNotifications();
+      _showMessageNotification(alert);
+    }
   }
 
   void _startNetworkAlertPolling() {
@@ -154,13 +247,13 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
           if (_isFirstPoll) {
             _isFirstPoll = false;
             final nowMs = DateTime.now().millisecondsSinceEpoch;
-            // On startup, mark historical alerts (older than 3 minutes) as processed,
-            // but preserve fresh alerts created recently so they sound when the app opens!
+            // On startup, mark only truly stale alerts (older than 30 minutes) as processed,
+            // so recent alerts (e.g. within 30 mins) still notify if missed while closed!
             for (var a in alerts) {
               final alertId = a['id']?.toString() ?? '';
               final createdAtMs = int.tryParse(a['created_at_ms']?.toString() ?? '') ?? 0;
-              final isRecent = createdAtMs > 0 && (nowMs - createdAtMs).abs() < 180000;
-              if (alertId.isNotEmpty && !isRecent) {
+              final isVeryOld = createdAtMs > 0 && (nowMs - createdAtMs) > 1800000;
+              if (alertId.isNotEmpty && isVeryOld) {
                 _globalProcessedAlertIds.add(alertId);
                 AlarmService.markAlertProcessed(alertId);
               }

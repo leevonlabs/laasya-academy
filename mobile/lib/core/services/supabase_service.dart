@@ -765,162 +765,40 @@ class SupabaseService {
 
     // 1. Live fetch from local / web backend API
     try {
-      final prof = _cachedProfile;
-      final tName = prof?['full_name'] ?? '';
-      final tPhone = prof?['phone'] ?? '';
-      final tId = prof?['id'] ?? '';
+      final prof = _cachedProfile ?? await getCurrentUserProfile();
+      final tName = (prof?['full_name'] ?? '').toString().trim();
+      final tPhone = (prof?['phone'] ?? '').toString().trim();
+      final tId = (prof?['id'] ?? prof?['trainer_id'] ?? prof?['profile_id'] ?? '').toString().trim();
       final nameParam = Uri.encodeComponent(tName);
       final phoneParam = Uri.encodeComponent(tPhone);
       final idParam = Uri.encodeComponent(tId);
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/trainer/batches?trainerId=$idParam&trainerName=$nameParam&phone=$phoneParam');
-      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['batches'] is List) {
           final liveBatches = List<Map<String, dynamic>>.from(decoded['batches']);
-          if (liveBatches.isNotEmpty) {
-            _cachedTrainerBatches = liveBatches;
-            return liveBatches;
-          }
+          _cachedTrainerBatches = liveBatches;
+          return liveBatches;
         }
       }
     } catch (e) {
       debugPrint('Live API fetch notice for trainer batches: $e');
     }
 
-    if (_cachedTrainerBatches.isNotEmpty) {
-      return List<Map<String, dynamic>>.from(_cachedTrainerBatches);
-    }
-
-    return [
-      {
-        'id': 'batch-201',
-        'name': 'Bharathanatyam - Batch A (Beginners)',
-        'room_or_hall': 'Natya Mandapam (Room 101)',
-        'days_of_week': ['Monday', 'Wednesday', 'Friday'],
-        'start_time': '17:00',
-        'end_time': '18:30',
-        'courses': {'title': 'Bharathanatyam', 'category': 'Classical Dance'},
-        'enrolled_count': 14,
-        'max_capacity': 20,
-        'start_date': '01 Jan 2026',
-        'duration': '12 Months',
-        'status': 'Active',
-      },
-      {
-        'id': 'batch-202',
-        'name': 'Bharathanatyam - Varnam Workshop',
-        'room_or_hall': 'Saraswathi Nilayam (Hall 2)',
-        'days_of_week': ['Tuesday', 'Thursday'],
-        'start_time': '18:45',
-        'end_time': '20:00',
-        'courses': {'title': 'Bharathanatyam', 'category': 'Classical Dance'},
-        'enrolled_count': 12,
-        'max_capacity': 15,
-        'start_date': '15 Feb 2026',
-        'duration': '6 Months',
-        'status': 'Active',
-      },
-      {
-        'id': 'batch-205',
-        'name': 'Adavu Foundation & Nattuvangam',
-        'room_or_hall': 'Natya Mandapam (Room 101)',
-        'days_of_week': ['Saturday', 'Sunday'],
-        'start_time': '09:00',
-        'end_time': '11:00',
-        'courses': {'title': 'Bharathanatyam', 'category': 'Classical Dance'},
-        'enrolled_count': 16,
-        'max_capacity': 20,
-        'start_date': '01 Mar 2026',
-        'duration': '12 Months',
-        'status': 'Active',
-      }
-    ];
+    return List<Map<String, dynamic>>.from(_cachedTrainerBatches);
   }
 
   Future<List<Map<String, dynamic>>> getBatchStudents(String batchId) async {
-    return [
-      {
-        'id': 'stu-1',
-        'roll_number': 'LCA-10021',
-        'name': 'Ananya Rao',
-        'phone': '+91 99123 45678',
-        'parent_name': 'Sri Ramesh Rao',
-        'parent_phone': '+91 99123 00001',
-        'attendance_rate': 92,
-        'status': 'present',
-        'batch_name': 'Batch A (Beginners)',
-        'students': {
-          'id': 'stu-1',
-          'roll_number': 'LCA-10021',
-          'profiles': {'full_name': 'Ananya Rao', 'phone': '+91 99123 45678'},
-        }
-      },
-      {
-        'id': 'stu-2',
-        'roll_number': 'LCA-10022',
-        'name': 'Sneha Reddy',
-        'phone': '+91 99123 45680',
-        'parent_name': 'Dr. K. V. Reddy',
-        'parent_phone': '+91 99123 00002',
-        'attendance_rate': 88,
-        'status': 'present',
-        'batch_name': 'Batch A (Beginners)',
-        'students': {
-          'id': 'stu-2',
-          'roll_number': 'LCA-10022',
-          'profiles': {'full_name': 'Sneha Reddy', 'phone': '+91 99123 45680'},
-        }
-      },
-      {
-        'id': 'stu-3',
-        'roll_number': 'LCA-10023',
-        'name': 'Meera Nambiar',
-        'phone': '+91 99123 45682',
-        'parent_name': 'Sri Govind Nambiar',
-        'parent_phone': '+91 99123 00003',
-        'attendance_rate': 96,
-        'status': 'present',
-        'batch_name': 'Batch A (Beginners)',
-        'students': {
-          'id': 'stu-3',
-          'roll_number': 'LCA-10023',
-          'profiles': {'full_name': 'Meera Nambiar', 'phone': '+91 99123 45682'},
-        }
-      },
-      {
-        'id': 'stu-4',
-        'roll_number': 'LCA-10024',
-        'name': 'Kiran Kumar',
-        'phone': '+91 99123 45684',
-        'parent_name': 'Sri Venkateshwarlu',
-        'parent_phone': '+91 99123 00004',
-        'attendance_rate': 78,
-        'status': 'absent',
-        'batch_name': 'Batch A (Beginners)',
-        'students': {
-          'id': 'stu-4',
-          'roll_number': 'LCA-10024',
-          'profiles': {'full_name': 'Kiran Kumar', 'phone': '+91 99123 45684'},
-        }
-      },
-      {
-        'id': 'stu-5',
-        'roll_number': 'LCA-10025',
-        'name': 'Pooja Iyer',
-        'phone': '+91 99123 45686',
-        'parent_name': 'Smt. Lakshmi Iyer',
-        'parent_phone': '+91 99123 00005',
-        'attendance_rate': 100,
-        'status': 'present',
-        'batch_name': 'Batch A (Beginners)',
-        'students': {
-          'id': 'stu-5',
-          'roll_number': 'LCA-10025',
-          'profiles': {'full_name': 'Pooja Iyer', 'phone': '+91 99123 45686'},
-        }
-      }
-    ];
+    final batches = await getTrainerBatches();
+    final batch = batches.firstWhere(
+      (b) => b['id'].toString() == batchId,
+      orElse: () => <String, dynamic>{},
+    );
+    if (batch['students'] is List) {
+      return List<Map<String, dynamic>>.from(batch['students']);
+    }
+    return [];
   }
 
   Future<void> startSession(String sessionId, String checkInCode) async {
@@ -2189,112 +2067,20 @@ class SupabaseService {
   Future<List<Map<String, dynamic>>> getTrainerSalaryPayouts({String? trainerId}) async {
     // 1. Live fetch from local / web backend API
     try {
-      final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/trainer-salaries');
+      final prof = _cachedProfile ?? await getCurrentUserProfile();
+      final id = (trainerId ?? prof?['id'] ?? prof?['trainer_id'] ?? prof?['profile_id'] ?? '').toString().trim();
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/trainer-salaries${id.isNotEmpty ? "?trainerId=${Uri.encodeComponent(id)}" : ""}');
       final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['salaries'] is List) {
           final liveSalaries = List<Map<String, dynamic>>.from(decoded['salaries']);
-          if (liveSalaries.isNotEmpty) {
-            _cachedSalaries = liveSalaries;
-          }
+          _cachedSalaries = liveSalaries;
+          return liveSalaries;
         }
       }
     } catch (e) {
       debugPrint('Live API fetch error for trainer salaries: $e');
-    }
-
-    if (_cachedSalaries.isEmpty) {
-      _cachedSalaries = [
-        {
-          'id': 'sal-2026-10-01',
-          'voucher_number': 'LCA-SAL-2026-10-004',
-          'receipt_number': 'LCA-VOUCHER-2026-10-004',
-          'payroll_month': 'October 2026',
-          'trainer_name': 'Smt. Anusha Sumesh',
-          'display_title': 'Founder & Head Guru',
-          'specialization': 'Bharatanatyam Classical Dance',
-          'base_salary': 45000,
-          'classes_assigned': 24,
-          'classes_conducted': 24,
-          'bonus_amount': 3000,
-          'bonus_reason': 'Festive Performance Choreography Honorarium',
-          'deduction_amount': 0,
-          'net_salary': 48000,
-          'status': 'paid',
-          'payment_date': '02 Oct 2026',
-          'payment_method': 'Bank Transfer (IMPS)',
-          'transaction_reference': 'IMPS/629104829104/HDFC',
-          'disbursed_by': 'Sri Ramesh Rao (Academy Director)',
-          'remarks': 'Monthly honorarium & Navaratri performance choreography advance',
-        },
-        {
-          'id': 'sal-2026-09-01',
-          'voucher_number': 'LCA-SAL-2026-09-004',
-          'receipt_number': 'LCA-VOUCHER-2026-09-004',
-          'payroll_month': 'September 2026',
-          'trainer_name': 'Smt. Anusha Sumesh',
-          'display_title': 'Founder & Head Guru',
-          'specialization': 'Bharatanatyam Classical Dance',
-          'base_salary': 45000,
-          'classes_assigned': 24,
-          'classes_conducted': 24,
-          'bonus_amount': 0,
-          'bonus_reason': null,
-          'deduction_amount': 0,
-          'net_salary': 45000,
-          'status': 'paid',
-          'payment_date': '02 Sep 2026',
-          'payment_method': 'Bank Transfer (NEFT)',
-          'transaction_reference': 'NEFT/591820491820/HDFC',
-          'disbursed_by': 'Sri Ramesh Rao (Academy Director)',
-          'remarks': 'Monthly faculty honorarium for September 2026',
-        },
-        {
-          'id': 'sal-2026-08-01',
-          'voucher_number': 'LCA-SAL-2026-08-004',
-          'receipt_number': 'LCA-VOUCHER-2026-08-004',
-          'payroll_month': 'August 2026',
-          'trainer_name': 'Smt. Anusha Sumesh',
-          'display_title': 'Founder & Head Guru',
-          'specialization': 'Bharatanatyam Classical Dance',
-          'base_salary': 45000,
-          'classes_assigned': 24,
-          'classes_conducted': 24,
-          'bonus_amount': 0,
-          'bonus_reason': null,
-          'deduction_amount': 0,
-          'net_salary': 45000,
-          'status': 'paid',
-          'payment_date': '02 Aug 2026',
-          'payment_method': 'Bank Transfer (NEFT)',
-          'transaction_reference': 'NEFT/540192847192/HDFC',
-          'disbursed_by': 'Sri Ramesh Rao (Academy Director)',
-          'remarks': 'Monthly faculty honorarium for August 2026',
-        },
-        {
-          'id': 'sal-2026-07-01',
-          'voucher_number': 'LCA-SAL-2026-07-004',
-          'receipt_number': 'LCA-VOUCHER-2026-07-004',
-          'payroll_month': 'July 2026',
-          'trainer_name': 'Smt. Anusha Sumesh',
-          'display_title': 'Founder & Head Guru',
-          'specialization': 'Bharatanatyam Classical Dance',
-          'base_salary': 45000,
-          'classes_assigned': 24,
-          'classes_conducted': 24,
-          'bonus_amount': 0,
-          'bonus_reason': null,
-          'deduction_amount': 0,
-          'net_salary': 45000,
-          'status': 'paid',
-          'payment_date': '03 Jul 2026',
-          'payment_method': 'Bank Transfer (NEFT)',
-          'transaction_reference': 'NEFT/489102938192/HDFC',
-          'disbursed_by': 'Sri Ramesh Rao (Academy Director)',
-          'remarks': 'Monthly faculty honorarium for July 2026',
-        },
-      ];
     }
 
     return List<Map<String, dynamic>>.from(_cachedSalaries);

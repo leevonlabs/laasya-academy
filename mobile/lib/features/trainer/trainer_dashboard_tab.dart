@@ -78,6 +78,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
       final sess = await SupabaseService().getTrainerTodaySessions();
 
       if (mounted) {
+        TrainerDataStore().setLiveBatches(btc);
         setState(() {
           _profile = prof ?? _profile;
           _batches = btc;
@@ -580,8 +581,12 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
     final monthlySalary = _profile?['monthly_salary'] ?? 45000;
     final salaryPaymentStatus = (_profile?['salary_payment_status'] ?? 'paid').toString().toLowerCase();
     final bool isPaid = salaryPaymentStatus == 'paid';
-    final batchCount = _profile?['assigned_batches_count'] ?? _batches.length;
-    final studentCount = _profile?['total_students_count'] ?? 42;
+    final batchCount = _batches.length;
+    final totalEnrolledStudents = _batches.fold<int>(
+      0,
+      (sum, b) => sum + ((b['students'] is List ? (b['students'] as List).length : (b['enrolled_count'] as num?)?.toInt() ?? 0)),
+    );
+    final studentCount = totalEnrolledStudents > 0 ? totalEnrolledStudents : (_profile?['total_students_count'] ?? 0);
 
     return RefreshIndicator(
       onRefresh: _loadData,

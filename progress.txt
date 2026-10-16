@@ -1,0 +1,32 @@
+# Ralph Loop Progress Log - Laasya Academy ERP
+
+## Iteration 1 - Database Realtime & RLS Policies
+- Granted SELECT on `public.session_alerts` to `anon`.
+- Created policy `session_alerts_anon_select_policy` for `anon` role.
+- Added `public.announcements` to `supabase_realtime` publication.
+- Verified active publication tables: `[ 'attendance', 'announcements', 'session_alerts' ]`.
+
+## Iteration 2 - Notification Service Consolidation
+- Cleaned and consolidated `NotificationService.dart` as the single source of truth.
+- Refactored `AlarmService.dart` into a lightweight, non-blocking facade delegating to `NotificationService`.
+- Unified deduplication keys across Dart and Kotlin `SharedPreferences`.
+- Fixed startup alert suppression bug in `student_main_scaffold.dart` and `trainer_main_scaffold.dart`.
+
+## Iteration 3 - Android Native Service & Background Resurrection
+- Updated `MainActivity.kt` to pass dynamic `baseUrl` (`ApiConstants.baseUrl`).
+- Updated `LaasyaAlertService.kt` to use the dynamic `baseUrl` and persist it.
+- Added `AlarmManager` wake-up reschedule in `onTaskRemoved` so the service reliably survives app task swipe on Android.
+- Verified system notification channels (`laasya_classes`, `laasya_announcements`) with default ringtone & vibration.
+
+## Iteration 4 - Guru Live Production Data Synchronization
+- Identified root cause of Guru login showing random/mock courses and batches:
+  - 700 lines of fake hardcoded courses and students in `TrainerDataStore`.
+  - Fallback in `api/trainer/batches/route.ts` generating 5 random batches when 0 matched.
+  - Fallback in `mobile-login` overriding 0 counts with default 1/20.
+  - Salary endpoint returning hardcoded mock vouchers instead of `guru_salary_records`.
+- Replaced all fallbacks with direct database queries:
+  - Match trainer batches by UUID, phone, or name against `public.batches`.
+  - Query `public.guru_salary_records` for trainer salary records.
+  - Zero out all mock structures in `TrainerDataStore` so it initializes empty and populates strictly via API.
+- Executed Next.js production build (`npm run build`): compiled 50 static/dynamic routes with zero errors.
+- Executed Flutter analysis (`flutter analyze`): 0 errors, 0 warnings.

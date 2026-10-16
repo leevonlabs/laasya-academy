@@ -160,8 +160,9 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     try {
       final nameParam = Uri.encodeComponent(_trainerName);
       final phoneParam = Uri.encodeComponent(_trainerPhone);
+      final idParam = Uri.encodeComponent(_trainerId);
       final uri = Uri.parse(
-        '${ApiConstants.baseUrl}/api/trainer/batches?trainerName=$nameParam&phone=$phoneParam',
+        '${ApiConstants.baseUrl}/api/trainer/batches?trainerId=$idParam&trainerName=$nameParam&phone=$phoneParam',
       );
       final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {

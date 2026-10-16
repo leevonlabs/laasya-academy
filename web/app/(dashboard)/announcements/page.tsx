@@ -2,7 +2,7 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { getAnnouncements } from '@/lib/announcements';
-import { getCourses, getBatches, getTrainers, getStudents } from '@/lib/academy';
+import { getCourses, getBatches, getTrainers, getStudentRecipients } from '@/lib/academy';
 import AnnouncementsClient from '@/components/announcements/AnnouncementsClient';
 
 export const revalidate = 15;
@@ -18,7 +18,7 @@ export default async function AnnouncementsPage() {
     getCourses(),
     getBatches(),
     getTrainers(),
-    getStudents()
+    getStudentRecipients()
   ]);
 
   return (

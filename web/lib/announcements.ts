@@ -62,9 +62,20 @@ export function calculateStatus(ann: {
 }
 
 // -------------------------------------------------------------
-// GET ANNOUNCEMENTS
+// GET ANNOUNCEMENTS (Optimized In-Memory Cache for Realtime Performance)
 // -------------------------------------------------------------
+const announcementsCache = new Map<string, { data: Announcement[]; expiry: number }>();
+
+export function invalidateAnnouncementsCache() {
+  announcementsCache.clear();
+}
+
 export async function getAnnouncements(filters?: AnnouncementFilters): Promise<Announcement[]> {
+  const cacheKey = JSON.stringify(filters || {});
+  const cached = announcementsCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiry) {
+    return cached.data;
+  }
   try {
     let sql = `
       SELECT 
@@ -163,11 +174,11 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
         return true;
       });
 
-    if (filters?.status && filters.status !== 'all') {
-      return processed.filter(r => r.status.toLowerCase() === filters.status?.toLowerCase());
-    }
-
-    return processed;
+    const finalResult = (filters?.status && filters.status !== 'all')
+      ? processed.filter(r => r.status.toLowerCase() === filters.status?.toLowerCase())
+      : processed;
+    announcementsCache.set(cacheKey, { data: finalResult, expiry: Date.now() + 15000 });
+    return finalResult;
   } catch (err) {
     console.error('Error fetching announcements:', err);
     return [];
@@ -337,6 +348,7 @@ export async function createAnnouncement(data: {
     console.warn('Could not insert session_alert copy for announcement:', alertErr);
   }
 
+  invalidateAnnouncementsCache();
   return row;
 }
 
@@ -440,6 +452,7 @@ export async function updateAnnouncement(
     data.action_links !== undefined ? JSON.stringify(data.action_links || []) : null
   ]);
 
+  invalidateAnnouncementsCache();
   return updated;
 }
 

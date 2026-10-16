@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/permission_service.dart';
 import 'trainer_dashboard_tab.dart';
@@ -26,6 +27,7 @@ class TrainerMainScaffold extends StatefulWidget {
 class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
   int _currentIndex = 0;
   Timer? _alertPollTimer;
+  RealtimeChannel? _realtimeChannel;
   static final Set<String> _globalProcessedAlertIds = {};
   bool _isFirstPoll = true;
   bool _isPolling = false;
@@ -33,6 +35,8 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
   @override
   void initState() {
     super.initState();
+    _startBackgroundAlertService();
+    _subscribeSupabaseRealtime();
     _startNetworkAlertPolling();
     _checkInitialNotificationRoute();
     AlarmService.setNotificationOpenedHandler(_handleNotificationOpened);
@@ -43,8 +47,64 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
     });
   }
 
+  Future<void> _startBackgroundAlertService() async {
+    try {
+      final prof = SupabaseService().currentUserProfile;
+      final trainerId = (prof?['id'] ?? prof?['profile_id'] ?? '').toString();
+      final trainerName = (prof?['full_name'] ?? 'Guru').toString();
+      final phone = (prof?['phone'] ?? '').toString();
+
+      await AlarmService.startBackgroundAlertService(
+        role: 'trainer',
+        studentId: trainerId,
+        rollNumber: trainerId,
+        name: trainerName,
+        phone: phone,
+        batchIds: 'all',
+      );
+    } catch (_) {}
+  }
+
+  void _subscribeSupabaseRealtime() {
+    try {
+      _realtimeChannel?.unsubscribe();
+      _realtimeChannel = SupabaseService().client
+          .channel('public:trainer_session_alerts_feed')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'session_alerts',
+            callback: (payload) {
+              final newRecord = payload.newRecord;
+              if (newRecord.isNotEmpty && mounted) {
+                _processIncomingRealtimeAlert(Map<String, dynamic>.from(newRecord));
+              }
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('Trainer Realtime subscription notice: $e');
+    }
+  }
+
+  void _processIncomingRealtimeAlert(Map<String, dynamic> alert) {
+    final alertType = (alert['alert_type'] ?? '').toString();
+    // Gurus ONLY receive admin announcements and circular notices
+    // NEVER receive student pickup alarm, NEVER receive student class completed alerts, NEVER play any 10-second ring alert!
+    if (alertType == 'message' || alertType == 'announcement' || alertType == 'admin_alert') {
+      final id = alert['id']?.toString() ?? '';
+      if (id.isNotEmpty && _globalProcessedAlertIds.contains(id)) return;
+      if (id.isNotEmpty) {
+        _globalProcessedAlertIds.add(id);
+        AlarmService.markAlertProcessed(id);
+      }
+      _showTrainerNoticeSnackBar(alert);
+    }
+  }
+
   @override
   void dispose() {
+    _realtimeChannel?.unsubscribe();
     _alertPollTimer?.cancel();
     super.dispose();
   }
@@ -80,11 +140,12 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
           if (_isFirstPoll) {
             _isFirstPoll = false;
             final nowMs = DateTime.now().millisecondsSinceEpoch;
+            // On startup, mark only truly stale notices (older than 30 minutes) as processed
             for (var a in alerts) {
               final alertId = a['id']?.toString() ?? '';
               final createdAtMs = int.tryParse(a['created_at_ms']?.toString() ?? '') ?? 0;
-              final isRecent = createdAtMs > 0 && (nowMs - createdAtMs).abs() < 180000;
-              if (alertId.isNotEmpty && !isRecent) {
+              final isVeryOld = createdAtMs > 0 && (nowMs - createdAtMs) > 1800000;
+              if (alertId.isNotEmpty && isVeryOld) {
                 _globalProcessedAlertIds.add(alertId);
                 AlarmService.markAlertProcessed(alertId);
               }

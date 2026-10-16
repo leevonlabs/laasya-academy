@@ -22,12 +22,11 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
   @override
   void initState() {
     super.initState();
-    _selectAllFilters();
     _syncData();
   }
 
   Future<void> _syncData() async {
-    final prof = SupabaseService().currentUserProfile;
+    final prof = SupabaseService().currentUserProfile ?? await SupabaseService().getCurrentUserProfile();
     await _store.syncFromApi(
       trainerName: prof?['full_name'],
       phone: prof?['phone'],

@@ -18,21 +18,7 @@ export async function GET(request: NextRequest) {
     const trainerName = searchParams.get('trainerName');
     const phone = searchParams.get('phone');
 
-    let trainerClause = '';
-    const params: any[] = [];
-
-    if (trainerId) {
-      params.push(trainerId);
-      trainerClause = `WHERE t.id = $1 OR t.profile_id = $1`;
-    } else if (trainerName) {
-      params.push(`%${trainerName.trim()}%`);
-      trainerClause = `WHERE p.full_name ILIKE $1`;
-    } else if (phone) {
-      params.push(`%${phone.replace(/\D/g, '')}%`);
-      trainerClause = `WHERE regexp_replace(p.phone, '\\D', '', 'g') LIKE $1`;
-    }
-
-    const sql = `
+    const baseSql = `
       SELECT 
         b.id,
         b.name,
@@ -55,41 +41,35 @@ export async function GET(request: NextRequest) {
       JOIN public.courses c ON b.course_id = c.id
       LEFT JOIN public.trainers t ON b.trainer_id = t.id
       LEFT JOIN public.profiles p ON t.profile_id = p.id
-      ${trainerClause}
-      ORDER BY c.title ASC, b.name ASC;
     `;
 
-    let batches = await query<any>(sql, params);
+    let batches: any[] = [];
+    const cleanId = (trainerId || '').trim();
+    const cleanPhone = (phone || '').replace(/\D/g, '');
+    const cleanName = (trainerName || '').trim();
 
-    // Fallback: if no direct match found, find batches based on trainer specialization or first course
-    if (batches.length === 0 && (trainerName || phone)) {
-      const fallbackBatches = await query<any>(`
-        SELECT 
-          b.id,
-          b.name,
-          b.course_id,
-          c.title as course_title,
-          c.category as course_category,
-          b.trainer_id,
-          COALESCE(p.full_name, $1) as trainer_name,
-          b.room_or_hall,
-          b.days_of_week,
-          b.start_time,
-          b.end_time,
-          b.max_capacity,
-          b.schedules,
-          COALESCE(
-            (SELECT count(*) FROM public.batch_enrollments be WHERE be.batch_id = b.id AND be.status = 'active'),
-            0
-          )::int as enrolled_count
-        FROM public.batches b
-        JOIN public.courses c ON b.course_id = c.id
-        LEFT JOIN public.trainers t ON b.trainer_id = t.id
-        LEFT JOIN public.profiles p ON t.profile_id = p.id
-        ORDER BY b.created_at ASC
-        LIMIT 5;
-      `, [trainerName || 'Assigned Guru']);
-      batches = fallbackBatches;
+    // 1. Primary lookup by trainer UUID / profile ID
+    if (cleanId && cleanId !== 'null' && cleanId !== 'undefined') {
+      batches = await query<any>(
+        `${baseSql} WHERE (t.id = $1 OR t.profile_id = $1) ORDER BY c.title ASC, b.name ASC;`,
+        [cleanId]
+      );
+    }
+
+    // 2. Secondary lookup by registered phone number digits
+    if (batches.length === 0 && cleanPhone.length >= 6) {
+      batches = await query<any>(
+        `${baseSql} WHERE regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%' ORDER BY c.title ASC, b.name ASC;`,
+        [cleanPhone]
+      );
+    }
+
+    // 3. Tertiary lookup by faculty full name
+    if (batches.length === 0 && cleanName && cleanName !== 'null' && cleanName !== 'undefined') {
+      batches = await query<any>(
+        `${baseSql} WHERE p.full_name ILIKE $1 ORDER BY c.title ASC, b.name ASC;`,
+        [`%${cleanName}%`]
+      );
     }
 
     // Fetch enrolled disciples for these batches

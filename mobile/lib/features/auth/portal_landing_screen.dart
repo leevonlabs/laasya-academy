@@ -62,11 +62,12 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
       final profile = await SupabaseService().signInWithPassword(
         email: id,
         password: pass,
+        role: _isStudent ? 'student' : 'trainer',
       );
 
       if (profile == null) {
         throw Exception(
-          'Invalid credentials. Please verify your mobile number / roll number and password.',
+          'Invalid credentials. Please verify your ${_isStudent ? "mobile number / student roll no" : "registered phone number"} and password.',
         );
       }
 

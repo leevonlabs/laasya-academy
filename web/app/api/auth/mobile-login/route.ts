@@ -117,8 +117,8 @@ export async function POST(request: NextRequest) {
             primary_course: guruCourseName,
             specialization: Array.isArray(trainer.specializations) ? trainer.specializations.join(', ') : guruCourseName,
             assigned_room: batchStats?.assigned_room || 'Natya Mandapam',
-            assigned_batches_count: batchStats?.assigned_batches_count || 1,
-            total_students_count: batchStats?.total_students_count || 20,
+            assigned_batches_count: Number(batchStats?.assigned_batches_count ?? 0),
+            total_students_count: Number(batchStats?.total_students_count ?? 0),
           };
 
           return NextResponse.json({ success: true, profile }, { headers: corsHeaders });

@@ -277,7 +277,29 @@ export async function renameCourseCategory(oldName: string, newName: string): Pr
   return trimmedNew;
 }
 
+const coursesCache = new Map<string, { data: Course[]; expiry: number }>();
+
+export function invalidateAcademyCache() {
+  coursesCache.clear();
+}
+
+export async function getStudentRecipients(): Promise<any[]> {
+  const sql = `
+    SELECT s.id, s.roll_number, p.full_name, p.phone, s.parent_name, s.parent_contact
+    FROM public.students s
+    JOIN public.profiles p ON p.id = s.profile_id
+    WHERE s.status = 'active'
+    ORDER BY 
+      CASE WHEN s.roll_number ~ '^LCA-[0-9]+$' THEN CAST(SUBSTRING(s.roll_number FROM 5) AS INT) ELSE 999999 END ASC,
+      p.full_name ASC;
+  `;
+  return query(sql);
+}
+
 export async function getCourses(category?: string): Promise<Course[]> {
+  const cacheKey = category || 'all';
+  const cached = coursesCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiry) return cached.data;
   let sql = `
     SELECT 
       c.id, c.title, c.code, COALESCE(c.category, '') as category, c.description, 
@@ -296,7 +318,9 @@ export async function getCourses(category?: string): Promise<Course[]> {
     }
   }
   sql += ` GROUP BY c.id ORDER BY c.category, c.title;`;
-  return query<Course>(sql, params);
+  const rows = await query<Course>(sql, params);
+  coursesCache.set(cacheKey, { data: rows, expiry: Date.now() + 15000 });
+  return rows;
 }
 
 export async function createCourse(data: {

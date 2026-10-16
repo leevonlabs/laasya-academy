@@ -85,11 +85,64 @@ class MainActivity: FlutterActivity() {
                     requestNotificationPermission()
                     result.success(true)
                 }
+                "startBackgroundAlertService" -> {
+                    val role = call.argument<String>("role") ?: "student"
+                    val studentId = call.argument<String>("studentId") ?: ""
+                    val rollNumber = call.argument<String>("rollNumber") ?: ""
+                    val name = call.argument<String>("name") ?: ""
+                    val phone = call.argument<String>("phone") ?: ""
+                    val batchIds = call.argument<String>("batchIds") ?: "all"
+                    val baseUrl = call.argument<String>("baseUrl") ?: "https://laasya-academy.vercel.app"
+
+                    val sIntent = Intent(this, LaasyaAlertService::class.java).apply {
+                        putExtra("role", role)
+                        putExtra("studentId", studentId)
+                        putExtra("rollNumber", rollNumber)
+                        putExtra("name", name)
+                        putExtra("phone", phone)
+                        putExtra("batchIds", batchIds)
+                        putExtra("baseUrl", baseUrl)
+                    }
+                    try {
+                        startService(sIntent)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    try {
+                        LaasyaNotificationReceiver.scheduleNextPoll(this, 1000L)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    result.success(true)
+                }
+                "stopBackgroundAlertService" -> {
+                    try {
+                        stopService(Intent(this, LaasyaAlertService::class.java))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    try {
+                        LaasyaNotificationReceiver.cancelPoll(this)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    result.success(true)
+                }
                 else -> {
                     result.notImplemented()
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        LaasyaAlertService.isAppInForeground = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        LaasyaAlertService.isAppInForeground = false
     }
 
     private fun showSystemNotification(id: Int, title: String, message: String, channelId: String, route: String) {
