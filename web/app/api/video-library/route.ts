@@ -7,6 +7,7 @@ import {
   createUniversalEventFolders,
   getGuruComplianceData,
 } from '@/lib/videoLibrary';
+import { sendFcmToUser, sendFcmToBatch } from '@/lib/fcm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -197,6 +198,31 @@ export async function POST(request: NextRequest) {
       access_level,
       created_by: created_by || (shared_by_type === 'guru' ? (trainer_name || 'Guru Faculty') : 'Academy Owner'),
     });
+
+    // Send real-time FCM Push Notification to target recipients
+    if (Array.isArray(body.target_students) && body.target_students.length > 0) {
+      for (const stuId of body.target_students) {
+        sendFcmToUser(stuId, {
+          title: 'New Performance Video Shared',
+          body: `Guru ${trainer_name || 'Faculty'} has shared "${title.trim()}" with you.`,
+          data: {
+            type: 'video_shared',
+            video_id: String(item?.id || ''),
+            course_title: String(target_course_title || '')
+          }
+        }).catch(err => console.error('[FCM] Error notifying student video:', err));
+      }
+    } else if (target_batch_id) {
+      sendFcmToBatch(target_batch_id, {
+        title: 'New Class Video Available',
+        body: `New video "${title.trim()}" shared for ${target_course_title || ''} (${target_batch_name || ''}).`,
+        data: {
+          type: 'video_shared',
+          batch_id: String(target_batch_id),
+          video_id: String(item?.id || '')
+        }
+      }).catch(err => console.error('[FCM] Error notifying batch video:', err));
+    }
 
     return NextResponse.json({ success: true, item }, { headers: corsHeaders });
   } catch (error: any) {

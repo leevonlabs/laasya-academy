@@ -3,6 +3,7 @@ import 'core/theme/app_theme.dart';
 import 'core/services/supabase_service.dart';
 import 'core/services/permission_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/fcm_service.dart';
 import 'features/auth/portal_landing_screen.dart';
 import 'features/trainer/trainer_main_scaffold.dart';
 import 'features/student/student_main_scaffold.dart';
@@ -10,6 +11,7 @@ import 'features/student/student_main_scaffold.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService().initialize();
+  await FcmService.initialize();
   NotificationService.initialize();
   runApp(const LaasyaAcademyApp());
 }
@@ -53,6 +55,10 @@ class _AuthGateState extends State<AuthGate> {
       final profile = await SupabaseService().getCurrentUserProfile();
       if (profile != null) {
         final role = profile['role'] ?? 'student';
+        final userId = profile['id']?.toString() ?? '';
+        if (userId.isNotEmpty) {
+          FcmService.registerDeviceToken(userId: userId, role: role);
+        }
         if (role == 'trainer') {
           _targetScreen = const TrainerMainScaffold();
         } else {

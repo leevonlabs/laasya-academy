@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAttendanceAuditRecords, getGuruAttendanceAuditRecords } from '@/lib/academy';
 import { query, queryOne } from '@/lib/db';
+import { sendFcmToUser } from '@/lib/fcm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -241,6 +242,23 @@ export async function POST(req: NextRequest) {
           batch_id, batch_name, course_title, trainer_name, message, alert_type, target_student_id, student_status, target_roll_number, target_student_name, created_at
         ) VALUES ${alertValuesSql.join(', ')};
       `, alertParams);
+
+      // Send real-time FCM Push Notification to each individual student/parent
+      for (const rec of resolvedRecords) {
+        const isPresent = rec.status !== 'absent';
+        const notifTitle = isPresent ? 'Attendance Marked: Present' : 'Attendance Marked: Absent';
+        const notifBody = `${rec.name} was marked ${isPresent ? 'PRESENT' : 'ABSENT'} for ${cTitle} (${bName}) by Guru ${guruName}.`;
+        sendFcmToUser(rec.student_id, {
+          title: notifTitle,
+          body: notifBody,
+          data: {
+            type: 'attendance_marked',
+            status: rec.status,
+            student_id: rec.student_id,
+            batch_id: String(batch_id)
+          }
+        }).catch(err => console.error(`[FCM] Error notifying student ${rec.student_id}:`, err));
+      }
     }
 
     // 4. Single consolidated session announcement for Notifications feed

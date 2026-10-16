@@ -38,6 +38,7 @@ class _TrainerCreateShareVideoScreenState
     extends State<TrainerCreateShareVideoScreen> {
   bool _isLoading = true;
   bool _isSubmitting = false;
+  bool _isEditMode = false;
 
   List<Map<String, dynamic>> _myCourses = [];
   List<Map<String, dynamic>> _myBatches = [];
@@ -107,18 +108,52 @@ class _TrainerCreateShareVideoScreenState
   }
 
   Future<void> _initData() async {
+    _isEditMode = widget.editingItem == null;
+
     if (widget.initialCourses != null &&
         widget.initialCourses!.isNotEmpty &&
         widget.initialBatches != null &&
         widget.initialBatches!.isNotEmpty) {
       _myCourses = List<Map<String, dynamic>>.from(widget.initialCourses!);
       _myBatches = List<Map<String, dynamic>>.from(widget.initialBatches!);
+      _filterForPreselectedStudent();
       _setupDefaultSelection();
       setState(() => _isLoading = false);
     } else {
       await _loadTrainerBatches();
+      _filterForPreselectedStudent();
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _filterForPreselectedStudent() {
+    if (widget.preselectedStudent != null) {
+      final sBatchesRaw = widget.preselectedStudent!['batches'];
+      if (sBatchesRaw is List && sBatchesRaw.isNotEmpty) {
+        final studentBatches = List<Map<String, dynamic>>.from(sBatchesRaw);
+        _myBatches = studentBatches;
+        final studentCourseIds = studentBatches
+            .map((b) => b['course_id']?.toString())
+            .where((id) => id != null && id.isNotEmpty)
+            .toSet();
+
+        final filteredCourses = _myCourses
+            .where((c) => studentCourseIds.contains(c['id']?.toString()))
+            .toList();
+        if (filteredCourses.isNotEmpty) {
+          _myCourses = filteredCourses;
+        } else {
+          final Map<String, String> cMap = {};
+          for (final b in studentBatches) {
+            final cId = b['course_id']?.toString();
+            if (cId != null && cId.isNotEmpty) {
+              cMap[cId] = (b['course_title'] ?? 'Course').toString();
+            }
+          }
+          _myCourses = cMap.entries.map((e) => {'id': e.key, 'title': e.value}).toList();
+        }
       }
     }
   }
@@ -235,6 +270,16 @@ class _TrainerCreateShareVideoScreenState
       _videoType = 'performance';
       final sName = (widget.preselectedStudent!['name'] ?? widget.preselectedStudent!['full_name'] ?? 'Student').toString();
       _titleController.text = '$sName - $_currentMonthName - Performance Video';
+
+      if (_myCourses.isNotEmpty && (_selectedCourseId == null || !_myCourses.any((c) => c['id']?.toString() == _selectedCourseId))) {
+        _selectedCourseId = _myCourses.first['id']?.toString();
+        _selectedCourseTitle = (_myCourses.first['title'] ?? 'Course').toString();
+      }
+      final batchesForCourse = _myBatches.where((b) => b['course_id']?.toString() == _selectedCourseId).toList();
+      if (batchesForCourse.isNotEmpty && (_selectedBatchOption == 'all' || !batchesForCourse.any((b) => b['id']?.toString() == _selectedBatchOption))) {
+        _selectedBatchOption = batchesForCourse.first['id']?.toString() ?? 'all';
+        _selectedBatchName = (batchesForCourse.first['name'] ?? 'Batch').toString();
+      }
     } else if (widget.isGeneralShare) {
       _videoType = 'general';
       _titleController.text = ''; // General share has no title pre-fill
@@ -575,9 +620,13 @@ class _TrainerCreateShareVideoScreenState
         backgroundColor: const Color(0xFF590231),
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Share Video Link',
-          style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
+        title: Text(
+          widget.editingItem != null
+              ? (_isEditMode ? 'Edit Video Details' : 'Video Details')
+              : (widget.preselectedStudent != null
+                  ? 'Share Performance Video'
+                  : 'Share Video Link'),
+          style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
         ),
       ),
       body: _isLoading
@@ -1013,7 +1062,7 @@ class _TrainerCreateShareVideoScreenState
                             ),
                           );
                         }).toList(),
-                        onChanged: (val) {
+                        onChanged: _isEditMode ? (val) {
                           if (val != null) {
                             setState(() {
                               _selectedCourseId = val;
@@ -1024,7 +1073,7 @@ class _TrainerCreateShareVideoScreenState
                               _updateAvailableStudents();
                             });
                           }
-                        },
+                        } : null,
                       ),
                     ),
                   ),
@@ -1054,17 +1103,18 @@ class _TrainerCreateShareVideoScreenState
                         isExpanded: true,
                         value: _selectedBatchOption,
                         items: [
-                          DropdownMenuItem<String>(
-                            value: 'all',
-                            child: Text(
-                              'All Batches in $_selectedCourseTitle',
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E1E1E),
+                          if (widget.preselectedStudent == null)
+                            DropdownMenuItem<String>(
+                              value: 'all',
+                              child: Text(
+                                'All Batches in $_selectedCourseTitle',
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E1E1E),
+                                ),
                               ),
                             ),
-                          ),
                           ...currentBatches.map((b) {
                             return DropdownMenuItem<String>(
                               value: b['id'],
@@ -1078,7 +1128,7 @@ class _TrainerCreateShareVideoScreenState
                             );
                           }),
                         ],
-                        onChanged: (val) {
+                        onChanged: _isEditMode ? (val) {
                           if (val != null) {
                             setState(() {
                               _selectedBatchOption = val;
@@ -1093,7 +1143,7 @@ class _TrainerCreateShareVideoScreenState
                               _updateAvailableStudents();
                             });
                           }
-                        },
+                        } : null,
                       ),
                     ),
                   ),
@@ -1437,6 +1487,7 @@ class _TrainerCreateShareVideoScreenState
                   const SizedBox(height: 6),
                   TextField(
                     controller: _titleController,
+                    enabled: _isEditMode,
                     style: const TextStyle(fontSize: 14),
                     decoration: InputDecoration(
                       hintText: 'e.g. Varnam Choreography & Footwork Practice',
@@ -1445,7 +1496,7 @@ class _TrainerCreateShareVideoScreenState
                         color: Colors.grey.shade400,
                       ),
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: _isEditMode ? Colors.white : const Color(0xFFF9FAFB),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFFE5D4DE)),
@@ -1453,6 +1504,10 @@ class _TrainerCreateShareVideoScreenState
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFFE5D4DE)),
+                      ),
+                      disabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -1477,7 +1532,8 @@ class _TrainerCreateShareVideoScreenState
                   TextField(
                     controller: _dateController,
                     readOnly: true,
-                    onTap: _selectDate,
+                    enabled: _isEditMode,
+                    onTap: _isEditMode ? _selectDate : null,
                     style: const TextStyle(fontSize: 13.5),
                     decoration: InputDecoration(
                       hintText: 'YYYY-MM-DD',
@@ -1486,12 +1542,12 @@ class _TrainerCreateShareVideoScreenState
                         size: 18,
                         color: Color(0xFF8A064D),
                       ),
-                      suffixIcon: const Icon(
+                      suffixIcon: _isEditMode ? const Icon(
                         Icons.arrow_drop_down_rounded,
                         color: Colors.grey,
-                      ),
+                      ) : null,
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: _isEditMode ? Colors.white : const Color(0xFFF9FAFB),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFFE5D4DE)),
@@ -1499,6 +1555,10 @@ class _TrainerCreateShareVideoScreenState
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFFE5D4DE)),
+                      ),
+                      disabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -1522,6 +1582,7 @@ class _TrainerCreateShareVideoScreenState
                   const SizedBox(height: 6),
                   TextField(
                     controller: _driveController,
+                    enabled: _isEditMode,
                     style: const TextStyle(fontSize: 13),
                     decoration: InputDecoration(
                       hintText: 'https://drive.google.com/drive/folders/...',
@@ -1534,13 +1595,13 @@ class _TrainerCreateShareVideoScreenState
                         size: 19,
                         color: Color(0xFF0F9D58),
                       ),
-                      suffixIcon: IconButton(
+                      suffixIcon: _isEditMode ? IconButton(
                         icon: const Icon(Icons.paste_rounded, size: 18),
                         onPressed: () => _pasteFromClipboard(_driveController),
                         tooltip: 'Paste from clipboard',
-                      ),
+                      ) : null,
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: _isEditMode ? Colors.white : const Color(0xFFF9FAFB),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFFE5D4DE)),
@@ -1548,6 +1609,10 @@ class _TrainerCreateShareVideoScreenState
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFFE5D4DE)),
+                      ),
+                      disabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -1571,6 +1636,7 @@ class _TrainerCreateShareVideoScreenState
                   const SizedBox(height: 6),
                   TextField(
                     controller: _youtubeController,
+                    enabled: _isEditMode,
                     style: const TextStyle(fontSize: 13),
                     decoration: InputDecoration(
                       hintText: 'https://youtube.com/watch?v=... or https://youtu.be/...',
@@ -1583,13 +1649,13 @@ class _TrainerCreateShareVideoScreenState
                         size: 19,
                         color: Color(0xFFFF0000),
                       ),
-                      suffixIcon: IconButton(
+                      suffixIcon: _isEditMode ? IconButton(
                         icon: const Icon(Icons.paste_rounded, size: 18),
                         onPressed: () => _pasteFromClipboard(_youtubeController),
                         tooltip: 'Paste from clipboard',
-                      ),
+                      ) : null,
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: _isEditMode ? Colors.white : const Color(0xFFF9FAFB),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFFE5D4DE)),
@@ -1597,6 +1663,10 @@ class _TrainerCreateShareVideoScreenState
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFFE5D4DE)),
+                      ),
+                      disabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -1630,8 +1700,9 @@ class _TrainerCreateShareVideoScreenState
                   const SizedBox(height: 6),
                   TextField(
                     controller: _descController,
-                    minLines: 6,
-                    maxLines: 12,
+                    enabled: _isEditMode,
+                    minLines: 5,
+                    maxLines: 10,
                     style: const TextStyle(fontSize: 13.5, height: 1.4),
                     decoration: InputDecoration(
                       hintText:
@@ -1642,7 +1713,7 @@ class _TrainerCreateShareVideoScreenState
                         height: 1.4,
                       ),
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: _isEditMode ? Colors.white : const Color(0xFFF9FAFB),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFFE5D4DE)),
@@ -1650,6 +1721,10 @@ class _TrainerCreateShareVideoScreenState
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFFE5D4DE)),
+                      ),
+                      disabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -1661,71 +1736,151 @@ class _TrainerCreateShareVideoScreenState
                   const SizedBox(height: 28),
 
                   // 9. ACTION BUTTONS: Delete & Edit if editingItem != null, else Share Button
+                  // 9. ACTION BUTTONS:
                   if (widget.editingItem != null) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 1,
-                          child: SizedBox(
-                            height: 50,
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.red.shade700,
-                                side: BorderSide(color: Colors.red.shade300, width: 1.5),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                    if (!_isEditMode) ...[
+                      // READ-ONLY DETAILS VIEW
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 50,
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF590231),
+                                  side: const BorderSide(color: Color(0xFF590231), width: 1.5),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
-                              ),
-                              onPressed: _isSubmitting ? null : _deleteEditingItem,
-                              icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                              label: const Text(
-                                'Delete',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: SizedBox(
-                            height: 50,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF590231),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 1,
-                              ),
-                              onPressed: _isSubmitting ? null : _handleShare,
-                              icon: _isSubmitting
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(Icons.check_circle_outline_rounded, size: 20),
-                              label: Text(
-                                _isSubmitting ? 'Saving Changes...' : 'Save Changes',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
+                                onPressed: () => setState(() => _isEditMode = true),
+                                icon: const Icon(Icons.edit_rounded, size: 20),
+                                label: const Text(
+                                  'Edit Details',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SizedBox(
+                              height: 50,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFDC2626),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 1,
+                                ),
+                                onPressed: _isSubmitting ? null : _deleteEditingItem,
+                                icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                                label: const Text(
+                                  'Delete Video',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      // EDIT MODE
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 50,
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.grey.shade700,
+                                  side: BorderSide(color: Colors.grey.shade300),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: () => setState(() => _isEditMode = false),
+                                child: const Text('Cancel', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: SizedBox(
+                              height: 50,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF590231),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 1,
+                                ),
+                                onPressed: _isSubmitting ? null : _handleShare,
+                                icon: _isSubmitting
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(Icons.check_circle_outline_rounded, size: 20),
+                                label: Text(
+                                  _isSubmitting ? 'Saving Changes...' : 'Save Changes',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: _isSubmitting ? null : _deleteEditingItem,
+                          icon: const Icon(Icons.delete_outline, color: Color(0xFFDC2626), size: 18),
+                          label: const Text('Delete this video link', style: TextStyle(color: Color(0xFFDC2626), fontSize: 13, fontWeight: FontWeight.w600)),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ] else ...[
+                    // CREATE MODE
+                    if (widget.preselectedStudent != null) ...[
+                      Center(
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF1F2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFFECDD3)),
+                          ),
+                          child: const Text(
+                            'Pending',
+                            style: TextStyle(
+                              color: Color(0xFFBE123C),
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -1753,7 +1908,7 @@ class _TrainerCreateShareVideoScreenState
                           _isSubmitting
                               ? 'Sharing Video Link...'
                               : (widget.preselectedStudent != null
-                                  ? 'Share Performance Video'
+                                  ? 'Share'
                                   : 'Share Video Link'),
                           style: const TextStyle(
                             fontSize: 15,

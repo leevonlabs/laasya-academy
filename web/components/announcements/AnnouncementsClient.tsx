@@ -31,7 +31,9 @@ import {
   Info,
   User,
   BookOpen,
-  RotateCcw
+  RotateCcw,
+  ArrowLeft,
+  ArrowRight
 } from 'lucide-react';
 import { Announcement } from '@/lib/announcements';
 import AiEnhanceButton from '@/components/common/AiEnhanceButton';
@@ -267,6 +269,9 @@ export default function AnnouncementsClient({
 
   // Active Tab: 'admin_sent' vs 'guru_sent'
   const [activeTab, setActiveTab] = useState<'admin_sent' | 'guru_sent'>('admin_sent');
+
+  // View Mode: 'overview' (landing 2 cards) vs 'chat' (full dedicated chat page)
+  const [viewMode, setViewMode] = useState<'overview' | 'chat'>('overview');
 
   // Default Current Month
   const defaultDates = useMemo(() => {
@@ -845,64 +850,159 @@ export default function AnnouncementsClient({
         </div>
       )}
 
-      {/* COMPACT MINIMAL TOP BAR */}
-      <div className="flex items-center justify-between gap-3 bg-white px-4 py-2.5 rounded-2xl border border-gray-200 shadow-2xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-[#075E54] text-[#25D366] flex items-center justify-center shadow-xs shrink-0">
-            <MessageSquare className="w-4 h-4" />
+      {viewMode === 'overview' ? (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Announcements Heading & Description */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-[#075E54] text-[#25D366] flex items-center justify-center shadow-md shrink-0">
+                  <MessageSquare className="w-7 h-7" />
+                </div>
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2.5">
+                    <span>Announcements & Broadcast Messages</span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#075E54] text-xs font-black border border-emerald-200 uppercase">
+                      Live Feed
+                    </span>
+                  </h1>
+                  <p className="text-xs sm:text-sm text-gray-600 font-medium mt-1 max-w-2xl leading-relaxed">
+                    Centralized communications directory for Laasya Academy. Broadcast official updates, holiday notices, fee reminders, and monitor faculty guru messages sent to students and batches.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs font-bold text-[#075E54] bg-[#E8F8F0] px-3.5 py-2 rounded-2xl border border-[#BCE8D0] shrink-0 self-start sm:self-auto">
+                <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
+                <span>Live WhatsApp Sync</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="text-sm sm:text-base font-black text-gray-900 tracking-tight flex items-center gap-2">
-              <span>Announcements & Broadcast Messages</span>
-              <span className="px-2 py-0.2 rounded-full bg-emerald-50 text-[#075E54] text-[9px] font-black border border-emerald-200 uppercase">
-                WhatsApp Channel View
-              </span>
-            </h1>
+
+          {/* 2 Grid-Based Cards: Admin Sent vs Guru Sent */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Card 1: Admin Sent */}
+            <div className="bg-white rounded-3xl p-6 border-2 border-emerald-100 hover:border-[#075E54] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-[#075E54] flex items-center justify-center shadow-2xs">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-[#075E54]">
+                    {adminMessages.length} Messages
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-gray-900">Admin Sent Broadcasts</h2>
+                  <p className="text-xs text-gray-600 font-medium mt-1.5 leading-relaxed">
+                    Official academy-wide notices, holiday alerts, fee reminders, schedule changes, and general administrative broadcasts sent directly to students, parents, and faculty gurus.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-100 text-[11px] font-bold text-gray-500">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+                  <span>Channel: Official Administration</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('admin_sent');
+                  setViewMode('chat');
+                }}
+                className="w-full py-3 px-4 rounded-2xl bg-[#075E54] hover:bg-[#064e46] active:scale-98 text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              >
+                <span>Open Admin Broadcasts</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Card 2: Guru Sent */}
+            <div className="bg-white rounded-3xl p-6 border-2 border-emerald-100 hover:border-[#075E54] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-[#FFF2F8] text-[#8A064D] flex items-center justify-center shadow-2xs">
+                    <GraduationCap className="w-6 h-6" />
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-[#8A064D]">
+                    {guruMessages.length} Messages
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-gray-900">Guru Sent Announcements</h2>
+                  <p className="text-xs text-gray-600 font-medium mt-1.5 leading-relaxed">
+                    Batch practice directives, classroom instructions, curriculum study notes, and direct updates shared by faculty gurus with their assigned batches and students.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-100 text-[11px] font-bold text-gray-500">
+                  <span className="inline-block w-2 h-2 rounded-full bg-[#8A064D]" />
+                  <span>Channel: Faculty Gurus</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('guru_sent');
+                  setViewMode('chat');
+                }}
+                className="w-full py-3 px-4 rounded-2xl bg-[#075E54] hover:bg-[#064e46] active:scale-98 text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              >
+                <span>Open Guru Announcements</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
+      ) : (
+        <div className="space-y-3 animate-in fade-in duration-200">
+          {/* DEDICATED TOP BAR FOR CHAT SCREEN */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white px-4 py-2.5 rounded-2xl border border-gray-200 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setViewMode('overview')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Overview</span>
+              </button>
+              <h2 className="text-sm sm:text-base font-black text-gray-900 tracking-tight flex items-center gap-2">
+                <span>{activeTab === 'admin_sent' ? 'Admin Sent Broadcasts' : 'Guru Sent Announcements'}</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-[#075E54] text-[10px] font-black border border-emerald-200">
+                  {activeTab === 'admin_sent' ? `${adminMessages.length} Messages` : `${guruMessages.length} Messages`}
+                </span>
+              </h2>
+            </div>
 
-        <div className="flex items-center gap-2 text-[11px] font-bold text-[#075E54] bg-[#E8F8F0] px-2.5 py-1 rounded-xl border border-[#BCE8D0] shrink-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#25D366] animate-pulse" />
-          <span>Live Sync</span>
-        </div>
-      </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('admin_sent')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    activeTab === 'admin_sent' ? 'bg-[#075E54] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Admin Sent ({adminMessages.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('guru_sent')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    activeTab === 'guru_sent' ? 'bg-[#075E54] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Guru Sent ({guruMessages.length})
+                </button>
+              </div>
 
-      {/* EQUAL 50/50 BUTTONS ROW: ADMIN SENT & GURU SENT */}
-      <div className="w-full grid grid-cols-2 gap-2.5">
-        <button
-          onClick={() => setActiveTab('admin_sent')}
-          className={`w-full py-3 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-xs border-2 ${
-            activeTab === 'admin_sent'
-              ? 'bg-[#075E54] text-white border-[#075E54] shadow-md ring-2 ring-[#075E54]/20'
-              : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4 shrink-0" />
-          <span>Admin Sent</span>
-          <span className={`px-2 py-0.2 rounded-full text-[11px] font-black ${
-            activeTab === 'admin_sent' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-800'
-          }`}>
-            {adminMessages.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('guru_sent')}
-          className={`w-full py-3 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-xs border-2 ${
-            activeTab === 'guru_sent'
-              ? 'bg-[#075E54] text-white border-[#075E54] shadow-md ring-2 ring-[#075E54]/20'
-              : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-          }`}
-        >
-          <GraduationCap className="w-4 h-4 shrink-0" />
-          <span>Guru Sent</span>
-          <span className={`px-2 py-0.2 rounded-full text-[11px] font-black ${
-            activeTab === 'guru_sent' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-800'
-          }`}>
-            {guruMessages.length}
-          </span>
-        </button>
-      </div>
+              <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-bold text-[#075E54] bg-[#E8F8F0] px-2.5 py-1 rounded-xl border border-[#BCE8D0]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#25D366] animate-pulse" />
+                <span>Live Sync</span>
+              </div>
+            </div>
+          </div>
 
       {/* ===================================================================== */}
       {/* 1. ADMIN SENT TAB (WITH COMPACT FILTER BAR + TALL WHATSAPP CHAT)      */}
@@ -1151,8 +1251,8 @@ export default function AnnouncementsClient({
               <div ref={adminChatEndRef} />
             </div>
 
-            {/* PINNED BOTTOM-RIGHT FLOATING ACTION BUTTON */}
-            <div className="absolute bottom-3 right-4 z-20">
+            {/* PINNED BOTTOM-LEFT FLOATING ACTION BUTTON */}
+            <div className="absolute bottom-3 left-4 z-20">
               <button
                 onClick={openCreateModal}
                 className="px-5 py-2.5 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] text-[#075E54] font-black text-xs sm:text-sm shadow-xl flex items-center gap-2 cursor-pointer transition transform hover:scale-105 active:scale-95 border-2 border-white"
@@ -1381,6 +1481,8 @@ export default function AnnouncementsClient({
               <div ref={guruChatEndRef} />
             </div>
           </div>
+        </div>
+      )}
         </div>
       )}
 

@@ -28,6 +28,9 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
   // Active tab: 'performance' or 'shared'
   String _activeTab = 'performance';
 
+  // Sub tab for Performance: 'pending' or 'success'
+  String _perfSubTab = 'pending';
+
   // Filters for Performance tab
   String _perfCourseFilter = 'all';
   String _perfBatchFilter = 'all';
@@ -37,7 +40,6 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
   // Filters for Shared tab
   String _sharedMonthFilter = 'all'; // 'all' or '1'..'12'
   String _sharedYearFilter = 'all';  // 'all' or '2026', etc.
-  String _sharedCourseFilter = 'all';
   String _sharedBatchFilter = 'all';
   String _sharedSearchQuery = '';
 
@@ -234,9 +236,15 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     return _computeStudentComplianceList().where((s) => s['is_pending'] == true).toList();
   }
 
-  // Filtered pending students based on course, batch, student multi-select, and search bar
-  List<Map<String, dynamic>> get _filteredPendingStudents {
-    return _pendingStudentsThisMonth.where((s) {
+  // Success students for current month (completed for all enrolled batches)
+  List<Map<String, dynamic>> get _successStudentsThisMonth {
+    return _computeStudentComplianceList().where((s) => s['is_pending'] == false).toList();
+  }
+
+  // Filtered performance students based on sub-tab (pending vs success), course, batch, student multi-select, and search bar
+  List<Map<String, dynamic>> get _filteredPerformanceStudents {
+    final baseList = _perfSubTab == 'pending' ? _pendingStudentsThisMonth : _successStudentsThisMonth;
+    return baseList.where((s) {
       // 1. Course Filter
       if (_perfCourseFilter != 'all') {
         final batches = s['batches'] as List<Map<String, dynamic>>;
@@ -308,13 +316,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
         }
       }
 
-      // 3. Course filter
-      if (_sharedCourseFilter != 'all') {
-        final cId = item['target_course_id']?.toString();
-        if (cId != _sharedCourseFilter) return false;
-      }
-
-      // 4. Batch filter
+      // 3. Batch filter
       if (_sharedBatchFilter != 'all') {
         final bId = item['target_batch_id']?.toString();
         if (bId != _sharedBatchFilter) return false;
@@ -339,18 +341,21 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
 
   // --- ACTIONS ---
 
-  // Opens form for a specific pending student
+  // Opens form for a specific student (pending or success)
   Future<void> _shareForStudent(Map<String, dynamic> student) async {
     final pendingBatches = student['pending_batches'] as List<Map<String, dynamic>>? ?? [];
-    final firstPendingBatch = pendingBatches.isNotEmpty ? pendingBatches.first : null;
+    final allBatches = student['batches'] as List<Map<String, dynamic>>? ?? [];
+    final targetBatch = pendingBatches.isNotEmpty
+        ? pendingBatches.first
+        : (allBatches.isNotEmpty ? allBatches.first : null);
 
     final studentDataForForm = {
       'id': student['id'],
       'name': student['name'],
       'roll_number': student['roll_number'],
       'phone': student['phone'],
-      'batch_name': firstPendingBatch?['name'] ?? '',
-      'course_title': firstPendingBatch?['course_title'] ?? '',
+      'batch_name': targetBatch?['name'] ?? '',
+      'course_title': targetBatch?['course_title'] ?? '',
     };
 
     final result = await Navigator.push<bool>(
@@ -361,8 +366,8 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
           initialCourses: _myCourses,
           initialBatches: _myBatches,
           preselectedStudent: studentDataForForm,
-          preselectedCourseId: firstPendingBatch?['course_id'],
-          preselectedBatchId: firstPendingBatch?['id'],
+          preselectedCourseId: targetBatch?['course_id'],
+          preselectedBatchId: targetBatch?['id'],
         ),
       ),
     );
@@ -410,9 +415,150 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     }
   }
 
-  // Modal to select multiple students searchably
+  // Single button Month & Year picker modal for Shared Videos page
+  void _openMonthYearPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        String tempMonth = _sharedMonthFilter;
+        String tempYear = _sharedYearFilter;
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Filter Month & Year',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D041A)),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setSheetState(() {
+                            tempMonth = 'all';
+                            tempYear = 'all';
+                          });
+                        },
+                        child: const Text('Reset to All', style: TextStyle(color: Color(0xFF8A064D), fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: tempMonth,
+                          decoration: InputDecoration(
+                            labelText: 'Month',
+                            labelStyle: const TextStyle(fontSize: 12),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          items: [
+                            const DropdownMenuItem(value: 'all', child: Text('All Months', style: TextStyle(fontSize: 13))),
+                            ...List.generate(12, (i) => DropdownMenuItem(
+                              value: (i + 1).toString(),
+                              child: Text(_monthNames[i], style: const TextStyle(fontSize: 13)),
+                            )),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setSheetState(() => tempMonth = val);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: tempYear,
+                          decoration: InputDecoration(
+                            labelText: 'Year',
+                            labelStyle: const TextStyle(fontSize: 12),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'all', child: Text('All Years', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(value: '2025', child: Text('2025', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(value: '2026', child: Text('2026', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(value: '2027', child: Text('2027', style: TextStyle(fontSize: 13))),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setSheetState(() => tempYear = val);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF590231),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _sharedMonthFilter = tempMonth;
+                          _sharedYearFilter = tempYear;
+                        });
+                        Navigator.pop(sheetCtx);
+                      },
+                      child: const Text('Apply Filter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String get _sharedMonthYearLabel {
+    if (_sharedMonthFilter == 'all' && _sharedYearFilter == 'all') {
+      return 'All Time';
+    }
+    if (_sharedMonthFilter != 'all' && _sharedYearFilter != 'all') {
+      final mIdx = int.tryParse(_sharedMonthFilter);
+      final mName = (mIdx != null && mIdx >= 1 && mIdx <= 12) ? _monthNames[mIdx - 1].substring(0, 3) : '';
+      return '$mName $_sharedYearFilter';
+    }
+    if (_sharedMonthFilter != 'all') {
+      final mIdx = int.tryParse(_sharedMonthFilter);
+      return (mIdx != null && mIdx >= 1 && mIdx <= 12) ? _monthNames[mIdx - 1] : 'Month';
+    }
+    return _sharedYearFilter;
+  }
+
+  // Modal to select multiple students searchably (cascading with course & batch filter)
   void _openStudentFilterModal() {
-    final allStudents = _computeStudentComplianceList();
+    final baseList = _perfSubTab == 'pending' ? _pendingStudentsThisMonth : _successStudentsThisMonth;
+    final candidates = baseList.where((s) {
+      if (_perfCourseFilter != 'all') {
+        final batches = s['batches'] as List<Map<String, dynamic>>;
+        if (!batches.any((b) => b['course_id'] == _perfCourseFilter)) return false;
+      }
+      if (_perfBatchFilter != 'all') {
+        final batches = s['batches'] as List<Map<String, dynamic>>;
+        if (!batches.any((b) => b['id'] == _perfBatchFilter)) return false;
+      }
+      return true;
+    }).toList();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -421,7 +567,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
         String modalSearch = '';
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
-            final filtered = allStudents.where((s) {
+            final filtered = candidates.where((s) {
               if (modalSearch.isEmpty) return true;
               final q = modalSearch.toLowerCase();
               final name = (s['name'] ?? '').toString().toLowerCase();
@@ -637,7 +783,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     final double complianceRate = totalStudents > 0 ? (completedCount / totalStudents) : 1.0;
     final int compliancePercent = (complianceRate * 100).round();
 
-    final filteredPending = _filteredPendingStudents;
+    final filteredPerformance = _filteredPerformanceStudents;
     final filteredShared = _filteredSharedVideos;
 
     return Scaffold(
@@ -876,10 +1022,99 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                     const SizedBox(height: 14),
 
                     // ==============================================================
-                    // TAB 1: PERFORMANCE (Current Month Pending Students)
+                    // TAB 1: PERFORMANCE (Pending vs Success Sub-Tabs)
                     // ==============================================================
                     if (_activeTab == 'performance') ...[
-                      // Performance Filters Bar: Course, Batch, Student Multi-select
+                      // Sub-tab Bar: Pending vs Success
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3E8EE),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            // Pending Sub-tab
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() {
+                                  _perfSubTab = 'pending';
+                                  _perfSelectedStudentIds.clear();
+                                }),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: _perfSubTab == 'pending'
+                                        ? const Color(0xFFE02424)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(9),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.pending_actions_rounded,
+                                        size: 15,
+                                        color: _perfSubTab == 'pending' ? Colors.white : Colors.grey.shade700,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Pending ($pendingCount)',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: _perfSubTab == 'pending' ? Colors.white : Colors.grey.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // Success Sub-tab
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() {
+                                  _perfSubTab = 'success';
+                                  _perfSelectedStudentIds.clear();
+                                }),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: _perfSubTab == 'success'
+                                        ? const Color(0xFF047857)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(9),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle_rounded,
+                                        size: 15,
+                                        color: _perfSubTab == 'success' ? Colors.white : Colors.grey.shade700,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Success ($completedCount)',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: _perfSubTab == 'success' ? Colors.white : Colors.grey.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Performance Filters Bar: Course, Batch, Student Multi-select (Cascaded)
                       Row(
                         children: [
                           // Course filter
@@ -907,6 +1142,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                       setState(() {
                                         _perfCourseFilter = val;
                                         _perfBatchFilter = 'all';
+                                        _perfSelectedStudentIds.clear();
                                       });
                                     }
                                   },
@@ -940,7 +1176,10 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                   ],
                                   onChanged: (val) {
                                     if (val != null) {
-                                      setState(() => _perfBatchFilter = val);
+                                      setState(() {
+                                        _perfBatchFilter = val;
+                                        _perfSelectedStudentIds.clear();
+                                      });
                                     }
                                   },
                                 ),
@@ -1001,7 +1240,9 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                           decoration: InputDecoration(
                             icon: const Icon(Icons.search_rounded, color: Colors.grey, size: 20),
                             border: InputBorder.none,
-                            hintText: 'Search pending students by name or student ID...',
+                            hintText: _perfSubTab == 'pending'
+                                ? 'Search pending students by name or student ID...'
+                                : 'Search completed students by name or student ID...',
                             hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
                             suffixIcon: _perfSearchQuery.isNotEmpty
                                 ? IconButton(
@@ -1014,38 +1255,8 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                       ),
                       const SizedBox(height: 14),
 
-                      // List of pending students
-                      if (pendingCount == 0)
-                        Container(
-                          padding: const EdgeInsets.all(28),
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDEF7EC).withOpacity(0.4),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0xFF31C48D)),
-                          ),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.celebration_rounded, size: 44, color: Color(0xFF03543F)),
-                              const SizedBox(height: 10),
-                              const Text(
-                                'All Students Completed! 🎉',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Color(0xFF03543F),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Every one of your $totalStudents assigned students has received their performance video for all enrolled batches this month.',
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF03543F)),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        )
-                      else if (filteredPending.isEmpty)
+                      // List of Performance students (Pending or Success)
+                      if (filteredPerformance.isEmpty)
                         Container(
                           padding: const EdgeInsets.all(28),
                           width: double.infinity,
@@ -1054,10 +1265,12 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                             borderRadius: BorderRadius.circular(18),
                             border: Border.all(color: const Color(0xFFF0D5E4)),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Text(
-                              'No pending students match the selected filters.',
-                              style: TextStyle(fontSize: 13, color: Colors.grey),
+                              _perfSubTab == 'pending'
+                                  ? 'No pending students match the selected filters.'
+                                  : 'No success students match the selected filters.',
+                              style: const TextStyle(fontSize: 13, color: Colors.grey),
                             ),
                           ),
                         )
@@ -1065,24 +1278,29 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                         ListView.separated(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: filteredPending.length,
+                          itemCount: filteredPerformance.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 10),
                           itemBuilder: (context, idx) {
-                            final student = filteredPending[idx];
+                            final student = filteredPerformance[idx];
                             final name = (student['name'] ?? 'Student').toString();
                             final roll = (student['roll_number'] ?? student['roll'] ?? student['id'] ?? 'N/A').toString();
                             final avatarUrl = student['avatar_url']?.toString();
                             final initials = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'S';
 
+                            final isPending = student['is_pending'] == true;
                             final pendingBatches = student['pending_batches'] as List<Map<String, dynamic>>? ?? [];
                             final completedBatches = student['completed_batches'] as List<Map<String, dynamic>>? ?? [];
+                            final allBatches = student['batches'] as List<Map<String, dynamic>>? ?? [];
 
                             return Container(
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: const Color(0xFFF8B4B4), width: 1.2),
+                                border: Border.all(
+                                  color: isPending ? const Color(0xFFF8B4B4) : const Color(0xFFA7F3D0),
+                                  width: 1.3,
+                                ),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withOpacity(0.02),
@@ -1096,17 +1314,17 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                 children: [
                                   CircleAvatar(
                                     radius: 22,
-                                    backgroundColor: const Color(0xFFFFF2F8),
+                                    backgroundColor: isPending ? const Color(0xFFFFF2F8) : const Color(0xFFECFDF5),
                                     backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
                                         ? NetworkImage(avatarUrl)
                                         : null,
                                     child: (avatarUrl == null || avatarUrl.isEmpty)
                                         ? Text(
                                             initials,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 15,
-                                              color: Color(0xFF8A064D),
+                                              color: isPending ? const Color(0xFF8A064D) : const Color(0xFF047857),
                                             ),
                                           )
                                         : null,
@@ -1128,18 +1346,20 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                                 ),
                                               ),
                                             ),
-                                            // Red [Pending] Status
+                                            // Red [Pending] or Green [Success] Status Badge on Top
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFFFDE8E8),
+                                                color: isPending ? const Color(0xFFFDE8E8) : const Color(0xFFDEF7EC),
                                                 borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(color: const Color(0xFFF8B4B4)),
+                                                border: Border.all(
+                                                  color: isPending ? const Color(0xFFF8B4B4) : const Color(0xFF31C48D),
+                                                ),
                                               ),
-                                              child: const Text(
-                                                '[Pending]',
+                                              child: Text(
+                                                isPending ? '[Pending]' : '[Success]',
                                                 style: TextStyle(
-                                                  color: Color(0xFFE02424),
+                                                  color: isPending ? const Color(0xFFE02424) : const Color(0xFF03543F),
                                                   fontSize: 10.5,
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -1158,53 +1378,70 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                         ),
                                         const SizedBox(height: 6),
 
-                                        // Display pending batch badges
+                                        // Display batch badges beside names
                                         Wrap(
                                           spacing: 6,
                                           runSpacing: 4,
-                                          children: [
-                                            ...pendingBatches.map((b) => Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFFFF1F2),
-                                                borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(color: const Color(0xFFFECDD3)),
-                                              ),
-                                              child: Text(
-                                                '${b['name']} (Missing)',
-                                                style: const TextStyle(
-                                                  color: Color(0xFFBE123C),
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            )),
-                                            ...completedBatches.map((b) => Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFF0FDF4),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                '${b['name']} (Done)',
-                                                style: const TextStyle(
-                                                  color: Color(0xFF15803D),
-                                                  fontSize: 10,
-                                                ),
-                                              ),
-                                            )),
-                                          ],
+                                          children: isPending
+                                              ? [
+                                                  ...pendingBatches.map((b) => Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFFFF1F2),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      border: Border.all(color: const Color(0xFFFECDD3)),
+                                                    ),
+                                                    child: Text(
+                                                      '${b['name']} (Missing)',
+                                                      style: const TextStyle(
+                                                        color: Color(0xFFBE123C),
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  )),
+                                                  ...completedBatches.map((b) => Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFF0FDF4),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Text(
+                                                      '${b['name']} (Done)',
+                                                      style: const TextStyle(
+                                                        color: Color(0xFF15803D),
+                                                        fontSize: 10,
+                                                      ),
+                                                    ),
+                                                  )),
+                                                ]
+                                              : allBatches.map((b) => Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFECFDF5),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                                                  ),
+                                                  child: Text(
+                                                    '${b['name']} (Covered)',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF047857),
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                )).toList(),
                                         ),
                                       ],
                                     ),
                                   ),
                                   const SizedBox(width: 10),
 
-                                  // Action Button Named just 'Share'
+                                  // Action Button Named just 'Share' (guru can send links to pending or success)
                                   ElevatedButton.icon(
                                     onPressed: () => _shareForStudent(student),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF590231),
+                                      backgroundColor: isPending ? const Color(0xFF590231) : const Color(0xFF047857),
                                       foregroundColor: Colors.white,
                                       elevation: 0,
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1227,42 +1464,52 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                     // TAB 2: SHARED VIDEOS LIST
                     // ==============================================================
                     if (_activeTab == 'shared') ...[
-                      // Shared Videos Filters: Month, Year, Course, Batch
+                      // Shared Videos Filters: Standard Single-Button Month & Year Filter + Batch Filter
                       Row(
                         children: [
-                          // Month Filter
+                          // Single-button Month & Year filter
                           Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFE5D4DE)),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  isExpanded: true,
-                                  value: _sharedMonthFilter,
-                                  items: [
-                                    const DropdownMenuItem(value: 'all', child: Text('All Months', style: TextStyle(fontSize: 11))),
-                                    ...List.generate(12, (i) => DropdownMenuItem(
-                                      value: (i + 1).toString(),
-                                      child: Text(_monthNames[i], style: const TextStyle(fontSize: 11)),
-                                    )),
+                            flex: 3,
+                            child: InkWell(
+                              onTap: _openMonthYearPicker,
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFE5D4DE)),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFF8A064D)),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _sharedMonthYearLabel,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF2D041A),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const Icon(Icons.arrow_drop_down_rounded, size: 20, color: Colors.grey),
                                   ],
-                                  onChanged: (val) {
-                                    if (val != null) setState(() => _sharedMonthFilter = val);
-                                  },
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 8),
 
-                          // Year Filter
+                          // Batch Filter
                           Expanded(
+                            flex: 3,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(10),
@@ -1271,49 +1518,16 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
                                   isExpanded: true,
-                                  value: _sharedYearFilter,
-                                  items: const [
-                                    DropdownMenuItem(value: 'all', child: Text('All Years', style: TextStyle(fontSize: 11))),
-                                    DropdownMenuItem(value: '2025', child: Text('2025', style: TextStyle(fontSize: 11))),
-                                    DropdownMenuItem(value: '2026', child: Text('2026', style: TextStyle(fontSize: 11))),
-                                    DropdownMenuItem(value: '2027', child: Text('2027', style: TextStyle(fontSize: 11))),
-                                  ],
-                                  onChanged: (val) {
-                                    if (val != null) setState(() => _sharedYearFilter = val);
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-
-                          // Course Filter
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFE5D4DE)),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  isExpanded: true,
-                                  value: _sharedCourseFilter,
+                                  value: _sharedBatchFilter,
                                   items: [
-                                    const DropdownMenuItem(value: 'all', child: Text('All Courses', style: TextStyle(fontSize: 11))),
-                                    ..._myCourses.map((c) => DropdownMenuItem(
-                                      value: c['id'].toString(),
-                                      child: Text(c['title'] ?? 'Course', style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis),
+                                    const DropdownMenuItem(value: 'all', child: Text('All Batches', style: TextStyle(fontSize: 11.5))),
+                                    ..._myBatches.map((b) => DropdownMenuItem(
+                                      value: b['id'].toString(),
+                                      child: Text(b['name'] ?? 'Batch', style: const TextStyle(fontSize: 11.5), overflow: TextOverflow.ellipsis),
                                     )),
                                   ],
                                   onChanged: (val) {
-                                    if (val != null) {
-                                      setState(() {
-                                        _sharedCourseFilter = val;
-                                        _sharedBatchFilter = 'all';
-                                      });
-                                    }
+                                    if (val != null) setState(() => _sharedBatchFilter = val);
                                   },
                                 ),
                               ),
@@ -1336,7 +1550,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                           decoration: InputDecoration(
                             icon: const Icon(Icons.search_rounded, color: Colors.grey, size: 20),
                             border: InputBorder.none,
-                            hintText: 'Search video titles, notes, courses...',
+                            hintText: 'Search video titles, students, batches...',
                             hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
                             suffixIcon: _sharedSearchQuery.isNotEmpty
                                 ? IconButton(
@@ -1381,11 +1595,10 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: filteredShared.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 14),
+                          separatorBuilder: (_, __) => const SizedBox(height: 12),
                           itemBuilder: (context, idx) {
                             final item = filteredShared[idx];
                             final title = (item['title'] ?? 'Shared Video').toString();
-                            final desc = (item['description'] ?? '').toString();
                             final course = (item['target_course_title'] ?? 'Assigned Course').toString();
                             final batch = (item['target_batch_name'] ?? 'All Batches').toString();
                             final dateStr = _formatDate(item['event_date'] ?? item['created_at']);
@@ -1398,11 +1611,16 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                             final cat = (item['category'] ?? '').toString().toLowerCase();
                             final isPerformance = cat == 'performance' || cat == 'student_performance';
 
+                            // Boundary color: Green for Performance, Blue for General
+                            final boundaryColor = isPerformance
+                                ? const Color(0xFF10B981) // Emerald Green
+                                : const Color(0xFF3B82F6); // Vibrant Blue
+
                             return Container(
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(color: const Color(0xFFF0D5E4)),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: boundaryColor, width: 1.8),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withOpacity(0.02),
@@ -1412,123 +1630,98 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                 ],
                               ),
                               child: Padding(
-                                padding: const EdgeInsets.all(15),
+                                padding: const EdgeInsets.all(14),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // Header: Status Badge (Blue for General, Green for Performance) & Date
+                                    // Row 1: Student highlighted on top (Left) and Date on right-top
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
-                                        Wrap(
-                                          spacing: 6,
-                                          crossAxisAlignment: WrapCrossAlignment.center,
-                                          children: [
-                                            // General (Blue) vs Performance (Green) Tag
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                                              decoration: BoxDecoration(
-                                                color: isPerformance ? const Color(0xFFDEF7EC) : const Color(0xFFEBF5FF),
-                                                borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(
-                                                  color: isPerformance ? const Color(0xFF31C48D) : const Color(0xFFA4CAFE),
-                                                ),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    isPerformance ? Icons.stars_rounded : Icons.group_work_rounded,
-                                                    size: 13,
-                                                    color: isPerformance ? const Color(0xFF03543F) : const Color(0xFF1E429F),
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    isPerformance ? 'Performance' : 'General',
-                                                    style: TextStyle(
-                                                      color: isPerformance ? const Color(0xFF03543F) : const Color(0xFF1E429F),
-                                                      fontSize: 10.5,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                        // Highlight student name on top (without text saying performance or general)
+                                        if (isPerformance && targetStudentName.isNotEmpty)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFECFDF5),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: const Color(0xFFA7F3D0)),
                                             ),
-
-                                            // Course and Batch Name
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFF3E8EE),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                '$course • $batch',
-                                                style: const TextStyle(
-                                                  color: Color(0xFF8A064D),
-                                                  fontSize: 10.5,
-                                                  fontWeight: FontWeight.bold,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.person_pin_rounded, size: 14, color: Color(0xFF047857)),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  targetStudentName,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Color(0xFF047857),
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
-                                              ),
+                                              ],
                                             ),
-                                          ],
-                                        ),
+                                          )
+                                        else
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFEFF6FF),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.groups_rounded, size: 14, color: Color(0xFF1D4ED8)),
+                                                SizedBox(width: 5),
+                                                Text(
+                                                  'All Students',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Color(0xFF1D4ED8),
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
 
-                                        // Date
+                                        // Right top of the grid: Date
                                         Text(
                                           dateStr,
-                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.grey.shade600,
+                                          ),
                                         ),
                                       ],
                                     ),
+                                    const SizedBox(height: 8),
 
-                                    // For Performance: Highlighted Student Name pill!
-                                    // For General: Do not display students on main grid (as requested)!
-                                    if (isPerformance && targetStudentName.isNotEmpty) ...[
-                                      const SizedBox(height: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFDEF7EC),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: const Color(0xFF31C48D).withOpacity(0.5)),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.person_pin_rounded, size: 14, color: Color(0xFF03543F)),
-                                            const SizedBox(width: 5),
-                                            Text(
-                                              'Student: $targetStudentName',
-                                              style: const TextStyle(
-                                                fontSize: 11.5,
-                                                color: Color(0xFF03543F),
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                    // Course and Batch below student name
+                                    Text(
+                                      '$course • $batch',
+                                      style: const TextStyle(
+                                        color: Color(0xFF8A064D),
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
                                       ),
-                                    ],
+                                    ),
+                                    const SizedBox(height: 6),
 
-                                    const SizedBox(height: 10),
+                                    // Title
                                     Text(
                                       title,
                                       style: const TextStyle(
-                                        fontSize: 15,
+                                        fontSize: 14.5,
                                         fontWeight: FontWeight.bold,
                                         color: LaasyaColors.textDark,
                                       ),
                                     ),
-                                    if (desc.isNotEmpty) ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        desc,
-                                        style: const TextStyle(fontSize: 12, color: Colors.black87),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
                                     const SizedBox(height: 12),
 
                                     // Action Buttons: Open Drive / YouTube and "Details" button
@@ -1569,14 +1762,14 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                           const SizedBox(width: 8),
                                         ],
 
-                                        // Details Button (Opens prefilled edit/delete view)
+                                        // Details Button (Opens prefilled details view with Edit and Delete options)
                                         OutlinedButton.icon(
                                           onPressed: () => _openDetails(item),
                                           style: OutlinedButton.styleFrom(
                                             foregroundColor: const Color(0xFF590231),
-                                            side: const BorderSide(color: Color(0xFFD8B4E2), width: 1.2),
+                                            side: const BorderSide(color: Color(0xFF8A064D), width: 1.2),
                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                           ),
                                           icon: const Icon(Icons.tune_rounded, size: 14),
                                           label: const Text('Details', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),

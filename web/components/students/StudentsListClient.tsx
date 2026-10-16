@@ -1982,7 +1982,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       {/* 3. MAIN STUDENTS GRID (DISPLAY ONLY REQUIRED FIELDS) */}
       {/* ===================================================================== */}
       {viewMode === 'grid' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
           {filteredStudents.length === 0 ? (
             <div className="col-span-full py-16 text-center text-[#6E3955] bg-white rounded-3xl border border-[#F0D5E4]">
               <AlertTriangle className="w-8 h-8 text-[#8A064D]/30 mx-auto mb-2" />

@@ -12,7 +12,7 @@ export default async function StudentsPage() {
   ]);
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="w-full">
       <StudentsListClient 
         initialStudents={students} 
         batches={batches}

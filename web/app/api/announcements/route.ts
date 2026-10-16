@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAnnouncements, createAnnouncement } from '@/lib/announcements';
 import { getCurrentUser } from '@/lib/auth';
+import { sendFcmToRole, sendFcmToBatch } from '@/lib/fcm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -81,6 +82,30 @@ export async function POST(request: NextRequest) {
       trainer_name: body.trainer_name || (isGuru ? createdBy : null),
       trainer_id: body.trainer_id || null,
     });
+
+    // Send real-time FCM Push Notification to target audience
+    if (body.announcement_type !== 'banner') {
+      const targetAudience = (body.audience || '').toLowerCase();
+      const notifPayload = {
+        title: body.title || 'Academy Notice',
+        body: body.message || 'A new announcement has been published.',
+        data: {
+          type: 'announcement',
+          id: String(created?.id || ''),
+          sender: String(createdBy)
+        }
+      };
+
+      if (targetAudience.includes('trainer') || targetAudience.includes('guru')) {
+        sendFcmToRole('trainer', notifPayload).catch(e => console.error('[FCM] Error notifying gurus:', e));
+      } else if (targetAudience.includes('student') || targetAudience.includes('disciple')) {
+        sendFcmToRole('student', notifPayload).catch(e => console.error('[FCM] Error notifying students:', e));
+      } else if (body.target_batch_id) {
+        sendFcmToBatch(body.target_batch_id, notifPayload).catch(e => console.error('[FCM] Error notifying batch:', e));
+      } else {
+        sendFcmToRole('all', notifPayload).catch(e => console.error('[FCM] Error notifying all:', e));
+      }
+    }
 
     return NextResponse.json({
       success: true,

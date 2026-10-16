@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
+import { sendFcmToBatch } from '@/lib/fcm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,6 +57,18 @@ export async function POST(request: NextRequest) {
     } catch (annError) {
       console.warn('Could not insert alert announcement copy:', annError);
     }
+
+    // 3. Send real-time FCM Push Notification to all students/parents in this batch
+    sendFcmToBatch(batch_id, {
+      title: `Class Completed: ${course_title}`,
+      body: alertMessage,
+      data: {
+        type: 'class_closed',
+        batch_id: String(batch_id),
+        batch_name: String(batch_name),
+        course_title: String(course_title)
+      }
+    }).catch(fcmErr => console.error('[FCM] Error sending session alert push:', fcmErr));
 
     return NextResponse.json({ success: true, alert }, { headers: corsHeaders });
   } catch (error: any) {

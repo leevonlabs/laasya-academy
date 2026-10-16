@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "159909035492",
+    "project_id": "laasya-academy",
+    "storage_bucket": "laasya-academy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:159909035492:android:df4d33aa986f22979f9bf1",
+        "android_client_info": {
+          "package_name": "com.Laasyaacademy.erp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAls-oLOcbhAWzUgSkNXMkED27BxgxaRjw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

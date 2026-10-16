@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/supabase_constants.dart';
 import '../constants/api_constants.dart';
+import 'fcm_service.dart';
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -638,6 +639,9 @@ class SupabaseService {
   Future<void> signOut() async {
     _cachedProfile = null;
     await _clearProfileFromPrefs();
+    try {
+      await FcmService.unregisterDeviceToken();
+    } catch (_) {}
     if (_isInitialized && _client != null) {
       try {
         await _client!.auth.signOut();

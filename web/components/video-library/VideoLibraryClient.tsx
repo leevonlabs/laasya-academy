@@ -1985,7 +1985,448 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
           </div>
 
           {guruShareViewMode === 'compliance_grid' ? (
-            <>
+            selectedGuruForModal ? (
+              /* =================================================================== */
+              /* DEDICATED FULL-PAGE GURU AUDIT VIEW (ROW-WISE TABLES)               */
+              /* =================================================================== */
+              <div className="space-y-5 animate-in fade-in duration-200">
+                {/* Back Navigation Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGuruForModal(null)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#FFF2F8] hover:bg-[#8A064D] text-[#8A064D] hover:text-white font-bold text-xs transition cursor-pointer border border-[#F0D5E4]"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Back to Gurus Directory</span>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-[#F9E33A] text-[#4A0025]">
+                      {complianceMonth !== 'all' ? MONTHS.find((m) => m.value === complianceMonth)?.label : 'All Months'} {complianceYear} Performance Audit
+                    </span>
+                  </div>
+                </div>
+
+                {/* Guru Hero Profile & Metrics */}
+                <div className="bg-gradient-to-r from-[#590231] to-[#8A064D] text-white p-6 rounded-3xl shadow-sm space-y-5">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      {selectedGuruForModal.avatar_url ? (
+                        <img
+                          src={selectedGuruForModal.avatar_url}
+                          alt={selectedGuruForModal.full_name}
+                          className="w-16 h-16 rounded-2xl object-cover border-2 border-[#D4AF37] shadow-md shrink-0"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md text-[#F9E33A] flex items-center justify-center font-bold text-xl border border-white/30 shrink-0">
+                          {selectedGuruForModal.full_name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h2 className="text-xl font-black text-white">
+                            {stripGuruPrefix(selectedGuruForModal.full_name)}
+                          </h2>
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                            selectedGuruForModal.compliance_status === 'completed'
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-[#D4AF37] text-[#2D041A]'
+                          }`}>
+                            {selectedGuruForModal.compliance_status === 'completed' ? '100% Completed' : `${selectedGuruForModal.missing_count} Missing`}
+                          </span>
+                        </div>
+                        <p className="text-xs text-rose-100 mt-1 flex flex-wrap items-center gap-3">
+                          <span>{stripGuruPrefix(selectedGuruForModal.display_title) || (selectedGuruForModal.specializations.length > 0 ? selectedGuruForModal.specializations.join(', ') : 'Faculty Member')}</span>
+                          {selectedGuruForModal.phone && (
+                            <span className="flex items-center gap-1 font-mono">
+                              <Phone className="w-3 h-3 text-[#D4AF37]" />
+                              {selectedGuruForModal.phone}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {selectedGuruForModal.courses.map((c) => (
+                        <span key={`audit-c-${c.id}`} className="px-2.5 py-1 rounded-xl text-xs font-bold bg-white/10 text-white border border-white/20">
+                          {c.title}
+                        </span>
+                      ))}
+                      <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-white/20 text-[#F9E33A]">
+                        {selectedGuruForModal.assigned_batches_count} Batches
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 4 Quick Stat Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                    <div className="bg-white/10 backdrop-blur-xs rounded-2xl p-3 border border-white/15">
+                      <span className="text-[11px] text-rose-200 block font-semibold uppercase">Total Students</span>
+                      <span className="text-xl sm:text-2xl font-black text-white">{selectedGuruForModal.total_students}</span>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-xs rounded-2xl p-3 border border-white/15">
+                      <span className="text-[11px] text-emerald-200 block font-semibold uppercase">Received Videos</span>
+                      <span className="text-xl sm:text-2xl font-black text-emerald-300">{selectedGuruForModal.received_count}</span>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-xs rounded-2xl p-3 border border-white/15">
+                      <span className="text-[11px] text-rose-200 block font-semibold uppercase">Missing Videos</span>
+                      <span className="text-xl sm:text-2xl font-black text-rose-300">{selectedGuruForModal.missing_count}</span>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-xs rounded-2xl p-3 border border-white/15">
+                      <span className="text-[11px] text-[#F9E33A] block font-semibold uppercase">Compliance Rate</span>
+                      <span className="text-xl sm:text-2xl font-black text-[#F9E33A]">{selectedGuruForModal.compliance_rate}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Subheader: Tabs & Filters */}
+                <div className="bg-white rounded-2xl p-4 border border-[#F0D5E4] shadow-xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setGuruModalActiveTab('received')}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                          guruModalActiveTab === 'received'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Received Videos ({modalFilteredReceived.length})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setGuruModalActiveTab('missing')}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                          guruModalActiveTab === 'missing'
+                            ? 'bg-rose-600 text-white shadow-xs'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <span>Missing Students ({modalFilteredMissing.length})</span>
+                      </button>
+                    </div>
+
+                    <div className="text-xs font-bold text-gray-700">
+                      Showing: <strong className="text-emerald-700 font-bold">{modalFilteredReceived.length} Received</strong>, <strong className="text-rose-600 font-bold">{modalFilteredMissing.length} Missing</strong>
+                    </div>
+                  </div>
+
+                  {/* Filter Controls Row */}
+                  <div className="pt-2 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {/* Batch Filter */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold text-gray-500 uppercase">Batch:</span>
+                        <select
+                          value={guruModalBatchFilter}
+                          onChange={(e) => {
+                            setGuruModalBatchFilter(e.target.value);
+                            setGuruModalSelectedStudentIds([]);
+                          }}
+                          className="px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-[#8A064D]/20 cursor-pointer shadow-2xs max-w-[210px] truncate"
+                        >
+                          <option value="all">All Enrolled Batches ({guruModalAvailableBatches.length})</option>
+                          {guruModalAvailableBatches.map((b) => (
+                            <option key={`guru-batch-opt-${b.id}`} value={b.id}>
+                              {b.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Searchable Multi-Select Student Filter */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setIsGuruModalStudentDropdownOpen(prev => !prev)}
+                          className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-2xs ${
+                            guruModalSelectedStudentIds.length > 0
+                              ? 'bg-[#8A064D] text-white border-[#8A064D]'
+                              : 'bg-white text-gray-800 border-gray-200 hover:border-[#8A064D]'
+                          }`}
+                        >
+                          <Users className="w-3.5 h-3.5" />
+                          <span>
+                            {guruModalSelectedStudentIds.length === 0
+                              ? `All Students (${disciplesForFilterList.length})`
+                              : `${guruModalSelectedStudentIds.length} Selected`}
+                          </span>
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isGuruModalStudentDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isGuruModalStudentDropdownOpen && (
+                          <div className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 bg-white rounded-2xl shadow-xl border border-[#F0D5E4] p-3 z-50 space-y-2 animate-in fade-in zoom-in-95">
+                            <div className="relative">
+                              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                              <input
+                                type="text"
+                                placeholder="Search students..."
+                                value={guruModalStudentSearch}
+                                onChange={(e) => setGuruModalStudentSearch(e.target.value)}
+                                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-gray-200 text-xs text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-[#8A064D]"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] px-1 py-0.5 border-b border-gray-100">
+                              <span className="text-gray-500 font-semibold">{disciplesForFilterList.length} Students</span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setGuruModalSelectedStudentIds(disciplesForFilterList.map(d => d.student_id))}
+                                  className="text-[#8A064D] hover:underline font-bold cursor-pointer"
+                                >
+                                  Select All
+                                </button>
+                                <span className="text-gray-300">•</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setGuruModalSelectedStudentIds([])}
+                                  className="text-gray-500 hover:underline font-semibold cursor-pointer"
+                                >
+                                  Clear
+                                </button>
+                              </div>
+                            </div>
+                            <div className="max-h-52 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+                              {disciplesForFilterList.length === 0 ? (
+                                <div className="p-4 text-center text-xs text-gray-400">No students match search</div>
+                              ) : (
+                                disciplesForFilterList.map((disciple) => {
+                                  const isChecked = guruModalSelectedStudentIds.includes(disciple.student_id);
+                                  return (
+                                    <label
+                                      key={`modal-student-chk-${disciple.student_id}`}
+                                      className={`flex items-center gap-2 p-1.5 rounded-lg text-xs cursor-pointer transition ${
+                                        isChecked ? 'bg-[#FFF2F8] text-[#8A064D] font-bold' : 'hover:bg-gray-50 text-gray-700'
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() => {
+                                          setGuruModalSelectedStudentIds(prev =>
+                                            prev.includes(disciple.student_id)
+                                              ? prev.filter(id => id !== disciple.student_id)
+                                              : [...prev, disciple.student_id]
+                                          );
+                                        }}
+                                        className="w-3.5 h-3.5 rounded-md text-[#8A064D] focus:ring-[#8A064D] border-gray-300 cursor-pointer"
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <span className="block truncate">{disciple.student_name}</span>
+                                        <span className="text-[10px] text-gray-400 font-normal block truncate">
+                                          {disciple.roll_number} {disciple.batch_name ? `• ${disciple.batch_name}` : ''}
+                                        </span>
+                                      </div>
+                                    </label>
+                                  );
+                                })
+                              )}
+                            </div>
+                            <div className="pt-1 border-t border-gray-100 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => setIsGuruModalStudentDropdownOpen(false)}
+                                className="px-3 py-1 rounded-lg bg-[#590231] hover:bg-[#740340] text-white text-[11px] font-bold cursor-pointer"
+                              >
+                                Done
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {(guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch.trim()) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGuruModalBatchFilter('all');
+                            setGuruModalSelectedStudentIds([]);
+                            setGuruModalStudentSearch('');
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                          title="Clear Filters"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Reset</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ROW-WISE TABLE SECTION */}
+                <div className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-xs">
+                  {guruModalActiveTab === 'received' ? (
+                    modalFilteredReceived.length === 0 ? (
+                      <div className="p-12 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
+                        <Video className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                        <h4 className="text-sm font-bold text-gray-700">No received performance videos match the selected filters</h4>
+                        <p className="text-xs text-gray-500 mt-1">Students will appear here once recordings are shared.</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-gray-200 bg-[#FFF9FB] text-[11px] font-black text-gray-600 uppercase tracking-wider">
+                              <th className="py-3 px-4">Student</th>
+                              <th className="py-3 px-4">Batch</th>
+                              <th className="py-3 px-4">Video Title & Recording Date</th>
+                              <th className="py-3 px-4">Description</th>
+                              <th className="py-3 px-4">Media Links</th>
+                              <th className="py-3 px-4 text-center">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 text-xs">
+                            {modalFilteredReceived.map((disciple, idx) => (
+                              <tr key={`received-row-${disciple.student_id}-${idx}`} className="hover:bg-emerald-50/30 transition">
+                                <td className="py-3.5 px-4">
+                                  <div className="font-bold text-gray-900">{disciple.student_name}</div>
+                                  <div className="text-[11px] font-mono text-gray-500">{disciple.roll_number}</div>
+                                </td>
+                                <td className="py-3.5 px-4 font-semibold text-gray-700">
+                                  <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-800 text-[11px]">
+                                    {disciple.batch_name}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="font-bold text-[#2D041A]">{disciple.video_title}</div>
+                                  {disciple.event_date && (
+                                    <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                      <Calendar className="w-3 h-3 text-gray-400" />
+                                      <span>
+                                        {new Date(disciple.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                      </span>
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 text-gray-600 max-w-xs">
+                                  <p className="line-clamp-2 text-[11.5px]">{disciple.description || '—'}</p>
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    {disciple.drive_url && (
+                                      <div className="flex items-center gap-1">
+                                        <a
+                                          href={disciple.drive_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="px-2.5 py-1 rounded-lg bg-[#03543F] hover:bg-[#023e2f] text-white text-[10.5px] font-bold transition flex items-center gap-1"
+                                        >
+                                          <span>Drive</span>
+                                          <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                        <button
+                                          type="button"
+                                          onClick={() => copyToClipboard(disciple.drive_url!, `${disciple.student_id}-gd`, 'Drive Link')}
+                                          className="px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-bold transition cursor-pointer"
+                                        >
+                                          {copiedId === `${disciple.student_id}-gd` ? 'Copied' : 'Copy'}
+                                        </button>
+                                      </div>
+                                    )}
+                                    {disciple.youtube_url && (
+                                      <div className="flex items-center gap-1">
+                                        <a
+                                          href={disciple.youtube_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[10.5px] font-bold transition flex items-center gap-1"
+                                        >
+                                          <span>YouTube</span>
+                                          <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                        <button
+                                          type="button"
+                                          onClick={() => copyToClipboard(disciple.youtube_url!, `${disciple.student_id}-yt`, 'YouTube Link')}
+                                          className="px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-bold transition cursor-pointer"
+                                        >
+                                          {copiedId === `${disciple.student_id}-yt` ? 'Copied' : 'Copy'}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 text-center">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-[#DEF7EC] text-[#03543F] border border-emerald-300">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    <span>Received</span>
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  ) : (
+                    /* MISSING STUDENTS ROW-WISE TABLE */
+                    modalFilteredMissing.length === 0 ? (
+                      <div className="p-12 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
+                        <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+                        <h4 className="text-sm font-bold text-gray-900">All students have received their monthly performance videos!</h4>
+                        <p className="text-xs text-gray-500 mt-1">No missing student records under the selected filters.</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-gray-200 bg-[#FFF9FB] text-[11px] font-black text-gray-600 uppercase tracking-wider">
+                              <th className="py-3 px-4">Student</th>
+                              <th className="py-3 px-4">Enrolled Course</th>
+                              <th className="py-3 px-4">Pending Batch</th>
+                              <th className="py-3 px-4">Parent Contact</th>
+                              <th className="py-3 px-4 text-center">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 text-xs">
+                            {modalFilteredMissing.map((disciple, idx) => (
+                              <tr key={`missing-row-${disciple.student_id}-${idx}`} className="hover:bg-rose-50/30 transition">
+                                <td className="py-3.5 px-4">
+                                  <div className="font-bold text-gray-900">{disciple.student_name}</div>
+                                  <div className="text-[11px] font-mono text-gray-500">{disciple.roll_number}</div>
+                                </td>
+                                <td className="py-3.5 px-4 font-semibold text-gray-800">
+                                  {disciple.course_title || 'Enrolled Course'}
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs">
+                                    {disciple.batch_name}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="font-semibold text-gray-800">{disciple.parent_name || '—'}</div>
+                                  {disciple.parent_phone && (
+                                    <a
+                                      href={`tel:${disciple.parent_phone}`}
+                                      className="text-[#8A064D] hover:underline font-mono font-bold text-[11px] flex items-center gap-1 mt-0.5"
+                                    >
+                                      <Phone className="w-3 h-3" />
+                                      <span>{disciple.parent_phone}</span>
+                                    </a>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 text-center">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                    <AlertCircle className="w-3 h-3 text-rose-600" />
+                                    <span>Pending Video</span>
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
 
           {/* KPI Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2288,7 +2729,8 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
               )}
             </div>
           </>
-          ) : (
+          )
+        ) : (
             /* =================================================================== */
             /* VIEW MODE: GENERAL VIDEO LINKS ONLY (MEDIA ARCHIVE)                 */
             /* =================================================================== */
@@ -2477,611 +2919,99 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                   <p className="text-xs text-gray-500 mt-1">Try clearing your search query, adjusting your Guru selection, or resetting the date filter.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  {guruGeneralItems.map((item, idx) => {
-                    const formattedDate = item.event_date
-                      ? new Date(item.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                      : 'Recent';
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-[#FFF9FB] text-[11px] font-black text-gray-600 uppercase tracking-wider">
+                        <th className="py-3 px-4">Faculty Guru</th>
+                        <th className="py-3 px-4">Target Course & Batch</th>
+                        <th className="py-3 px-4">Video Title & Date</th>
+                        <th className="py-3 px-4">Description</th>
+                        <th className="py-3 px-4">Media Links</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 text-xs">
+                      {guruGeneralItems.map((item, idx) => {
+                        const formattedDate = item.event_date
+                          ? new Date(item.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                          : 'Recent';
 
-                    return (
-                      <div
-                        key={`guru-general-item-${item.id}-${idx}`}
-                        className="bg-white rounded-3xl p-5 border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                      >
-                        <div className="space-y-2.5">
-                          {/* Top Row: Guru Pill + Video Type + Batch details + Date + Delete */}
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {/* 1. Guru Name */}
-                              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-200 shadow-2xs">
+                        return (
+                          <tr key={`guru-gen-row-${item.id}-${idx}`} className="hover:bg-rose-50/20 transition">
+                            <td className="py-3.5 px-4">
+                              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-200 shadow-2xs inline-block">
                                 {stripGuruPrefix(item.trainer_name || item.created_by || 'Faculty Guru')}
                               </span>
-
-                              {/* 2. Video Type (Always General Video in this view) */}
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
-                                <Users className="w-3 h-3 text-blue-600" />
-                                <span>General Video</span>
-                              </span>
-
-                              {/* 3. Batch Details */}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-gray-800">{item.target_course_title || 'General Course'}</div>
                               {item.target_batch_name && (
-                                <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                                <span className="inline-block px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-gray-100 text-gray-700 border border-gray-200 mt-0.5">
                                   {item.target_batch_name}
                                 </span>
                               )}
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] text-gray-400 font-medium flex items-center gap-1">
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-[#2D041A]">{item.title}</div>
+                              <div className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
                                 <Calendar className="w-3 h-3 text-gray-400" />
-                                {formattedDate}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Course Details Pill (NO student name rendered!) */}
-                          {item.target_course_title && (
-                            <div className="text-[11.5px] font-semibold text-gray-600 flex items-center gap-1.5">
-                              <BookOpen className="w-3.5 h-3.5 text-[#8A064D]" />
-                              <span>Course: <strong className="text-gray-900">{item.target_course_title}</strong></span>
-                            </div>
-                          )}
-
-                          {/* Title */}
-                          <h4 className="font-bold text-base text-[#2D041A] leading-snug pt-0.5">
-                            {item.title}
-                          </h4>
-
-                          {/* Description */}
-                          {item.description && (
-                            <p className="text-xs text-gray-600 bg-[#FFF9FB] p-2.5 rounded-xl border border-[#F0D5E4]/60 line-clamp-2">
-                              {item.description}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Links deck: Google Drive & YouTube buttons */}
-                        <div className="space-y-2 pt-2 border-t border-gray-100">
-                          {item.drive_url && (
-                            <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                                  <LinkIcon className="w-4 h-4" />
-                                </div>
-                                <div className="min-w-0">
-                                  <span className="text-[11px] font-bold text-emerald-900 block truncate">Google Drive Media Folder</span>
-                                  <span className="text-[10px] text-emerald-700 font-mono truncate block max-w-xs">{item.drive_url}</span>
-                                </div>
+                                <span>{formattedDate}</span>
                               </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(item.drive_url!, `${item.id}-drive`, 'Drive Link')}
-                                  className="px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-800 text-[11px] font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
-                                >
-                                  {copiedId === `${item.id}-drive` ? 'Copied' : 'Copy'}
-                                </button>
-                                <a
-                                  href={item.drive_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-3 py-1.5 rounded-xl bg-[#03543F] hover:bg-[#023e2f] text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                                >
-                                  <span>Open Drive</span>
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
+                            </td>
+                            <td className="py-3.5 px-4 text-gray-600 max-w-xs">
+                              <p className="line-clamp-2 text-[11.5px]">{item.description || '—'}</p>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="flex flex-wrap items-center gap-2">
+                                {item.drive_url && (
+                                  <div className="flex items-center gap-1">
+                                    <a
+                                      href={item.drive_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-2.5 py-1 rounded-lg bg-[#03543F] hover:bg-[#023e2f] text-white text-[10.5px] font-bold transition flex items-center gap-1 shadow-2xs"
+                                    >
+                                      <span>Drive</span>
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(item.drive_url!, `${item.id}-drive`, 'Drive Link')}
+                                      className="px-2 py-1 rounded-lg bg-white border border-emerald-200 text-emerald-800 text-[10px] font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                                    >
+                                      {copiedId === `${item.id}-drive` ? 'Copied' : 'Copy'}
+                                    </button>
+                                  </div>
+                                )}
+                                {item.youtube_url && (
+                                  <div className="flex items-center gap-1">
+                                    <a
+                                      href={item.youtube_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[10.5px] font-bold transition flex items-center gap-1 shadow-2xs"
+                                    >
+                                      <span>YouTube</span>
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(item.youtube_url!, `${item.id}-yt`, 'YouTube Link')}
+                                      className="px-2 py-1 rounded-lg bg-white border border-rose-200 text-rose-800 text-[10px] font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
+                                    >
+                                      {copiedId === `${item.id}-yt` ? 'Copied' : 'Copy'}
+                                    </button>
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          )}
-
-                          {item.youtube_url && (
-                            <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-rose-50/70 border border-rose-200/80">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                                  <Video className="w-4 h-4" />
-                                </div>
-                                <div className="min-w-0">
-                                  <span className="text-[11px] font-bold text-rose-950 block truncate">YouTube Recording Broadcast</span>
-                                  <span className="text-[10px] text-rose-700 font-mono truncate block max-w-xs">{item.youtube_url}</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(item.youtube_url!, `${item.id}-yt`, 'YouTube Link')}
-                                  className="px-2.5 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-800 text-[11px] font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
-                                >
-                                  {copiedId === `${item.id}-yt` ? 'Copied' : 'Copy'}
-                                </button>
-                                <a
-                                  href={item.youtube_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                                >
-                                  <span>Open YouTube</span>
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
-            </div>
-          )}
-          {/* =================================================================== */}
-          {/* GURU PERFORMANCE INSPECTOR MODAL                                   */}
-          {/* =================================================================== */}
-          {selectedGuruForModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-              <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-[#F0D5E4] overflow-hidden">
-                {/* Modal Header */}
-                <div className="px-6 py-5 bg-gradient-to-r from-[#590231] to-[#8A064D] text-white flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3.5">
-                    {selectedGuruForModal.avatar_url ? (
-                      <img
-                        src={selectedGuruForModal.avatar_url}
-                        alt={selectedGuruForModal.full_name}
-                        className="w-12 h-12 rounded-2xl object-cover border-2 border-[#D4AF37] shadow-sm"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md text-[#F9E33A] flex items-center justify-center font-bold text-base border border-white/30">
-                        {selectedGuruForModal.full_name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-lg text-white">
-                          {stripGuruPrefix(selectedGuruForModal.full_name)}
-                        </h3>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#F9E33A] text-[#4A0025]">
-                          {complianceMonth !== 'all' ? MONTHS.find((m) => m.value === complianceMonth)?.label : 'All Months'} {complianceYear} Audit
-                        </span>
-                      </div>
-                      <p className="text-xs text-rose-100 mt-0.5 flex flex-wrap items-center gap-2">
-                        <span>{stripGuruPrefix(selectedGuruForModal.display_title) || 'Faculty Member'}</span>
-                        {selectedGuruForModal.phone && (
-                          <span className="flex items-center gap-1 font-mono">
-                            <Phone className="w-3 h-3 text-[#D4AF37]" />
-                            {selectedGuruForModal.phone}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setSelectedGuruForModal(null)}
-                    className="text-white/80 hover:text-white p-1 rounded-xl hover:bg-white/10 transition cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {/* Modal Subheader & Tab Switcher */}
-                <div className="px-6 py-3 bg-[#FFF9FB] border-b border-[#F0D5E4] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-xl">
-                    <button
-                      type="button"
-                      onClick={() => setGuruModalActiveTab('received')}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                        guruModalActiveTab === 'received'
-                          ? 'bg-emerald-600 text-white shadow-xs'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Received Videos ({modalFilteredReceived.length})</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setGuruModalActiveTab('missing')}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                        guruModalActiveTab === 'missing'
-                          ? 'bg-rose-600 text-white shadow-xs'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      <span>Missing Students ({modalFilteredMissing.length})</span>
-                    </button>
-                  </div>
-
-                  <div className="text-xs font-bold text-gray-700">
-                    Compliance: <span className={selectedGuruForModal.compliance_status === 'completed' ? 'text-emerald-700' : 'text-[#8A064D]'}>
-                      {selectedGuruForModal.received_count} / {selectedGuruForModal.total_students} ({selectedGuruForModal.compliance_rate}%)
-                    </span>
-                  </div>
-                </div>
-
-                {/* Dedicated Filter Bar: Enrolled Batch Filter & Searchable Multi-Select Student Filter */}
-                <div className="px-6 py-3 bg-[#FFF2F8]/60 border-b border-[#F0D5E4] flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    {/* 1. Batch Filter for Batches Enrolled by this Guru */}
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-bold text-gray-500 uppercase">Batch:</span>
-                      <select
-                        value={guruModalBatchFilter}
-                        onChange={(e) => {
-                          setGuruModalBatchFilter(e.target.value);
-                          setGuruModalSelectedStudentIds([]);
-                        }}
-                        className="px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-[#8A064D]/20 cursor-pointer shadow-2xs max-w-[210px] truncate"
-                      >
-                        <option value="all">All Enrolled Batches ({guruModalAvailableBatches.length})</option>
-                        {guruModalAvailableBatches.map((b) => (
-                          <option key={`guru-batch-opt-${b.id}`} value={b.id}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* 2. Searchable Multi-Select Student Filter */}
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setIsGuruModalStudentDropdownOpen(prev => !prev)}
-                        className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-2xs ${
-                          guruModalSelectedStudentIds.length > 0
-                            ? 'bg-[#8A064D] text-white border-[#8A064D]'
-                            : 'bg-white text-gray-800 border-gray-200 hover:border-[#8A064D]'
-                        }`}
-                      >
-                        <Users className="w-3.5 h-3.5" />
-                        <span>
-                          {guruModalSelectedStudentIds.length === 0
-                            ? `All Students (${disciplesForFilterList.length})`
-                            : `${guruModalSelectedStudentIds.length} Selected`}
-                        </span>
-                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isGuruModalStudentDropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
-
-                      {/* Dropdown Menu */}
-                      {isGuruModalStudentDropdownOpen && (
-                        <div className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 bg-white rounded-2xl shadow-xl border border-[#F0D5E4] p-3 z-50 space-y-2 animate-in fade-in zoom-in-95">
-                          {/* Search Input */}
-                          <div className="relative">
-                            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                            <input
-                              type="text"
-                              placeholder="Search student name or roll..."
-                              value={guruModalStudentSearch}
-                              onChange={(e) => setGuruModalStudentSearch(e.target.value)}
-                              className="w-full pl-8 pr-7 py-1.5 rounded-xl border border-gray-200 text-xs bg-[#FFF9FB] text-gray-800 focus:outline-hidden focus:ring-1 focus:ring-[#8A064D]"
-                              autoFocus
-                            />
-                            {guruModalStudentSearch && (
-                              <button
-                                type="button"
-                                onClick={() => setGuruModalStudentSearch('')}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Quick Actions: Select All / Clear */}
-                          <div className="flex items-center justify-between text-[11px] px-1 py-0.5 border-b border-gray-100">
-                            <span className="text-gray-500 font-semibold">
-                              {disciplesForFilterList.length} Students
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setGuruModalSelectedStudentIds(disciplesForFilterList.map(d => d.student_id));
-                                }}
-                                className="text-[#8A064D] hover:underline font-bold cursor-pointer"
-                              >
-                                Select All
-                              </button>
-                              <span className="text-gray-300">•</span>
-                              <button
-                                type="button"
-                                onClick={() => setGuruModalSelectedStudentIds([])}
-                                className="text-gray-500 hover:underline font-semibold cursor-pointer"
-                              >
-                                Clear
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Checkbox List */}
-                          <div className="max-h-52 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
-                            {disciplesForFilterList.length === 0 ? (
-                              <div className="p-4 text-center text-xs text-gray-400">
-                                No students match search
-                              </div>
-                            ) : (
-                              disciplesForFilterList.map((disciple) => {
-                                const isChecked = guruModalSelectedStudentIds.includes(disciple.student_id);
-                                return (
-                                  <label
-                                    key={`modal-student-chk-${disciple.student_id}`}
-                                    className={`flex items-center gap-2 p-1.5 rounded-lg text-xs cursor-pointer transition ${
-                                      isChecked
-                                        ? 'bg-[#FFF2F8] text-[#8A064D] font-bold'
-                                        : 'hover:bg-gray-50 text-gray-700'
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={() => {
-                                        setGuruModalSelectedStudentIds(prev =>
-                                          prev.includes(disciple.student_id)
-                                            ? prev.filter(id => id !== disciple.student_id)
-                                            : [...prev, disciple.student_id]
-                                        );
-                                      }}
-                                      className="w-3.5 h-3.5 rounded-md text-[#8A064D] focus:ring-[#8A064D] border-gray-300 cursor-pointer"
-                                    />
-                                    <div className="min-w-0 flex-1">
-                                      <span className="block truncate">{disciple.student_name}</span>
-                                      <span className="text-[10px] text-gray-400 font-normal block truncate">
-                                        {disciple.roll_number} {disciple.batch_name ? `• ${disciple.batch_name}` : ''}
-                                      </span>
-                                    </div>
-                                  </label>
-                                );
-                              })
-                            )}
-                          </div>
-
-                          {/* Done Button */}
-                          <div className="pt-1 border-t border-gray-100 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => setIsGuruModalStudentDropdownOpen(false)}
-                              className="px-3 py-1 rounded-lg bg-[#590231] hover:bg-[#740340] text-white text-[11px] font-bold cursor-pointer"
-                            >
-                              Done
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Reset Filters button if any active */}
-                    {(guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch.trim()) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGuruModalBatchFilter('all');
-                          setGuruModalSelectedStudentIds([]);
-                          setGuruModalStudentSearch('');
-                        }}
-                        className="px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                        title="Clear Filters"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Reset</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Active Filter Summary Text */}
-                  <div className="text-[11px] font-medium text-gray-500">
-                    Showing: <strong className="text-emerald-700 font-bold">{modalFilteredReceived.length} Received</strong>, <strong className="text-rose-600 font-bold">{modalFilteredMissing.length} Missing</strong>
-                  </div>
-                </div>
-
-                {/* Modal Tab Content Body */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                  {/* TAB A: RECEIVED VIDEOS */}
-                  {guruModalActiveTab === 'received' && (
-                    <div className="space-y-4">
-                      {modalFilteredReceived.length === 0 ? (
-                        <div className="p-8 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
-                          <Video className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                          <h4 className="text-sm font-bold text-gray-700">
-                            {guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch
-                              ? 'No received performance videos match the selected filters'
-                              : 'No performance videos received yet for this month'}
-                          </h4>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch
-                              ? 'Try adjusting your batch filter or student selection above.'
-                              : `Students will appear here once ${stripGuruPrefix(selectedGuruForModal.full_name)} shares their monthly performance recordings.`}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {modalFilteredReceived.map((disciple, idx) => (
-                            <div
-                              key={`received-disciple-${disciple.student_id}-${idx}`}
-                              className="p-4 bg-white rounded-2xl border border-emerald-200 shadow-2xs hover:border-emerald-400 transition space-y-3 flex flex-col justify-between"
-                            >
-                              <div className="space-y-2">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div>
-                                    <h5 className="font-bold text-sm text-[#2D041A]">
-                                      {disciple.student_name}
-                                    </h5>
-                                    <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium mt-0.5">
-                                      <span className="font-mono font-bold text-gray-700">{disciple.roll_number}</span>
-                                      <span>•</span>
-                                      <span>{disciple.batch_name}</span>
-                                    </div>
-                                  </div>
-                                  <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-[#DEF7EC] text-[#03543F]">
-                                    Received
-                                  </span>
-                                </div>
-
-                                {/* Video Info Card */}
-                                <div className="p-2.5 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4]/60 space-y-1">
-                                  <div className="text-xs font-bold text-gray-900 truncate">
-                                    {disciple.video_title}
-                                  </div>
-                                  {disciple.event_date && (
-                                    <div className="text-[10.5px] text-gray-500 flex items-center gap-1">
-                                      <Calendar className="w-3 h-3 text-gray-400" />
-                                      <span>
-                                        {new Date(disciple.event_date).toLocaleDateString('en-GB', {
-                                          day: '2-digit',
-                                          month: 'short',
-                                          year: 'numeric',
-                                        })}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {disciple.description && (
-                                    <p className="text-[11px] text-gray-600 line-clamp-2 mt-0.5">
-                                      {disciple.description}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Clickable Action Links */}
-                              <div className="pt-2 border-t border-gray-100 space-y-2">
-                                {disciple.drive_url && (
-                                  <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-emerald-50 border border-emerald-200">
-                                    <span className="text-[11px] font-bold text-emerald-900 truncate">
-                                      Google Drive Link
-                                    </span>
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                      <button
-                                        type="button"
-                                        onClick={() => copyToClipboard(disciple.drive_url!, `${disciple.student_id}-gd`, 'Drive Link')}
-                                        className="px-2 py-1 rounded-lg bg-white border border-emerald-200 text-emerald-800 text-[10.5px] font-bold hover:bg-emerald-50 transition cursor-pointer"
-                                      >
-                                        {copiedId === `${disciple.student_id}-gd` ? 'Copied' : 'Copy'}
-                                      </button>
-                                      <a
-                                        href={disciple.drive_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-2.5 py-1 rounded-lg bg-[#03543F] hover:bg-[#023e2f] text-white text-[10.5px] font-bold transition flex items-center gap-1 cursor-pointer"
-                                      >
-                                        <span>Open</span>
-                                        <ExternalLink className="w-3 h-3" />
-                                      </a>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {disciple.youtube_url && (
-                                  <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-rose-50 border border-rose-200">
-                                    <span className="text-[11px] font-bold text-rose-950 truncate">
-                                      YouTube Video Link
-                                    </span>
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                      <button
-                                        type="button"
-                                        onClick={() => copyToClipboard(disciple.youtube_url!, `${disciple.student_id}-yt`, 'YouTube Link')}
-                                        className="px-2 py-1 rounded-lg bg-white border border-rose-200 text-rose-800 text-[10.5px] font-bold hover:bg-rose-50 transition cursor-pointer"
-                                      >
-                                        {copiedId === `${disciple.student_id}-yt` ? 'Copied' : 'Copy'}
-                                      </button>
-                                      <a
-                                        href={disciple.youtube_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[10.5px] font-bold transition flex items-center gap-1 cursor-pointer"
-                                      >
-                                        <span>Open</span>
-                                        <ExternalLink className="w-3 h-3" />
-                                      </a>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* TAB B: MISSING STUDENTS */}
-                  {guruModalActiveTab === 'missing' && (
-                    <div className="space-y-4">
-                      {modalFilteredMissing.length === 0 ? (
-                        <div className="p-8 text-center bg-emerald-50/60 rounded-2xl border border-emerald-200">
-                          <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
-                          <h4 className="text-sm font-bold text-emerald-900">
-                            {guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch
-                              ? 'No missing students match the selected filters'
-                              : 'All Students Completed!'}
-                          </h4>
-                          <p className="text-xs text-emerald-700 mt-1">
-                            {guruModalBatchFilter !== 'all' || guruModalSelectedStudentIds.length > 0 || guruModalStudentSearch
-                              ? 'Try adjusting your batch filter or student selection above.'
-                              : `${stripGuruPrefix(selectedGuruForModal.full_name)} has shared a monthly performance video for every assigned student in this period.`}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 flex items-center gap-3">
-                            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-                            <p className="text-xs text-rose-900 font-medium">
-                              <strong>{modalFilteredMissing.length} students</strong> are currently missing their monthly performance video link. Follow up with {stripGuruPrefix(selectedGuruForModal.full_name)} to ensure every student receives their performance video.
-                            </p>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                            {modalFilteredMissing.map((disciple, idx) => (
-                              <div
-                                key={`missing-disciple-${disciple.student_id}-${idx}`}
-                                className="p-4 bg-white rounded-2xl border border-rose-200 hover:border-rose-400 transition shadow-2xs space-y-2.5"
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div>
-                                    <h5 className="font-bold text-sm text-[#2D041A]">
-                                      {disciple.student_name}
-                                    </h5>
-                                    <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium mt-0.5">
-                                      <span className="font-mono font-bold text-gray-700">{disciple.roll_number}</span>
-                                      <span>•</span>
-                                      <span>{disciple.batch_name}</span>
-                                    </div>
-                                  </div>
-                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1 shrink-0">
-                                    <AlertCircle className="w-3 h-3 text-rose-600" />
-                                    <span>Didn&apos;t Receive Performance Video</span>
-                                  </span>
-                                </div>
-
-                                <div className="text-xs text-gray-700 bg-[#FFF9FB] p-3 rounded-xl border border-[#F0D5E4]/80 space-y-2">
-                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11.5px]">
-                                    <span className="text-gray-600">
-                                      Course: <strong className="text-gray-900 font-bold">{disciple.course_title || 'Enrolled Course'}</strong>
-                                    </span>
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[10.5px]">
-                                      Pending Batch: {disciple.batch_name}
-                                    </span>
-                                  </div>
-                                  <div className="text-[11px] text-gray-500 flex items-center justify-between pt-1.5 border-t border-rose-100/60">
-                                    <span>Parent: <strong className="text-gray-800 font-semibold">{disciple.parent_name || 'Parent'}</strong></span>
-                                    {disciple.parent_phone && (
-                                      <a
-                                        href={`tel:${disciple.parent_phone}`}
-                                        className="text-[#8A064D] hover:underline font-mono font-bold text-[10.5px] flex items-center gap-1"
-                                      >
-                                        <Phone className="w-3 h-3" />
-                                        <span>{disciple.parent_phone}</span>
-                                      </a>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
           )}
         </div>

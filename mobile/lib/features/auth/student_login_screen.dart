@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/fcm_service.dart';
 import '../../core/widgets/laasya_policy_dialog.dart';
 import '../student/student_main_scaffold.dart';
 
@@ -54,6 +55,11 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
       if (profile['role'] != 'student') {
         await SupabaseService().signOut();
         throw Exception('Access Denied: This login portal is strictly reserved for Students & Parents. Revered Gurus must log in through the Guru Login portal.');
+      }
+
+      final userId = profile['id']?.toString() ?? '';
+      if (userId.isNotEmpty) {
+        FcmService.registerDeviceToken(userId: userId, role: 'student');
       }
 
       if (!mounted) return;
