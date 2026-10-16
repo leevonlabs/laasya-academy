@@ -70,6 +70,11 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
   List<Map<String, dynamic>> get _thisMonthSharedVideos {
     final now = DateTime.now();
     return _mySharedItems.where((item) {
+      final cat = (item['category'] ?? '').toString().toLowerCase();
+      // Only individual performance videos count towards the monthly requirement!
+      if (cat != 'performance' && cat != 'student_performance') {
+        return false;
+      }
       final dateVal = item['event_date'] ?? item['created_at'];
       if (dateVal == null) return false;
       try {
@@ -754,6 +759,30 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
+                                        const SizedBox(height: 5),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFDE8E8),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: const Color(0xFFF8B4B4)),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.warning_amber_rounded, size: 12, color: Color(0xFF9B1C1C)),
+                                              SizedBox(width: 4),
+                                              Text(
+                                                "Didn't receive performance video",
+                                                style: TextStyle(
+                                                  color: Color(0xFF9B1C1C),
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -767,10 +796,10 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     ),
-                                    icon: const Icon(Icons.video_call_rounded, size: 16),
+                                    icon: const Icon(Icons.stars_rounded, size: 16),
                                     label: const Text(
                                       'Share Video',
-                                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 ],
@@ -860,6 +889,8 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                             final targetNames = (item['target_student_names'] ?? item['target_student_name'] ?? '').toString();
                             final hasDrive = driveUrl.isNotEmpty;
                             final hasYoutube = youtubeUrl.isNotEmpty;
+                            final cat = (item['category'] ?? '').toString().toLowerCase();
+                            final isPerf = cat == 'performance' || cat == 'student_performance';
 
                             return Container(
                               decoration: BoxDecoration(
@@ -882,20 +913,55 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFF3E8EE),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            '$course • $batch',
-                                            style: const TextStyle(
-                                              color: Color(0xFF8A064D),
-                                              fontSize: 10.5,
-                                              fontWeight: FontWeight.bold,
+                                        Wrap(
+                                          spacing: 6,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF3E8EE),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                '$course • $batch',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF8A064D),
+                                                  fontSize: 10.5,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
                                             ),
-                                          ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: isPerf ? const Color(0xFFF3E8FF) : const Color(0xFFEBF5FF),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: isPerf ? const Color(0xFFD8B4FE) : const Color(0xFFA4CAFE),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    isPerf ? Icons.stars_rounded : Icons.group_work_rounded,
+                                                    size: 11,
+                                                    color: isPerf ? const Color(0xFF6B21A8) : const Color(0xFF1E429F),
+                                                  ),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    isPerf ? 'Performance' : 'General',
+                                                    style: TextStyle(
+                                                      color: isPerf ? const Color(0xFF6B21A8) : const Color(0xFF1E429F),
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                         Row(
                                           children: [

@@ -72,7 +72,7 @@ export default function GuruAttendanceTab({
   // ---------------------------------------------------------------------------
   const [detailSelectedCourseIds, setDetailSelectedCourseIds] = useState<string[]>([]);
   const [detailSelectedBatchIds, setDetailSelectedBatchIds] = useState<string[]>([]);
-  const [detailStatusFilter, setDetailStatusFilter] = useState<'all' | 'present' | 'absent' | 'upcoming'>('all');
+  const [detailStatusFilter, setDetailStatusFilter] = useState<'all' | 'present' | 'absent'>('all');
   const [detailDatePreset, setDetailDatePreset] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'>('all');
   const [detailMonthLabel, setDetailMonthLabel] = useState('');
   const [detailYearMonth, setDetailYearMonth] = useState('');
@@ -134,7 +134,6 @@ export default function GuruAttendanceTab({
     const totalSessions = records.length;
     const presentSessions = records.filter(r => r.guru_status === 'present').length;
     const absentSessions = records.filter(r => r.guru_status === 'absent').length;
-    const upcomingSessions = records.filter(r => r.guru_status === 'upcoming').length;
     const pastSessions = presentSessions + absentSessions;
     const complianceRate = pastSessions > 0 ? Math.round((presentSessions / pastSessions) * 100) : 100;
 
@@ -143,7 +142,6 @@ export default function GuruAttendanceTab({
       totalSessions,
       presentSessions,
       absentSessions,
-      upcomingSessions,
       complianceRate,
     };
   }, [records, trainers.length]);
@@ -351,7 +349,6 @@ export default function GuruAttendanceTab({
     const total = currentGuruFilteredRecords.length;
     const present = currentGuruFilteredRecords.filter(r => r.guru_status === 'present').length;
     const absent = currentGuruFilteredRecords.filter(r => r.guru_status === 'absent').length;
-    const upcoming = currentGuruFilteredRecords.filter(r => r.guru_status === 'upcoming').length;
     const past = present + absent;
     const complianceRate = past > 0 ? Math.round((present / past) * 100) : 100;
     const totalStudentsRollCall = currentGuruFilteredRecords.reduce((acc, r) => acc + (r.marked_students_count || 0), 0);
@@ -360,7 +357,6 @@ export default function GuruAttendanceTab({
       total,
       present,
       absent,
-      upcoming,
       complianceRate,
       totalStudentsRollCall
     };
@@ -505,14 +501,14 @@ export default function GuruAttendanceTab({
         </div>
 
         {/* 2. Guru Individual KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-xs">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Scheduled</p>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Conducted</p>
             <p className="text-xl font-black text-gray-900 mt-0.5">{currentGuruStats.total}</p>
           </div>
 
           <div className="bg-white p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-xs">
-            <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Conducted (Present)</p>
+            <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Present (Held)</p>
             <p className="text-xl font-black text-emerald-700 mt-0.5">{currentGuruStats.present}</p>
           </div>
 
@@ -521,12 +517,7 @@ export default function GuruAttendanceTab({
             <p className="text-xl font-black text-rose-700 mt-0.5">{currentGuruStats.absent}</p>
           </div>
 
-          <div className="bg-white p-3.5 rounded-xl border border-blue-200 bg-blue-50/20 shadow-xs">
-            <p className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Upcoming Classes</p>
-            <p className="text-xl font-black text-blue-700 mt-0.5">{currentGuruStats.upcoming}</p>
-          </div>
-
-          <div className="bg-white p-3.5 rounded-xl border border-[#D4AF37]/40 bg-[#FFFDF5] shadow-xs col-span-2 sm:col-span-1">
+          <div className="bg-white p-3.5 rounded-xl border border-[#D4AF37]/40 bg-[#FFFDF5] shadow-xs">
             <p className="text-[10px] font-bold text-[#8A064D] uppercase tracking-wider">Compliance Rate</p>
             <p className="text-xl font-black text-[#590231] mt-0.5">{currentGuruStats.complianceRate}%</p>
           </div>
@@ -614,7 +605,6 @@ export default function GuruAttendanceTab({
                 <option value="all">All Verdicts</option>
                 <option value="present">Present (Conducted & Closed)</option>
                 <option value="absent">Absent (Missed Roll-call)</option>
-                <option value="upcoming">Upcoming</option>
               </select>
             </div>
           </div>
@@ -680,7 +670,6 @@ export default function GuruAttendanceTab({
                   {currentGuruFilteredRecords.map((r) => {
                     const isPresent = r.guru_status === 'present';
                     const isAbsent = r.guru_status === 'absent';
-                    const isUpcoming = r.guru_status === 'upcoming';
 
                     return (
                       <tr key={r.session_id} className="hover:bg-rose-50/30 transition-colors">
@@ -713,19 +702,13 @@ export default function GuruAttendanceTab({
                         {/* 5. Student Roll-Call */}
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-1.5">
-                            <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${
-                              r.marked_students_count > 0 
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-rose-50 text-rose-700 border border-rose-200'
-                            }`}>
-                              {r.marked_students_count} / {r.total_enrolled} Marked
+                            <span className="px-2.5 py-1 rounded-md font-bold text-xs bg-gray-50 text-gray-800 border border-gray-200 tabular-nums">
+                              <span className="text-[#8A064D] font-extrabold">{r.total_enrolled}</span> Total / <span className="text-rose-600 font-extrabold">{r.absent_students_count}</span> Absent
                             </span>
                           </div>
-                          {r.marked_students_count > 0 && (
-                            <div className="text-[10px] text-gray-500 mt-0.5">
-                              {r.present_students_count} P • {r.absent_students_count} A
-                            </div>
-                          )}
+                          <div className="text-[10px] text-gray-500 mt-0.5">
+                            {r.present_students_count} Present • {r.absent_students_count} Absent
+                          </div>
                         </td>
 
                         {/* 6. Class Closure */}
@@ -733,11 +716,9 @@ export default function GuruAttendanceTab({
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                             r.session_status === 'completed' || isPresent
                               ? 'bg-emerald-100 text-emerald-800'
-                              : isUpcoming
-                              ? 'bg-blue-100 text-blue-800'
                               : 'bg-rose-100 text-rose-800'
                           }`}>
-                            {r.session_status === 'completed' || isPresent ? 'Closed' : isUpcoming ? 'Scheduled' : 'Open / Unclosed'}
+                            {r.session_status === 'completed' || isPresent ? 'Closed' : 'Open / Unclosed'}
                           </span>
                         </td>
 
@@ -753,12 +734,6 @@ export default function GuruAttendanceTab({
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-800 border border-rose-300">
                               <XCircle className="w-3.5 h-3.5 text-rose-700" />
                               <span>Absent</span>
-                            </span>
-                          )}
-                          {isUpcoming && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                              <Clock className="w-3.5 h-3.5 text-blue-600" />
-                              <span>Upcoming</span>
                             </span>
                           )}
                         </td>
@@ -1044,7 +1019,6 @@ export default function GuruAttendanceTab({
             const coursesTaught = getTrainerCourses(guru, trainerRecs);
             const present = trainerRecs.filter(r => r.guru_status === 'present').length;
             const absent = trainerRecs.filter(r => r.guru_status === 'absent').length;
-            const upcoming = trainerRecs.filter(r => r.guru_status === 'upcoming').length;
             const total = trainerRecs.length;
             const past = present + absent;
             const complianceRate = past > 0 ? Math.round((present / past) * 100) : 100;
@@ -1125,9 +1099,9 @@ export default function GuruAttendanceTab({
                       <p className="text-[10px] font-bold text-rose-700 uppercase">Missed</p>
                       <p className="text-xs font-black text-rose-800 mt-0.5">{absent}</p>
                     </div>
-                    <div className="p-1.5 rounded-lg bg-blue-50/60 border border-blue-100">
-                      <p className="text-[10px] font-bold text-blue-700 uppercase">Upcoming</p>
-                      <p className="text-xs font-black text-blue-800 mt-0.5">{upcoming}</p>
+                    <div className="p-1.5 rounded-lg bg-[#FFF2F8] border border-rose-100">
+                      <p className="text-[10px] font-bold text-[#8A064D] uppercase">Compliance</p>
+                      <p className="text-xs font-black text-[#8A064D] mt-0.5">{complianceRate}%</p>
                     </div>
                   </div>
                 </div>

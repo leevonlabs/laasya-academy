@@ -1427,7 +1427,6 @@ export async function getGuruAttendanceAuditRecords(options?: {
       COALESCE(att_stats.absent_count, 0) as absent_students_count,
       COALESCE(enr_stats.enrolled_count, 0) as total_enrolled,
       CASE 
-        WHEN cs.session_date > CURRENT_DATE THEN 'upcoming'
         WHEN (cs.status = 'completed' OR COALESCE(alert_check.has_alert, false) = true) AND COALESCE(att_stats.marked_count, 0) > 0 THEN 'present'
         ELSE 'absent'
       END as guru_status
@@ -1457,7 +1456,7 @@ export async function getGuruAttendanceAuditRecords(options?: {
         AND sa.created_at::date = cs.session_date
       LIMIT 1
     ) alert_check ON true
-    WHERE 1=1
+    WHERE cs.session_date <= CURRENT_DATE
   `;
   const params: any[] = [];
   if (options?.trainerId && options.trainerId !== 'all') {

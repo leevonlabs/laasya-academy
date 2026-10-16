@@ -49,7 +49,11 @@ import {
   SessionAttendanceAuditRow,
   StudentAbsenceProfile,
   BatchAttendanceReportRow,
-  BatchAttendanceReportSummary
+  BatchAttendanceReportSummary,
+  GuruAbsenceReportRow,
+  GuruAbsenceProfile,
+  GuruBatchAbsenceRow,
+  GuruSessionAttendanceAuditRow
 } from '@/lib/reports';
 import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
 import MonthYearRangeFilter, { MonthYearRangeResult } from '@/components/common/MonthYearRangeFilter';
@@ -113,6 +117,15 @@ const ABSENCE_COLUMNS: ColumnDef[] = [
   { key: 'parent_contact', label: 'Parent Contact' },
   { key: 'total_classes_held', label: 'Classes Held' },
   { key: 'total_absent_days', label: 'Absent Days' },
+];
+
+const GURU_ABSENCE_COLUMNS: ColumnDef[] = [
+  { key: 'trainer_name', label: 'Guru Name' },
+  { key: 'display_title', label: 'Title / Specialization' },
+  { key: 'phone', label: 'Contact Number' },
+  { key: 'email', label: 'Email' },
+  { key: 'total_classes_held', label: 'Classes Held' },
+  { key: 'total_absent_days', label: 'Absent Classes' },
 ];
 
 const FEES_COLUMNS: ColumnDef[] = [
@@ -246,8 +259,8 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     generatedAt: string;
   } | null>(null);
 
-  // Attendance Sub-view: 'general' vs 'absence' vs 'batch'
-  const [attendanceSubView, setAttendanceSubView] = useState<'general' | 'absence' | 'batch'>('general');
+  // Attendance Sub-view: 'general' vs 'absence' vs 'batch' vs 'guru_absence'
+  const [attendanceSubView, setAttendanceSubView] = useState<'general' | 'absence' | 'batch' | 'guru_absence'>('general');
 
   // Batch Attendance Report State
   const [batchAttendanceSort, setBatchAttendanceSort] = useState<'high_absence' | 'low_absence'>('high_absence');
@@ -294,6 +307,41 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     generatedAt: string;
   } | null>(null);
 
+  // Guru Absence Report Filters & Drilldown
+  const [guruAbsenceSort, setGuruAbsenceSort] = useState<'high_absence' | 'low_absence'>('high_absence');
+  const [guruAbsenceSelectedTrainerIds, setGuruAbsenceSelectedTrainerIds] = useState<string[]>([]);
+  // Level 2: Selected guru for batch breakdown
+  const [guruAbsenceSelectedTrainer, setGuruAbsenceSelectedTrainer] = useState<GuruAbsenceReportRow | null>(null);
+  // Level 3: Selected batch for session breakdown
+  const [guruAbsenceSelectedBatch, setGuruAbsenceSelectedBatch] = useState<GuruBatchAbsenceRow | null>(null);
+
+  // Guru Absence Report Data States
+  const [guruAbsenceData, setGuruAbsenceData] = useState<{
+    records: GuruAbsenceReportRow[];
+    totalTrainers: number;
+    generatedAt: string;
+  } | null>(null);
+
+  const [guruBatchesData, setGuruBatchesData] = useState<{
+    trainer: GuruAbsenceProfile | null;
+    records: GuruBatchAbsenceRow[];
+    totalClassesHeld: number;
+    totalPresentDays: number;
+    totalAbsentDays: number;
+    generatedAt: string;
+  } | null>(null);
+
+  const [guruSessionAuditData, setGuruSessionAuditData] = useState<{
+    trainer: GuruAbsenceProfile | null;
+    courseName: string;
+    batchName: string;
+    records: GuruSessionAttendanceAuditRow[];
+    totalSessions: number;
+    presentCount: number;
+    absentCount: number;
+    generatedAt: string;
+  } | null>(null);
+
   // Loading, Error & Refresh States
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -303,6 +351,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     if (activeType === 'attendance') {
       if (attendanceSubView === 'batch') return BATCH_ATTENDANCE_COLUMNS;
       if (attendanceSubView === 'absence') return ABSENCE_COLUMNS;
+      if (attendanceSubView === 'guru_absence') return GURU_ABSENCE_COLUMNS;
       return ATTENDANCE_COLUMNS;
     }
     if (activeType === 'fees') return FEES_COLUMNS;
@@ -328,13 +377,15 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     });
   };
 
-  const openReport = (type: ReportType, subView?: 'general' | 'absence' | 'batch') => {
+  const openReport = (type: ReportType, subView?: 'general' | 'absence' | 'batch' | 'guru_absence') => {
     setActiveType(type);
     if (type === 'attendance' && subView) {
       setAttendanceSubView(subView);
     }
     setAbsenceSelectedStudent(null);
     setAbsenceSelectedBatch(null);
+    setGuruAbsenceSelectedTrainer(null);
+    setGuruAbsenceSelectedBatch(null);
     setHasGenerated(false);
     setAttendanceData(null);
     setFeesData(null);
@@ -342,18 +393,30 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     setIncomeExpensesData(null);
     setBatchAttendanceData(null);
     setAbsenceData(null);
+    setGuruAbsenceData(null);
     setReportView('subpage');
   };
 
   const handleBackFromSubpage = () => {
-    if (activeType === 'attendance' && attendanceSubView === 'absence') {
-      if (absenceSelectedBatch) {
-        setAbsenceSelectedBatch(null);
-        return;
-      }
-      if (absenceSelectedStudent) {
-        setAbsenceSelectedStudent(null);
-        return;
+    if (activeType === 'attendance') {
+      if (attendanceSubView === 'absence') {
+        if (absenceSelectedBatch) {
+          setAbsenceSelectedBatch(null);
+          return;
+        }
+        if (absenceSelectedStudent) {
+          setAbsenceSelectedStudent(null);
+          return;
+        }
+      } else if (attendanceSubView === 'guru_absence') {
+        if (guruAbsenceSelectedBatch) {
+          setGuruAbsenceSelectedBatch(null);
+          return;
+        }
+        if (guruAbsenceSelectedTrainer) {
+          setGuruAbsenceSelectedTrainer(null);
+          return;
+        }
       }
     }
     setReportView('directory');
@@ -376,6 +439,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     if (activeType === 'attendance') {
       if (attendanceSubView === 'general') return 'General Report';
       if (attendanceSubView === 'batch') return 'Batch Attendance Report';
+      if (attendanceSubView === 'guru_absence') return 'Guru Absence Audit';
       return 'Absence Report';
     }
     return 'General Report';
@@ -421,8 +485,8 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
       return;
     }
 
-    // If viewing absence report under attendance, skip general fetch
-    if (activeType === 'attendance' && attendanceSubView === 'absence') {
+    // If viewing absence or guru absence report under attendance, skip general fetch
+    if (activeType === 'attendance' && (attendanceSubView === 'absence' || attendanceSubView === 'guru_absence')) {
       return;
     }
 
@@ -522,6 +586,9 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     setAbsenceData(null);
     setStudentCoursesData(null);
     setSessionAuditData(null);
+    setGuruAbsenceData(null);
+    setGuruBatchesData(null);
+    setGuruSessionAuditData(null);
   }, [
     activeType,
     attendanceSubView,
@@ -535,6 +602,8 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     selectedStatus,
     absenceSort,
     absenceSelectedStudentIds,
+    guruAbsenceSort,
+    guruAbsenceSelectedTrainerIds,
     startDate,
     endDate
   ]);
@@ -635,6 +704,102 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     };
   }, [refreshKey, absenceSelectedStudent, absenceSelectedBatch]);
 
+  // Fetch Guru Absence Report Data safely with AbortController
+  useEffect(() => {
+    if (!hasGenerated) return;
+    if (activeType !== 'attendance' || attendanceSubView !== 'guru_absence') return;
+
+    let isMounted = true;
+    const abortController = new AbortController();
+
+    async function fetchGuruAbsenceSafe() {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      try {
+        const params = new URLSearchParams();
+        params.set('type', 'guru_absence');
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+
+        if (guruAbsenceSelectedTrainer && guruAbsenceSelectedBatch) {
+          // Level 3: Individual session attendance details for guru and batch
+          params.set('trainerId', guruAbsenceSelectedTrainer.trainer_id);
+          params.set('batchId', guruAbsenceSelectedBatch.batch_id);
+        } else if (guruAbsenceSelectedTrainer) {
+          // Level 2: Guru batches breakdown
+          params.set('trainerId', guruAbsenceSelectedTrainer.trainer_id);
+        } else {
+          // Level 1: Overall guru absence report
+          params.set('sort', guruAbsenceSort);
+          if (guruAbsenceSelectedTrainerIds.length > 0) {
+            params.set('trainerIds', guruAbsenceSelectedTrainerIds.join(','));
+          }
+        }
+
+        const res = await fetch(`/api/reports?${params.toString()}`, {
+          signal: abortController.signal
+        });
+
+        if (!res.ok) {
+          throw new Error(`Server returned HTTP ${res.status}`);
+        }
+        const json = await res.json();
+
+        if (!json.success) {
+          throw new Error(json.error || 'Failed to generate guru absence report');
+        }
+
+        if (isMounted) {
+          if (guruAbsenceSelectedTrainer && guruAbsenceSelectedBatch) {
+            setGuruSessionAuditData({
+              trainer: json.trainer,
+              courseName: json.courseName,
+              batchName: json.batchName,
+              records: json.records || [],
+              totalSessions: json.totalSessions || 0,
+              presentCount: json.presentCount || 0,
+              absentCount: json.absentCount || 0,
+              generatedAt: json.generatedAt
+            });
+          } else if (guruAbsenceSelectedTrainer) {
+            setGuruBatchesData({
+              trainer: json.trainer,
+              records: json.records || [],
+              totalClassesHeld: json.totalClassesHeld || 0,
+              totalPresentDays: json.totalPresentDays || 0,
+              totalAbsentDays: json.totalAbsentDays || 0,
+              generatedAt: json.generatedAt
+            });
+          } else {
+            setGuruAbsenceData({
+              records: json.records || [],
+              totalTrainers: json.totalTrainers || 0,
+              generatedAt: json.generatedAt
+            });
+          }
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+        if (isMounted) {
+          console.error('Error fetching guru absence report:', err);
+          setErrorMessage(err.message || 'Unable to retrieve guru absence records. Please verify connectivity and retry.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    fetchGuruAbsenceSafe();
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
+  }, [refreshKey, guruAbsenceSelectedTrainer, guruAbsenceSelectedBatch]);
+
   // Searchable Student & Trainer options
   const studentOptions: StudentOption[] = useMemo(() => {
     return students.map(s => ({
@@ -672,9 +837,13 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     setEndDate(currentMonthRange.end);
     setAbsenceSort('high_absence');
     setBatchAttendanceSort('high_absence');
+    setGuruAbsenceSort('high_absence');
     setAbsenceSelectedStudentIds([]);
     setAbsenceSelectedStudent(null);
     setAbsenceSelectedBatch(null);
+    setGuruAbsenceSelectedTrainerIds([]);
+    setGuruAbsenceSelectedTrainer(null);
+    setGuruAbsenceSelectedBatch(null);
     setHasGenerated(false);
     setAttendanceData(null);
     setFeesData(null);
@@ -682,6 +851,9 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     setIncomeExpensesData(null);
     setBatchAttendanceData(null);
     setAbsenceData(null);
+    setGuruAbsenceData(null);
+    setGuruBatchesData(null);
+    setGuruSessionAuditData(null);
   };
 
   const hasActiveFilters = Boolean(
@@ -692,6 +864,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     selectedStudentId !== 'all' ||
     selectedTrainerId !== 'all' ||
     selectedStatus !== 'all' ||
+    guruAbsenceSelectedTrainerIds.length > 0 ||
     (startDate && startDate !== currentMonthRange.start) ||
     (endDate && endDate !== currentMonthRange.end)
   );
@@ -700,13 +873,14 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
   const currentGeneratedAt = useMemo(() => {
     if (activeType === 'attendance') {
       if (attendanceSubView === 'absence') return absenceData?.generatedAt;
+      if (attendanceSubView === 'guru_absence') return guruAbsenceData?.generatedAt;
       if (attendanceSubView === 'batch') return batchAttendanceData?.generatedAt;
       return attendanceData?.generatedAt;
     }
     if (activeType === 'fees') return feesData?.generatedAt;
     if (activeType === 'salaries') return salariesData?.generatedAt;
     return incomeExpensesData?.generatedAt;
-  }, [activeType, attendanceSubView, attendanceData, absenceData, batchAttendanceData, feesData, salariesData, incomeExpensesData]);
+  }, [activeType, attendanceSubView, attendanceData, absenceData, guruAbsenceData, batchAttendanceData, feesData, salariesData, incomeExpensesData]);
 
   // Record Count
   const currentRecordCount = useMemo(() => {
@@ -715,6 +889,11 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
         if (absenceSelectedStudent && absenceSelectedBatch) return sessionAuditData?.records.length || 0;
         if (absenceSelectedStudent) return studentCoursesData?.records.length || 0;
         return absenceData?.records.length || 0;
+      }
+      if (attendanceSubView === 'guru_absence') {
+        if (guruAbsenceSelectedTrainer && guruAbsenceSelectedBatch) return guruSessionAuditData?.records.length || 0;
+        if (guruAbsenceSelectedTrainer) return guruBatchesData?.records.length || 0;
+        return guruAbsenceData?.records.length || 0;
       }
       if (attendanceSubView === 'batch') {
         return batchAttendanceData?.records.length || 0;
@@ -729,9 +908,14 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     attendanceSubView, 
     absenceSelectedStudent, 
     absenceSelectedBatch, 
+    guruAbsenceSelectedTrainer,
+    guruAbsenceSelectedBatch,
     sessionAuditData, 
     studentCoursesData, 
     absenceData, 
+    guruSessionAuditData,
+    guruBatchesData,
+    guruAbsenceData,
     batchAttendanceData, 
     attendanceData, 
     feesData, 
@@ -767,6 +951,34 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
           rows.push(['Student Name', 'Roll Number', 'Student Contact Number', 'Parent Contact Number', 'Total Classes Held', 'Total Absent Days']);
           absenceData.records.forEach(r => {
             rows.push([r.student_name, r.roll_number, r.student_contact, r.parent_contact, String(r.total_classes_held), String(r.total_absent_days)]);
+          });
+        }
+      } else if (attendanceSubView === 'guru_absence') {
+        if (guruAbsenceSelectedTrainer && guruAbsenceSelectedBatch && guruSessionAuditData) {
+          filename = `laasya_${guruAbsenceSelectedTrainer.trainer_name}_${guruAbsenceSelectedBatch.batch_name}_sessions_audit.csv`;
+          rows.push(['Session Date', 'Guru Name', 'Course', 'Batch', 'Student Roll Call', 'Audit Status', 'Remarks']);
+          guruSessionAuditData.records.forEach(r => {
+            rows.push([
+              r.session_date,
+              r.trainer_name || guruAbsenceSelectedTrainer.trainer_name,
+              r.course_name,
+              r.batch_name,
+              r.student_roll_call || r.roll_call_display || '',
+              r.audit_status,
+              r.remarks || ''
+            ]);
+          });
+        } else if (guruAbsenceSelectedTrainer && guruBatchesData) {
+          filename = `laasya_${guruAbsenceSelectedTrainer.trainer_name}_batches_absence.csv`;
+          rows.push(['Course Name', 'Batch Name', 'Room / Hall', 'Total Classes Held', 'Total Present Days', 'Total Absent Days']);
+          guruBatchesData.records.forEach(r => {
+            rows.push([r.course_name, r.batch_name, r.room_or_hall || 'Mandapam', String(r.total_classes_held), String(r.total_present_days), String(r.total_absent_days)]);
+          });
+        } else if (guruAbsenceData) {
+          filename = `laasya_guru_absence_report.csv`;
+          rows.push(['Guru Name', 'Specialization / Title', 'Contact Number', 'Email', 'Total Classes Held', 'Total Absent Days']);
+          guruAbsenceData.records.forEach(r => {
+            rows.push([r.trainer_name, r.display_title || '', r.phone, r.email, String(r.total_classes_held), String(r.total_absent_days)]);
           });
         }
       } else if (attendanceSubView === 'batch' && batchAttendanceData) {
@@ -837,6 +1049,31 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
           filename = `laasya_student_absence_report.xls`;
           headers = ['Student Name', 'Roll Number', 'Student Contact Number', 'Parent Contact Number', 'Total Classes Held', 'Total Absent Days'];
           rows = absenceData.records.map(r => [r.student_name, r.roll_number, r.student_contact, r.parent_contact, String(r.total_classes_held), String(r.total_absent_days)]);
+        }
+      } else if (attendanceSubView === 'guru_absence') {
+        if (guruAbsenceSelectedTrainer && guruAbsenceSelectedBatch && guruSessionAuditData) {
+          title = `Guru Session Attendance Audit - ${guruAbsenceSelectedTrainer.trainer_name} (${guruAbsenceSelectedBatch.batch_name})`;
+          filename = `laasya_${guruAbsenceSelectedBatch.batch_name}_sessions_audit.xls`;
+          headers = ['Session Date', 'Guru Name', 'Course', 'Batch', 'Student Roll Call', 'Audit Status', 'Remarks'];
+          rows = guruSessionAuditData.records.map(r => [
+            r.session_date,
+            r.trainer_name || guruAbsenceSelectedTrainer.trainer_name,
+            r.course_name,
+            r.batch_name,
+            r.student_roll_call || r.roll_call_display || '',
+            r.audit_status,
+            r.remarks || ''
+          ]);
+        } else if (guruAbsenceSelectedTrainer && guruBatchesData) {
+          title = `Guru Batch Absence Breakdown - ${guruAbsenceSelectedTrainer.trainer_name}`;
+          filename = `laasya_${guruAbsenceSelectedTrainer.trainer_name}_batches_absence.xls`;
+          headers = ['Course Name', 'Batch Name', 'Room / Hall', 'Total Classes Held', 'Total Present Days', 'Total Absent Days'];
+          rows = guruBatchesData.records.map(r => [r.course_name, r.batch_name, r.room_or_hall || 'Mandapam', String(r.total_classes_held), String(r.total_present_days), String(r.total_absent_days)]);
+        } else if (guruAbsenceData) {
+          title = `Guru Absence Report`;
+          filename = `laasya_guru_absence_report.xls`;
+          headers = ['Guru Name', 'Specialization / Title', 'Contact Number', 'Email', 'Total Classes Held', 'Total Absent Days'];
+          rows = guruAbsenceData.records.map(r => [r.trainer_name, r.display_title || '', r.phone, r.email, String(r.total_classes_held), String(r.total_absent_days)]);
         }
       } else if (attendanceSubView === 'batch' && batchAttendanceData) {
         title = `Batch Attendance & Absence Report`;
@@ -914,6 +1151,8 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
       doc.text(
         activeType === 'attendance' && attendanceSubView === 'absence'
           ? 'Official Academic Report: ABSENCE AUDIT'
+          : activeType === 'attendance' && attendanceSubView === 'guru_absence'
+          ? 'Official Academic Report: GURU ABSENCE AUDIT'
           : activeType === 'attendance' && attendanceSubView === 'batch'
           ? 'Official Academic Report: BATCH ATTENDANCE & ABSENCE'
           : `Official Academic Report: ${activeType.toUpperCase().replace('_', ' ')}`,
@@ -958,6 +1197,22 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
             doc.text(`• Total Students Audited: ${absenceData.totalStudents}`, 14, y);
             const totalAbsences = absenceData.records.reduce((sum, r) => sum + r.total_absent_days, 0);
             doc.text(`• Total Absences Tracked: ${totalAbsences}`, 80, y);
+            y += 5;
+          }
+        } else if (attendanceSubView === 'guru_absence') {
+          if (guruAbsenceSelectedTrainer && guruAbsenceSelectedBatch && guruSessionAuditData) {
+            doc.text(`• Guru: ${guruAbsenceSelectedTrainer.trainer_name} (${guruAbsenceSelectedTrainer.display_title || 'Faculty'})`, 14, y);
+            doc.text(`• Course: ${guruAbsenceSelectedBatch.course_name} - ${guruAbsenceSelectedBatch.batch_name}`, 14, y + 5);
+            doc.text(`• Sessions Audited: ${guruSessionAuditData.totalSessions} | Present: ${guruSessionAuditData.presentCount} | Absent: ${guruSessionAuditData.absentCount}`, 14, y + 10);
+            y += 12;
+          } else if (guruAbsenceSelectedTrainer && guruBatchesData) {
+            doc.text(`• Guru: ${guruAbsenceSelectedTrainer.trainer_name} (${guruAbsenceSelectedTrainer.display_title || 'Faculty'})`, 14, y);
+            doc.text(`• Total Classes Held: ${guruBatchesData.totalClassesHeld} | Present: ${guruBatchesData.totalPresentDays} | Absent: ${guruBatchesData.totalAbsentDays}`, 14, y + 5);
+            y += 8;
+          } else if (guruAbsenceData) {
+            doc.text(`• Total Gurus Audited: ${guruAbsenceData.totalTrainers}`, 14, y);
+            const totalAbsences = guruAbsenceData.records.reduce((sum, r) => sum + r.total_absent_days, 0);
+            doc.text(`• Total Guru Absences: ${totalAbsences}`, 80, y);
             y += 5;
           }
         } else if (attendanceSubView === 'batch' && batchAttendanceData) {
@@ -1051,6 +1306,62 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
               doc.text(String(r.student_contact).slice(0, 16), 90, y);
               doc.text(String(r.total_classes_held), 135, y);
               doc.text(String(r.total_absent_days), 165, y);
+              y += 5.5;
+            });
+          }
+        } else if (attendanceSubView === 'guru_absence') {
+          if (guruAbsenceSelectedTrainer && guruAbsenceSelectedBatch && guruSessionAuditData) {
+            doc.text('Session Date', 16, y);
+            doc.text('Course', 55, y);
+            doc.text('Batch', 105, y);
+            doc.text('Roll Call', 145, y);
+            doc.text('Status', 180, y);
+            y += 6;
+            guruSessionAuditData.records.slice(0, 30).forEach(r => {
+              if (y > 275) { doc.addPage(); y = 20; }
+              doc.setFont('helvetica', 'normal');
+              doc.setTextColor(40, 40, 40);
+              doc.text(String(r.session_date), 16, y);
+              doc.text(String(r.course_name).slice(0, 22), 55, y);
+              doc.text(String(r.batch_name).slice(0, 18), 105, y);
+              doc.text(String(r.student_roll_call), 145, y);
+              doc.text(String(r.audit_status), 180, y);
+              y += 5.5;
+            });
+          } else if (guruAbsenceSelectedTrainer && guruBatchesData) {
+            doc.text('Course Name', 16, y);
+            doc.text('Batch', 80, y);
+            doc.text('Classes Held', 120, y);
+            doc.text('Present', 145, y);
+            doc.text('Absent', 170, y);
+            y += 6;
+            guruBatchesData.records.slice(0, 30).forEach(r => {
+              if (y > 275) { doc.addPage(); y = 20; }
+              doc.setFont('helvetica', 'normal');
+              doc.setTextColor(40, 40, 40);
+              doc.text(String(r.course_name).slice(0, 28), 16, y);
+              doc.text(String(r.batch_name).slice(0, 18), 80, y);
+              doc.text(String(r.total_classes_held), 120, y);
+              doc.text(String(r.total_present_days), 145, y);
+              doc.text(String(r.total_absent_days), 170, y);
+              y += 5.5;
+            });
+          } else if (guruAbsenceData) {
+            doc.text('Guru Name', 16, y);
+            doc.text('Title / Specialization', 60, y);
+            doc.text('Contact', 115, y);
+            doc.text('Classes Held', 145, y);
+            doc.text('Absent Days', 175, y);
+            y += 6;
+            guruAbsenceData.records.slice(0, 30).forEach(r => {
+              if (y > 275) { doc.addPage(); y = 20; }
+              doc.setFont('helvetica', 'normal');
+              doc.setTextColor(40, 40, 40);
+              doc.text(String(r.trainer_name).slice(0, 20), 16, y);
+              doc.text(String(r.display_title || '').slice(0, 22), 60, y);
+              doc.text(String(r.phone).slice(0, 14), 115, y);
+              doc.text(String(r.total_classes_held), 145, y);
+              doc.text(String(r.total_absent_days), 175, y);
               y += 5.5;
             });
           }
@@ -1451,6 +1762,21 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
           >
             Student Absence Audit
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAttendanceSubView('guru_absence');
+              setGuruAbsenceSelectedTrainer(null);
+              setGuruAbsenceSelectedBatch(null);
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
+              attendanceSubView === 'guru_absence'
+                ? 'bg-[#590231] text-white shadow-xs'
+                : 'text-gray-700 hover:text-[#8A064D]'
+            }`}
+          >
+            Guru Absence Audit
+          </button>
         </div>
       )}
 
@@ -1462,7 +1788,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
             Date Range:
           </label>
           <div className="w-full sm:max-w-md">
-            {activeType === 'attendance' && (attendanceSubView === 'absence' || attendanceSubView === 'batch') ? (
+            {activeType === 'attendance' && (attendanceSubView === 'absence' || attendanceSubView === 'guru_absence' || attendanceSubView === 'batch') ? (
               <MonthPicker
                 value={startDate}
                 triggerLabel={startDate && endDate ? `${formatDisplayDate(startDate)} – ${formatDisplayDate(endDate)}` : undefined}
@@ -1492,7 +1818,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
         </div>
 
         {/* Row 2: Course (for Attendance General/Batch & Fees) */}
-        {(activeType === 'fees' || (activeType === 'attendance' && attendanceSubView !== 'absence')) && (
+        {(activeType === 'fees' || (activeType === 'attendance' && attendanceSubView !== 'absence' && attendanceSubView !== 'guru_absence')) && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
             <label className="w-28 sm:w-32 text-sm font-bold text-gray-700 shrink-0">
               Course:
@@ -1518,7 +1844,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
         )}
 
         {/* Row 3: Batch (for Attendance General/Batch & Fees) */}
-        {(activeType === 'fees' || (activeType === 'attendance' && attendanceSubView !== 'absence')) && (
+        {(activeType === 'fees' || (activeType === 'attendance' && attendanceSubView !== 'absence' && attendanceSubView !== 'guru_absence')) && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
             <label className="w-28 sm:w-32 text-sm font-bold text-gray-700 shrink-0">
               Batch:
@@ -1570,8 +1896,8 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
           </div>
         )}
 
-        {/* Guru / Faculty Filter (Salaries) */}
-        {activeType === 'salaries' && (
+        {/* Guru / Faculty Filter (Salaries & Guru Absence) */}
+        {((activeType === 'salaries') || (activeType === 'attendance' && attendanceSubView === 'guru_absence')) && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
             <label className="w-28 sm:w-32 text-sm font-bold text-gray-700 shrink-0">
               Guru / Faculty:
@@ -1579,8 +1905,18 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
             <div className="w-full sm:max-w-md">
               <TrainerSearchSelect
                 trainers={trainerOptions}
-                value={selectedTrainerId === 'all' ? '' : selectedTrainerId}
-                onChange={(id) => setSelectedTrainerId(id || 'all')}
+                value={
+                  activeType === 'attendance' && attendanceSubView === 'guru_absence'
+                    ? (guruAbsenceSelectedTrainerIds[0] || '')
+                    : (selectedTrainerId === 'all' ? '' : selectedTrainerId)
+                }
+                onChange={(id) => {
+                  if (activeType === 'attendance' && attendanceSubView === 'guru_absence') {
+                    setGuruAbsenceSelectedTrainerIds(id ? [id] : []);
+                  } else {
+                    setSelectedTrainerId(id || 'all');
+                  }
+                }}
                 placeholder="+ Select Guru"
                 className="w-full"
               />
@@ -1618,19 +1954,27 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
           </div>
         )}
 
-        {/* Sort Filter (Attendance Batch & Absence) */}
-        {activeType === 'attendance' && (attendanceSubView === 'batch' || attendanceSubView === 'absence') && (
+        {/* Sort Filter (Attendance Batch, Student Absence, & Guru Absence) */}
+        {activeType === 'attendance' && (attendanceSubView === 'batch' || attendanceSubView === 'absence' || attendanceSubView === 'guru_absence') && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
             <label className="w-28 sm:w-32 text-sm font-bold text-gray-700 shrink-0">
               Sort By:
             </label>
             <div className="w-full sm:max-w-md">
               <select
-                value={attendanceSubView === 'batch' ? batchAttendanceSort : absenceSort}
+                value={
+                  attendanceSubView === 'batch' 
+                    ? batchAttendanceSort 
+                    : attendanceSubView === 'guru_absence'
+                    ? guruAbsenceSort
+                    : absenceSort
+                }
                 onChange={(e) => {
                   const val = e.target.value as 'high_absence' | 'low_absence';
                   if (attendanceSubView === 'batch') {
                     setBatchAttendanceSort(val);
+                  } else if (attendanceSubView === 'guru_absence') {
+                    setGuruAbsenceSort(val);
                   } else {
                     setAbsenceSort(val);
                   }
@@ -2358,6 +2702,435 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                             <tr>
                               <td colSpan={7} className="py-8 text-center text-xs text-gray-500 font-semibold">
                                 No absence records found matching the selected filters.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* GURU ABSENCE AUDIT (3-TIER DRILLDOWN NAVIGATION) */}
+          {/* ========================================================= */}
+          {activeType === 'attendance' && attendanceSubView === 'guru_absence' && (
+            <div className="space-y-6">
+
+              {/* LEVEL 3: Individual Session Attendance Details for Guru & Batch */}
+              {guruAbsenceSelectedTrainer && guruAbsenceSelectedBatch ? (
+                <div className="space-y-6">
+                  {/* Breadcrumb Navigation Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGuruAbsenceSelectedBatch(null);
+                          setGuruAbsenceSelectedTrainer(null);
+                        }}
+                        className="text-xs font-bold text-gray-500 hover:text-[#8A064D] transition cursor-pointer"
+                      >
+                        Guru Absence Report
+                      </button>
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      <button
+                        type="button"
+                        onClick={() => setGuruAbsenceSelectedBatch(null)}
+                        className="text-xs font-bold text-gray-500 hover:text-[#8A064D] transition cursor-pointer"
+                      >
+                        {guruAbsenceSelectedTrainer.trainer_name}
+                      </button>
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-xs font-black text-[#590231]">
+                        {guruAbsenceSelectedBatch.course_name} ({guruAbsenceSelectedBatch.batch_name})
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setGuruAbsenceSelectedBatch(null)}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FFF2F8] hover:bg-[#F0D5E4] text-[#8A064D] text-xs font-bold transition border border-[#F0D5E4] cursor-pointer"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Back to {guruAbsenceSelectedTrainer.trainer_name}&apos;s Batches</span>
+                    </button>
+                  </div>
+
+                  {/* Header Metrics Banner */}
+                  <div className="bg-white rounded-3xl p-6 border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl md:text-2xl font-black text-[#590231]">
+                        {guruAbsenceSelectedBatch.course_name} — {guruAbsenceSelectedBatch.batch_name}
+                      </h2>
+                      <p className="text-xs font-semibold text-gray-600 mt-1">
+                        Guru / Faculty: <strong className="text-gray-900">{guruAbsenceSelectedTrainer.trainer_name}</strong> ({guruAbsenceSelectedTrainer.display_title || 'Faculty Guru'})
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="px-3.5 py-2 bg-amber-50 rounded-2xl border border-amber-200 text-center">
+                        <div className="text-[10px] font-black uppercase text-amber-800">Classes Scheduled</div>
+                        <div className="text-xl font-black text-amber-700 tabular-nums">
+                          {guruSessionAuditData?.totalSessions || guruAbsenceSelectedBatch.total_classes_held}
+                        </div>
+                      </div>
+                      <div className="px-3.5 py-2 bg-emerald-50 rounded-2xl border border-emerald-200 text-center">
+                        <div className="text-[10px] font-black uppercase text-emerald-800">Present Sessions</div>
+                        <div className="text-xl font-black text-emerald-700 tabular-nums">
+                          {guruSessionAuditData?.presentCount ?? guruAbsenceSelectedBatch.total_present_days}
+                        </div>
+                      </div>
+                      <div className="px-3.5 py-2 bg-rose-50 rounded-2xl border border-rose-200 text-center">
+                        <div className="text-[10px] font-black uppercase text-rose-800">Absent Sessions</div>
+                        <div className="text-xl font-black text-rose-700 tabular-nums">
+                          {guruSessionAuditData?.absentCount ?? guruAbsenceSelectedBatch.total_absent_days}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sessions Audit Table */}
+                  <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
+                    <div className="px-6 py-4 border-b border-[#F0D5E4] bg-[#FFF9FB] flex items-center justify-between">
+                      <h3 className="font-black text-sm text-[#590231] uppercase tracking-wider">
+                        Guru Class Attendance Records — Past Sessions Only
+                      </h3>
+                      <span className="text-xs font-semibold text-[#6E3955] tabular-nums">
+                        {guruSessionAuditData?.records.length || 0} session records
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-sm">
+                        <thead>
+                          <tr className="bg-[#FFF2F8] text-[#590231] border-b border-[#F0D5E4] text-xs font-black uppercase tracking-wider">
+                            <th className="py-3 px-5">Session Date</th>
+                            <th className="py-3 px-5">Course</th>
+                            <th className="py-3 px-5">Batch</th>
+                            <th className="py-3 px-5 text-center">Student Roll Call (Total / Absent)</th>
+                            <th className="py-3 px-5 text-center">Guru Audit Status</th>
+                            <th className="py-3 px-5">Remarks</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#F0D5E4]/60">
+                          {guruSessionAuditData && guruSessionAuditData.records.length > 0 ? (
+                            guruSessionAuditData.records.map((s, idx) => (
+                              <tr key={s.session_id || idx} className="hover:bg-[#FFF9FB] transition">
+                                <td className="py-3.5 px-5 font-bold text-gray-800 whitespace-nowrap tabular-nums">
+                                  {s.session_date}
+                                </td>
+                                <td className="py-3.5 px-5 font-semibold text-gray-900">
+                                  {s.course_name}
+                                </td>
+                                <td className="py-3.5 px-5 font-semibold text-gray-600">
+                                  {s.batch_name}
+                                </td>
+                                <td className="py-3.5 px-5 text-center">
+                                  <span className="px-3 py-1 bg-purple-50 text-purple-900 border border-purple-200 rounded-xl text-xs font-black tabular-nums inline-block">
+                                    {s.student_roll_call}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-5 text-center">
+                                  <span className={`px-3 py-1 rounded-xl text-xs font-black inline-block ${
+                                    s.audit_status === 'Present'
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                      : 'bg-rose-100 text-rose-800 border border-rose-200'
+                                  }`}>
+                                    {s.audit_status}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-5 text-xs text-gray-500">
+                                  {s.remarks || '—'}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={6} className="py-8 text-center text-xs text-gray-500 font-semibold">
+                                No session attendance records found for this guru and batch in the selected date range.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : guruAbsenceSelectedTrainer ? (
+                /* LEVEL 2: Guru Details (Batch-wise Breakdown) */
+                <div className="space-y-6">
+                  {/* Breadcrumb Navigation Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGuruAbsenceSelectedBatch(null);
+                          setGuruAbsenceSelectedTrainer(null);
+                        }}
+                        className="text-xs font-bold text-gray-500 hover:text-[#8A064D] transition cursor-pointer"
+                      >
+                        Guru Absence Report
+                      </button>
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-xs font-black text-[#590231]">
+                        {guruAbsenceSelectedTrainer.trainer_name}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGuruAbsenceSelectedBatch(null);
+                        setGuruAbsenceSelectedTrainer(null);
+                      }}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FFF2F8] hover:bg-[#F0D5E4] text-[#8A064D] text-xs font-bold transition border border-[#F0D5E4] cursor-pointer"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Back to All Gurus</span>
+                    </button>
+                  </div>
+
+                  {/* Guru Details Hero Card */}
+                  <div className="bg-white rounded-3xl p-6 border border-[#F0D5E4] shadow-xs">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <h2 className="text-2xl md:text-3xl font-black text-[#590231]">
+                            {guruAbsenceSelectedTrainer.trainer_name}
+                          </h2>
+                          <span className="px-3 py-1 bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] rounded-xl text-xs font-black">
+                            {guruAbsenceSelectedTrainer.display_title || 'Faculty Guru'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-gray-600 mt-2">
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 text-[#8A064D]" />
+                            <span>Contact: {guruAbsenceSelectedTrainer.phone}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 text-[#8A064D]" />
+                            <span>Email: {guruAbsenceSelectedTrainer.email}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Highlighted Stat Pills */}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="px-4 py-2.5 bg-amber-50 rounded-2xl border border-amber-200 text-center">
+                          <div className="text-[10px] font-black uppercase text-amber-800 tracking-wider">Total Classes Held</div>
+                          <div className="text-2xl font-black text-amber-700 tabular-nums">
+                            {guruBatchesData?.totalClassesHeld ?? guruAbsenceSelectedTrainer.total_classes_held}
+                          </div>
+                        </div>
+                        <div className="px-4 py-2.5 bg-emerald-50 rounded-2xl border border-emerald-200 text-center">
+                          <div className="text-[10px] font-black uppercase text-emerald-800 tracking-wider">Total Present</div>
+                          <div className="text-2xl font-black text-emerald-700 tabular-nums">
+                            {guruBatchesData?.totalPresentDays ?? guruAbsenceSelectedTrainer.total_present_days}
+                          </div>
+                        </div>
+                        <div className="px-4 py-2.5 bg-rose-50 rounded-2xl border border-rose-200 text-center">
+                          <div className="text-[10px] font-black uppercase text-rose-800 tracking-wider">Total Absent Days</div>
+                          <div className="text-2xl font-black text-rose-700 tabular-nums">
+                            {guruBatchesData?.totalAbsentDays ?? guruAbsenceSelectedTrainer.total_absent_days}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Guru Details: Batch-wise Table */}
+                  <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
+                    <div className="px-6 py-4 border-b border-[#F0D5E4] bg-[#FFF9FB] flex items-center justify-between">
+                      <h3 className="font-black text-sm text-[#590231] uppercase tracking-wider">
+                        Assigned Courses & Batch Ratios
+                      </h3>
+                      <span className="text-xs font-semibold text-[#6E3955] tabular-nums">
+                        {guruBatchesData?.records.length || 0} active batch assignments
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-sm">
+                        <thead>
+                          <tr className="bg-[#FFF2F8] text-[#590231] border-b border-[#F0D5E4] text-xs font-black uppercase tracking-wider">
+                            <th className="py-3 px-5">Course Name</th>
+                            <th className="py-3 px-5">Batch Name</th>
+                            <th className="py-3 px-5">Mandapam / Hall</th>
+                            <th className="py-3 px-5 text-center">Total Classes Held</th>
+                            <th className="py-3 px-5 text-center">Present Classes</th>
+                            <th className="py-3 px-5 text-center">Absent Classes</th>
+                            <th className="py-3 px-5 text-center">Details</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#F0D5E4]/60">
+                          {guruBatchesData && guruBatchesData.records.length > 0 ? (
+                            guruBatchesData.records.map((b, idx) => (
+                              <tr key={b.batch_id || idx} className="hover:bg-[#FFF9FB] transition">
+                                <td className="py-3.5 px-5 font-bold text-gray-900">
+                                  {b.course_name}
+                                </td>
+                                <td className="py-3.5 px-5 font-semibold text-gray-700">
+                                  {b.batch_name}
+                                </td>
+                                <td className="py-3.5 px-5 font-semibold text-gray-600">
+                                  {b.room_or_hall || 'Mandapam'}
+                                </td>
+                                <td className="py-3.5 px-5 text-center">
+                                  <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl font-black text-xs tabular-nums inline-block">
+                                    {b.total_classes_held}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-5 text-center">
+                                  <span className="px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl font-black text-xs tabular-nums inline-block">
+                                    {b.total_present_days}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-5 text-center">
+                                  <span className="px-3 py-1 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl font-black text-xs tabular-nums inline-block">
+                                    {b.total_absent_days}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-5 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setGuruAbsenceSelectedBatch(b)}
+                                    className="px-3.5 py-1.5 rounded-xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-bold transition inline-flex items-center gap-1 shadow-xs cursor-pointer active:scale-95"
+                                  >
+                                    <span>Details</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={7} className="py-8 text-center text-xs text-gray-500 font-semibold">
+                                No batches assigned to this guru.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* LEVEL 1: Overall Guru Absence Report */
+                <div className="space-y-6">
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-xs">
+                      <div className="text-xs font-black text-[#6E3955] uppercase tracking-wide">Gurus Audited</div>
+                      <div className="text-3xl font-black text-[#590231] mt-2 tabular-nums">
+                        {guruAbsenceData?.totalTrainers || 0}
+                      </div>
+                      <div className="text-[11px] font-semibold text-[#8C5E77] mt-1">Faculty instructors</div>
+                    </div>
+
+                    <div className="bg-white rounded-3xl p-5 border border-amber-200 shadow-xs">
+                      <div className="text-xs font-black text-amber-800 uppercase tracking-wide">Classes Tracked</div>
+                      <div className="text-3xl font-black text-amber-700 mt-2 tabular-nums">
+                        {guruAbsenceData?.records.reduce((sum, r) => sum + r.total_classes_held, 0) || 0}
+                      </div>
+                      <div className="text-[11px] font-semibold text-amber-600 mt-1">Cumulative scheduled classes</div>
+                    </div>
+
+                    <div className="bg-white rounded-3xl p-5 border border-rose-200 shadow-xs">
+                      <div className="text-xs font-black text-rose-800 uppercase tracking-wide">Guru Absences Logged</div>
+                      <div className="text-3xl font-black text-rose-700 mt-2 tabular-nums">
+                        {guruAbsenceData?.records.reduce((sum, r) => sum + r.total_absent_days, 0) || 0}
+                      </div>
+                      <div className="text-[11px] font-semibold text-rose-600 mt-1">Total missed classes</div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-5 border border-[#F9E33A] shadow-xs">
+                      <div className="text-xs font-black text-[#854D0E] uppercase flex items-center justify-between">
+                        <span>Current Sorting</span>
+                        <ArrowDownWideNarrow className="w-4 h-4 text-[#854D0E]" />
+                      </div>
+                      <div className="text-lg font-black text-[#590231] mt-2 truncate">
+                        {guruAbsenceSort === 'high_absence' ? 'High Absence' : 'Low Absence'}
+                      </div>
+                      <div className="text-[11px] font-semibold text-emerald-700 mt-1 font-bold">
+                        {guruAbsenceSort === 'high_absence' ? 'Highest absences first' : 'Lowest absences first'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Main Guru Absence Table */}
+                  <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
+                    <div className="px-6 py-4 border-b border-[#F0D5E4] bg-[#FFF9FB] flex items-center justify-between">
+                      <h3 className="font-black text-sm text-[#590231] uppercase tracking-wider">
+                        Guru Absence Ledger
+                      </h3>
+                      <span className="text-xs font-semibold text-[#6E3955] tabular-nums">
+                        {guruAbsenceData?.records.length || 0} gurus listed
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-sm">
+                        <thead>
+                          <tr className="bg-[#FFF2F8] text-[#590231] border-b border-[#F0D5E4] text-xs font-black uppercase tracking-wider">
+                            <th className="py-3 px-5">Guru / Faculty Name</th>
+                            <th className="py-3 px-5">Specialization / Title</th>
+                            <th className="py-3 px-5">Contact Number</th>
+                            <th className="py-3 px-5">Email</th>
+                            <th className="py-3 px-5 text-center">Total Classes Held</th>
+                            <th className="py-3 px-5 text-center">Total Absent Days</th>
+                            <th className="py-3 px-5 text-center">Details</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#F0D5E4]/60">
+                          {guruAbsenceData && guruAbsenceData.records.length > 0 ? (
+                            guruAbsenceData.records.map((r) => (
+                              <tr key={r.trainer_id} className="hover:bg-[#FFF9FB] transition">
+                                <td className="py-3.5 px-5 font-bold text-gray-900">
+                                  {r.trainer_name}
+                                </td>
+                                <td className="py-3.5 px-5 font-semibold text-[#6E3955]">
+                                  {r.display_title || 'Faculty Guru'}
+                                </td>
+                                <td className="py-3.5 px-5 font-semibold text-gray-700">
+                                  {r.phone}
+                                </td>
+                                <td className="py-3.5 px-5 font-semibold text-gray-700">
+                                  {r.email}
+                                </td>
+                                <td className="py-3.5 px-5 text-center font-black text-[#590231] tabular-nums">
+                                  {r.total_classes_held}
+                                </td>
+                                <td className="py-3.5 px-5 text-center">
+                                  <span className={`px-3 py-1 rounded-xl text-xs font-black tabular-nums inline-block ${
+                                    r.total_absent_days > 0
+                                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  }`}>
+                                    {r.total_absent_days}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-5 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setGuruAbsenceSelectedTrainer(r)}
+                                    className="px-3.5 py-1.5 rounded-xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-bold transition inline-flex items-center gap-1 shadow-xs cursor-pointer active:scale-95"
+                                  >
+                                    <span>Details</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={7} className="py-8 text-center text-xs text-gray-500 font-semibold">
+                                No guru absence records found matching the selected filters.
                               </td>
                             </tr>
                           )}

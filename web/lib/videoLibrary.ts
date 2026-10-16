@@ -336,7 +336,7 @@ export async function createEventFolder(data: {
   created_by?: string;
 }): Promise<VideoLibraryItem | null> {
   try {
-    const category = data.category || (data.shared_by_type === 'guru' ? 'guru_share' : 'event_folder');
+    const category = data.category || (data.shared_by_type === 'guru' ? 'performance' : 'event_folder');
     const validCourseId = isValidUuid(data.target_course_id) ? data.target_course_id : null;
     const validBatchId = isValidUuid(data.target_batch_id) ? data.target_batch_id : null;
 
@@ -767,13 +767,17 @@ export async function getGuruComplianceData(options?: {
         }
       });
       const assignedStudents = Array.from(studentMap.values());
-      const trainerVideos = filteredVideos.filter((v: any) => isVideoByTrainer(v, trainer));
+      const trainerAllVideos = filteredVideos.filter((v: any) => isVideoByTrainer(v, trainer));
+      // Compliance requirement: Every disciple must receive at least 1 individual performance video (not general)
+      const trainerPerformanceVideos = trainerAllVideos.filter((v: any) => 
+        (v.category === 'performance' || v.category === 'student_performance')
+      );
 
       const receivedDisciples: GuruComplianceDisciple[] = [];
       const missingDisciples: GuruComplianceDisciple[] = [];
 
       assignedStudents.forEach((student: any) => {
-        const matchingVideos = trainerVideos.filter((v: any) => isStudentTargeted(v, student));
+        const matchingVideos = trainerPerformanceVideos.filter((v: any) => isStudentTargeted(v, student));
 
         if (matchingVideos.length > 0) {
           const primaryVideo = matchingVideos[0];
@@ -859,8 +863,8 @@ export async function getGuruComplianceData(options?: {
         compliance_status: complianceStatus,
         received_disciples: receivedDisciples,
         missing_disciples: missingDisciples,
-        shared_videos_count: trainerVideos.length,
-        shared_videos: trainerVideos,
+        shared_videos_count: trainerAllVideos.length,
+        shared_videos: trainerAllVideos,
       };
     });
 

@@ -5,7 +5,60 @@ import { getExpenses } from './expenses';
 // TYPES
 // -------------------------------------------------------------
 
-export type ReportType = 'attendance' | 'fees' | 'salaries' | 'income_expenses' | 'absence' | 'batch_attendance' | 'batch';
+export type ReportType = 'attendance' | 'fees' | 'salaries' | 'income_expenses' | 'absence' | 'guru_absence' | 'batch_attendance' | 'batch';
+
+export interface GuruAbsenceReportRow {
+  trainer_id: string;
+  trainer_name: string;
+  display_title: string;
+  phone: string;
+  email: string;
+  specializations: string[] | null;
+  assigned_batches_count: number;
+  total_classes_held: number;
+  total_present_days: number;
+  total_absent_days: number;
+  absence_percentage: number;
+}
+
+export interface GuruAbsenceProfile {
+  trainer_id: string;
+  trainer_name: string;
+  display_title: string;
+  phone: string;
+  email: string;
+  specializations: string[] | null;
+}
+
+export interface GuruBatchAbsenceRow {
+  course_id: string;
+  course_name: string;
+  batch_id: string;
+  batch_name: string;
+  room_or_hall: string;
+  total_classes_held: number;
+  total_present_days: number;
+  total_absent_days: number;
+  absence_percentage: number;
+}
+
+export interface GuruSessionAttendanceAuditRow {
+  session_id: string;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  trainer_name: string;
+  course_name: string;
+  batch_name: string;
+  audit_status: 'Present' | 'Absent';
+  total_enrolled: number;
+  present_students_count: number;
+  absent_students_count: number;
+  roll_call_display: string;
+  student_roll_call: string;
+  session_status: string;
+  remarks?: string | null;
+}
 
 export interface BatchAttendanceReportRow {
   batch_id: string;
@@ -1132,6 +1185,394 @@ export async function getBatchAttendanceReport(filters: {
         totalBatches: 0,
         totalStudents: 0
       },
+      generatedAt: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * Guru Absence Audit - Level 1: Overall Guru absence report
+ */
+export async function getGuruAbsenceReport(filters: {
+  trainerIds?: string[];
+  sort?: 'high_absence' | 'low_absence';
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  records: GuruAbsenceReportRow[];
+  totalTrainers: number;
+  generatedAt: string;
+}> {
+  try {
+    const params: any[] = [];
+    let sql = `
+      SELECT 
+        t.id as trainer_id,
+        COALESCE(p.full_name, 'Faculty Guru') as trainer_name,
+        COALESCE(t.display_title, 'Faculty Guru') as display_title,
+        COALESCE(p.phone, 'N/A') as phone,
+        COALESCE(p.email, 'N/A') as email,
+        t.specializations,
+        COUNT(DISTINCT b.id)::int as assigned_batches_count,
+        COUNT(DISTINCT cs.id)::int as total_classes_held,
+        COUNT(DISTINCT CASE 
+          WHEN (cs.status = 'completed' OR alert_check.has_alert = true) AND COALESCE(att_stats.marked_count, 0) > 0 THEN cs.id 
+        END)::int as total_present_days,
+        COUNT(DISTINCT CASE 
+          WHEN NOT ((cs.status = 'completed' OR alert_check.has_alert = true) AND COALESCE(att_stats.marked_count, 0) > 0) THEN cs.id 
+        END)::int as total_absent_days
+      FROM public.trainers t
+      JOIN public.profiles p ON t.profile_id = p.id
+      LEFT JOIN public.batches b ON b.trainer_id = t.id
+      LEFT JOIN public.class_sessions cs ON (cs.trainer_id = t.id OR cs.batch_id = b.id)
+        AND cs.session_date <= CURRENT_DATE
+    `;
+
+    if (filters.startDate) {
+      params.push(filters.startDate);
+      sql += ` AND cs.session_date >= $${params.length}::date`;
+    }
+    if (filters.endDate) {
+      params.push(filters.endDate);
+      sql += ` AND cs.session_date <= $${params.length}::date`;
+    }
+
+    sql += `
+      LEFT JOIN LATERAL (
+        SELECT count(*)::int as marked_count
+        FROM public.attendance a
+        WHERE a.session_id = cs.id
+      ) att_stats ON true
+      LEFT JOIN LATERAL (
+        SELECT true as has_alert
+        FROM public.session_alerts sa
+        WHERE (sa.batch_id = cs.batch_id::text OR sa.batch_name = b.name)
+          AND sa.alert_type = 'class_closed'
+          AND sa.created_at::date = cs.session_date
+        LIMIT 1
+      ) alert_check ON true
+      WHERE t.is_active = true
+    `;
+
+    if (filters.trainerIds && filters.trainerIds.length > 0) {
+      params.push(filters.trainerIds);
+      sql += ` AND t.id = ANY($${params.length}::uuid[])`;
+    }
+
+    sql += `
+      GROUP BY t.id, p.full_name, t.display_title, p.phone, p.email, t.specializations
+    `;
+
+    if (filters.sort === 'low_absence') {
+      sql += ` ORDER BY total_absent_days ASC, p.full_name ASC`;
+    } else {
+      sql += ` ORDER BY total_absent_days DESC, p.full_name ASC`;
+    }
+
+    const rawRecords = await query<any>(sql, params);
+    const records: GuruAbsenceReportRow[] = rawRecords.map(r => {
+      const held = Number(r.total_classes_held || 0);
+      const present = Number(r.total_present_days || 0);
+      const absent = Number(r.total_absent_days || 0);
+      const absence_percentage = held > 0 ? Math.round((absent / held) * 100) : 0;
+      return {
+        trainer_id: r.trainer_id,
+        trainer_name: r.trainer_name,
+        display_title: r.display_title,
+        phone: r.phone,
+        email: r.email,
+        specializations: r.specializations,
+        assigned_batches_count: Number(r.assigned_batches_count || 0),
+        total_classes_held: held,
+        total_present_days: present,
+        total_absent_days: absent,
+        absence_percentage
+      };
+    });
+
+    return {
+      records,
+      totalTrainers: records.length,
+      generatedAt: new Date().toISOString()
+    };
+  } catch (err) {
+    console.error('Error in getGuruAbsenceReport:', err);
+    return {
+      records: [],
+      totalTrainers: 0,
+      generatedAt: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * Guru Absence Audit - Level 2: Guru batch-wise breakdown
+ */
+export async function getGuruBatchAbsenceReport(filters: {
+  trainerId: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  trainer: GuruAbsenceProfile | null;
+  records: GuruBatchAbsenceRow[];
+  totalClassesHeld: number;
+  totalPresentDays: number;
+  totalAbsentDays: number;
+  generatedAt: string;
+}> {
+  try {
+    const trainerProfileSql = `
+      SELECT 
+        t.id as trainer_id,
+        COALESCE(p.full_name, 'Faculty Guru') as trainer_name,
+        COALESCE(t.display_title, 'Faculty Guru') as display_title,
+        COALESCE(p.phone, 'N/A') as phone,
+        COALESCE(p.email, 'N/A') as email,
+        t.specializations
+      FROM public.trainers t
+      JOIN public.profiles p ON t.profile_id = p.id
+      WHERE t.id = $1
+    `;
+    const trainer = await queryOne<GuruAbsenceProfile>(trainerProfileSql, [filters.trainerId]);
+
+    const params: any[] = [filters.trainerId];
+    let sql = `
+      SELECT 
+        c.id as course_id,
+        c.title as course_name,
+        b.id as batch_id,
+        b.name as batch_name,
+        COALESCE(b.room_or_hall, 'Mandapam') as room_or_hall,
+        COUNT(DISTINCT cs.id)::int as total_classes_held,
+        COUNT(DISTINCT CASE 
+          WHEN (cs.status = 'completed' OR alert_check.has_alert = true) AND COALESCE(att_stats.marked_count, 0) > 0 THEN cs.id 
+        END)::int as total_present_days,
+        COUNT(DISTINCT CASE 
+          WHEN NOT ((cs.status = 'completed' OR alert_check.has_alert = true) AND COALESCE(att_stats.marked_count, 0) > 0) THEN cs.id 
+        END)::int as total_absent_days
+      FROM public.batches b
+      JOIN public.courses c ON b.course_id = c.id
+      LEFT JOIN public.class_sessions cs ON (cs.batch_id = b.id OR cs.trainer_id = $1)
+        AND cs.session_date <= CURRENT_DATE
+    `;
+
+    if (filters.startDate) {
+      params.push(filters.startDate);
+      sql += ` AND cs.session_date >= $${params.length}::date`;
+    }
+    if (filters.endDate) {
+      params.push(filters.endDate);
+      sql += ` AND cs.session_date <= $${params.length}::date`;
+    }
+
+    sql += `
+      LEFT JOIN LATERAL (
+        SELECT count(*)::int as marked_count
+        FROM public.attendance a
+        WHERE a.session_id = cs.id
+      ) att_stats ON true
+      LEFT JOIN LATERAL (
+        SELECT true as has_alert
+        FROM public.session_alerts sa
+        WHERE (sa.batch_id = cs.batch_id::text OR sa.batch_name = b.name)
+          AND sa.alert_type = 'class_closed'
+          AND sa.created_at::date = cs.session_date
+        LIMIT 1
+      ) alert_check ON true
+      WHERE b.trainer_id = $1
+      GROUP BY c.id, c.title, b.id, b.name, b.room_or_hall
+      ORDER BY total_absent_days DESC, c.title ASC
+    `;
+
+    const rawRecords = await query<any>(sql, params);
+    const records: GuruBatchAbsenceRow[] = rawRecords.map(r => {
+      const held = Number(r.total_classes_held || 0);
+      const present = Number(r.total_present_days || 0);
+      const absent = Number(r.total_absent_days || 0);
+      const absence_percentage = held > 0 ? Math.round((absent / held) * 100) : 0;
+      return {
+        course_id: r.course_id,
+        course_name: r.course_name,
+        batch_id: r.batch_id,
+        batch_name: r.batch_name,
+        room_or_hall: r.room_or_hall,
+        total_classes_held: held,
+        total_present_days: present,
+        total_absent_days: absent,
+        absence_percentage
+      };
+    });
+
+    const totalClassesHeld = records.reduce((sum, r) => sum + r.total_classes_held, 0);
+    const totalPresentDays = records.reduce((sum, r) => sum + r.total_present_days, 0);
+    const totalAbsentDays = records.reduce((sum, r) => sum + r.total_absent_days, 0);
+
+    return {
+      trainer,
+      records,
+      totalClassesHeld,
+      totalPresentDays,
+      totalAbsentDays,
+      generatedAt: new Date().toISOString()
+    };
+  } catch (err) {
+    console.error('Error in getGuruBatchAbsenceReport:', err);
+    return {
+      trainer: null,
+      records: [],
+      totalClassesHeld: 0,
+      totalPresentDays: 0,
+      totalAbsentDays: 0,
+      generatedAt: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * Guru Absence Audit - Level 3: Individual session attendance details for guru and batch
+ */
+export async function getGuruBatchSessionAudit(filters: {
+  trainerId: string;
+  batchId: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  trainer: GuruAbsenceProfile | null;
+  courseName: string;
+  batchName: string;
+  records: GuruSessionAttendanceAuditRow[];
+  totalSessions: number;
+  presentCount: number;
+  absentCount: number;
+  generatedAt: string;
+}> {
+  try {
+    const trainerProfileSql = `
+      SELECT 
+        t.id as trainer_id,
+        COALESCE(p.full_name, 'Faculty Guru') as trainer_name,
+        COALESCE(t.display_title, 'Faculty Guru') as display_title,
+        COALESCE(p.phone, 'N/A') as phone,
+        COALESCE(p.email, 'N/A') as email,
+        t.specializations
+      FROM public.trainers t
+      JOIN public.profiles p ON t.profile_id = p.id
+      WHERE t.id = $1
+    `;
+    const trainer = await queryOne<GuruAbsenceProfile>(trainerProfileSql, [filters.trainerId]);
+
+    const batchInfoSql = `
+      SELECT c.title as course_name, b.name as batch_name
+      FROM public.batches b
+      JOIN public.courses c ON c.id = b.course_id
+      WHERE b.id = $1
+    `;
+    const batchInfo = await queryOne<{ course_name: string; batch_name: string }>(batchInfoSql, [filters.batchId]);
+
+    const params: any[] = [filters.batchId];
+    let sql = `
+      SELECT 
+        cs.id as session_id,
+        TO_CHAR(cs.session_date, 'DD/MM/YYYY') as session_date,
+        COALESCE(cs.start_time::text, '00:00') as start_time,
+        COALESCE(cs.end_time::text, '00:00') as end_time,
+        c.title as course_name,
+        b.name as batch_name,
+        CASE 
+          WHEN (cs.status = 'completed' OR alert_check.has_alert = true) AND COALESCE(att_stats.marked_count, 0) > 0 THEN 'Present'
+          ELSE 'Absent'
+        END as audit_status,
+        COALESCE(enr_stats.enrolled_count, 0)::int as total_enrolled,
+        COALESCE(att_stats.present_count, 0)::int as present_students_count,
+        COALESCE(att_stats.absent_count, 0)::int as absent_students_count,
+        cs.status as session_status,
+        cs.notes as remarks
+      FROM public.class_sessions cs
+      JOIN public.batches b ON b.id = cs.batch_id
+      JOIN public.courses c ON c.id = b.course_id
+      LEFT JOIN LATERAL (
+        SELECT 
+          count(*)::int as marked_count,
+          count(*) FILTER (WHERE a.status = 'present')::int as present_count,
+          count(*) FILTER (WHERE a.status = 'absent')::int as absent_count
+        FROM public.attendance a
+        WHERE a.session_id = cs.id
+      ) att_stats ON true
+      LEFT JOIN LATERAL (
+        SELECT count(*)::int as enrolled_count
+        FROM public.batch_enrollments be
+        WHERE be.batch_id = cs.batch_id AND be.status = 'active'
+      ) enr_stats ON true
+      LEFT JOIN LATERAL (
+        SELECT true as has_alert
+        FROM public.session_alerts sa
+        WHERE (sa.batch_id = cs.batch_id::text OR sa.batch_name = b.name)
+          AND sa.alert_type = 'class_closed'
+          AND sa.created_at::date = cs.session_date
+        LIMIT 1
+      ) alert_check ON true
+      WHERE cs.batch_id = $1
+        AND cs.session_date <= CURRENT_DATE
+    `;
+
+    if (filters.startDate) {
+      params.push(filters.startDate);
+      sql += ` AND cs.session_date >= $${params.length}::date`;
+    }
+    if (filters.endDate) {
+      params.push(filters.endDate);
+      sql += ` AND cs.session_date <= $${params.length}::date`;
+    }
+
+    sql += ` ORDER BY cs.session_date DESC, cs.start_time DESC`;
+
+    const rawRecords = await query<any>(sql, params);
+    const records: GuruSessionAttendanceAuditRow[] = rawRecords.map(r => {
+      const totalEnrolled = Number(r.total_enrolled || 0);
+      const absentCount = Number(r.absent_students_count || 0);
+      const rollCallFormatted = `${totalEnrolled} Total / ${absentCount} Absent`;
+      return {
+        session_id: r.session_id,
+        session_date: r.session_date,
+        start_time: r.start_time,
+        end_time: r.end_time,
+        trainer_name: trainer?.trainer_name || 'Faculty Guru',
+        course_name: r.course_name,
+        batch_name: r.batch_name,
+        audit_status: r.audit_status as 'Present' | 'Absent',
+        total_enrolled: totalEnrolled,
+        present_students_count: Number(r.present_students_count || 0),
+        absent_students_count: absentCount,
+        roll_call_display: rollCallFormatted,
+        student_roll_call: rollCallFormatted,
+        session_status: r.session_status,
+        remarks: r.remarks
+      };
+    });
+
+    const presentCount = records.filter(r => r.audit_status === 'Present').length;
+    const absentCount = records.filter(r => r.audit_status === 'Absent').length;
+
+    return {
+      trainer,
+      courseName: batchInfo?.course_name || 'Course',
+      batchName: batchInfo?.batch_name || 'Batch',
+      records,
+      totalSessions: records.length,
+      presentCount,
+      absentCount,
+      generatedAt: new Date().toISOString()
+    };
+  } catch (err) {
+    console.error('Error in getGuruBatchSessionAudit:', err);
+    return {
+      trainer: null,
+      courseName: 'Course',
+      batchName: 'Batch',
+      records: [],
+      totalSessions: 0,
+      presentCount: 0,
+      absentCount: 0,
       generatedAt: new Date().toISOString()
     };
   }

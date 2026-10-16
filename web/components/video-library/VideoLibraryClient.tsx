@@ -100,12 +100,13 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
   const [allVideosMonthLabel, setAllVideosMonthLabel] = useState('');
   const [allVideosYearMonth, setAllVideosYearMonth] = useState('');
 
-  // Guru Share Tab Filters
+  // Guru Share Tab Filters (General Videos View)
   const [guruShareSearch, setGuruShareSearch] = useState('');
-  const [guruShareTrainerFilter, setGuruShareTrainerFilter] = useState('all');
-  const [guruShareCourseFilter, setGuruShareCourseFilter] = useState('all');
-  const [guruShareMonthFilter, setGuruShareMonthFilter] = useState('all');
-  const [guruShareYearFilter, setGuruShareYearFilter] = useState('all');
+  const [guruGeneralMonthLabel, setGuruGeneralMonthLabel] = useState('');
+  const [guruGeneralYearMonth, setGuruGeneralYearMonth] = useState('');
+  const [selectedGeneralGurus, setSelectedGeneralGurus] = useState<string[]>([]);
+  const [isGuruFilterOpen, setIsGuruFilterOpen] = useState(false);
+  const [guruFilterSearch, setGuruFilterSearch] = useState('');
 
   // GURU PERFORMANCE VIDEO COMPLIANCE TRACKING STATE
   const [complianceMonth, setComplianceMonth] = useState<string>(() => {
@@ -400,31 +401,49 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
         set.add(i.trainer_name);
       }
     });
+    if (complianceData.gurus) {
+      complianceData.gurus.forEach(g => {
+        if (g.full_name) set.add(g.full_name);
+      });
+    }
     return Array.from(set).sort();
-  }, [items]);
+  }, [items, complianceData.gurus]);
 
   // All Guru Shared items
   const guruSharedItems = useMemo(() => {
     return items.filter(i => i.shared_by_type === 'guru' || i.category === 'guru_share' || Boolean(i.trainer_id));
   }, [items]);
 
-  // Filtered Guru Shared items
-  const guruFilteredItems = useMemo(() => {
+  // General Guru Shared items (ONLY general video links, strictly excludes performance videos)
+  const guruGeneralItems = useMemo(() => {
     return guruSharedItems.filter(item => {
-      if (guruShareTrainerFilter !== 'all' && item.trainer_name !== guruShareTrainerFilter) {
+      const cat = (item.category || '').toLowerCase();
+      // Strictly exclude performance videos
+      if (cat === 'performance' || cat === 'student_performance') {
         return false;
       }
-      if (guruShareCourseFilter !== 'all' && item.target_course_id !== guruShareCourseFilter && item.target_course_title !== guruShareCourseFilter) {
-        return false;
+
+      // Filter by selected Gurus (multi-select)
+      if (selectedGeneralGurus.length > 0) {
+        const itemGuru = item.trainer_name || item.created_by || '';
+        const matches = selectedGeneralGurus.some(
+          g => g === itemGuru || stripGuruPrefix(g).toLowerCase() === stripGuruPrefix(itemGuru).toLowerCase()
+        );
+        if (!matches) return false;
       }
-      if (guruShareMonthFilter !== 'all' && item.event_date) {
-        const m = (new Date(item.event_date).getMonth() + 1).toString();
-        if (m !== guruShareMonthFilter) return false;
+
+      // Filter by Month & Year (from MonthPicker)
+      if (guruGeneralYearMonth) {
+        const [targetYear, targetMonth] = guruGeneralYearMonth.split('-');
+        if (item.event_date) {
+          const d = new Date(item.event_date);
+          const y = d.getFullYear().toString();
+          const m = (d.getMonth() + 1).toString().padStart(2, '0');
+          if (y !== targetYear || m !== targetMonth) return false;
+        }
       }
-      if (guruShareYearFilter !== 'all' && item.event_date) {
-        const y = new Date(item.event_date).getFullYear().toString();
-        if (y !== guruShareYearFilter) return false;
-      }
+
+      // Filter by search query
       if (guruShareSearch.trim()) {
         const q = guruShareSearch.toLowerCase();
         const matchTitle = item.title?.toLowerCase().includes(q);
@@ -434,9 +453,17 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
         const matchDesc = item.description?.toLowerCase().includes(q);
         if (!matchTitle && !matchTrainer && !matchCourse && !matchBatch && !matchDesc) return false;
       }
+
       return true;
     });
-  }, [guruSharedItems, guruShareTrainerFilter, guruShareCourseFilter, guruShareMonthFilter, guruShareYearFilter, guruShareSearch]);
+  }, [guruSharedItems, selectedGeneralGurus, guruGeneralYearMonth, guruShareSearch]);
+
+  // Filtered Gurus for dropdown in General view
+  const filteredGuruNamesForDropdown = useMemo(() => {
+    if (!guruFilterSearch.trim()) return guruNames;
+    const q = guruFilterSearch.toLowerCase();
+    return guruNames.filter(g => stripGuruPrefix(g).toLowerCase().includes(q) || g.toLowerCase().includes(q));
+  }, [guruNames, guruFilterSearch]);
 
   // Filtered Gurus for Compliance Directory
   const filteredComplianceGurus = useMemo(() => {
@@ -1888,40 +1915,77 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
         /* TAB 3: GURU SHARE & MONTHLY PERFORMANCE VIDEO TRACKING HUB           */
         /* ===================================================================== */
         <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Nice Summary Row with Month & Year Filter */}
+          {/* Top Summary Row with View Mode Switcher & Month/Year Filter */}
           <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-[#F0D5E4] flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#FFF2F8] text-[#8A064D] border border-rose-200 text-[11px] font-bold mb-1">
+                <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                <span>FACULTY VIDEO LIBRARY &amp; AUDITS</span>
+              </div>
               <h3 className="font-bold text-lg text-[#2D041A] flex items-center gap-2">
                 <Users className="w-5 h-5 text-[#8A064D]" />
-                <span>Faculty Performance Videos Compliance</span>
+                <span>Guru Share Hub</span>
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Monthly performance video tracking and audit across all faculty members and disciples
+                Audit monthly disciple performance compliance (1 video/student/month) or browse general group video links
               </p>
             </div>
 
-            {/* Month & Year Filter using MonthPicker */}
-            <div className="flex items-center gap-2 shrink-0">
-              <MonthPicker
-                value={complianceMonth !== 'all' && complianceYear ? `${MONTHS.find(m => m.value === complianceMonth)?.label || ''} ${complianceYear}` : ''}
-                onChange={(label, ym) => {
-                  if (!ym) {
-                    setComplianceMonth('all');
-                    setComplianceYear('all');
-                    fetchComplianceData('all', 'all');
-                  } else {
-                    const [y, m] = ym.split('-');
-                    const mNum = parseInt(m, 10).toString();
-                    setComplianceMonth(mNum);
-                    setComplianceYear(y);
-                    fetchComplianceData(mNum, y);
-                  }
-                }}
-                align="right"
-                placeholder="Select Month & Year"
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              {/* View Mode Toggle: Performance Videos (Compliance & Audit) vs General (All Video Links) */}
+              <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setGuruShareViewMode('compliance_grid')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                    guruShareViewMode === 'compliance_grid'
+                      ? 'bg-[#590231] text-white shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>Performance Videos (Compliance &amp; Audit)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGuruShareViewMode('media_archive')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                    guruShareViewMode === 'media_archive'
+                      ? 'bg-[#590231] text-white shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  <span>General Videos ({guruGeneralItems.length})</span>
+                </button>
+              </div>
+
+              {/* Month & Year Filter using MonthPicker */}
+              {guruShareViewMode === 'compliance_grid' && (
+                <MonthPicker
+                  value={complianceMonth !== 'all' && complianceYear ? `${MONTHS.find(m => m.value === complianceMonth)?.label || ''} ${complianceYear}` : ''}
+                  onChange={(label, ym) => {
+                    if (!ym) {
+                      setComplianceMonth('all');
+                      setComplianceYear('all');
+                      fetchComplianceData('all', 'all');
+                    } else {
+                      const [y, m] = ym.split('-');
+                      const mNum = parseInt(m, 10).toString();
+                      setComplianceMonth(mNum);
+                      setComplianceYear(y);
+                      fetchComplianceData(mNum, y);
+                    }
+                  }}
+                  align="right"
+                  placeholder="Select Month & Year"
+                />
+              )}
             </div>
           </div>
+
+          {guruShareViewMode === 'compliance_grid' ? (
+            <>
 
           {/* KPI Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2223,7 +2287,339 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                 </div>
               )}
             </div>
+          </>
+          ) : (
+            /* =================================================================== */
+            /* VIEW MODE: GENERAL VIDEO LINKS ONLY (MEDIA ARCHIVE)                 */
+            /* =================================================================== */
+            <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-[#F0D5E4] space-y-5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10.5px] font-bold mb-1">
+                    <Users className="w-3 h-3 text-blue-600" />
+                    <span>GENERAL GROUP REPOSITORIES</span>
+                  </div>
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <Video className="w-5 h-5 text-[#8A064D]" />
+                    <span>General Faculty Video Links ({guruGeneralItems.length})</span>
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    General reference recordings, group practice videos, and syllabus materials shared by Gurus for entire batches
+                  </p>
+                </div>
 
+                {/* Search & Multi-Filter Control Deck */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* 1. Search Bar */}
+                  <div className="relative w-full sm:w-56">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search title, course, batch..."
+                      value={guruShareSearch}
+                      onChange={(e) => setGuruShareSearch(e.target.value)}
+                      className="w-full pl-8 pr-7 py-2 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-medium text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-[#8A064D]"
+                    />
+                    {guruShareSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setGuruShareSearch('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 2. Guru Multi-Selection Searchable Filter */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsGuruFilterOpen(prev => !prev)}
+                      className={`px-3 py-2 rounded-xl border text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-2xs ${
+                        selectedGeneralGurus.length > 0
+                          ? 'bg-[#8A064D] text-white border-[#8A064D]'
+                          : 'bg-[#FFF9FB] text-gray-800 border-gray-200 hover:border-[#8A064D]'
+                      }`}
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      <span>
+                        {selectedGeneralGurus.length === 0
+                          ? `All Gurus (${guruNames.length})`
+                          : `${selectedGeneralGurus.length} Gurus Selected`}
+                      </span>
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isGuruFilterOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isGuruFilterOpen && (
+                      <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-1.5 w-72 bg-white rounded-2xl shadow-xl border border-[#F0D5E4] p-3 z-40 space-y-2 animate-in fade-in zoom-in-95">
+                        {/* Search Input inside Dropdown */}
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Search Guru name..."
+                            value={guruFilterSearch}
+                            onChange={(e) => setGuruFilterSearch(e.target.value)}
+                            className="w-full pl-8 pr-7 py-1.5 rounded-xl border border-gray-200 bg-[#FFF9FB] text-xs font-medium text-gray-900 focus:outline-hidden focus:border-[#8A064D]"
+                          />
+                          {guruFilterSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setGuruFilterSearch('')}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Quick Selection Shortcuts */}
+                        <div className="flex items-center justify-between text-[11px] font-bold px-1 text-[#8A064D]">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGeneralGurus([...guruNames])}
+                            className="hover:underline cursor-pointer"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGeneralGurus([])}
+                            className="text-gray-500 hover:text-gray-800 cursor-pointer"
+                          >
+                            Clear Selection
+                          </button>
+                        </div>
+
+                        {/* Scrollable Checkbox List of Gurus */}
+                        <div className="max-h-48 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+                          {filteredGuruNamesForDropdown.length === 0 ? (
+                            <p className="text-[11px] text-gray-400 text-center py-2">No matching Gurus</p>
+                          ) : (
+                            filteredGuruNamesForDropdown.map((gName) => {
+                              const isChecked = selectedGeneralGurus.includes(gName);
+                              return (
+                                <label
+                                  key={`guru-multi-opt-${gName}`}
+                                  className={`flex items-center gap-2 p-1.5 rounded-lg text-xs cursor-pointer transition ${
+                                    isChecked ? 'bg-[#FFF2F8] text-[#8A064D] font-bold' : 'hover:bg-gray-50 text-gray-700'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      setSelectedGeneralGurus(prev =>
+                                        prev.includes(gName)
+                                          ? prev.filter(g => g !== gName)
+                                          : [...prev, gName]
+                                      );
+                                    }}
+                                    className="w-3.5 h-3.5 rounded-md text-[#8A064D] focus:ring-[#8A064D] border-gray-300 cursor-pointer"
+                                  />
+                                  <span className="truncate">{stripGuruPrefix(gName)}</span>
+                                </label>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {/* Done Button */}
+                        <div className="pt-1.5 border-t border-gray-100 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setIsGuruFilterOpen(false)}
+                            className="px-3 py-1 rounded-lg bg-[#590231] hover:bg-[#740340] text-white text-[11px] font-bold cursor-pointer"
+                          >
+                            Done
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Standard MonthPicker Filter */}
+                  <MonthPicker
+                    value={guruGeneralMonthLabel}
+                    onChange={(label, ym) => {
+                      setGuruGeneralMonthLabel(label);
+                      setGuruGeneralYearMonth(ym);
+                    }}
+                    placeholder="All Dates / Month"
+                    align="right"
+                  />
+
+                  {/* 4. Reset Filters Button */}
+                  {(guruShareSearch || selectedGeneralGurus.length > 0 || guruGeneralYearMonth) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGuruShareSearch('');
+                        setSelectedGeneralGurus([]);
+                        setGuruGeneralMonthLabel('');
+                        setGuruGeneralYearMonth('');
+                      }}
+                      className="px-2.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                      title="Reset all filters"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reset</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {guruGeneralItems.length === 0 ? (
+                <div className="p-12 text-center bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]">
+                  <Video className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-gray-700">No general faculty video links match the selected criteria</p>
+                  <p className="text-xs text-gray-500 mt-1">Try clearing your search query, adjusting your Guru selection, or resetting the date filter.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {guruGeneralItems.map((item, idx) => {
+                    const formattedDate = item.event_date
+                      ? new Date(item.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                      : 'Recent';
+
+                    return (
+                      <div
+                        key={`guru-general-item-${item.id}-${idx}`}
+                        className="bg-white rounded-3xl p-5 border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                      >
+                        <div className="space-y-2.5">
+                          {/* Top Row: Guru Pill + Video Type + Batch details + Date + Delete */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {/* 1. Guru Name */}
+                              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-200 shadow-2xs">
+                                {stripGuruPrefix(item.trainer_name || item.created_by || 'Faculty Guru')}
+                              </span>
+
+                              {/* 2. Video Type (Always General Video in this view) */}
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
+                                <Users className="w-3 h-3 text-blue-600" />
+                                <span>General Video</span>
+                              </span>
+
+                              {/* 3. Batch Details */}
+                              {item.target_batch_name && (
+                                <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                                  {item.target_batch_name}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] text-gray-400 font-medium flex items-center gap-1">
+                                <Calendar className="w-3 h-3 text-gray-400" />
+                                {formattedDate}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteItem(item.id)}
+                                title="Delete Link"
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Course Details Pill (NO disciple name rendered!) */}
+                          {item.target_course_title && (
+                            <div className="text-[11.5px] font-semibold text-gray-600 flex items-center gap-1.5">
+                              <BookOpen className="w-3.5 h-3.5 text-[#8A064D]" />
+                              <span>Course: <strong className="text-gray-900">{item.target_course_title}</strong></span>
+                            </div>
+                          )}
+
+                          {/* Title */}
+                          <h4 className="font-bold text-base text-[#2D041A] leading-snug pt-0.5">
+                            {item.title}
+                          </h4>
+
+                          {/* Description */}
+                          {item.description && (
+                            <p className="text-xs text-gray-600 bg-[#FFF9FB] p-2.5 rounded-xl border border-[#F0D5E4]/60 line-clamp-2">
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Links deck: Google Drive & YouTube buttons */}
+                        <div className="space-y-2 pt-2 border-t border-gray-100">
+                          {item.drive_url && (
+                            <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                  <LinkIcon className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="text-[11px] font-bold text-emerald-900 block truncate">Google Drive Media Folder</span>
+                                  <span className="text-[10px] text-emerald-700 font-mono truncate block max-w-xs">{item.drive_url}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(item.drive_url!, `${item.id}-drive`, 'Drive Link')}
+                                  className="px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-800 text-[11px] font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                                >
+                                  {copiedId === `${item.id}-drive` ? 'Copied' : 'Copy'}
+                                </button>
+                                <a
+                                  href={item.drive_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 rounded-xl bg-[#03543F] hover:bg-[#023e2f] text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                >
+                                  <span>Open Drive</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                            </div>
+                          )}
+
+                          {item.youtube_url && (
+                            <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-rose-50/70 border border-rose-200/80">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                  <Video className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="text-[11px] font-bold text-rose-950 block truncate">YouTube Recording Broadcast</span>
+                                  <span className="text-[10px] text-rose-700 font-mono truncate block max-w-xs">{item.youtube_url}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(item.youtube_url!, `${item.id}-yt`, 'YouTube Link')}
+                                  className="px-2.5 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-800 text-[11px] font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
+                                >
+                                  {copiedId === `${item.id}-yt` ? 'Copied' : 'Copy'}
+                                </button>
+                                <a
+                                  href={item.youtube_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                >
+                                  <span>Open YouTube</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
           {/* =================================================================== */}
           {/* GURU PERFORMANCE INSPECTOR MODAL                                   */}
           {/* =================================================================== */}
@@ -2669,8 +3065,9 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                                       <span>{disciple.batch_name}</span>
                                     </div>
                                   </div>
-                                  <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-rose-100 text-rose-800">
-                                    Missing Video
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1 shrink-0">
+                                    <AlertCircle className="w-3 h-3 text-rose-600" />
+                                    <span>Didn&apos;t Receive Performance Video</span>
                                   </span>
                                 </div>
 
@@ -2734,7 +3131,26 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <div>
-                                    <h5 className="font-bold text-sm text-[#2D041A]">{vid.title}</h5>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <h5 className="font-bold text-sm text-[#2D041A]">{vid.title}</h5>
+                                      {vid.category === 'performance' || vid.category === 'student_performance' ? (
+                                        <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-[#F3E8FF] text-[#6B21A8] border border-purple-200 flex items-center gap-1">
+                                          <Sparkles className="w-2.5 h-2.5" />
+                                          <span>Student Performance</span>
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
+                                          <Users className="w-2.5 h-2.5" />
+                                          <span>General Video</span>
+                                        </span>
+                                      )}
+                                    </div>
+                                    {(vid.category === 'performance' || vid.category === 'student_performance') && (vid.target_student_names || vid.target_student_name) && (
+                                      <div className="text-[11px] font-bold text-purple-900 bg-[#F3E8FF] px-2 py-0.5 rounded-md inline-flex items-center gap-1 border border-purple-200 mt-1">
+                                        <Sparkles className="w-2.5 h-2.5 text-[#6B21A8]" />
+                                        <span>Disciple: {vid.target_student_names || vid.target_student_name}</span>
+                                      </div>
+                                    )}
                                     <div className="flex items-center gap-2 text-[11px] text-gray-500 mt-0.5">
                                       <span className="font-semibold text-[#8A064D]">{vid.target_course_title}</span>
                                       <span>•</span>

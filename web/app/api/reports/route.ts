@@ -7,6 +7,9 @@ import {
   getAbsenceReport,
   getStudentCourseAbsenceReport,
   getStudentBatchSessionAudit,
+  getGuruAbsenceReport,
+  getGuruBatchAbsenceReport,
+  getGuruBatchSessionAudit,
   getBatchAttendanceReport,
   ReportType 
 } from '@/lib/reports';
@@ -38,6 +41,8 @@ export async function GET(request: NextRequest) {
     // Absence specific parameters
     const studentIdsParam = searchParams.get('studentIds');
     const studentIds = studentIdsParam ? studentIdsParam.split(',').filter(Boolean) : undefined;
+    const trainerIdsParam = searchParams.get('trainerIds');
+    const trainerIds = trainerIdsParam ? trainerIdsParam.split(',').filter(Boolean) : undefined;
     const sort = (searchParams.get('sort') || 'high_absence') as 'high_absence' | 'low_absence';
 
     switch (type) {
@@ -58,6 +63,21 @@ export async function GET(request: NextRequest) {
         }
         // Level 1: Overall student absence report
         const result = await getAbsenceReport({ studentIds, sort, startDate, endDate });
+        return NextResponse.json({ success: true, type, level: 'main', ...result });
+      }
+      case 'guru_absence': {
+        // Level 3: Individual session attendance details for guru and batch
+        if (trainerId && batchId) {
+          const result = await getGuruBatchSessionAudit({ trainerId, batchId, startDate, endDate });
+          return NextResponse.json({ success: true, type, level: 'sessions', ...result });
+        }
+        // Level 2: Guru batch-wise breakdown
+        if (trainerId) {
+          const result = await getGuruBatchAbsenceReport({ trainerId, startDate, endDate });
+          return NextResponse.json({ success: true, type, level: 'batches', ...result });
+        }
+        // Level 1: Overall Guru absence report
+        const result = await getGuruAbsenceReport({ trainerIds, sort, startDate, endDate });
         return NextResponse.json({ success: true, type, level: 'main', ...result });
       }
       case 'fees': {

@@ -43,6 +43,9 @@ class _TrainerCreateShareVideoScreenState
   String _selectedBatchOption = 'all'; // 'all' or batch.id
   String _selectedBatchName = 'All Batches in Course';
 
+  // Video Type: 'performance' (Individual Disciple, monthly required) vs 'general' (Group/Batch)
+  String _videoType = 'performance';
+
   // Disciples / Student Multi-Select State
   List<Map<String, dynamic>> _availableStudents = [];
   final Set<String> _selectedStudentIds = {};
@@ -57,6 +60,25 @@ class _TrainerCreateShareVideoScreenState
   final TextEditingController _driveController = TextEditingController();
   final TextEditingController _youtubeController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
+
+  void _updateTitleForType() {
+    if (_videoType == 'performance') {
+      if (_selectedStudentIds.isNotEmpty) {
+        final stu = _availableStudents.firstWhere(
+          (s) => _selectedStudentIds.contains(s['id'].toString()),
+          orElse: () => {},
+        );
+        if (stu.isNotEmpty) {
+          final sName = stu['name'] ?? 'Disciple';
+          _titleController.text = '$sName - Monthly Performance Video';
+          return;
+        }
+      }
+      _titleController.text = 'Disciple - Monthly Performance Video';
+    } else {
+      _titleController.text = '$_selectedBatchName - Choreography & Practice Video';
+    }
+  }
 
   String get _trainerName =>
       widget.trainerProfile?['full_name'] ?? 'Faculty Guru';
@@ -190,14 +212,23 @@ class _TrainerCreateShareVideoScreenState
     if (widget.preselectedStudent != null && widget.preselectedStudent!['id'] != null) {
       _selectedStudentIds.clear();
       _selectedStudentIds.add(widget.preselectedStudent!['id'].toString());
+    } else if (_videoType == 'performance') {
+      // In performance mode, select ONLY ONE disciple
+      if (_selectedStudentIds.length != 1 ||
+          !_availableStudents.any((s) => _selectedStudentIds.contains(s['id'].toString()))) {
+        _selectedStudentIds.clear();
+        if (_availableStudents.isNotEmpty) {
+          _selectedStudentIds.add(_availableStudents.first['id'].toString());
+        }
+      }
     } else {
       _selectedStudentIds.clear();
       for (final s in _availableStudents) {
         _selectedStudentIds.add(s['id'].toString());
       }
     }
+    _updateTitleForType();
   }
-
 
   List<Map<String, dynamic>> get _filteredStudents {
     if (_studentFilterText.trim().isEmpty) {
@@ -213,6 +244,7 @@ class _TrainerCreateShareVideoScreenState
   }
 
   void _toggleSelectAllStudents() {
+    if (_videoType == 'performance') return;
     setState(() {
       if (_selectedStudentIds.length == _availableStudents.length) {
         _selectedStudentIds.clear();
@@ -268,14 +300,35 @@ class _TrainerCreateShareVideoScreenState
       return;
     }
 
-    if (_selectedStudentIds.isEmpty && _availableStudents.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one disciple to share this video with.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
+    if (_videoType == 'performance') {
+      if (_selectedStudentIds.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select one disciple for their individual performance video.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+      if (_selectedStudentIds.length > 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Performance videos must be shared individually. Please select only 1 disciple.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+    } else {
+      if (_selectedStudentIds.isEmpty && _availableStudents.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select at least one disciple to share this video with.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
     }
 
     setState(() => _isSubmitting = true);
@@ -316,12 +369,11 @@ class _TrainerCreateShareVideoScreenState
         'trainer_id': _trainerId.isNotEmpty ? _trainerId : null,
         'trainer_name': _trainerName,
         'created_by': _trainerName,
-        'category': 'performance',
+        'category': _videoType == 'performance' ? 'performance' : 'general',
         'event_date': _dateController.text.trim().isNotEmpty
             ? _dateController.text.trim()
             : DateTime.now().toIso8601String().split('T')[0],
       };
-
 
       final res = await http.post(
         Uri.parse('${ApiConstants.baseUrl}/api/video-library'),
@@ -440,6 +492,183 @@ class _TrainerCreateShareVideoScreenState
                         ),
                       ],
                     ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // 0. VIDEO TYPE SELECTOR (Student Performance vs General Video)
+                  const Text(
+                    'VIDEO TYPE *',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.6,
+                      color: Color(0xFF8A064D),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      // Option A: Student Performance (Individual Disciple, 1/Month required)
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              _videoType = 'performance';
+                              if (_selectedStudentIds.length != 1 && _availableStudents.isNotEmpty) {
+                                _selectedStudentIds.clear();
+                                _selectedStudentIds.add(_availableStudents.first['id'].toString());
+                              }
+                              _updateTitleForType();
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _videoType == 'performance'
+                                  ? const Color(0xFFFFF2F8)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _videoType == 'performance'
+                                    ? const Color(0xFF8A064D)
+                                    : const Color(0xFFE5D4DE),
+                                width: _videoType == 'performance' ? 2 : 1,
+                              ),
+                              boxShadow: _videoType == 'performance'
+                                  ? [
+                                      BoxShadow(
+                                        color: const Color(0xFF8A064D).withOpacity(0.08),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : [],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.stars_rounded,
+                                      size: 18,
+                                      color: _videoType == 'performance'
+                                          ? const Color(0xFF8A064D)
+                                          : Colors.grey,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Student Performance',
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: _videoType == 'performance'
+                                              ? const Color(0xFF590231)
+                                              : const Color(0xFF4B5563),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Individual disciple • Min 1 video / month',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+
+                      // Option B: General Group Video (Batch-Wide, Unlimited)
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              _videoType = 'general';
+                              if (_selectedStudentIds.isEmpty) {
+                                for (final s in _availableStudents) {
+                                  _selectedStudentIds.add(s['id'].toString());
+                                }
+                              }
+                              _updateTitleForType();
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _videoType == 'general'
+                                  ? const Color(0xFFF3F4F6)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _videoType == 'general'
+                                    ? const Color(0xFF1E3A8A)
+                                    : const Color(0xFFE5D4DE),
+                                width: _videoType == 'general' ? 2 : 1,
+                              ),
+                              boxShadow: _videoType == 'general'
+                                  ? [
+                                      BoxShadow(
+                                        color: const Color(0xFF1E3A8A).withOpacity(0.08),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : [],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.group_work_rounded,
+                                      size: 18,
+                                      color: _videoType == 'general'
+                                          ? const Color(0xFF1E3A8A)
+                                          : Colors.grey,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'General Video',
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: _videoType == 'general'
+                                              ? const Color(0xFF1E3A8A)
+                                              : const Color(0xFF4B5563),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Group / Batch-wise • Choreography link',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 18),
@@ -567,7 +796,7 @@ class _TrainerCreateShareVideoScreenState
 
                   const SizedBox(height: 18),
 
-                  // 3. STUDENT MULTI-SELECT FILTER SECTION
+                  // 3. STUDENT SELECTION SECTION
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -581,17 +810,21 @@ class _TrainerCreateShareVideoScreenState
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Row(
+                            Row(
                               children: [
                                 Icon(
-                                  Icons.people_alt_rounded,
+                                  _videoType == 'performance'
+                                      ? Icons.person_pin_rounded
+                                      : Icons.people_alt_rounded,
                                   size: 18,
-                                  color: Color(0xFF8A064D),
+                                  color: const Color(0xFF8A064D),
                                 ),
-                                SizedBox(width: 6),
+                                const SizedBox(width: 6),
                                 Text(
-                                  'FILTER DISCIPLES',
-                                  style: TextStyle(
+                                  _videoType == 'performance'
+                                      ? 'TARGET DISCIPLE (INDIVIDUAL) *'
+                                      : 'TARGET DISCIPLES (GROUP)',
+                                  style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 0.6,
@@ -606,19 +839,32 @@ class _TrainerCreateShareVideoScreenState
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF3E8FF),
+                                color: _videoType == 'performance'
+                                    ? const Color(0xFFDEF7EC)
+                                    : const Color(0xFFF3E8FF),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
-                                '${_selectedStudentIds.length} of ${_availableStudents.length} selected',
-                                style: const TextStyle(
+                                _videoType == 'performance'
+                                    ? (_selectedStudentIds.isNotEmpty ? '1 Disciple Selected' : 'Choose 1 Disciple')
+                                    : '${_selectedStudentIds.length} of ${_availableStudents.length} selected',
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF6B21A8),
+                                  color: _videoType == 'performance'
+                                      ? const Color(0xFF03543F)
+                                      : const Color(0xFF6B21A8),
                                 ),
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _videoType == 'performance'
+                            ? 'Every disciple must receive at least 1 performance video per month. Select the individual disciple for this evaluation.'
+                            : 'General practice / choreography links can be sent to all or multiple disciples.',
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
                         ),
                         const SizedBox(height: 10),
 
@@ -663,37 +909,39 @@ class _TrainerCreateShareVideoScreenState
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            OutlinedButton(
-                              onPressed: _toggleSelectAllStudents,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF590231),
-                                side: const BorderSide(color: Color(0xFFD8B4E2)),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                            if (_videoType == 'general') ...[
+                              const SizedBox(width: 8),
+                              OutlinedButton(
+                                onPressed: _toggleSelectAllStudents,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF590231),
+                                  side: const BorderSide(color: Color(0xFFD8B4E2)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 11,
+                                  ),
                                 ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 11,
+                                child: Text(
+                                  _selectedStudentIds.length ==
+                                          _availableStudents.length
+                                      ? 'Clear All'
+                                      : 'Select All',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                              child: Text(
-                                _selectedStudentIds.length ==
-                                        _availableStudents.length
-                                    ? 'Clear All'
-                                    : 'Select All',
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+                            ],
                           ],
                         ),
 
                         const SizedBox(height: 12),
 
-                        // List of students with checkboxes
+                        // List of students with Radio (performance) or Checkbox (general)
                         if (_availableStudents.isEmpty)
                           Container(
                             padding: const EdgeInsets.all(16),
@@ -730,11 +978,17 @@ class _TrainerCreateShareVideoScreenState
                                 return InkWell(
                                   onTap: () {
                                     setState(() {
-                                      if (isSelected) {
-                                        _selectedStudentIds.remove(sId);
-                                      } else {
+                                      if (_videoType == 'performance') {
+                                        _selectedStudentIds.clear();
                                         _selectedStudentIds.add(sId);
+                                      } else {
+                                        if (isSelected) {
+                                          _selectedStudentIds.remove(sId);
+                                        } else {
+                                          _selectedStudentIds.add(sId);
+                                        }
                                       }
+                                      _updateTitleForType();
                                     });
                                   },
                                   child: Padding(
@@ -745,38 +999,59 @@ class _TrainerCreateShareVideoScreenState
                                     child: Row(
                                       children: [
                                         SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: Checkbox(
-                                            value: isSelected,
-                                            activeColor: const Color(0xFF590231),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            onChanged: (val) {
-                                              setState(() {
-                                                if (val == true) {
-                                                  _selectedStudentIds.add(sId);
-                                                } else {
-                                                  _selectedStudentIds.remove(sId);
-                                                }
-                                              });
-                                            },
-                                          ),
+                                          width: 24,
+                                          height: 24,
+                                          child: _videoType == 'performance'
+                                              ? Radio<String>(
+                                                  value: sId,
+                                                  groupValue: _selectedStudentIds.isNotEmpty
+                                                      ? _selectedStudentIds.first
+                                                      : null,
+                                                  activeColor: const Color(0xFF590231),
+                                                  onChanged: (val) {
+                                                    if (val != null) {
+                                                      setState(() {
+                                                        _selectedStudentIds.clear();
+                                                        _selectedStudentIds.add(val);
+                                                        _updateTitleForType();
+                                                      });
+                                                    }
+                                                  },
+                                                )
+                                              : Checkbox(
+                                                  value: isSelected,
+                                                  activeColor: const Color(0xFF590231),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(4),
+                                                  ),
+                                                  onChanged: (val) {
+                                                    setState(() {
+                                                      if (val == true) {
+                                                        _selectedStudentIds.add(sId);
+                                                      } else {
+                                                        _selectedStudentIds.remove(sId);
+                                                      }
+                                                    });
+                                                  },
+                                                ),
                                         ),
-                                        const SizedBox(width: 10),
+                                        const SizedBox(width: 8),
                                         CircleAvatar(
                                           radius: 14,
-                                          backgroundColor: const Color(0xFFF3E8FF),
+                                          backgroundColor: isSelected
+                                              ? const Color(0xFF8A064D)
+                                              : const Color(0xFFF3E8FF),
                                           child: Text(
                                             sName.isNotEmpty
                                                 ? sName[0].toUpperCase()
                                                 : 'S',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.bold,
-                                              color: Color(0xFF6B21A8),
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : const Color(0xFF6B21A8),
                                             ),
                                           ),
                                         ),
@@ -788,10 +1063,10 @@ class _TrainerCreateShareVideoScreenState
                                             children: [
                                               Text(
                                                 sName,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontSize: 12.5,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFF1E1E1E),
+                                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                                  color: isSelected ? const Color(0xFF8A064D) : const Color(0xFF1E1E1E),
                                                 ),
                                               ),
                                               if (sRoll.isNotEmpty)
@@ -805,6 +1080,22 @@ class _TrainerCreateShareVideoScreenState
                                             ],
                                           ),
                                         ),
+                                        if (_videoType == 'performance' && isSelected)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFDEF7EC),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Text(
+                                              'Selected',
+                                              style: TextStyle(
+                                                color: Color(0xFF03543F),
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ),

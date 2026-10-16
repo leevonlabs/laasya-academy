@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   KeyRound, 
   Search, 
@@ -19,56 +20,29 @@ import {
   Sparkles,
   AlertCircle,
   CheckCircle2,
-  Building2,
-  Bell,
-  Calendar,
-  Database,
-  ArrowRight,
-  ArrowLeft,
-  Settings as SettingsIcon,
-  ChevronRight,
-  Shield,
-  Smartphone,
   Mail,
-  Activity,
-  Layers,
-  Award
+  Shield,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { StudentPasswordInfo, GuruPasswordInfo } from '@/lib/passwords';
 
 interface Props {
   initialStudents: StudentPasswordInfo[];
   initialGurus: GuruPasswordInfo[];
+  initialSection?: 'admin-profile' | 'passwords';
 }
 
-export default function SettingsClient({ initialStudents, initialGurus }: Props) {
-  const [activeSection, setActiveSection] = useState<'hub' | 'passwords' | 'admin-profile' | 'ai-api'>('hub');
+export default function SettingsClient({ 
+  initialStudents, 
+  initialGurus, 
+  initialSection = 'admin-profile' 
+}: Props) {
+  const router = useRouter();
+  const [activeSection, setActiveSection] = useState<'admin-profile' | 'passwords'>(initialSection);
   const [activeTab, setActiveTab] = useState<'students' | 'gurus'>('students');
   const [search, setSearch] = useState('');
-  const [students, setStudents] = useState<StudentPasswordInfo[]>(initialStudents);
-  const [gurus, setGurus] = useState<GuruPasswordInfo[]>(initialGurus);
-
-  // AI API Configuration State
-  const [aiApiKey, setAiApiKey] = useState('');
-  const [aiModel, setAiModel] = useState('gemini-3.8-flash');
-  const [showAiKey, setShowAiKey] = useState(false);
-  const [isTestingAi, setIsTestingAi] = useState(false);
-  const [isSavingAiKey, setIsSavingAiKey] = useState(false);
-  const [aiTestResult, setAiTestResult] = useState<{ success: boolean; message: string; sample?: string } | null>(null);
-
-  useEffect(() => {
-    fetch('/api/settings/ai-config')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.apiKey) {
-          setAiApiKey(data.apiKey);
-        }
-        if (data && data.model) {
-          setAiModel(data.model);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  const [students] = useState<StudentPasswordInfo[]>(initialStudents);
+  const [gurus] = useState<GuruPasswordInfo[]>(initialGurus);
 
   // Admin Profile State
   const [adminName] = useState('Satya');
@@ -81,7 +55,7 @@ export default function SettingsClient({ initialStudents, initialGurus }: Props)
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
 
-  // Modal State
+  // Modal State for Password Management
   const [selectedUser, setSelectedUser] = useState<{
     profile_id: string;
     name: string;
@@ -114,63 +88,6 @@ export default function SettingsClient({ initialStudents, initialGurus }: Props)
     navigator.clipboard.writeText(adminEmail);
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
-  };
-
-  const handleTestAi = async () => {
-    setIsTestingAi(true);
-    setAiTestResult(null);
-    try {
-      const res = await fetch('/api/settings/ai-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: aiApiKey.trim() })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setAiTestResult({
-          success: true,
-          message: data.message || 'Connection verified! Model responded properly.',
-          sample: data.sample
-        });
-        showNotification('success', 'Gemini AI connection verified successfully!');
-      } else {
-        setAiTestResult({
-          success: false,
-          message: data.error || 'Connection failed'
-        });
-        showNotification('error', data.error || 'AI test failed');
-      }
-    } catch (e: any) {
-      setAiTestResult({ success: false, message: e.message || 'Network error' });
-      showNotification('error', 'Network error testing AI');
-    } finally {
-      setIsTestingAi(false);
-    }
-  };
-
-  const handleSaveAiKey = async () => {
-    if (!aiApiKey.trim()) {
-      showNotification('error', 'API Key cannot be blank.');
-      return;
-    }
-    setIsSavingAiKey(true);
-    try {
-      const res = await fetch('/api/settings/ai-config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: aiApiKey.trim() })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        showNotification('success', 'AI API Key updated and verified successfully!');
-      } else {
-        showNotification('error', data.error || 'Failed to update AI key');
-      }
-    } catch (e: any) {
-      showNotification('error', e.message || 'Error saving AI key');
-    } finally {
-      setIsSavingAiKey(false);
-    }
   };
 
   const handleUpdateAdminPassword = async (e: React.FormEvent) => {
@@ -208,7 +125,7 @@ export default function SettingsClient({ initialStudents, initialGurus }: Props)
     setTimeout(() => setCopiedDefault(false), 2000);
   };
 
-  // Filtered lists
+  // Filtered lists for Password Management
   const filteredStudents = useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) return students;
@@ -308,6 +225,11 @@ export default function SettingsClient({ initialStudents, initialGurus }: Props)
     }
   };
 
+  const switchSection = (section: 'admin-profile' | 'passwords') => {
+    setActiveSection(section);
+    router.push(`/settings/${section}`);
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Toast Feedback */}
@@ -329,327 +251,57 @@ export default function SettingsClient({ initialStudents, initialGurus }: Props)
         </div>
       )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* SECTION BREADCRUMB */}
-      {/* ------------------------------------------------------------- */}
-      {activeSection !== 'hub' && (
-        <div className="flex items-center justify-between pb-1">
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
-            <button 
-              type="button" 
-              onClick={() => setActiveSection('hub')} 
-              className="hover:text-[#8A064D] transition flex items-center gap-1.5 cursor-pointer text-gray-600 hover:underline"
-            >
-              <SettingsIcon className="w-3.5 h-3.5 text-[#8A064D]" />
-              <span>Settings</span>
-            </button>
-            <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
-            <span className="text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-full border border-[#F0D5E4]">
-              {activeSection === 'admin-profile' 
-                ? 'Admin Profile' 
-                : activeSection === 'ai-api'
-                ? 'AI API Configuration'
-                : 'Password Management'}
-            </span>
+      {/* Top Header & 2-Page Segmented Tab Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#F0D5E4]">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF2F8] text-[#8A064D] text-[11px] font-bold border border-[#F0D5E4] mb-1.5 shadow-2xs">
+            <SettingsIcon className="w-3.5 h-3.5 text-[#8A064D]" />
+            <span>ACADEMY SETTINGS</span>
           </div>
+          <h1 className="text-2xl font-serif font-black tracking-tight text-[#2D041A]">
+            {activeSection === 'admin-profile' ? 'Admin Profile & Master Access' : 'Password Management Desk'}
+          </h1>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {activeSection === 'admin-profile'
+              ? 'Administrator records, official contact number, executive authority privileges, and password security.'
+              : 'Manage, reset, and set passwords for disciples and faculty Gurus with single-click default credentials.'}
+          </p>
+        </div>
+
+        {/* 2-Page Segmented Navigation Switcher */}
+        <div className="inline-flex p-1.5 bg-[#FFF2F8] border border-[#F0D5E4] rounded-2xl shadow-2xs self-start sm:self-center">
+          <button
+            type="button"
+            onClick={() => switchSection('admin-profile')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeSection === 'admin-profile'
+                ? 'bg-[#8A064D] text-white shadow-xs'
+                : 'text-[#6E3955] hover:text-[#8A064D] hover:bg-white/60'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Admin Profile</span>
+          </button>
 
           <button
             type="button"
-            onClick={() => setActiveSection('hub')}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#8A064D] hover:text-[#70043E] bg-[#FFF2F8] hover:bg-[#FFE5F0] border border-[#F0D5E4] px-3.5 py-1.5 rounded-xl transition cursor-pointer"
+            onClick={() => switchSection('passwords')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeSection === 'passwords'
+                ? 'bg-[#8A064D] text-white shadow-xs'
+                : 'text-[#6E3955] hover:text-[#8A064D] hover:bg-white/60'
+            }`}
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to Settings</span>
+            <KeyRound className="w-4 h-4" />
+            <span>Password Management</span>
           </button>
         </div>
-      )}
+      </div>
 
-      {activeSection === 'hub' ? (
-        /* ------------------------------------------------------------- */
-        /* SETTINGS HUB OVERVIEW (OPTIONS SELECTION) */
-        /* ------------------------------------------------------------- */
-        <div className="space-y-6">
-          {/* Executive Header Banner */}
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#2D041A] via-[#4D0329] to-[#8A064D] text-white p-6 sm:p-8 shadow-xl border border-[#D4AF37]/30">
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-2 max-w-2xl">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#F9E33A] text-[11px] font-bold border border-[#D4AF37]/30">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#F9E33A]" />
-                  <span>LAASYA CULTURAL ACADEMY ADMINISTRATION</span>
-                </div>
-                <h1 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-white">
-                  Settings & Governance
-                </h1>
-                <p className="text-xs sm:text-sm text-rose-100/90 leading-relaxed">
-                  Central management console for administrative credentials, disciple and guru authentication, communication preferences, and academic rules.
-                </p>
-              </div>
-
-              {/* Quick Status / Quick Actions */}
-              <div className="flex flex-col sm:flex-row md:flex-col items-start md:items-end gap-3 shrink-0">
-                <div className="bg-black/30 backdrop-blur-md border border-white/15 px-4 py-2.5 rounded-2xl flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#F9E33A] flex items-center justify-center font-black text-[#2D041A] text-sm">
-                    S
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-                      <span>{adminName}</span>
-                      <span className="text-[10px] text-[#F9E33A] font-mono">({adminPhone})</span>
-                    </div>
-                    <p className="text-[10px] text-emerald-300 font-semibold flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Super Administrator
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 text-[11px] font-bold text-rose-200">
-                  <span className="bg-white/10 px-2.5 py-1 rounded-xl border border-white/10">300 Disciples</span>
-                  <span className="bg-white/10 px-2.5 py-1 rounded-xl border border-white/10">14 Faculty Gurus</span>
-                </div>
-              </div>
-            </div>
-            {/* Background luxury gradient flare */}
-            <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-[#D4AF37]/15 rounded-full blur-3xl pointer-events-none" />
-          </div>
-
-          {/* Settings Grid Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {/* 1. Admin Profile Card (Active & Clickable) */}
-            <div 
-              onClick={() => setActiveSection('admin-profile')}
-              className="bg-white rounded-3xl p-6 border-2 border-[#D4AF37]/50 hover:border-[#8A064D] shadow-xs hover:shadow-xl transition-all duration-200 cursor-pointer group flex flex-col justify-between relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-[#FFF2F8] to-transparent rounded-bl-full pointer-events-none" />
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#FFF2F8] to-[#FFE5F0] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D] group-hover:scale-105 transition-transform shadow-xs">
-                    <ShieldCheck className="w-6 h-6 text-[#8A064D]" />
-                  </div>
-                  <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-50 to-amber-100 text-amber-800 border border-amber-300">
-                    MASTER CONTROL
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-[#2D041A] group-hover:text-[#8A064D] transition-colors flex items-center gap-2">
-                  <span>Admin Profile</span>
-                  <span className="w-2 h-2 rounded-full bg-[#8A064D] opacity-0 group-hover:opacity-100 transition-opacity" />
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                  Administrator records, verified login contact number, academy executive roles, and password management for admin portal.
-                </p>
-
-                <div className="mt-4 p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]/60 flex items-center justify-between text-xs">
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] font-bold text-gray-400 block uppercase">Administrator</span>
-                    <span className="font-bold text-[#8A064D]">{adminName}</span>
-                  </div>
-                  <div className="text-right space-y-0.5">
-                    <span className="text-[10px] font-bold text-gray-400 block uppercase">Login Contact</span>
-                    <span className="font-mono font-bold text-gray-800">{adminPhone}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between text-xs font-bold text-[#8A064D] group-hover:text-[#70043E]">
-                <span>Manage Profile & Password</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-
-            {/* 2. Password Management Card (Active & Clickable) */}
-            <div 
-              onClick={() => setActiveSection('passwords')}
-              className="bg-white rounded-3xl p-6 border-2 border-[#8A064D]/30 hover:border-[#8A064D] shadow-xs hover:shadow-xl transition-all duration-200 cursor-pointer group flex flex-col justify-between relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-[#FFF2F8] to-transparent rounded-bl-full pointer-events-none" />
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#FFF2F8] to-[#FFE5F0] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D] group-hover:scale-105 transition-transform shadow-xs">
-                    <KeyRound className="w-6 h-6 text-[#8A064D]" />
-                  </div>
-                  <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    PASSWORDS DESK
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-[#2D041A] group-hover:text-[#8A064D] transition-colors flex items-center gap-2">
-                  <span>Password Management</span>
-                  <span className="w-2 h-2 rounded-full bg-[#8A064D] opacity-0 group-hover:opacity-100 transition-opacity" />
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                  Manage, reset, and set passwords for students and faculty gurus. Single-click default &apos;123456&apos; login access.
-                </p>
-
-                <div className="mt-4 p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]/60 flex items-center justify-between text-xs">
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] font-bold text-gray-400 block uppercase">Accounts</span>
-                    <span className="font-bold text-[#8A064D]">{students.length} Disciples • {gurus.length} Gurus</span>
-                  </div>
-                  <div className="text-right space-y-0.5">
-                    <span className="text-[10px] font-bold text-gray-400 block uppercase">Default Key</span>
-                    <span className="font-mono font-bold text-emerald-700">123456</span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between text-xs font-bold text-[#8A064D] group-hover:text-[#70043E]">
-                <span>Open Password Registry</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-
-            {/* 3. AI Engine & API Configuration Card (Active & Clickable) */}
-            <div 
-              onClick={() => setActiveSection('ai-api')}
-              className="bg-white rounded-3xl p-6 border-2 border-purple-200 hover:border-[#8A064D] shadow-xs hover:shadow-xl transition-all duration-200 cursor-pointer group flex flex-col justify-between relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-purple-50 to-transparent rounded-bl-full pointer-events-none" />
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 flex items-center justify-center text-[#8A064D] group-hover:scale-105 transition-transform shadow-xs">
-                    <Sparkles className="w-6 h-6 text-purple-600" />
-                  </div>
-                  <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-800 border border-purple-200">
-                    GEMINI AI SUITE
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-[#2D041A] group-hover:text-[#8A064D] transition-colors flex items-center gap-2">
-                  <span>AI API &amp; Writing Assistant</span>
-                  <span className="w-2 h-2 rounded-full bg-[#8A064D] opacity-0 group-hover:opacity-100 transition-opacity" />
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                  Configure Google Gemini API keys, test connection latency, and manage automated writing enhancement across academy notices, banners, and syllabus.
-                </p>
-
-                <div className="mt-4 p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]/60 flex items-center justify-between text-xs">
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] font-bold text-gray-400 block uppercase">Active Model</span>
-                    <span className="font-bold text-[#8A064D]">{aiModel}</span>
-                  </div>
-                  <div className="text-right space-y-0.5">
-                    <span className="text-[10px] font-bold text-gray-400 block uppercase">Integration</span>
-                    <span className="font-bold text-emerald-700 flex items-center gap-1 justify-end">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Live Ready
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between text-xs font-bold text-[#8A064D] group-hover:text-[#70043E]">
-                <span>Configure AI Key &amp; Settings</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-
-            {/* 3. Academy Institution Profile */}
-            <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-800">
-                    <Building2 className="w-6 h-6" />
-                  </div>
-                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    CAMPUS ACTIVE
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-[#2D041A]">
-                  Academy Institutional Profile
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                  Campus facility data, 4 dedicated studio practice rooms (Room 101-104), and fine arts curriculum tracks.
-                </p>
-
-                <div className="mt-4 space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between text-gray-600">
-                    <span>Campus:</span>
-                    <span className="font-bold text-[#2D041A]">Main Campus, Hyderabad</span>
-                  </div>
-                  <div className="flex items-center justify-between text-gray-600">
-                    <span>Rooms:</span>
-                    <span className="font-bold text-[#2D041A]">4 Studio Rooms</span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-6 pt-4 border-t border-gray-100 text-xs font-semibold text-gray-400 flex items-center justify-between">
-                <span>4 Fine Arts Disciplines</span>
-                <Award className="w-4 h-4 text-[#D4AF37]" />
-              </div>
-            </div>
-
-            {/* 4. Notifications & Broadcasts */}
-            <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D]">
-                    <Bell className="w-6 h-6" />
-                  </div>
-                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    REALTIME ENGINE
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-gray-900">
-                  Notifications & Broadcasts
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                  Realtime notification dispatches, announcements from Gurus & Admin to enrolled batch disciples, and emergency alerts.
-                </p>
-              </div>
-              <div className="mt-6 pt-4 border-t border-gray-100 text-xs font-semibold text-emerald-700 flex items-center justify-between">
-                <span>Active Broadcast Channels</span>
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              </div>
-            </div>
-
-            {/* 5. Academic Calendar */}
-            <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-600">
-                    <Calendar className="w-6 h-6" />
-                  </div>
-                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                    10 CLASSES / MO
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-gray-900">
-                  Calendar & Holiday Rules
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                  Batch session scheduling, monthly 10-class policy, Vijayadashami performance terms, and holiday schedules.
-                </p>
-              </div>
-              <div className="mt-6 pt-4 border-t border-gray-100 text-xs font-semibold text-gray-500 flex items-center justify-between">
-                <span>Current Cycle: Active</span>
-                <Layers className="w-4 h-4 text-gray-400" />
-              </div>
-            </div>
-
-            {/* 6. System Data & Backup */}
-            <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-600">
-                    <Database className="w-6 h-6" />
-                  </div>
-                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    CLOUD SYNC
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-gray-900">
-                  Data & Cloud Security
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                  Supabase database encryption, real-time timetable synchronization across web & mobile devices, and automated audit logs.
-                </p>
-              </div>
-              <div className="mt-6 pt-4 border-t border-gray-100 text-xs font-semibold text-emerald-700 flex items-center justify-between">
-                <span>Realtime Linked</span>
-                <Activity className="w-4 h-4 text-emerald-600" />
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : activeSection === 'admin-profile' ? (
-        /* ------------------------------------------------------------- */
-        /* ADMIN PROFILE SUB-VIEW */
-        /* ------------------------------------------------------------- */
+      {activeSection === 'admin-profile' ? (
+        /* ============================================================= */
+        /* PAGE 1: ADMIN PROFILE & MASTER GOVERNANCE                      */
+        /* ============================================================= */
         <div className="space-y-6">
           {/* Admin Hero Card */}
           <div className="bg-gradient-to-r from-[#2D041A] via-[#590231] to-[#8A064D] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-[#D4AF37]/40 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
@@ -664,9 +316,9 @@ export default function SettingsClient({ initialStudents, initialGurus }: Props)
                   <ShieldCheck className="w-3.5 h-3.5 text-[#F9E33A]" />
                   <span>SUPER ADMINISTRATOR</span>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-white">
+                <h2 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-white">
                   {adminName}
-                </h1>
+                </h2>
                 <div className="text-xs sm:text-sm text-rose-100/90 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
@@ -874,266 +526,54 @@ export default function SettingsClient({ initialStudents, initialGurus }: Props)
             </div>
           </div>
         </div>
-      ) : activeSection === 'ai-api' ? (
-        /* ------------------------------------------------------------- */
-        /* AI API CONFIGURATION SUB-VIEW */
-        /* ------------------------------------------------------------- */
-        <div className="space-y-6">
-          {/* Executive Header Banner */}
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#2D041A] via-[#590231] to-[#8A064D] text-white p-6 sm:p-8 shadow-xl border border-[#D4AF37]/40">
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-2 max-w-2xl">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#F9E33A] text-[11px] font-bold border border-[#D4AF37]/30">
-                  <Sparkles className="w-3.5 h-3.5 text-[#F9E33A]" />
-                  <span>GOOGLE GEMINI GENERATIVE AI SUITE</span>
-                </div>
-                <h1 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-white">
-                  AI API &amp; Model Governance
-                </h1>
-                <p className="text-xs sm:text-sm text-rose-100/90 leading-relaxed">
-                  Manage the Google Gemini API key powering automated copywriting, grammar refinement, punctuation fixing, and tone polishing across classical academy notices, banners, syllabi, faculty bios, and disciple video notes.
-                </p>
-              </div>
-
-              <div className="bg-black/30 backdrop-blur-md border border-white/15 px-4 py-3 rounded-2xl shrink-0 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#F9E33A] flex items-center justify-center font-black text-[#2D041A] text-base shadow-sm">
-                  ✨
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-gray-300 block uppercase">Active AI Model</span>
-                  <span className="text-xs font-black text-[#F9E33A]">{aiModel}</span>
-                  <span className="text-[10px] text-emerald-300 font-semibold flex items-center gap-1 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Online &amp; Connected
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-[#D4AF37]/15 rounded-full blur-3xl pointer-events-none" />
-          </div>
-
-          {/* Main Configuration Card */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#F0D5E4] shadow-xs space-y-5">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D]">
-                      <KeyRound className="w-5 h-5 text-[#8A064D]" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-black text-[#2D041A]">Gemini API Credentials</h3>
-                      <p className="text-[11px] text-gray-500 font-medium">Used exclusively by the academy backend for Enhance &amp; Undo features</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                    GEMINI 3.8 FLASH
-                  </span>
-                </div>
-
-                {/* API Key Form */}
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-xs font-black text-[#590231] uppercase tracking-wider block">
-                        Google Gemini API Key *
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setShowAiKey(!showAiKey)}
-                        className="text-[11px] font-bold text-[#8A064D] hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        {showAiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        <span>{showAiKey ? 'Hide Secret Key' : 'Reveal Key'}</span>
-                      </button>
-                    </div>
-
-                    <div className="relative">
-                      <input
-                        type={showAiKey ? 'text' : 'password'}
-                        value={aiApiKey}
-                        onChange={(e) => setAiApiKey(e.target.value)}
-                        placeholder="Paste or enter Google Gemini API Key..."
-                        className="w-full px-4 py-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-[#8A064D] pr-24 shadow-2xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(aiApiKey);
-                          showNotification('success', 'API Key copied to clipboard');
-                        }}
-                        className="absolute right-2 top-2 px-3 py-1.5 rounded-xl bg-white border border-[#F0D5E4] text-[10px] font-bold text-gray-600 hover:text-[#8A064D] hover:bg-rose-50 transition cursor-pointer"
-                      >
-                        Copy
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-1 font-medium">
-                      Encrypted and transmitted server-side via Google Generative AI service.
-                    </p>
-                  </div>
-
-                  {/* Buttons */}
-                  <div className="flex flex-wrap items-center gap-3 pt-2">
-                    <button
-                      type="button"
-                      disabled={isTestingAi || !aiApiKey.trim()}
-                      onClick={handleTestAi}
-                      className="px-4 py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 text-xs font-bold transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {isTestingAi ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-700" />
-                          <span>Testing Gemini Connection...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                          <span>Test API Connection</span>
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isSavingAiKey || !aiApiKey.trim()}
-                      onClick={handleSaveAiKey}
-                      className="px-5 py-2.5 rounded-xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-black shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {isSavingAiKey ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-[#F9E33A]" />
-                          <span>Saving &amp; Verifying...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-[#F9E33A]" />
-                          <span>Save &amp; Activate API Key</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Test Result Display */}
-                  {aiTestResult && (
-                    <div className={`p-4 rounded-2xl border text-xs space-y-1.5 transition-all ${
-                      aiTestResult.success
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                        : 'bg-rose-50 border-rose-200 text-rose-900'
-                    }`}>
-                      <div className="flex items-center gap-2 font-bold">
-                        {aiTestResult.success ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        ) : (
-                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                        )}
-                        <span>{aiTestResult.message}</span>
-                      </div>
-                      {aiTestResult.sample && (
-                        <div className="mt-2 p-2.5 rounded-xl bg-white/80 border border-emerald-200 text-[11px] font-medium text-emerald-800">
-                          <span className="font-bold block mb-0.5">Sample AI Output:</span>
-                          &ldquo;{aiTestResult.sample}&rdquo;
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* AI Integration Points Summary Card */}
-            <div className="space-y-6">
-              <div className="bg-white rounded-3xl p-6 border border-[#F0D5E4] shadow-xs space-y-4">
-                <h3 className="text-xs font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
-                  <Sparkles className="w-4 h-4 text-[#8A064D]" />
-                  <span>AI-Powered Modules</span>
-                </h3>
-
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  The configured API key provides instant writing enhancement with 1-click &apos;Undo&apos; across:
-                </p>
-
-                <div className="space-y-2.5 text-xs">
-                  {[
-                    { label: 'App Carousel Banners', desc: 'Headline & promotional catchphrase' },
-                    { label: 'Broadcast Announcements', desc: 'Circular subject & official notice body' },
-                    { label: 'Course Curriculum', desc: 'Course syllabus & prerequisites text' },
-                    { label: 'Faculty Guru Profiles', desc: 'Lineage, credentials & bio summaries' },
-                    { label: 'Video Library Sharing', desc: 'Choreography instructions & disciple notes' },
-                    { label: 'Mobile App (Guru Login)', desc: 'Mobile video share & broadcast announcements' }
-                  ].map((item, idx) => (
-                    <div key={idx} className="p-2.5 rounded-xl bg-[#FFF9FB] border border-[#F0D5E4] flex items-start gap-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold text-[#2D041A] block">{item.label}</span>
-                        <span className="text-[10px] text-gray-500">{item.desc}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       ) : (
-        /* ------------------------------------------------------------- */
-        /* PASSWORD MANAGEMENT SUB-VIEW */
-        /* ------------------------------------------------------------- */
+        /* ============================================================= */
+        /* PAGE 2: PASSWORD MANAGEMENT DESK                               */
+        /* ============================================================= */
         <div className="space-y-6">
-          {/* Page Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-[#2D041A] flex items-center gap-2.5">
-                <div className="p-2 bg-[#FFF2F8] border border-[#F0D5E4] rounded-2xl text-[#8A064D]">
-                  <KeyRound className="w-6 h-6" />
-                </div>
-                <span>Password Management Desk</span>
-              </h1>
-              <p className="text-xs text-gray-500 mt-1 max-w-2xl">
-                Reset or set individual passwords for Disciples and Gurus. If any user encounters difficulty logging into the mobile app, update their password here.
-              </p>
-            </div>
-
-            {/* Global Action & Default Password Card */}
+          {/* Quick Action & Default Password Card */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-3xl bg-[#FFF9FB] border border-[#F0D5E4]">
             <div className="flex items-center gap-3">
-              <div className="bg-[#FFF9FB] border border-[#F0D5E4] px-3.5 py-2 rounded-2xl flex items-center gap-2 shadow-2xs">
-                <Lock className="w-3.5 h-3.5 text-[#8A064D]" />
-                <div className="text-left">
-                  <p className="text-[10px] text-gray-500 font-medium">Default App Key</p>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-xs font-bold text-[#8A064D]">123456</span>
-                    <button
-                      type="button"
-                      onClick={copyDefaultPassword}
-                      title="Copy Default Password"
-                      className="p-1 hover:bg-[#FFF2F8] rounded text-gray-400 hover:text-[#8A064D] transition"
-                    >
-                      {copiedDefault ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                    </button>
-                  </div>
+              <div className="p-3 rounded-2xl bg-white border border-[#F0D5E4] text-[#8A064D] shadow-2xs">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[#2D041A]">Universal Default App Key</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="font-mono text-sm font-black text-[#8A064D]">123456</span>
+                  <button
+                    type="button"
+                    onClick={copyDefaultPassword}
+                    title="Copy Default Password"
+                    className="p-1 hover:bg-[#FFF2F8] rounded text-gray-400 hover:text-[#8A064D] transition cursor-pointer"
+                  >
+                    {copiedDefault ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                  <span className="text-[11px] text-gray-400">Default for all new accounts</span>
                 </div>
               </div>
-
-              <button
-                type="button"
-                onClick={handleResetAll}
-                disabled={isResettingAll}
-                className="bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 px-3.5 py-2.5 rounded-2xl text-xs font-bold shadow-2xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                title="Reset every student and guru password to 123456"
-              >
-                {isResettingAll ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-3.5 h-3.5" />
-                )}
-                <span>Reset All to 123456</span>
-              </button>
             </div>
+
+            <button
+              type="button"
+              onClick={handleResetAll}
+              disabled={isResettingAll}
+              className="bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50 self-start sm:self-center"
+              title="Reset every student and guru password to 123456"
+            >
+              {isResettingAll ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" />
+              )}
+              <span>Reset All Accounts to 123456</span>
+            </button>
           </div>
 
           <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
             {/* Navigation Tabs & Search Bar */}
             <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gray-50/50">
-              {/* Tabs */}
+              {/* Sub-Tabs: Students vs Gurus */}
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -1200,57 +640,77 @@ export default function SettingsClient({ initialStudents, initialGurus }: Props)
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-gray-50/80 text-gray-500 font-semibold border-b border-gray-100 text-[11px] uppercase tracking-wider">
-                      <th className="py-3 px-4">Roll No / ID</th>
-                      <th className="py-3 px-4">Student Name</th>
-                      <th className="py-3 px-4">Registered Contact Number</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4 text-right">Action</th>
+                    <tr className="bg-[#FFF9FB] text-gray-500 font-bold border-b border-[#F0D5E4]/80 text-[11px] uppercase tracking-wider">
+                      <th className="py-3.5 px-5">Roll No / ID</th>
+                      <th className="py-3.5 px-5">Disciple Name</th>
+                      <th className="py-3.5 px-5">Registered Contact Number</th>
+                      <th className="py-3.5 px-5">Account Status</th>
+                      <th className="py-3.5 px-5 text-right">Access Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium">
                     {filteredStudents.length > 0 ? (
                       filteredStudents.map((s) => (
-                        <tr key={s.id} className="hover:bg-[#FFF9FB]/50 transition">
-                          <td className="py-3.5 px-4 font-mono font-bold text-[#8A064D]">
-                            <span className="bg-[#FFF2F8] px-2.5 py-1 rounded-xl border border-[#F0D5E4]">
+                        <tr key={s.id} className="hover:bg-[#FFF9FB]/70 transition-colors">
+                          <td className="py-3.5 px-5 font-mono font-bold text-[#8A064D]">
+                            <span className="bg-[#FFF2F8] px-2.5 py-1 rounded-xl border border-[#F0D5E4] shadow-2xs inline-block">
                               {s.roll_number || 'N/A'}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 font-semibold text-gray-900">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-full bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] flex items-center justify-center font-bold text-[11px] shrink-0">
+                          <td className="py-3.5 px-5 font-semibold text-gray-900">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FFF2F8] to-[#FFE5F0] text-[#8A064D] border border-[#F0D5E4] flex items-center justify-center font-black text-xs shadow-2xs shrink-0">
                                 {s.full_name ? s.full_name.charAt(0).toUpperCase() : 'S'}
                               </div>
                               <div>
-                                <p className="font-bold text-gray-900">{s.full_name}</p>
-                                <p className="text-[10px] text-gray-400 font-normal">{s.email || 'No email'}</p>
+                                <p className="font-bold text-gray-900 text-xs">{s.full_name}</p>
+                                <p className="text-[10px] text-gray-400 font-normal">{s.email || 'No email registered'}</p>
                               </div>
                             </div>
                           </td>
-                          <td className="py-3.5 px-4 font-semibold text-gray-800">
-                            <div className="flex items-center gap-1.5">
-                              <Phone className="w-3 h-3 text-[#8A064D] shrink-0" />
-                              <span className="font-mono">{s.phone || 'No phone registered'}</span>
+                          <td className="py-3.5 px-5 font-semibold text-gray-800">
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={s.phone ? `tel:${s.phone}` : undefined}
+                                className="font-mono text-gray-800 hover:text-[#8A064D] hover:underline flex items-center gap-1.5"
+                                title="Click to call disciple"
+                              >
+                                <Phone className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
+                                <span>{s.phone || 'No phone registered'}</span>
+                              </a>
+                              {s.phone && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(s.phone);
+                                    showNotification('success', `Copied ${s.phone} to clipboard`);
+                                  }}
+                                  title="Copy phone"
+                                  className="p-1 rounded-md text-gray-400 hover:text-[#8A064D] hover:bg-rose-50 transition cursor-pointer"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </button>
+                              )}
                             </div>
                           </td>
-                          <td className="py-3.5 px-4">
-                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                          <td className="py-3.5 px-5">
+                            <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1.5 shadow-2xs ${
                               s.status === 'active'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-gray-100 text-gray-600'
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                : 'bg-gray-100 text-gray-600 border border-gray-200'
                             }`}>
-                              {s.status}
+                              <span className={`w-1.5 h-1.5 rounded-full ${s.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+                              <span>{s.status}</span>
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-right">
+                          <td className="py-3.5 px-5 text-right">
                             <button
                               type="button"
                               onClick={() => handleOpenChangePassword(s.profile_id, s.full_name, s.roll_number, s.phone, 'student')}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFF2F8] hover:bg-[#FFE5F0] text-[#8A064D] border border-[#F0D5E4] rounded-xl text-xs font-bold transition shadow-2xs hover:border-[#8A064D]/40 cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FFF2F8] hover:bg-[#FFE5F0] text-[#8A064D] border border-[#F0D5E4] rounded-xl text-xs font-bold transition shadow-2xs hover:border-[#8A064D]/50 hover:shadow-xs cursor-pointer active:scale-98"
                             >
                               <KeyRound className="w-3.5 h-3.5" />
-                              <span>Change Password</span>
+                              <span>Set Password</span>
                             </button>
                           </td>
                         </tr>
@@ -1258,7 +718,9 @@ export default function SettingsClient({ initialStudents, initialGurus }: Props)
                     ) : (
                       <tr>
                         <td colSpan={5} className="py-12 text-center text-gray-400">
-                          No students found matching &quot;{search}&quot;
+                          <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                          <p className="font-bold text-gray-600">No disciples found matching &quot;{search}&quot;</p>
+                          <p className="text-xs text-gray-400 mt-0.5">Try searching with roll number or registered phone.</p>
                         </td>
                       </tr>
                     )}
@@ -1270,59 +732,79 @@ export default function SettingsClient({ initialStudents, initialGurus }: Props)
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-gray-50/80 text-gray-500 font-semibold border-b border-gray-100 text-[11px] uppercase tracking-wider">
-                      <th className="py-3 px-4">Guru ID</th>
-                      <th className="py-3 px-4">Revered Guru Name</th>
-                      <th className="py-3 px-4">Primary Contact Number</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4 text-right">Action</th>
+                    <tr className="bg-[#FFF9FB] text-gray-500 font-bold border-b border-[#F0D5E4]/80 text-[11px] uppercase tracking-wider">
+                      <th className="py-3.5 px-5">Guru ID</th>
+                      <th className="py-3.5 px-5">Faculty Guru Name</th>
+                      <th className="py-3.5 px-5">Primary Contact Number</th>
+                      <th className="py-3.5 px-5">Account Status</th>
+                      <th className="py-3.5 px-5 text-right">Access Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium">
                     {filteredGurus.length > 0 ? (
                       filteredGurus.map((g) => (
-                        <tr key={g.id} className="hover:bg-[#FFF9FB]/50 transition">
-                          <td className="py-3.5 px-4 font-mono font-bold text-[#8A064D]">
-                            <span className="bg-[#FFF2F8] px-2.5 py-1 rounded-xl border border-[#F0D5E4]">
+                        <tr key={g.id} className="hover:bg-[#FFF9FB]/70 transition-colors">
+                          <td className="py-3.5 px-5 font-mono font-bold text-[#8A064D]">
+                            <span className="bg-[#FFF2F8] px-2.5 py-1 rounded-xl border border-[#F0D5E4] shadow-2xs inline-block">
                               {g.guru_code}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 font-semibold text-gray-900">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-full bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] flex items-center justify-center font-bold text-[11px] shrink-0">
+                          <td className="py-3.5 px-5 font-semibold text-gray-900">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FFF2F8] to-[#FFE5F0] text-[#8A064D] border border-[#F0D5E4] flex items-center justify-center font-black text-xs shadow-2xs shrink-0">
                                 {g.full_name ? g.full_name.charAt(0).toUpperCase() : 'G'}
                               </div>
                               <div>
-                                <p className="font-bold text-gray-900">{g.full_name}</p>
+                                <p className="font-bold text-gray-900 text-xs">{g.full_name}</p>
                                 {g.display_title && (
                                   <p className="text-[10px] text-gray-500 font-normal">{g.display_title}</p>
                                 )}
                               </div>
                             </div>
                           </td>
-                          <td className="py-3.5 px-4 font-semibold text-gray-800">
-                            <div className="flex items-center gap-1.5">
-                              <Phone className="w-3 h-3 text-[#8A064D] shrink-0" />
-                              <span className="font-mono">{g.phone || 'No phone registered'}</span>
+                          <td className="py-3.5 px-5 font-semibold text-gray-800">
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={g.phone ? `tel:${g.phone}` : undefined}
+                                className="font-mono text-gray-800 hover:text-[#8A064D] hover:underline flex items-center gap-1.5"
+                                title="Click to call guru"
+                              >
+                                <Phone className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
+                                <span>{g.phone || 'No phone registered'}</span>
+                              </a>
+                              {g.phone && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(g.phone);
+                                    showNotification('success', `Copied ${g.phone} to clipboard`);
+                                  }}
+                                  title="Copy phone"
+                                  className="p-1 rounded-md text-gray-400 hover:text-[#8A064D] hover:bg-rose-50 transition cursor-pointer"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </button>
+                              )}
                             </div>
                           </td>
-                          <td className="py-3.5 px-4">
-                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                          <td className="py-3.5 px-5">
+                            <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1.5 shadow-2xs ${
                               g.is_active
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-gray-100 text-gray-600'
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                : 'bg-gray-100 text-gray-600 border border-gray-200'
                             }`}>
-                              {g.is_active ? 'Active' : 'Inactive'}
+                              <span className={`w-1.5 h-1.5 rounded-full ${g.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+                              <span>{g.is_active ? 'Active' : 'Inactive'}</span>
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-right">
+                          <td className="py-3.5 px-5 text-right">
                             <button
                               type="button"
                               onClick={() => handleOpenChangePassword(g.profile_id, g.full_name, g.guru_code, g.phone, 'guru')}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFF2F8] hover:bg-[#FFE5F0] text-[#8A064D] border border-[#F0D5E4] rounded-xl text-xs font-bold transition shadow-2xs hover:border-[#8A064D]/40 cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FFF2F8] hover:bg-[#FFE5F0] text-[#8A064D] border border-[#F0D5E4] rounded-xl text-xs font-bold transition shadow-2xs hover:border-[#8A064D]/50 hover:shadow-xs cursor-pointer active:scale-98"
                             >
                               <KeyRound className="w-3.5 h-3.5" />
-                              <span>Change Password</span>
+                              <span>Set Password</span>
                             </button>
                           </td>
                         </tr>
@@ -1330,7 +812,9 @@ export default function SettingsClient({ initialStudents, initialGurus }: Props)
                     ) : (
                       <tr>
                         <td colSpan={5} className="py-12 text-center text-gray-400">
-                          No gurus found matching &quot;{search}&quot;
+                          <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                          <p className="font-bold text-gray-600">No gurus found matching &quot;{search}&quot;</p>
+                          <p className="text-xs text-gray-400 mt-0.5">Try searching with Guru code or contact number.</p>
                         </td>
                       </tr>
                     )}
