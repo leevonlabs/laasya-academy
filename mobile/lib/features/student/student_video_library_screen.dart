@@ -66,7 +66,8 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
   @override
   void initState() {
     super.initState();
-    _unreadCount = SupabaseService().getUnreadVideosCount();
+    SupabaseService().markAllVideosAsRead();
+    _unreadCount = 0;
     _loadEventFolders();
   }
 

@@ -30,7 +30,7 @@ class LaasyaNotificationReceiver : BroadcastReceiver() {
         const val NOTIF_ID_ANNOUNCEMENT = 2003
 
         const val ACTION_POLL_ALERTS = "com.laasyaacademy.app.ACTION_POLL_ALERTS"
-        const val POLL_INTERVAL_MS = 25000L // 25 seconds for timely class conclusion notices
+        const val POLL_INTERVAL_MS = 20000L // 20 seconds for timely class conclusion notices
 
         fun scheduleNextPoll(context: Context, delayMs: Long = POLL_INTERVAL_MS) {
             val intent = Intent(context, LaasyaNotificationReceiver::class.java).apply {
@@ -85,23 +85,53 @@ class LaasyaNotificationReceiver : BroadcastReceiver() {
         // Automatically reschedule next poll so notifications persist even when swiped from slides
         scheduleNextPoll(context)
 
-        // Perform server check on background worker thread
+        val pendingResult = goAsync()
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        val wakeLock = powerManager?.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "laasya:notification_check")
+        wakeLock?.acquire(15000L) // 15 seconds timeout
+
+        // Perform server check on background worker thread with guaranteed completion
         Thread {
             try {
                 checkServerForAlerts(context)
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            } finally {
+                try {
+                    if (wakeLock?.isHeld == true) {
+                        wakeLock.release()
+                    }
+                } catch (_: Exception) {}
+                try {
+                    pendingResult.finish()
+                } catch (_: Exception) {}
+            }
         }.start()
     }
 
     private fun checkServerForAlerts(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val role = prefs.getString("laasya_bg_role", "") ?: ""
-        val studentId = prefs.getString("laasya_bg_student_id", "") ?: ""
-        val rollNumber = prefs.getString("laasya_bg_roll", "") ?: ""
-        val name = prefs.getString("laasya_bg_name", "") ?: ""
-        val phone = prefs.getString("laasya_bg_phone", "") ?: ""
-        val batchIds = prefs.getString("laasya_bg_batch_ids", "all") ?: "all"
-        val baseUrl = prefs.getString("laasya_bg_base_url", "https://laasya-academy.vercel.app") ?: "https://laasya-academy.vercel.app"
+        var role = prefs.getString("laasya_bg_role", prefs.getString("flutter.laasya_bg_role", "")) ?: ""
+        var studentId = prefs.getString("laasya_bg_student_id", prefs.getString("flutter.laasya_bg_student_id", "")) ?: ""
+        var rollNumber = prefs.getString("laasya_bg_roll", prefs.getString("flutter.laasya_bg_roll", "")) ?: ""
+        var name = prefs.getString("laasya_bg_name", prefs.getString("flutter.laasya_bg_name", "")) ?: ""
+        var phone = prefs.getString("laasya_bg_phone", prefs.getString("flutter.laasya_bg_phone", "")) ?: ""
+        var batchIds = prefs.getString("laasya_bg_batch_ids", prefs.getString("flutter.laasya_bg_batch_ids", "all")) ?: "all"
+        var baseUrl = prefs.getString("laasya_bg_base_url", prefs.getString("flutter.laasya_bg_base_url", "https://laasya-academy.vercel.app")) ?: "https://laasya-academy.vercel.app"
+
+        // Fallback: Check if saved_user_profile exists in Flutter prefs
+        if (role.isEmpty() && studentId.isEmpty() && phone.isEmpty()) {
+            val userJson = prefs.getString("flutter.saved_user_profile", prefs.getString("saved_user_profile", null))
+            if (userJson != null && userJson.isNotEmpty()) {
+                try {
+                    val userObj = JSONObject(userJson)
+                    role = userObj.optString("role", "student")
+                    studentId = userObj.optString("id", userObj.optString("profile_id", ""))
+                    rollNumber = userObj.optString("roll_number", "")
+                    name = userObj.optString("full_name", "")
+                    phone = userObj.optString("phone", "")
+                } catch (_: Exception) {}
+            }
+        }
 
         // If user hasn't logged in on device yet, do not query
         if (role.isEmpty() && studentId.isEmpty() && phone.isEmpty()) {

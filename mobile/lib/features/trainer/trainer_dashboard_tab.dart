@@ -42,12 +42,28 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
   @override
   void initState() {
     super.initState();
-    // 1. Instantly render from cached profile so screen loads in under 10ms with ZERO blank spinner
+    // 1. Instantly render from cached profile, batches, and banners so screen loads in under 10ms with ZERO blank spinner
     final cachedProf = SupabaseService().currentUserProfile;
     if (cachedProf != null) {
       _profile = cachedProf;
       _isLoading = false;
     }
+
+    final cachedBatches = TrainerDataStore().getLiveBatches();
+    if (cachedBatches.isNotEmpty) {
+      _batches = cachedBatches;
+    }
+
+    final cachedBanners = SupabaseService().getCachedBannerAnnouncements();
+    _announcements = cachedBanners.where((n) {
+      final isBanner = n['announcement_type'] == 'banner' || 
+                       (n['image_url'] != null && n['image_url'].toString().isNotEmpty && n['announcement_type'] != 'message');
+      return isBanner;
+    }).toList();
+    if (_announcements.isNotEmpty) {
+      _startBannerAutoScroll();
+    }
+
     _loadData();
   }
 
@@ -59,23 +75,22 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
   }
 
   Future<void> _loadData() async {
-    // Only display spinner if we have no cached data at all
+    // Only display spinner if we have no cached profile data at all
     if (_profile == null) {
       setState(() => _isLoading = true);
     }
 
     try {
-      // Fetch profile, batches, and banners concurrently in parallel (< 1 second)
+      // 1. Fetch profile and batches concurrently (< 200ms)
       final results = await Future.wait([
         SupabaseService().getCurrentUserProfile(),
         SupabaseService().getTrainerBatches(),
-        SupabaseService().getBannerAnnouncements(),
+        SupabaseService().getTrainerTodaySessions(),
       ]);
 
       final prof = results[0] as Map<String, dynamic>?;
       final btc = results[1] as List<Map<String, dynamic>>;
-      final bannerAds = results[2] as List<Map<String, dynamic>>;
-      final sess = await SupabaseService().getTrainerTodaySessions();
+      final sess = results[2] as List<Map<String, dynamic>>;
 
       if (mounted) {
         TrainerDataStore().setLiveBatches(btc);
@@ -83,16 +98,26 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
           _profile = prof ?? _profile;
           _batches = btc;
           _todaySessions = sess;
-          _announcements = bannerAds.where((n) {
+          _isLoading = false;
+        });
+      }
+
+      // 2. Refresh live banners in the background without blocking the UI
+      SupabaseService().getBannerAnnouncements(forceRefresh: true).then((bannerAds) {
+        if (mounted && bannerAds.isNotEmpty) {
+          final liveBanners = bannerAds.where((n) {
             final isBanner = n['announcement_type'] == 'banner' || 
                              (n['image_url'] != null && n['image_url'].toString().isNotEmpty && n['announcement_type'] != 'message');
             return isBanner;
           }).toList();
-          _isLoading = false;
-        });
-
-        _startBannerAutoScroll();
-      }
+          if (liveBanners.isNotEmpty) {
+            setState(() {
+              _announcements = liveBanners;
+            });
+            _startBannerAutoScroll();
+          }
+        }
+      });
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }

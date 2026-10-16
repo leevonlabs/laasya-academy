@@ -21,7 +21,8 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
   @override
   void initState() {
     super.initState();
-    _unreadCount = SupabaseService().getUnreadMessagesCount();
+    SupabaseService().markAllMessagesAsRead();
+    _unreadCount = 0;
     _loadMessages();
   }
 

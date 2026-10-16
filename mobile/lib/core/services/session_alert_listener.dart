@@ -59,9 +59,9 @@ class SessionAlertListener with WidgetsBindingObserver {
     // 4. Subscribe to Supabase Realtime for sub-second alert broadcast
     _subscribeSupabaseRealtime();
 
-    // 5. Periodic polling fallback every 10 seconds while app is in foreground
+    // 5. High-speed polling fallback every 3 seconds while app is in foreground for realtime alerts
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (_isListening) {
         _pollServerForAlerts();
       }
@@ -116,7 +116,7 @@ class SessionAlertListener with WidgetsBindingObserver {
         '&sinceSeconds=180',
       );
 
-      final resp = await http.get(uri).timeout(const Duration(seconds: 6));
+      final resp = await http.get(uri).timeout(const Duration(seconds: 4));
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         if (data is Map && data['success'] == true && data['alerts'] is List) {
@@ -166,9 +166,17 @@ class SessionAlertListener with WidgetsBindingObserver {
       final targetId = (alert['target_student_id']?.toString() ?? '').toLowerCase();
       final targetName = (alert['target_student_name']?.toString() ?? '').toLowerCase();
 
-      final matchesStudent = (_rollNumber.isNotEmpty && targetRoll.contains(_rollNumber.toLowerCase())) ||
-          (_studentId.isNotEmpty && targetId == _studentId.toLowerCase()) ||
-          (_name.isNotEmpty && targetName.contains(_name.toLowerCase()));
+      final targetDigits = targetRoll.replaceAll(RegExp(r'\D'), '');
+      final myDigits = _rollNumber.replaceAll(RegExp(r'\D'), '');
+      final rollMatches = (_rollNumber.isNotEmpty && (targetRoll == _rollNumber.toLowerCase() || targetRoll.contains(_rollNumber.toLowerCase()) || _rollNumber.toLowerCase().contains(targetRoll))) ||
+          (targetDigits.isNotEmpty && myDigits.isNotEmpty && targetDigits == myDigits);
+
+      final nameMatches = _name.isNotEmpty && targetName.isNotEmpty &&
+          (targetName.contains(_name.toLowerCase()) || _name.toLowerCase().contains(targetName));
+
+      final idMatches = _studentId.isNotEmpty && targetId == _studentId.toLowerCase();
+
+      final matchesStudent = rollMatches || idMatches || nameMatches;
 
       if (matchesStudent) {
         await AlarmService.markAlertProcessed(alertId);

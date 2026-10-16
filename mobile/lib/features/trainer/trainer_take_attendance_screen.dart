@@ -213,7 +213,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Class Completed • Close Session?',
+                'Class Completed • Conclude Session?',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
               ),
             ),
@@ -224,7 +224,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Closing the session for ${widget.classInfo['course_short_title']} (${widget.classInfo['batch_name']}) will sound the custom pickup chime ("Class is over, hooray hooray!") and notify relevant students and parents for child pickup.',
+              'Conclude today\'s class session for ${widget.classInfo['course_short_title']} (${widget.classInfo['batch_name']}). An immediate notification will be sent to enrolled students and parents informing them that the class has finished.',
               style: const TextStyle(fontSize: 13, height: 1.45, color: Colors.black87),
             ),
             const SizedBox(height: 12),
@@ -237,11 +237,11 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.music_note_rounded, size: 18, color: Color(0xFF8A064D)),
+                  Icon(Icons.notifications_active_rounded, size: 18, color: Color(0xFF8A064D)),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Vocal child pickup chime will play and alert parents to collect their children.',
+                      'Parents and disciples will receive instant class conclusion notifications on their mobile phones.',
                       style: TextStyle(fontSize: 11, color: Color(0xFF8A064D), fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -269,7 +269,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
               });
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Class Completed! Pickup vocal chime broadcasted to parents.'),
+                  content: Text('Class Completed! Parents and disciples have been notified.'),
                   backgroundColor: Color(0xFF03543F),
                   duration: Duration(seconds: 4),
                 ),
@@ -280,7 +280,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Class Completed (Alert Parents)', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text('Complete Class & Notify', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -563,7 +563,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                           const SizedBox(width: 10),
                           const Expanded(
                             child: Text(
-                              'Conclude Session & Alert Parents',
+                              'Conclude Session & Notify Parents',
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF590231)),
                             ),
                           ),
@@ -571,7 +571,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Finished today\'s class? Tap below to conclude this session and broadcast a 10-second pickup attention alarm to parent & student mobile phones.',
+                        'Finished today\'s class? Tap below to conclude this session and send immediate completion notifications to parent & student devices.',
                         style: TextStyle(fontSize: 12, color: Colors.black87, height: 1.35),
                       ),
                       const SizedBox(height: 12),
@@ -588,7 +588,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                           ),
                           icon: const Icon(Icons.notifications_active_rounded, size: 18),
                           label: const Text(
-                            'Class Completed • Alert Parents',
+                            'Class Completed • Notify Parents',
                             style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -614,12 +614,12 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Class Session Concluded • Parents Alerted',
+                              'Class Session Concluded • Parents Notified',
                               style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF03543F), fontSize: 13),
                             ),
                             SizedBox(height: 2),
                             Text(
-                              '10-second pickup attention alarm chime was broadcast to parents\' devices.',
+                              'Class completion notifications were sent to parents and disciples.',
                               style: TextStyle(fontSize: 11, color: Color(0xFF03543F)),
                             ),
                           ],

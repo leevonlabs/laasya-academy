@@ -35,6 +35,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
   @override
   void initState() {
     super.initState();
+    SupabaseService().markAllMessagesAsRead();
     _loadData();
   }
 
@@ -100,7 +101,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
             return da.compareTo(db);
           });
 
-          SupabaseService().markAllMessagesAsRead();
+          SupabaseService().markAllMessagesAsRead(_announcements);
         }
       }
     } catch (e) {

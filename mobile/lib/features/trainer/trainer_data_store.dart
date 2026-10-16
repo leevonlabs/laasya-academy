@@ -19,7 +19,11 @@ class TrainerDataStore {
   final Map<String, Map<String, Map<String, String>>> _dailyAttendanceRecords = {};
   final Map<String, String> _sessionStatus = {};
 
+  List<Map<String, dynamic>> _liveBatches = [];
+  List<Map<String, dynamic>> getLiveBatches() => List<Map<String, dynamic>>.from(_liveBatches);
+
   void setLiveBatches(List<Map<String, dynamic>> liveBatches) {
+    _liveBatches = List<Map<String, dynamic>>.from(liveBatches);
     _buildCoursesFromLiveBatches(liveBatches);
     _isSynced = true;
   }

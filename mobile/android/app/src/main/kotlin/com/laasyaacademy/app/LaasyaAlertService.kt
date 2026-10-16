@@ -66,23 +66,30 @@ class LaasyaAlertService : Service() {
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit()
                 .putString("laasya_bg_role", role)
+                .putString("flutter.laasya_bg_role", role)
                 .putString("laasya_bg_student_id", studentId)
+                .putString("flutter.laasya_bg_student_id", studentId)
                 .putString("laasya_bg_roll", rollNumber)
+                .putString("flutter.laasya_bg_roll", rollNumber)
                 .putString("laasya_bg_name", name)
+                .putString("flutter.laasya_bg_name", name)
                 .putString("laasya_bg_phone", phone)
+                .putString("flutter.laasya_bg_phone", phone)
                 .putString("laasya_bg_batch_ids", batchIds)
+                .putString("flutter.laasya_bg_batch_ids", batchIds)
                 .putString("laasya_bg_base_url", baseUrl)
-                .apply()
+                .putString("flutter.laasya_bg_base_url", baseUrl)
+                .commit()
         } else {
             // Recreated by Android OS (START_STICKY)
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            role = prefs.getString("laasya_bg_role", "student") ?: "student"
-            studentId = prefs.getString("laasya_bg_student_id", "") ?: ""
-            rollNumber = prefs.getString("laasya_bg_roll", "") ?: ""
-            name = prefs.getString("laasya_bg_name", "") ?: ""
-            phone = prefs.getString("laasya_bg_phone", "") ?: ""
-            batchIds = prefs.getString("laasya_bg_batch_ids", "all") ?: "all"
-            baseUrl = prefs.getString("laasya_bg_base_url", "https://laasya-academy.vercel.app") ?: "https://laasya-academy.vercel.app"
+            role = prefs.getString("laasya_bg_role", prefs.getString("flutter.laasya_bg_role", "student")) ?: "student"
+            studentId = prefs.getString("laasya_bg_student_id", prefs.getString("flutter.laasya_bg_student_id", "")) ?: ""
+            rollNumber = prefs.getString("laasya_bg_roll", prefs.getString("flutter.laasya_bg_roll", "")) ?: ""
+            name = prefs.getString("laasya_bg_name", prefs.getString("flutter.laasya_bg_name", "")) ?: ""
+            phone = prefs.getString("laasya_bg_phone", prefs.getString("flutter.laasya_bg_phone", "")) ?: ""
+            batchIds = prefs.getString("laasya_bg_batch_ids", prefs.getString("flutter.laasya_bg_batch_ids", "all")) ?: "all"
+            baseUrl = prefs.getString("laasya_bg_base_url", prefs.getString("flutter.laasya_bg_base_url", "https://laasya-academy.vercel.app")) ?: "https://laasya-academy.vercel.app"
         }
 
         startPollingLoop()

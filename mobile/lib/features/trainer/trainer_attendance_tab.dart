@@ -65,11 +65,11 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.ring_volume_rounded, color: Color(0xFF590231), size: 20),
+                  Icon(Icons.notifications_active_rounded, color: Color(0xFF590231), size: 20),
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'This will send a 10-second attention alarm chime to parents\' phones reminding them to pick up their child.',
+                      'This will send instant class completion notifications to parents and disciples.',
                       style: TextStyle(fontSize: 11.5, color: Color(0xFF590231), height: 1.35),
                     ),
                   ),
@@ -99,7 +99,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
               setState(() {});
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Class session closed! Attention chime broadcast to parents.'),
+                  content: Text('Class session concluded! Parents and students notified.'),
                   backgroundColor: Color(0xFF590231),
                 ),
               );
@@ -110,7 +110,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            label: const Text('Confirm & Alert', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: const Text('Confirm & Notify', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),

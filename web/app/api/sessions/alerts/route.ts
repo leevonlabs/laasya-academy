@@ -169,8 +169,11 @@ export async function GET(request: NextRequest) {
         if (studentRolls.some(r => r && (targetRoll === r || targetRollDigits === r))) return true;
 
         // 3. Name match
-        if (nameParam && targetName && targetName.includes(nameParam.trim().toLowerCase())) return true;
-        if (studentNames.some(n => n && targetName && targetName.includes(n))) return true;
+        if (nameParam && targetName) {
+          const np = nameParam.trim().toLowerCase();
+          if (targetName.includes(np) || np.includes(targetName)) return true;
+        }
+        if (studentNames.some(n => n && targetName && (targetName.includes(n) || n.includes(targetName)))) return true;
 
         return false;
       }

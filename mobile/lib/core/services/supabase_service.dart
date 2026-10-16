@@ -44,6 +44,24 @@ class SupabaseService {
       await prefs.remove('saved_user_profile');
     } catch (_) {}
   }
+
+  Future<void> _saveBannerAnnouncementsToPrefs(List<Map<String, dynamic>> banners) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('laasya_cached_banners', jsonEncode(banners));
+    } catch (e) {
+      debugPrint('Error saving cached banners: $e');
+    }
+  }
+
+  Future<void> _saveMessageAnnouncementsToPrefs(List<Map<String, dynamic>> messages) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('laasya_cached_messages', jsonEncode(messages));
+    } catch (e) {
+      debugPrint('Error saving cached messages: $e');
+    }
+  }
   final List<Map<String, dynamic>> _mockAttendance = [];
   final List<Map<String, dynamic>> _mockBannerAnnouncements = [
     {
@@ -121,6 +139,8 @@ class SupabaseService {
       'audience': 'All students',
       'date': 'Today',
       'time': '10:15 AM',
+      'publish_date': '2026-10-10',
+      'created_at': '2026-10-10T09:00:00Z',
       'is_delivered': true,
       'is_read': false,
       'action_links': [
@@ -139,6 +159,8 @@ class SupabaseService {
       'audience': 'All students',
       'date': 'Yesterday',
       'time': '03:45 PM',
+      'publish_date': '2026-10-08',
+      'created_at': '2026-10-08T09:00:00Z',
       'is_delivered': true,
       'is_read': true,
       'action_links': [
@@ -156,6 +178,8 @@ class SupabaseService {
       'audience': 'Bharathanatyam',
       'date': '04 Oct 2026',
       'time': '11:20 AM',
+      'publish_date': '2026-10-04',
+      'created_at': '2026-10-04T09:00:00Z',
       'is_delivered': true,
       'is_read': true,
       'action_links': [
@@ -173,6 +197,8 @@ class SupabaseService {
       'audience': 'All students',
       'date': '02 Oct 2026',
       'time': '05:00 PM',
+      'publish_date': '2026-10-02',
+      'created_at': '2026-10-02T09:00:00Z',
       'is_delivered': true,
       'is_read': true,
     },
@@ -187,8 +213,24 @@ class SupabaseService {
         _cachedProfile = Map<String, dynamic>.from(jsonDecode(savedJson));
         debugPrint('Restored persistent login for ${_cachedProfile?['full_name']} (${_cachedProfile?['role']})');
       }
+
+      final savedBannersJson = prefs.getString('laasya_cached_banners');
+      if (savedBannersJson != null && savedBannersJson.isNotEmpty) {
+        final decoded = jsonDecode(savedBannersJson);
+        if (decoded is List) {
+          _cachedBannerAnnouncements = decoded.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+        }
+      }
+
+      final savedMessagesJson = prefs.getString('laasya_cached_messages');
+      if (savedMessagesJson != null && savedMessagesJson.isNotEmpty) {
+        final decoded = jsonDecode(savedMessagesJson);
+        if (decoded is List) {
+          _cachedMessageAnnouncements = decoded.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+        }
+      }
     } catch (e) {
-      debugPrint('Error restoring saved profile session: $e');
+      debugPrint('Error restoring saved cached sessions: $e');
     }
 
     await _ensureReadStateLoaded();
@@ -1271,6 +1313,7 @@ class SupabaseService {
             item['is_read'] = false;
           }
           _cachedBannerAnnouncements = live;
+          _saveBannerAnnouncementsToPrefs(live);
           return live;
         }
       } catch (e) {
@@ -1291,6 +1334,7 @@ class SupabaseService {
               item['image_url'] = _normalizeImageUrl(item['image_url']);
             }
             _cachedBannerAnnouncements = live;
+            _saveBannerAnnouncementsToPrefs(live);
             return live;
           }
         }
@@ -1299,6 +1343,13 @@ class SupabaseService {
       debugPrint('Live API fetch notice for banner announcements: $e');
     }
 
+    if (_cachedBannerAnnouncements.isNotEmpty) {
+      return List<Map<String, dynamic>>.from(_cachedBannerAnnouncements);
+    }
+    return List<Map<String, dynamic>>.from(_mockBannerAnnouncements);
+  }
+
+  List<Map<String, dynamic>> getCachedBannerAnnouncements() {
     if (_cachedBannerAnnouncements.isNotEmpty) {
       return List<Map<String, dynamic>>.from(_cachedBannerAnnouncements);
     }
@@ -1426,6 +1477,7 @@ class SupabaseService {
           final filtered = _filterAnnouncementsForCurrentUser(valid);
           if (filtered.isNotEmpty) {
             _cachedMessageAnnouncements = filtered;
+            _saveMessageAnnouncementsToPrefs(filtered);
             return filtered;
           }
         }
@@ -1462,6 +1514,7 @@ class SupabaseService {
             final filtered = _filterAnnouncementsForCurrentUser(valid);
             if (filtered.isNotEmpty) {
               _cachedMessageAnnouncements = filtered;
+              _saveMessageAnnouncementsToPrefs(filtered);
               return filtered;
             }
           }
@@ -1471,6 +1524,13 @@ class SupabaseService {
       debugPrint('Live API fetch notice for message announcements: $e');
     }
 
+    if (_cachedMessageAnnouncements.isNotEmpty) {
+      return List<Map<String, dynamic>>.from(_cachedMessageAnnouncements);
+    }
+    return List<Map<String, dynamic>>.from(_mockMessageAnnouncements);
+  }
+
+  List<Map<String, dynamic>> getCachedMessageAnnouncements() {
     if (_cachedMessageAnnouncements.isNotEmpty) {
       return List<Map<String, dynamic>>.from(_cachedMessageAnnouncements);
     }
@@ -1529,11 +1589,12 @@ class SupabaseService {
       if (id != null && _readMessageIds.contains(id)) return false;
       if (_lastReadMessageTimestamp > 0) {
         final dateStr = (m['publish_date'] ?? m['created_at'])?.toString();
-        if (dateStr != null) {
-          final dt = DateTime.tryParse(dateStr.contains('T') ? dateStr : '$dateStr 00:00:00');
-          if (dt != null && dt.millisecondsSinceEpoch <= _lastReadMessageTimestamp) {
-            return false;
-          }
+        if (dateStr == null || dateStr.trim().isEmpty) {
+          return false;
+        }
+        final dt = DateTime.tryParse(dateStr.contains('T') ? dateStr : '$dateStr 00:00:00');
+        if (dt == null || dt.millisecondsSinceEpoch <= _lastReadMessageTimestamp) {
+          return false;
         }
       }
       return true;
@@ -1553,11 +1614,12 @@ class SupabaseService {
       if (id != null && _readVideoIds.contains(id)) return false;
       if (_lastReadVideoTimestamp > 0) {
         final dateStr = (n['date'] ?? n['created_at'])?.toString();
-        if (dateStr != null) {
-          final dt = DateTime.tryParse(dateStr.contains('T') ? dateStr : '$dateStr 00:00:00');
-          if (dt != null && dt.millisecondsSinceEpoch <= _lastReadVideoTimestamp) {
-            return false;
-          }
+        if (dateStr == null || dateStr.trim().isEmpty) {
+          return false;
+        }
+        final dt = DateTime.tryParse(dateStr.contains('T') ? dateStr : '$dateStr 00:00:00');
+        if (dt == null || dt.millisecondsSinceEpoch <= _lastReadVideoTimestamp) {
+          return false;
         }
       }
       return true;
