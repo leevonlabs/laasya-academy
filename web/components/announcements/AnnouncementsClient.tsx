@@ -410,9 +410,11 @@ export default function AnnouncementsClient({
   const [activeFormTab, setActiveFormTab] = useState<'compose' | 'preview'>('compose');
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  // Chat scroll anchor
+  // Chat scroll anchors & container refs
   const adminChatEndRef = useRef<HTMLDivElement>(null);
   const guruChatEndRef = useRef<HTMLDivElement>(null);
+  const adminScrollContainerRef = useRef<HTMLDivElement>(null);
+  const guruScrollContainerRef = useRef<HTMLDivElement>(null);
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToastMessage({ text, type });
@@ -432,24 +434,45 @@ export default function AnnouncementsClient({
     return !isGuruSent(ann);
   };
 
-  // Format Date and Time
+  // Format Date and Time in Indian Standard Time (IST)
   const formatDateTime = (dateStr?: string, createdStr?: string) => {
-    const raw = dateStr || createdStr;
-    if (!raw) return { date: '—', time: '—', rawDate: '' };
-    const d = new Date(raw);
-    const dateFormatted = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    const timeFormatted = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-    return { date: dateFormatted, time: timeFormatted, rawDate: d.toISOString().split('T')[0] };
+    // Time priority: createdStr contains the true exact timestamp when message was broadcast
+    const rawTime = createdStr || dateStr;
+    const rawDate = dateStr || createdStr;
+    if (!rawDate && !rawTime) return { date: '—', time: '—', rawDate: '' };
+
+    const dateObj = new Date(rawDate!);
+    const timeObj = new Date(rawTime!);
+
+    const dateFormatted = !isNaN(dateObj.getTime())
+      ? dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
+      : '—';
+    const timeFormatted = !isNaN(timeObj.getTime())
+      ? timeObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+      : '—';
+
+    return { 
+      date: dateFormatted, 
+      time: timeFormatted, 
+      rawDate: !isNaN(dateObj.getTime()) ? dateObj.toISOString().split('T')[0] : '' 
+    };
   };
 
-  const getDaySeparator = (dateStr?: string) => {
-    if (!dateStr) return '';
-    const msgDate = new Date(dateStr).toDateString();
-    const today = new Date().toDateString();
-    const yesterday = new Date(Date.now() - 86400000).toDateString();
-    if (msgDate === today) return 'TODAY';
-    if (msgDate === yesterday) return 'YESTERDAY';
-    return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+  const getDaySeparator = (dateStr?: string, createdStr?: string) => {
+    const raw = dateStr || createdStr;
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return '';
+
+    const todayStr = new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' });
+    const msgDateStr = d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' });
+
+    const yesterday = new Date(Date.now() - 86400000);
+    const yesterdayStr = yesterday.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' });
+
+    if (msgDateStr === todayStr) return 'TODAY';
+    if (msgDateStr === yesterdayStr) return 'YESTERDAY';
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }).toUpperCase();
   };
 
   // Admin Sent Messages (Sorted Oldest on Top, Latest Below like WhatsApp)
@@ -486,8 +509,8 @@ export default function AnnouncementsClient({
     });
 
     list.sort((a, b) => {
-      const timeA = new Date(a.publish_date || a.created_at).getTime();
-      const timeB = new Date(b.publish_date || b.created_at).getTime();
+      const timeA = new Date(a.created_at || a.publish_date).getTime();
+      const timeB = new Date(b.created_at || b.publish_date).getTime();
       return timeA - timeB;
     });
     return list;
@@ -531,21 +554,32 @@ export default function AnnouncementsClient({
     });
 
     list.sort((a, b) => {
-      const timeA = new Date(a.publish_date || a.created_at).getTime();
-      const timeB = new Date(b.publish_date || b.created_at).getTime();
+      const timeA = new Date(a.created_at || a.publish_date).getTime();
+      const timeB = new Date(b.created_at || b.publish_date).getTime();
       return timeA - timeB;
     });
     return list;
   }, [announcements, appliedGuruFilters, trainers]);
 
-  // Scroll to bottom on initial load / message change
+  // WhatsApp-style Auto-scroll: Immediately position view at the bottom (latest messages)
   useEffect(() => {
-    if (activeTab === 'admin_sent') {
-      adminChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      guruChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (viewMode === 'chat') {
+      const timer = setTimeout(() => {
+        if (activeTab === 'admin_sent') {
+          if (adminScrollContainerRef.current) {
+            adminScrollContainerRef.current.scrollTop = adminScrollContainerRef.current.scrollHeight;
+          }
+          adminChatEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        } else {
+          if (guruScrollContainerRef.current) {
+            guruScrollContainerRef.current.scrollTop = guruScrollContainerRef.current.scrollHeight;
+          }
+          guruChatEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        }
+      }, 50);
+      return () => clearTimeout(timer);
     }
-  }, [activeTab, adminMessages.length, guruMessages.length]);
+  }, [viewMode, activeTab, adminMessages.length, guruMessages.length]);
 
   // Fetch Recipient Students for "View Recipient Students" button
   const handleOpenRecipientsModal = async (ann: Announcement) => {
@@ -968,41 +1002,23 @@ export default function AnnouncementsClient({
               <button
                 type="button"
                 onClick={() => setViewMode('overview')}
-                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1.5 px-3.5 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition cursor-pointer shrink-0 shadow-2xs"
                 title="Back to Overview"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-4 h-4 text-gray-700" />
                 <span className="hidden sm:inline">Back to Overview</span>
                 <span className="sm:hidden">Back</span>
               </button>
 
-              {/* Tab Switcher */}
-              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('admin_sent')}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer bg-[#075E54] text-white shadow-xs"
-                >
-                  Admin Sent ({adminMessages.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('guru_sent')}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer text-gray-600 hover:text-gray-900"
-                >
-                  Guru Sent ({guruMessages.length})
-                </button>
-              </div>
-
-              {/* Search */}
-              <div className="relative min-w-[150px] flex-1 sm:flex-initial">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              {/* Search: expands to fill remaining space cleanly */}
+              <div className="relative min-w-[180px] flex-1">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   value={adminSearch}
                   onChange={(e) => setAdminSearch(e.target.value)}
-                  placeholder="Search notices..."
-                  className="w-full h-9 pl-7 pr-2.5 rounded-xl border border-gray-200 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#075E54]"
+                  placeholder="Search notices, broadcasts, messages..."
+                  className="w-full h-9 pl-8 pr-3 rounded-xl border border-gray-200 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#075E54] bg-gray-50/50 hover:bg-white transition"
                 />
               </div>
 
@@ -1079,7 +1095,10 @@ export default function AnnouncementsClient({
             <div className="absolute inset-0 opacity-[0.035] pointer-events-none bg-[radial-gradient(#075E54_1px,transparent_1px)] [background-size:16px_16px]" />
 
             {/* Scrollable messages container */}
-            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 relative z-10 w-full">
+            <div 
+              ref={adminScrollContainerRef}
+              className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 relative z-10 w-full"
+            >
               {adminMessages.length === 0 ? (
                 <div className="text-center py-20 space-y-2 bg-white/70 backdrop-blur-xs rounded-3xl p-6 max-w-sm mx-auto border border-gray-200 my-auto">
                   <div className="w-12 h-12 rounded-full bg-emerald-50 text-[#075E54] mx-auto flex items-center justify-center">
@@ -1103,7 +1122,7 @@ export default function AnnouncementsClient({
                       {showDateHeader && (
                         <div className="flex justify-center my-2">
                           <span className="px-3 py-0.5 rounded-full bg-white/95 shadow-2xs border border-gray-200 text-[9px] font-black uppercase text-gray-600 tracking-wider">
-                            {getDaySeparator(ann.publish_date || ann.created_at)} • {date}
+                            {getDaySeparator(ann.publish_date, ann.created_at)} • {date}
                           </span>
                         </div>
                       )}
@@ -1234,13 +1253,13 @@ export default function AnnouncementsClient({
             </div>
 
             {/* PINNED BOTTOM-LEFT FLOATING ACTION BUTTON */}
-            <div className="absolute bottom-3 left-4 z-20">
+            <div className="absolute bottom-4 left-5 z-20">
               <button
                 onClick={openCreateModal}
-                className="px-5 py-2.5 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] text-[#075E54] font-black text-xs sm:text-sm shadow-xl flex items-center gap-2 cursor-pointer transition transform hover:scale-105 active:scale-95 border-2 border-white"
+                className="px-6 py-3.5 sm:px-8 sm:py-4 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] text-[#075E54] font-black text-sm sm:text-base shadow-2xl flex items-center gap-2.5 cursor-pointer transition transform hover:scale-105 active:scale-95 border-2 border-white ring-4 ring-emerald-500/20"
               >
-                <Plus className="w-4 h-4 text-[#075E54] stroke-[3]" />
-                <span>Broadcast New Message</span>
+                <Plus className="w-5 h-5 text-[#075E54] stroke-[3.5]" />
+                <span>+ Broadcast New Message</span>
               </button>
             </div>
           </div>
@@ -1259,34 +1278,16 @@ export default function AnnouncementsClient({
               <button
                 type="button"
                 onClick={() => setViewMode('overview')}
-                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1.5 px-3.5 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition cursor-pointer shrink-0 shadow-2xs"
                 title="Back to Overview"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-4 h-4 text-gray-700" />
                 <span className="hidden sm:inline">Back to Overview</span>
                 <span className="sm:hidden">Back</span>
               </button>
 
-              {/* Tab Switcher */}
-              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('admin_sent')}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer text-gray-600 hover:text-gray-900"
-                >
-                  Admin Sent ({adminMessages.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('guru_sent')}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer bg-[#075E54] text-white shadow-xs"
-                >
-                  Guru Sent ({guruMessages.length})
-                </button>
-              </div>
-
-              {/* 1. Guru Filter */}
-              <div className="w-auto min-w-[130px]">
+              {/* 1. Guru Filter: flexes to fill space */}
+              <div className="flex-1 min-w-[160px]">
                 <CompactSearchableMultiSelect
                   label="Faculty Guru"
                   placeholder="All Gurus"
@@ -1296,8 +1297,8 @@ export default function AnnouncementsClient({
                 />
               </div>
 
-              {/* 2. Batch Filter */}
-              <div className="w-auto min-w-[130px]">
+              {/* 2. Batch Filter: flexes to fill space */}
+              <div className="flex-1 min-w-[150px]">
                 <CompactSearchableMultiSelect
                   label="Batch"
                   placeholder="All Batches"
@@ -1307,8 +1308,8 @@ export default function AnnouncementsClient({
                 />
               </div>
 
-              {/* 3. Student Filter */}
-              <div className="w-auto min-w-[130px]">
+              {/* 3. Student Filter: flexes to fill space */}
+              <div className="flex-1 min-w-[160px]">
                 <CompactSearchableMultiSelect
                   label="Disciple Student"
                   placeholder="All Students"
@@ -1319,7 +1320,7 @@ export default function AnnouncementsClient({
               </div>
 
               {/* 4. Month & Year Filter using MonthPicker */}
-              <div className="w-auto min-w-[140px]">
+              <div className="w-auto min-w-[145px]">
                 <MonthPicker
                   value={guruMonthLabel}
                   onChange={(label, key, sDate, eDate) => {
@@ -1338,9 +1339,9 @@ export default function AnnouncementsClient({
                 <button
                   type="button"
                   onClick={handleApplyGuruFilters}
-                  className="h-9 px-3 rounded-xl bg-[#075E54] hover:bg-[#128C7E] text-white text-xs font-black shadow-xs transition flex items-center justify-center gap-1 cursor-pointer"
+                  className="h-9 px-3.5 rounded-xl bg-[#075E54] hover:bg-[#128C7E] text-white text-xs font-black shadow-xs transition flex items-center justify-center gap-1 cursor-pointer"
                 >
-                  <Eye className="w-3 h-3" />
+                  <Eye className="w-3.5 h-3.5" />
                   <span>View</span>
                 </button>
                 <button
@@ -1359,7 +1360,10 @@ export default function AnnouncementsClient({
           <div className="relative rounded-3xl bg-[#EFEAE2] border border-gray-300 shadow-inner h-[calc(100vh-170px)] min-h-[620px] flex flex-col overflow-hidden">
             <div className="absolute inset-0 opacity-[0.035] pointer-events-none bg-[radial-gradient(#075E54_1px,transparent_1px)] [background-size:16px_16px]" />
 
-            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 relative z-10 w-full">
+            <div 
+              ref={guruScrollContainerRef}
+              className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 relative z-10 w-full"
+            >
               {guruMessages.length === 0 ? (
                 <div className="text-center py-20 space-y-2 bg-white/70 backdrop-blur-xs rounded-3xl p-6 max-w-sm mx-auto border border-gray-200 my-auto">
                   <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 mx-auto flex items-center justify-center">
@@ -1382,7 +1386,7 @@ export default function AnnouncementsClient({
                       {showDateHeader && (
                         <div className="flex justify-center my-2">
                           <span className="px-3 py-0.5 rounded-full bg-white/95 shadow-2xs border border-gray-200 text-[9px] font-black uppercase text-gray-600 tracking-wider">
-                            {getDaySeparator(ann.publish_date || ann.created_at)} • {date}
+                            {getDaySeparator(ann.publish_date, ann.created_at)} • {date}
                           </span>
                         </div>
                       )}
