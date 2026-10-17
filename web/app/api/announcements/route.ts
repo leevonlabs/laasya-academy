@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAnnouncements, createAnnouncement } from '@/lib/announcements';
 import { getCurrentUser } from '@/lib/auth';
-import { sendFcmToRole, sendFcmToBatch } from '@/lib/fcm';
+import { sendFcmToRole, sendFcmToBatch, sendFcmToCourse } from '@/lib/fcm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,6 +98,8 @@ export async function POST(request: NextRequest) {
 
       if (body.target_batch_id) {
         sendFcmToBatch(body.target_batch_id, notifPayload).catch(e => console.error('[FCM] Error notifying batch:', e));
+      } else if (body.target_course_id) {
+        sendFcmToCourse(body.target_course_id, notifPayload).catch(e => console.error('[FCM] Error notifying course:', e));
       } else if (targetAudience.includes('student') && (targetAudience.includes('guru') || targetAudience.includes('trainer'))) {
         sendFcmToRole('all', notifPayload).catch(e => console.error('[FCM] Error notifying all:', e));
       } else if (targetAudience.includes('student') || targetAudience.includes('disciple')) {

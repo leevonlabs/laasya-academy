@@ -221,6 +221,32 @@ export async function sendFcmToBatch(batchId: string, payload: FcmNotificationPa
 }
 
 /**
+ * Send notification to all devices enrolled in batches belonging to a specific course
+ */
+export async function sendFcmToCourse(courseId: string, payload: FcmNotificationPayload): Promise<number> {
+  if (!courseId) return 0;
+
+  const rows = await query<{ fcm_token: string }>(`
+    SELECT DISTINCT dt.fcm_token 
+    FROM public.device_tokens dt
+    LEFT JOIN public.students s ON (s.profile_id = dt.user_id OR s.id = dt.user_id)
+    LEFT JOIN public.batch_enrollments be ON (be.student_id = s.id OR be.student_id = dt.user_id)
+    LEFT JOIN public.batches b ON b.id = be.batch_id
+    WHERE b.course_id::text = $1
+       OR dt.role = 'admin';
+  `, [courseId]);
+
+  let sent = 0;
+  for (const r of rows) {
+    if (r.fcm_token) {
+      const ok = await sendFcmMessage(r.fcm_token, payload);
+      if (ok) sent++;
+    }
+  }
+  return sent;
+}
+
+/**
  * Send notification to all devices belonging to a specific role ('student', 'trainer', 'all')
  */
 export async function sendFcmToRole(role: 'student' | 'trainer' | 'all', payload: FcmNotificationPayload): Promise<number> {
