@@ -62,10 +62,16 @@ class _SupportScreenState extends State<SupportScreen> {
   }
 
   Future<void> _makeCall(String phone) async {
-    final clean = phone.replaceAll(RegExp(r'[^0-9+]'), '');
-    final uri = Uri.parse('tel:$clean');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+    try {
+      final clean = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+      if (clean.isEmpty) return;
+      final uri = Uri.parse('tel:$clean');
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        await launchUrl(uri);
+      }
+    } catch (e) {
+      debugPrint('[SupportScreen] Error making call: $e');
     }
   }
 

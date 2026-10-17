@@ -122,8 +122,8 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
 
   Future<void> _loadAnnouncements() async {
     try {
-      final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements');
-      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements?_t=${DateTime.now().millisecondsSinceEpoch}');
+      final res = await http.get(uri).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         if (data['success'] == true && data['announcements'] is List) {
@@ -139,10 +139,25 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
           });
 
           SupabaseService().markAllMessagesAsRead(_announcements);
+          return;
         }
       }
     } catch (e) {
-      debugPrint('Error loading announcements: $e');
+      debugPrint('Error loading announcements via HTTP: $e');
+    }
+
+    // Direct Supabase fallback
+    try {
+      final msgs = await SupabaseService().getMessageAnnouncements(forceRefresh: true);
+      _announcements = msgs.where(_isMatchingTrainer).toList();
+      _announcements.sort((a, b) {
+        final da = DateTime.tryParse(a['publish_date'] ?? a['created_at'] ?? '') ?? DateTime(2000);
+        final db = DateTime.tryParse(b['publish_date'] ?? b['created_at'] ?? '') ?? DateTime(2000);
+        return da.compareTo(db);
+      });
+      SupabaseService().markAllMessagesAsRead(_announcements);
+    } catch (e) {
+      debugPrint('Error loading announcements fallback: $e');
     }
   }
 

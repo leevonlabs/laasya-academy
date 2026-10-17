@@ -63,7 +63,7 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
     if (_messages.isEmpty) {
       setState(() => _isLoading = true);
     }
-    final msgs = await SupabaseService().getMessageAnnouncements(forceRefresh: _messages.isEmpty);
+    final msgs = await SupabaseService().getMessageAnnouncements(forceRefresh: true);
     if (mounted) {
       final now = DateTime.now();
       final profile = SupabaseService().currentUserProfile;

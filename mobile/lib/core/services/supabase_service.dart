@@ -361,6 +361,25 @@ class SupabaseService {
     } catch (e) {
       debugPrint('HTTP preloadTrainerAvatars notice: $e');
     }
+
+    // 3. Fetch Admin Avatar from /api/settings/admin-profile
+    try {
+      final adminUri = Uri.parse('${ApiConstants.baseUrl}/api/settings/admin-profile');
+      final adminRes = await http.get(adminUri).timeout(const Duration(seconds: 5));
+      if (adminRes.statusCode == 200) {
+        final decoded = jsonDecode(adminRes.body);
+        if (decoded is Map && decoded['success'] == true && decoded['profile'] is Map) {
+          final av = decoded['profile']['avatar_url']?.toString();
+          if (av != null && av.trim().isNotEmpty && av != 'null') {
+            _adminAvatarUrl = av.trim();
+          } else {
+            _adminAvatarUrl = null;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[SupabaseService] Notice fetching admin avatar: $e');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1618,7 +1637,7 @@ class SupabaseService {
 
     // 2. HTTP API fallback
     try {
-      final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements?announcementType=message');
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements?announcementType=message&_t=${DateTime.now().millisecondsSinceEpoch}');
       final res = await http.get(uri).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
