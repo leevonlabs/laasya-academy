@@ -98,7 +98,7 @@ class LaasyaAlertService : Service() {
         }
 
         startPollingLoop()
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     private fun startForegroundNotification() {
@@ -119,37 +119,33 @@ class LaasyaAlertService : Service() {
             .setContentText("Connected for live attendance & notifications")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pendingIntent)
-            .setOngoing(true)
+            .setOngoing(false)
+            .setAutoCancel(true)
             .setSilent(true)
 
         try {
             startForeground(NOTIF_ID_FOREGROUND, builder.build())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_DETACH)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(false)
+            }
         } catch (_: Exception) {}
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Reschedule wake-up via LaasyaNotificationReceiver so notifications survive being swiped away from slides
         super.onTaskRemoved(rootIntent)
         try {
-            LaasyaNotificationReceiver.scheduleNextPoll(applicationContext, 2000L)
+            LaasyaNotificationReceiver.cancelPoll(applicationContext)
         } catch (_: Exception) {}
         try {
-            val restartIntent = Intent(applicationContext, LaasyaAlertService::class.java).apply {
-                putExtra("role", role)
-                putExtra("studentId", studentId)
-                putExtra("rollNumber", rollNumber)
-                putExtra("name", name)
-                putExtra("phone", phone)
-                putExtra("batchIds", batchIds)
-                putExtra("baseUrl", baseUrl)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                androidx.core.content.ContextCompat.startForegroundService(applicationContext, restartIntent)
-            } else {
-                startService(restartIntent)
-            }
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(NOTIF_ID_FOREGROUND)
         } catch (_: Exception) {}
-        startPollingLoop()
+        scheduler?.shutdownNow()
+        scheduler = null
+        stopSelf()
     }
 
     private fun startPollingLoop() {

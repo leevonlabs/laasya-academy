@@ -326,19 +326,56 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
-            tooltip: 'Guru Notices',
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TrainerNotificationsScreen()),
+          Builder(
+            builder: (context) {
+              final unreadMsg = SupabaseService().getUnreadMessagesCount();
+              final unreadVid = SupabaseService().getUnreadVideosCount();
+              final totalUnread = unreadMsg + unreadVid;
+              return IconButton(
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
+                    if (totalUnread > 0)
+                      Positioned(
+                        right: -4,
+                        top: -3,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE53E3E),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white, width: 1.2),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                          child: Text(
+                            totalUnread > 99 ? '99+' : '$totalUnread',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              height: 1,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                tooltip: 'Guru Notices',
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TrainerNotificationsScreen()),
+                  );
+                  if (mounted) setState(() {});
+                  if (result is Map && mounted) {
+                    if (result['action'] == 'switch_tab' && result['index'] is int) {
+                      setState(() => _currentIndex = result['index']);
+                    }
+                  }
+                },
               );
-              if (result is Map && mounted) {
-                if (result['action'] == 'switch_tab' && result['index'] is int) {
-                  setState(() => _currentIndex = result['index']);
-                }
-              }
             },
           ),
         ],

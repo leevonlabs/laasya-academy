@@ -199,7 +199,12 @@ class TrainerDataStore {
     for (var course in courses) {
       for (var batch in (course['batches'] as List)) {
         final days = List<String>.from(batch['days'] ?? []);
-        final isToday = days.any((d) => d.toString().trim().toLowerCase() == currentDayName.toLowerCase());
+        final curLower = currentDayName.toLowerCase();
+        final cur3 = curLower.length >= 3 ? curLower.substring(0, 3) : curLower;
+        final isToday = days.any((d) {
+          final dLower = d.toString().trim().toLowerCase();
+          return dLower == curLower || dLower.startsWith(cur3) || curLower.startsWith(dLower);
+        });
 
         if (isToday) {
           final batchId = batch['id'] as String;

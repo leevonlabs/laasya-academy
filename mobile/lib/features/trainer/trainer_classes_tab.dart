@@ -277,38 +277,24 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
                     itemBuilder: (context, index) {
                       final b = _batches[index];
                       final courseTitle = _getCourseTitle(b);
-                      final room = _getRoom(b);
-                      final days = _getDays(b);
                       final status = _getStatus(b);
                       final name = _getName(b);
-                      final startTime = b['start_time']?.toString() ?? '17:00';
-                      final endTime = b['end_time']?.toString() ?? '18:30';
                       final enrolled = b['enrolled_count']?.toString() ?? '0';
                       final capacity = b['max_capacity']?.toString() ?? '20';
-
-                      final rawSchedules = b['schedules'];
-                      List<Map<String, dynamic>> cardSlots = [];
-                      if (rawSchedules is List) {
-                        for (var s in rawSchedules) {
-                          if (s is Map) {
-                            cardSlots.add({
-                              'day': _formatShortDay(s['day']),
-                              'startTime': s['startTime']?.toString() ?? '',
-                              'endTime': s['endTime']?.toString() ?? '',
-                              'room': s['room']?.toString() ?? room,
-                            });
-                          }
-                        }
-                      }
+                      final isActive = status.toLowerCase() == 'active';
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 14),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(18),
                           border: Border.all(color: const Color(0xFFF0D5E4)),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
                           ],
                         ),
                         child: Padding(
@@ -316,6 +302,7 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Top Row: Course Name Badge & Active/Inactive Status Badge
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
@@ -327,10 +314,15 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFF3E8EE),
                                           borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFFF0D5E4)),
                                         ),
                                         child: Text(
                                           courseTitle,
-                                          style: const TextStyle(color: LaasyaColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                                          style: const TextStyle(
+                                            color: LaasyaColors.primary,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                          ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -341,118 +333,72 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFDEF7EC),
+                                      color: isActive ? const Color(0xFFDEF7EC) : const Color(0xFFFDE8E8),
                                       borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isActive ? const Color(0xFF86EFAC) : const Color(0xFFF8B4B4),
+                                        width: 0.8,
+                                      ),
                                     ),
                                     child: Text(
-                                      status.toUpperCase(),
-                                      style: const TextStyle(color: Color(0xFF03543F), fontWeight: FontWeight.bold, fontSize: 11),
+                                      isActive ? 'ACTIVE' : 'INACTIVE',
+                                      style: TextStyle(
+                                        color: isActive ? const Color(0xFF03543F) : const Color(0xFF9B1C1C),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10.5,
+                                        letterSpacing: 0.3,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
+
                               const SizedBox(height: 12),
+
+                              // Batch Name
                               Text(
                                 name,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                                style: const TextStyle(
+                                  fontSize: 16.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: LaasyaColors.textDark,
+                                ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 8),
-                              if (cardSlots.isNotEmpty)
-                                ...cardSlots.map((slot) => Padding(
-                                      padding: const EdgeInsets.only(bottom: 6),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF590231),
-                                              borderRadius: BorderRadius.circular(5),
-                                            ),
-                                            child: Text(
-                                              slot['day'] ?? 'Day',
-                                              style: const TextStyle(color: Color(0xFFF9E33A), fontWeight: FontWeight.bold, fontSize: 10.5),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '${slot['startTime']} - ${slot['endTime']}',
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(Icons.room_rounded, size: 13, color: LaasyaColors.primary),
-                                                const SizedBox(width: 2),
-                                                Expanded(
-                                                  child: Text(
-                                                    slot['room'] ?? 'Hall',
-                                                    style: const TextStyle(fontSize: 11.5, color: Colors.black54),
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ))
-                              else ...[
-                                Row(
-                                  children: [
-                                    const Icon(Icons.room_rounded, size: 16, color: LaasyaColors.primary),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        room,
-                                        style: const TextStyle(fontSize: 12, color: Colors.black87),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Padding(
-                                      padding: EdgeInsets.only(top: 2),
-                                      child: Icon(Icons.schedule_rounded, size: 16, color: LaasyaColors.primary),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        '$startTime - $endTime ($days)',
-                                        style: const TextStyle(fontSize: 12, color: Colors.black87),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                              const SizedBox(height: 14),
+
+                              const SizedBox(height: 12),
+
+                              // Total Student Strength & Details Button Row
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Expanded(
-                                    child: Text(
-                                      'Students: $enrolled / $capacity',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.groups_rounded, size: 16, color: LaasyaColors.primary),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Students: $enrolled / $capacity',
+                                        style: const TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 8),
                                   OutlinedButton(
                                     onPressed: () => _showBatchDetails(b),
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: LaasyaColors.primary,
-                                      side: const BorderSide(color: LaasyaColors.primary),
+                                      side: const BorderSide(color: LaasyaColors.primary, width: 1.2),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                                     ),
-                                    child: const Text('View Class Details', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                    child: const Text(
+                                      'Details',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
                                   ),
                                 ],
                               ),

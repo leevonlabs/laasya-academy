@@ -87,15 +87,19 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
         final data = jsonDecode(res.body);
         if (data['success'] == true && data['announcements'] is List) {
           final all = List<Map<String, dynamic>>.from(data['announcements']);
-          // Filter announcements that belong to this trainer or his assigned courses
+          // Filter announcements that belong to this trainer or academy notices from admin
           _announcements = all.where((a) {
-            final senderRole = (a['sender_role'] ?? '').toString();
+            final senderRole = (a['sender_role'] ?? '').toString().toLowerCase();
+            final audience = (a['audience'] ?? '').toString().toLowerCase();
             final aTrainerName = (a['trainer_name'] ?? a['created_by'] ?? '').toString().toLowerCase();
             final tName = _trainerName.toLowerCase();
             if (senderRole == 'trainer' && (aTrainerName.contains(tName) || tName.contains(aTrainerName))) {
               return true;
             }
             if (a['trainer_id'] == _trainerId) return true;
+            if (senderRole == 'admin' || audience.contains('trainer') || audience.contains('guru') || audience.contains('all') || audience.isEmpty) {
+              return true;
+            }
             return false;
           }).toList();
 
@@ -165,11 +169,11 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Academy Messages',
+              'Messages',
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             Text(
-              'Guru Broadcast • $_trainerName',
+              'Guru & Academy Broadcast • $_trainerName',
               style: const TextStyle(fontSize: 11, color: LaasyaColors.accentGold),
             ),
           ],
@@ -372,115 +376,142 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                           final dateStr = _formatDate(ann['publish_date'] ?? ann['created_at']);
                           final typeTag = ann['type_tag'] ?? 'General';
 
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: const Color(0xFFF0D5E4)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.02),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(15),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFF0FDF4),
-                                              borderRadius: BorderRadius.circular(6),
-                                              border: Border.all(color: const Color(0xFFBBF7D0), width: 0.8),
-                                            ),
-                                            child: const Text(
-                                              'YOU',
-                                              style: TextStyle(
-                                                color: Color(0xFF15803D),
-                                                fontSize: 9.5,
-                                                fontWeight: FontWeight.w900,
-                                                letterSpacing: 0.5,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFFFF2F8),
-                                              borderRadius: BorderRadius.circular(6),
-                                              border: Border.all(color: const Color(0xFFF0D5E4), width: 0.8),
-                                            ),
-                                            child: Text(
-                                              typeTag.toUpperCase(),
-                                              style: const TextStyle(
-                                                color: LaasyaColors.primary,
-                                                fontSize: 9.5,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      Text(
-                                        dateStr,
-                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                          final senderRole = (ann['sender_role'] ?? '').toString().toLowerCase();
+                          final isAdmin = senderRole == 'admin' || (ann['trainer_id'] == null && (ann['trainer_name'] == null || (ann['trainer_name'] ?? '').toString().isEmpty));
+
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSenderAvatar(ann, !isAdmin),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(3),
+                                      topRight: Radius.circular(16),
+                                      bottomLeft: Radius.circular(16),
+                                      bottomRight: Radius.circular(16),
+                                    ),
+                                    border: Border.all(
+                                      color: isAdmin ? const Color(0xFFBBF7D0) : const Color(0xFFF0D5E4),
+                                      width: 1,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.04),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    title,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: LaasyaColors.textDark,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    message,
-                                    style: const TextStyle(fontSize: 12.5, color: Colors.black87, height: 1.35),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFF9FB),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: const Color(0xFFF0D5E4)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(14),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Icon(Icons.school_rounded, size: 13, color: LaasyaColors.primary),
-                                        const SizedBox(width: 5),
-                                        Flexible(
-                                          child: Text(
-                                            '$course • $batch',
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              color: LaasyaColors.primary,
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: isAdmin ? const Color(0xFFF0FDF4) : const Color(0xFFFFF2F8),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(
+                                                      color: isAdmin ? const Color(0xFF86EFAC) : const Color(0xFFF0D5E4),
+                                                      width: 0.8,
+                                                    ),
+                                                  ),
+                                                  child: Text(
+                                                    isAdmin ? 'ACADEMY ADMIN' : 'YOU (GURU)',
+                                                    style: TextStyle(
+                                                      color: isAdmin ? const Color(0xFF15803D) : const Color(0xFF8A064D),
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.w900,
+                                                      letterSpacing: 0.5,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFFFF2F8),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(color: const Color(0xFFF0D5E4), width: 0.8),
+                                                  ),
+                                                  child: Text(
+                                                    typeTag.toUpperCase(),
+                                                    style: const TextStyle(
+                                                      color: LaasyaColors.primary,
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            overflow: TextOverflow.ellipsis,
+                                            Text(
+                                              dateStr,
+                                              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          title,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold,
+                                            color: LaasyaColors.textDark,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          message,
+                                          style: const TextStyle(fontSize: 12.5, color: Colors.black87, height: 1.35),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFF9FB),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFF0D5E4)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                isAdmin ? Icons.verified_user_rounded : Icons.school_rounded,
+                                                size: 13,
+                                                color: isAdmin ? const Color(0xFF15803D) : LaasyaColors.primary,
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Flexible(
+                                                child: Text(
+                                                  isAdmin ? 'Academy Direct Broadcast' : '$course • $batch',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: isAdmin ? const Color(0xFF15803D) : LaasyaColors.primary,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
+                            ],
                           );
                         },
                       ),
@@ -489,5 +520,76 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
               ),
             ),
     );
+  }
+
+  Widget _buildSenderAvatar(Map<String, dynamic> msg, bool isGuru) {
+    if (isGuru) {
+      final avatarUrl = (msg['trainer_avatar_url'] ?? msg['avatar_url'] ?? '').toString();
+      final senderName = (msg['trainer_name'] ?? msg['created_by'] ?? _trainerName).toString();
+      final initials = senderName.trim().split(' ').where((p) => p.isNotEmpty).map((p) => p[0]).take(2).join().toUpperCase();
+
+      return Container(
+        margin: const EdgeInsets.only(top: 2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFF9E33A), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: CircleAvatar(
+          radius: 17,
+          backgroundColor: const Color(0xFF8A064D),
+          backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+          child: avatarUrl.isEmpty
+              ? Text(
+                  initials.isNotEmpty ? initials : 'G',
+                  style: const TextStyle(
+                    color: Color(0xFFF9E33A),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : null,
+        ),
+      );
+    } else {
+      // Academy Administration / Director DP avatar
+      return Container(
+        margin: const EdgeInsets.only(top: 2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFF075E54), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: CircleAvatar(
+          radius: 17,
+          backgroundColor: Colors.white,
+          child: ClipOval(
+            child: Image.asset(
+              'assets/images/header_logo.png',
+              width: 30,
+              height: 30,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const CircleAvatar(
+                radius: 17,
+                backgroundColor: Color(0xFF075E54),
+                child: Text('👑', style: TextStyle(fontSize: 14)),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
   }
 }

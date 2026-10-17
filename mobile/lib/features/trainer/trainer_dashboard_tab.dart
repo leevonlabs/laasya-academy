@@ -6,9 +6,10 @@ import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/widgets/laasya_avatar.dart';
-import '../student/student_video_library_screen.dart';
+import '../student/student_messages_screen.dart';
 import 'trainer_salaries_screen.dart';
-import 'trainer_announcements_screen.dart';
+import 'trainer_share_video_screen.dart';
+import 'trainer_timetable_screen.dart';
 import 'trainer_data_store.dart';
 
 class TrainerDashboardTab extends StatefulWidget {
@@ -601,7 +602,6 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
     final name = _profile?['full_name'] ?? 'Smt. Anusha Sumesh';
     final guruTitle = _profile?['display_title'] ?? _profile?['title_name'] ?? _profile?['designation'] ?? 'Revered Faculty Guru';
     final courseName = _profile?['course_name'] ?? _profile?['primary_course'] ?? _profile?['specialization'] ?? 'Classical Discipline';
-    final specialization = _profile?['specialization'] ?? courseName;
     final avatarUrl = _profile?['avatar_url'] as String? ?? _profile?['photo_url'] as String? ?? _profile?['image_url'] as String?;
     final monthlySalary = _profile?['monthly_salary'] ?? 45000;
     final salaryPaymentStatus = (_profile?['salary_payment_status'] ?? 'paid').toString().toLowerCase();
@@ -730,12 +730,20 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                   label: 'Timetable',
                   bgColor: const Color(0xFFFFF2F8),
                   iconColor: LaasyaColors.primary,
-                  onTap: widget.onNavigateToClasses,
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TrainerTimetableScreen(trainerProfile: _profile),
+                      ),
+                    );
+                    setState(() {});
+                  },
                 ),
                 const SizedBox(width: 8),
                 _quickActionButton(
-                  icon: Icons.video_library_rounded,
-                  label: 'Drive Vault',
+                  icon: Icons.video_call_rounded,
+                  label: 'Share Video',
                   bgColor: const Color(0xFFFEF3C7),
                   iconColor: const Color(0xFF92400E),
                   unreadCount: SupabaseService().getUnreadVideosCount(),
@@ -743,10 +751,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => StudentVideoLibraryScreen(
-                          studentCourse: specialization,
-                          studentBatch: 'All Batches',
-                        ),
+                        builder: (_) => TrainerShareVideoScreen(trainerProfile: _profile),
                       ),
                     );
                     setState(() {});
@@ -755,7 +760,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                 const SizedBox(width: 8),
                 _quickActionButton(
                   icon: Icons.chat_bubble_rounded,
-                  label: 'Academy Messages',
+                  label: 'Messages',
                   bgColor: const Color(0xFFE8F4FD),
                   iconColor: const Color(0xFF0284C7),
                   unreadCount: SupabaseService().getUnreadMessagesCount(),
@@ -763,7 +768,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => TrainerAnnouncementsScreen(trainerProfile: _profile),
+                        builder: (_) => const StudentMessagesScreen(),
                       ),
                     );
                     setState(() {});

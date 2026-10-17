@@ -708,30 +708,55 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Stack(
-              children: [
-                Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: CircleAvatar(
-                    radius: 5,
-                    backgroundColor: LaasyaColors.accentGold,
-                  ),
+          Builder(
+            builder: (context) {
+              final unreadMsg = SupabaseService().getUnreadMessagesCount();
+              final unreadVid = SupabaseService().getUnreadVideosCount();
+              final totalUnread = unreadMsg + unreadVid;
+              return IconButton(
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
+                    if (totalUnread > 0)
+                      Positioned(
+                        right: -4,
+                        top: -3,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE53E3E),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white, width: 1.2),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                          child: Text(
+                            totalUnread > 99 ? '99+' : '$totalUnread',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              height: 1,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const StudentNotificationsScreen()),
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const StudentNotificationsScreen()),
+                  );
+                  if (mounted) setState(() {});
+                  if (result is Map && mounted) {
+                    if (result['action'] == 'switch_tab' && result['index'] is int) {
+                      setState(() => _currentIndex = result['index']);
+                    } else if (result['action'] == 'alarm') { setState(() => _currentIndex = 3); }
+                  }
+                },
               );
-              if (result is Map && mounted) {
-                if (result['action'] == 'switch_tab' && result['index'] is int) {
-                  setState(() => _currentIndex = result['index']);
-                } else if (result['action'] == 'alarm') { setState(() => _currentIndex = 3); }
-              }
             },
           ),
         ],

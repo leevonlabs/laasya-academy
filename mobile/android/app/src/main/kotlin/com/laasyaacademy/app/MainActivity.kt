@@ -151,10 +151,60 @@ class MainActivity: FlutterActivity() {
                     }
                     result.success(true)
                 }
+                "saveImage" -> {
+                    val bytes = call.argument<ByteArray>("bytes")
+                    val fileName = call.argument<String>("fileName") ?: "timetable_${System.currentTimeMillis()}.png"
+                    if (bytes != null) {
+                        try {
+                            val success = saveImageToPublic(bytes, fileName)
+                            result.success(success)
+                        } catch (e: Exception) {
+                            result.error("SAVE_FAILED", e.message, null)
+                        }
+                    } else {
+                        result.error("NO_DATA", "Byte array was null", null)
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }
             }
+        }
+    }
+
+    private fun saveImageToPublic(bytes: ByteArray, fileName: String): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val contentValues = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/LaasyaAcademy")
+                }
+                val uri = contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                if (uri != null) {
+                    contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(bytes)
+                        out.flush()
+                    }
+                    true
+                } else {
+                    false
+                }
+            } else {
+                val picturesDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES)
+                val targetDir = java.io.File(picturesDir, "LaasyaAcademy")
+                if (!targetDir.exists()) targetDir.mkdirs()
+                val file = java.io.File(targetDir, fileName)
+                java.io.FileOutputStream(file).use { out ->
+                    out.write(bytes)
+                    out.flush()
+                }
+                android.media.MediaScannerConnection.scanFile(this, arrayOf(file.absolutePath), arrayOf("image/png"), null)
+                true
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
     }
 

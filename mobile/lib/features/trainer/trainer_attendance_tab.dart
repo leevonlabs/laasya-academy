@@ -16,7 +16,6 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
   final TrainerDataStore _store = TrainerDataStore();
 
   bool _isLoading = true;
-  String _batchFilter = 'today';
 
   @override
   void initState() {
@@ -122,10 +121,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
     final now = DateTime.now();
     final dayOfWeek = DateFormat('EEEE').format(now);
     final formattedDate = DateFormat('d MMMM yyyy').format(now);
-    final todayClasses = _store.getTodayClasses();
-    final allClasses = _store.getAllAssignedClasses();
-    final isShowingToday = _batchFilter == 'today' && todayClasses.isNotEmpty;
-    final displayedClasses = isShowingToday ? todayClasses : allClasses;
+    final displayedClasses = _store.getTodayClasses();
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8FA),
@@ -227,7 +223,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                           const Icon(Icons.schedule_rounded, color: LaasyaColors.accentGold, size: 14),
                           const SizedBox(width: 6),
                           Text(
-                            '${todayClasses.length} Scheduled Classes for Today',
+                            '${displayedClasses.length} Scheduled Classes for Today',
                             style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                           ),
                         ],
@@ -240,73 +236,14 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
               const SizedBox(height: 20),
 
               // =================================================================
-              // 2. BATCH FILTER TOGGLE & AVAILABLE CLASSES HEADER
+              // 2. AVAILABLE CLASSES HEADER (TODAY ONLY)
               // =================================================================
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFF0D5E4)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _batchFilter = 'today'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: _batchFilter == 'today' ? LaasyaColors.primary : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            "Today's Batches (${todayClasses.length})",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: _batchFilter == 'today' ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _batchFilter = 'all'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: _batchFilter == 'all' ? LaasyaColors.primary : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            "All My Batches (${allClasses.length})",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: _batchFilter == 'all' ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    _batchFilter == 'today' && todayClasses.isNotEmpty
-                        ? 'Today\'s Scheduled Classes'
-                        : 'Assigned Guru Batches',
-                    style: const TextStyle(
+                  const Text(
+                    'Today\'s Scheduled Classes',
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: LaasyaColors.textDark,
@@ -315,15 +252,16 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF3E8EE),
+                      color: const Color(0xFFDEF7EC),
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF86EFAC), width: 0.8),
                     ),
                     child: Text(
-                      '${displayedClasses.length} AVAILABLE',
+                      '${displayedClasses.length} AVAILABLE TODAY',
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: LaasyaColors.primary,
+                        color: Color(0xFF03543F),
                       ),
                     ),
                   ),
@@ -342,20 +280,46 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
               // =================================================================
               if (displayedClasses.isEmpty)
                 Container(
-                  padding: const EdgeInsets.all(28),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: const Color(0xFFF0D5E4)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  child: Center(
-                    child: Text(
-                      _batchFilter == 'today'
-                          ? 'No classes scheduled for today ($dayOfWeek). Tap "All My Batches" above to take attendance.'
-                          : 'No batches currently assigned.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.grey, fontSize: 13),
-                    ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFF2F8),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.event_busy_rounded, color: LaasyaColors.primary, size: 36),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'No Classes Scheduled for $dayOfWeek',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: LaasyaColors.textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'You have no batches scheduled on $dayOfWeek. Attendance can only be taken on active class days according to your timetable.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.black54, fontSize: 12.5, height: 1.4),
+                      ),
+                    ],
                   ),
                 )
               else

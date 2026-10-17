@@ -555,13 +555,14 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                                         ),
                                       ),
 
-                                    // Message Bubble
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: Container(
-                                        constraints: BoxConstraints(
-                                          maxWidth: MediaQuery.of(context).size.width * 0.88,
-                                        ),
+                                    // WhatsApp Group Chat Style Message Bubble with Sender Avatar DP
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildSenderAvatar(msg, isGuru),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Container(
                                         decoration: BoxDecoration(
                                           color: Colors.white,
                                           borderRadius: const BorderRadius.only(
@@ -767,7 +768,9 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                                     ),
                                   ],
                                 ),
-                              );
+                              ],
+                            ),
+                          );
                             },
                           ),
                         ),
@@ -810,5 +813,76 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildSenderAvatar(Map<String, dynamic> msg, bool isGuru) {
+    if (isGuru) {
+      final avatarUrl = (msg['trainer_avatar_url'] ?? msg['avatar_url'] ?? '').toString();
+      final senderName = (msg['trainer_name'] ?? msg['sender_name'] ?? msg['created_by'] ?? 'Guru').toString();
+      final initials = senderName.trim().split(' ').where((p) => p.isNotEmpty).map((p) => p[0]).take(2).join().toUpperCase();
+
+      return Container(
+        margin: const EdgeInsets.only(top: 2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFF9E33A), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: CircleAvatar(
+          radius: 17,
+          backgroundColor: const Color(0xFF8A064D),
+          backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+          child: avatarUrl.isEmpty
+              ? Text(
+                  initials.isNotEmpty ? initials : 'G',
+                  style: const TextStyle(
+                    color: Color(0xFFF9E33A),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : null,
+        ),
+      );
+    } else {
+      // Academy Administration / Director
+      return Container(
+        margin: const EdgeInsets.only(top: 2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFF075E54), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: CircleAvatar(
+          radius: 17,
+          backgroundColor: Colors.white,
+          child: ClipOval(
+            child: Image.asset(
+              'assets/images/header_logo.png',
+              width: 30,
+              height: 30,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const CircleAvatar(
+                radius: 17,
+                backgroundColor: Color(0xFF075E54),
+                child: Text('👑', style: TextStyle(fontSize: 14)),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
   }
 }

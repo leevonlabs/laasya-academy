@@ -1612,46 +1612,42 @@ class SupabaseService {
       _ensureReadStateLoaded();
     }
     final list = _cachedMessageAnnouncements.isNotEmpty ? _cachedMessageAnnouncements : _mockMessageAnnouncements;
-    return list.where((m) {
-      final id = m['id']?.toString();
-      if (id != null && _readMessageIds.contains(id)) return false;
-      if (_lastReadMessageTimestamp > 0) {
-        final dateStr = (m['publish_date'] ?? m['created_at'])?.toString();
-        if (dateStr == null || dateStr.trim().isEmpty) {
-          return false;
-        }
-        final dt = DateTime.tryParse(dateStr.contains('T') ? dateStr : '$dateStr 00:00:00');
-        if (dt == null || dt.millisecondsSinceEpoch <= _lastReadMessageTimestamp) {
-          return false;
-        }
+    final Set<String> seen = {};
+    int count = 0;
+    for (var m in list) {
+      final id = m['id']?.toString() ?? '';
+      if (id.isEmpty || seen.contains(id)) continue;
+      seen.add(id);
+      if (!_readMessageIds.contains(id)) {
+        count++;
       }
-      return true;
-    }).length;
+    }
+    return count;
   }
 
   int getUnreadVideosCount() {
     if (!_readStateLoaded) {
       _ensureReadStateLoaded();
     }
-    final videoAlerts = _cachedNotifications.where((n) {
+    final List<Map<String, dynamic>> allVideos = [];
+    allVideos.addAll(_cachedEventFolders);
+    for (var n in _cachedNotifications) {
       final t = (n['type'] ?? '').toString();
-      return t == 'video' || t == 'video_shared';
-    });
-    return videoAlerts.where((n) {
-      final id = n['id']?.toString();
-      if (id != null && _readVideoIds.contains(id)) return false;
-      if (_lastReadVideoTimestamp > 0) {
-        final dateStr = (n['date'] ?? n['created_at'])?.toString();
-        if (dateStr == null || dateStr.trim().isEmpty) {
-          return false;
-        }
-        final dt = DateTime.tryParse(dateStr.contains('T') ? dateStr : '$dateStr 00:00:00');
-        if (dt == null || dt.millisecondsSinceEpoch <= _lastReadVideoTimestamp) {
-          return false;
-        }
+      if (t == 'video' || t == 'video_shared') {
+        allVideos.add(n);
       }
-      return true;
-    }).length;
+    }
+    final Set<String> seen = {};
+    int count = 0;
+    for (var v in allVideos) {
+      final id = v['id']?.toString() ?? '';
+      if (id.isEmpty || seen.contains(id)) continue;
+      seen.add(id);
+      if (!_readVideoIds.contains(id)) {
+        count++;
+      }
+    }
+    return count;
   }
 
   void markMessageAsRead(String id) {
@@ -1681,9 +1677,25 @@ class SupabaseService {
     _saveReadVideos();
   }
 
-  void markAllVideosAsRead() {
+  void markAllVideosAsRead([List<Map<String, dynamic>>? currentList]) {
+    if (currentList != null && currentList.isNotEmpty) {
+      for (var item in currentList) {
+        final id = item['id']?.toString();
+        if (id != null) {
+          _readVideoIds.add(id);
+          _readNotifIds.add(id);
+        }
+      }
+    }
     for (var n in _cachedNotifications) {
       final id = n['id']?.toString();
+      if (id != null) {
+        _readVideoIds.add(id);
+        _readNotifIds.add(id);
+      }
+    }
+    for (var f in _cachedEventFolders) {
+      final id = f['id']?.toString();
       if (id != null) {
         _readVideoIds.add(id);
         _readNotifIds.add(id);

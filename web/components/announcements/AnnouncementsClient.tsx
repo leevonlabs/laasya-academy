@@ -955,55 +955,7 @@ export default function AnnouncementsClient({
           </div>
         </div>
       ) : (
-        <div className="space-y-3 animate-in fade-in duration-200">
-          {/* DEDICATED TOP BAR FOR CHAT SCREEN */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white px-4 py-2.5 rounded-2xl border border-gray-200 shadow-2xs">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setViewMode('overview')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back to Overview</span>
-              </button>
-              <h2 className="text-sm sm:text-base font-black text-gray-900 tracking-tight flex items-center gap-2">
-                <span>{activeTab === 'admin_sent' ? 'Admin Sent Broadcasts' : 'Guru Sent Announcements'}</span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-[#075E54] text-[10px] font-black border border-emerald-200">
-                  {activeTab === 'admin_sent' ? `${adminMessages.length} Messages` : `${guruMessages.length} Messages`}
-                </span>
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('admin_sent')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    activeTab === 'admin_sent' ? 'bg-[#075E54] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Admin Sent ({adminMessages.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('guru_sent')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    activeTab === 'guru_sent' ? 'bg-[#075E54] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Guru Sent ({guruMessages.length})
-                </button>
-              </div>
-
-              <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-bold text-[#075E54] bg-[#E8F8F0] px-2.5 py-1 rounded-xl border border-[#BCE8D0]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#25D366] animate-pulse" />
-                <span>Live Sync</span>
-              </div>
-            </div>
-          </div>
-
+        <div className="space-y-2.5 animate-in fade-in duration-200">
       {/* ===================================================================== */}
       {/* 1. ADMIN SENT TAB (WITH COMPACT FILTER BAR + TALL WHATSAPP CHAT)      */}
       {/* ===================================================================== */}
@@ -1011,9 +963,39 @@ export default function AnnouncementsClient({
         <div className="space-y-2.5 animate-in fade-in duration-200">
           {/* COMPACT FILTER BAR FOR ADMIN SENT */}
           <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-gray-200 shadow-2xs">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 items-center">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Back to Overview */}
+              <button
+                type="button"
+                onClick={() => setViewMode('overview')}
+                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition cursor-pointer shrink-0"
+                title="Back to Overview"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Back to Overview</span>
+                <span className="sm:hidden">Back</span>
+              </button>
+
+              {/* Tab Switcher */}
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('admin_sent')}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer bg-[#075E54] text-white shadow-xs"
+                >
+                  Admin Sent ({adminMessages.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('guru_sent')}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer text-gray-600 hover:text-gray-900"
+                >
+                  Guru Sent ({guruMessages.length})
+                </button>
+              </div>
+
               {/* Search */}
-              <div className="relative col-span-2 sm:col-span-1">
+              <div className="relative min-w-[150px] flex-1 sm:flex-initial">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
@@ -1025,7 +1007,7 @@ export default function AnnouncementsClient({
               </div>
 
               {/* Audience Filter */}
-              <div>
+              <div className="w-auto min-w-[125px]">
                 <select
                   value={adminAudience}
                   onChange={(e) => setAdminAudience(e.target.value)}
@@ -1040,7 +1022,7 @@ export default function AnnouncementsClient({
               </div>
 
               {/* Category Filter */}
-              <div>
+              <div className="w-auto min-w-[110px]">
                 <select
                   value={adminCategory}
                   onChange={(e) => setAdminCategory(e.target.value)}
@@ -1055,8 +1037,8 @@ export default function AnnouncementsClient({
                 </select>
               </div>
 
-              {/* Month & Year Filter using MonthPicker (Reference Image 2) */}
-              <div className="col-span-2 sm:col-span-1">
+              {/* Month & Year Filter using MonthPicker */}
+              <div className="w-auto min-w-[140px]">
                 <MonthPicker
                   value={adminMonthLabel}
                   onChange={(label, key, sDate, eDate) => {
@@ -1071,11 +1053,11 @@ export default function AnnouncementsClient({
               </div>
 
               {/* Filter Action Buttons */}
-              <div className="flex items-center gap-1.5 col-span-2 sm:col-span-1">
+              <div className="flex items-center gap-1.5 ml-auto shrink-0">
                 <button
                   type="button"
                   onClick={handleApplyAdminFilters}
-                  className="flex-1 h-9 px-3 rounded-xl bg-[#075E54] hover:bg-[#128C7E] text-white text-xs font-black shadow-xs transition flex items-center justify-center gap-1 cursor-pointer"
+                  className="h-9 px-3 rounded-xl bg-[#075E54] hover:bg-[#128C7E] text-white text-xs font-black shadow-xs transition flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Filter className="w-3 h-3" />
                   <span>Apply</span>
@@ -1093,7 +1075,7 @@ export default function AnnouncementsClient({
           </div>
 
           {/* EXPANDED FULL-HEIGHT WHATSAPP CHAT STREAM */}
-          <div className="relative rounded-3xl bg-[#EFEAE2] border border-gray-300 shadow-inner h-[calc(100vh-235px)] min-h-[560px] flex flex-col overflow-hidden">
+          <div className="relative rounded-3xl bg-[#EFEAE2] border border-gray-300 shadow-inner h-[calc(100vh-170px)] min-h-[620px] flex flex-col overflow-hidden">
             <div className="absolute inset-0 opacity-[0.035] pointer-events-none bg-[radial-gradient(#075E54_1px,transparent_1px)] [background-size:16px_16px]" />
 
             {/* Scrollable messages container */}
@@ -1272,9 +1254,39 @@ export default function AnnouncementsClient({
         <div className="space-y-2.5 animate-in fade-in duration-200">
           {/* STREAMLINED ULTRA-COMPACT FILTER BAR */}
           <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-gray-200 shadow-2xs">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 items-end">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Back to Overview */}
+              <button
+                type="button"
+                onClick={() => setViewMode('overview')}
+                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition cursor-pointer shrink-0"
+                title="Back to Overview"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Back to Overview</span>
+                <span className="sm:hidden">Back</span>
+              </button>
+
+              {/* Tab Switcher */}
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('admin_sent')}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer text-gray-600 hover:text-gray-900"
+                >
+                  Admin Sent ({adminMessages.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('guru_sent')}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer bg-[#075E54] text-white shadow-xs"
+                >
+                  Guru Sent ({guruMessages.length})
+                </button>
+              </div>
+
               {/* 1. Guru Filter */}
-              <div>
+              <div className="w-auto min-w-[130px]">
                 <CompactSearchableMultiSelect
                   label="Faculty Guru"
                   placeholder="All Gurus"
@@ -1285,7 +1297,7 @@ export default function AnnouncementsClient({
               </div>
 
               {/* 2. Batch Filter */}
-              <div>
+              <div className="w-auto min-w-[130px]">
                 <CompactSearchableMultiSelect
                   label="Batch"
                   placeholder="All Batches"
@@ -1296,7 +1308,7 @@ export default function AnnouncementsClient({
               </div>
 
               {/* 3. Student Filter */}
-              <div>
+              <div className="w-auto min-w-[130px]">
                 <CompactSearchableMultiSelect
                   label="Disciple Student"
                   placeholder="All Students"
@@ -1306,11 +1318,8 @@ export default function AnnouncementsClient({
                 />
               </div>
 
-              {/* 4. Month & Year Filter using MonthPicker (Reference Image 2) */}
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[10px] font-black text-gray-600 uppercase tracking-wider mb-0.5">
-                  Month & Year
-                </label>
+              {/* 4. Month & Year Filter using MonthPicker */}
+              <div className="w-auto min-w-[140px]">
                 <MonthPicker
                   value={guruMonthLabel}
                   onChange={(label, key, sDate, eDate) => {
@@ -1325,11 +1334,11 @@ export default function AnnouncementsClient({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-1.5 col-span-2 sm:col-span-1">
+              <div className="flex items-center gap-1.5 ml-auto shrink-0">
                 <button
                   type="button"
                   onClick={handleApplyGuruFilters}
-                  className="flex-1 h-9 px-3 rounded-xl bg-[#075E54] hover:bg-[#128C7E] text-white text-xs font-black shadow-xs transition flex items-center justify-center gap-1 cursor-pointer"
+                  className="h-9 px-3 rounded-xl bg-[#075E54] hover:bg-[#128C7E] text-white text-xs font-black shadow-xs transition flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Eye className="w-3 h-3" />
                   <span>View</span>
@@ -1347,7 +1356,7 @@ export default function AnnouncementsClient({
           </div>
 
           {/* EXPANDED FULL-HEIGHT GURU CHAT STREAM */}
-          <div className="relative rounded-3xl bg-[#EFEAE2] border border-gray-300 shadow-inner h-[calc(100vh-235px)] min-h-[560px] flex flex-col overflow-hidden">
+          <div className="relative rounded-3xl bg-[#EFEAE2] border border-gray-300 shadow-inner h-[calc(100vh-170px)] min-h-[620px] flex flex-col overflow-hidden">
             <div className="absolute inset-0 opacity-[0.035] pointer-events-none bg-[radial-gradient(#075E54_1px,transparent_1px)] [background-size:16px_16px]" />
 
             <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 relative z-10 w-full">

@@ -82,23 +82,10 @@ class LaasyaNotificationReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
-        // Automatically reschedule next poll so notifications persist even when swiped from slides
-        scheduleNextPoll(context)
-
         val pendingResult = goAsync()
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
         val wakeLock = powerManager?.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "laasya:notification_check")
         wakeLock?.acquire(15000L) // 15 seconds timeout
-
-        // Ensure the foreground service is also running
-        try {
-            val serviceIntent = Intent(context, LaasyaAlertService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                androidx.core.content.ContextCompat.startForegroundService(context, serviceIntent)
-            } else {
-                context.startService(serviceIntent)
-            }
-        } catch (_: Exception) {}
 
         // Perform server check on background worker thread with guaranteed completion
         Thread {

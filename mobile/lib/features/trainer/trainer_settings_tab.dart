@@ -522,12 +522,12 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                   ),
                   const Divider(height: 1, indent: 64),
 
-                  // 6. Academy Messages
+                  // 6. Messages
                   _settingsTile(
                     icon: Icons.chat_bubble_rounded,
                     iconBg: const Color(0xFFE8F4FD),
                     iconColor: const Color(0xFF0284C7),
-                    title: 'Academy Messages',
+                    title: 'Messages',
                     subtitle: 'Official broadcasts, parent circulars & academy notices',
                     badgeText: SupabaseService().getUnreadMessagesCount() > 0
                         ? '${SupabaseService().getUnreadMessagesCount()}'
@@ -600,25 +600,14 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                   ),
                   const Divider(height: 1, indent: 64),
 
-                  // 3. Privacy Policy Option
+                  // 3. Privacy Policy & Terms & Conditions Option (Single combined button)
                   _settingsTile(
-                    icon: Icons.privacy_tip_rounded,
+                    icon: Icons.verified_user_rounded,
                     iconBg: const Color(0xFFF3E8FF),
                     iconColor: const Color(0xFF6B21A8),
-                    title: 'Privacy Policy',
-                    subtitle: 'Child safety, data protection & pickup chimes disclosure',
+                    title: 'Privacy Policy & Terms',
+                    subtitle: 'Child safety, data protection, terms of service & academy guidelines',
                     onTap: () => LaasyaPolicyDialog.showPrivacy(context),
-                  ),
-                  const Divider(height: 1, indent: 64),
-
-                  // 4. Terms & Conditions Option
-                  _settingsTile(
-                    icon: Icons.gavel_rounded,
-                    iconBg: const Color(0xFFFEF3C7),
-                    iconColor: const Color(0xFF92400E),
-                    title: 'Terms & Conditions',
-                    subtitle: 'Faculty guidelines, attendance policies & academy rules',
-                    onTap: () => LaasyaPolicyDialog.showTerms(context),
                   ),
                 ],
               ),
