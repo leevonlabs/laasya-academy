@@ -112,7 +112,7 @@ export async function sendFcmMessage(token: string, payload: FcmNotificationPayl
           sound: payload.sound || 'default',
           default_sound: true,
           default_vibrate_timings: true,
-          priority: 'high' as const
+          notification_priority: 'PRIORITY_HIGH' as const
         }
       },
       apns: {
@@ -142,18 +142,20 @@ export async function sendFcmMessage(token: string, payload: FcmNotificationPayl
     });
 
     if (res.ok) {
+      const respData = await res.json().catch(() => ({}));
+      console.log(`[FCM] Push dispatched successfully to token ${token.substring(0, 12)}... (FCM ID: ${respData?.name || 'ok'})`);
       return true;
     }
 
     const errData = await res.json().catch(() => ({}));
     const errCode = errData?.error?.details?.[0]?.errorCode || errData?.error?.status;
     
-    // Clean up dead/unregistered tokens
-    if (errCode === 'UNREGISTERED' || errCode === 'INVALID_ARGUMENT' || res.status === 404) {
-      console.warn(`[FCM] Deleting invalid/expired token: ${token.substring(0, 16)}...`);
+    // Clean up ONLY when token is confirmed unregistered or not found
+    if (errCode === 'UNREGISTERED' || res.status === 404) {
+      console.warn(`[FCM] Deleting unregistered/expired token: ${token.substring(0, 16)}...`);
       await query(`DELETE FROM public.device_tokens WHERE fcm_token = $1;`, [token]);
     } else {
-      console.error(`[FCM] Send error: ${res.status}`, errData);
+      console.error(`[FCM] Delivery failed with HTTP ${res.status}:`, errData?.error?.message || errData);
     }
     return false;
   } catch (err) {
@@ -201,11 +203,12 @@ export async function sendFcmToBatch(batchId: string, payload: FcmNotificationPa
   const rows = await query<{ fcm_token: string }>(`
     SELECT DISTINCT dt.fcm_token 
     FROM public.device_tokens dt
-    LEFT JOIN public.batch_enrollments be ON be.student_id = dt.user_id
+    LEFT JOIN public.students s ON (s.profile_id = dt.user_id OR s.id = dt.user_id)
+    LEFT JOIN public.batch_enrollments be ON (be.student_id = s.id OR be.student_id = dt.user_id)
     WHERE dt.batch_ids ?| $1::text[]
-       OR be.batch_id = ANY($2::text[])
+       OR be.batch_id::text = ANY($1::text[])
        OR dt.role = 'admin';
-  `, [batchIds, batchIds]);
+  `, [batchIds]);
 
   let sent = 0;
   for (const r of rows) {
@@ -240,12 +243,17 @@ export async function sendFcmToRole(role: 'student' | 'trainer' | 'all', payload
 }
 
 /**
- * Send notification to a specific user
+ * Send notification to a specific user (handles student_id or profile_id)
  */
 export async function sendFcmToUser(userId: string, payload: FcmNotificationPayload): Promise<number> {
   if (!userId) return 0;
   const rows = await query<{ fcm_token: string }>(`
-    SELECT DISTINCT fcm_token FROM public.device_tokens WHERE user_id = $1;
+    SELECT DISTINCT dt.fcm_token 
+    FROM public.device_tokens dt
+    LEFT JOIN public.students s ON (s.profile_id = dt.user_id OR s.id = dt.user_id)
+    WHERE dt.user_id::text = $1
+       OR s.id::text = $1
+       OR s.profile_id::text = $1;
   `, [userId]);
 
   let sent = 0;

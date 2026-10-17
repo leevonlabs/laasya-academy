@@ -147,17 +147,25 @@ export async function POST(request: NextRequest) {
 
     // Also sync to public.profiles table for the owner
     const primaryPhone = contacts[0]?.phone || '7780763121';
-    const primaryEmail = emails[0]?.email || 'admin@laasyaacademy.com';
-
-    await query(`
-      UPDATE public.profiles
-      SET full_name = $1,
-          phone = $2,
-          email = $3,
-          avatar_url = COALESCE($4, avatar_url),
-          updated_at = NOW()
-      WHERE role = 'owner';
-    `, [fullName, primaryPhone, primaryEmail, avatarUrl]);
+    const currentUser = await getCurrentUser();
+    if (currentUser?.userId) {
+      await query(`
+        UPDATE public.profiles
+        SET full_name = $1,
+            phone = COALESCE($2, phone),
+            avatar_url = COALESCE($3, avatar_url),
+            updated_at = NOW()
+        WHERE id = $4;
+      `, [fullName, primaryPhone, avatarUrl, currentUser.userId]);
+    } else {
+      await query(`
+        UPDATE public.profiles
+        SET full_name = $1,
+            avatar_url = COALESCE($2, avatar_url),
+            updated_at = NOW()
+        WHERE role = 'owner';
+      `, [fullName, avatarUrl]);
+    }
 
     return NextResponse.json({
       success: true,

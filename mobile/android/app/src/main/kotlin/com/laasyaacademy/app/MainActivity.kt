@@ -114,29 +114,8 @@ class MainActivity: FlutterActivity() {
                         .putString("flutter.laasya_bg_base_url", baseUrl)
                         .commit()
 
-                    val sIntent = Intent(this, LaasyaAlertService::class.java).apply {
-                        putExtra("role", role)
-                        putExtra("studentId", studentId)
-                        putExtra("rollNumber", rollNumber)
-                        putExtra("name", name)
-                        putExtra("phone", phone)
-                        putExtra("batchIds", batchIds)
-                        putExtra("baseUrl", baseUrl)
-                    }
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            ContextCompat.startForegroundService(this, sIntent)
-                        } else {
-                            startService(sIntent)
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                    try {
-                        LaasyaNotificationReceiver.scheduleNextPoll(this, 1000L)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                    // No continuous background foreground service is launched on app open.
+                    // Firebase Cloud Messaging (FCM) handles instant real-time notifications when the app is open, in background, or closed.
                     result.success(true)
                 }
                 "stopBackgroundAlertService" -> {

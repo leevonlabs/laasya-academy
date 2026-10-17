@@ -103,15 +103,16 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
         a.sender_role,
         a.trainer_id,
         a.trainer_name,
-        COALESCE(pt.avatar_url, tt.avatar_url) as trainer_avatar_url,
-        pa.avatar_url as admin_avatar_url,
+        COALESCE(pt.avatar_url, tt.avatar_url, pt2.avatar_url) as trainer_avatar_url,
+        COALESCE(pa.avatar_url, (SELECT config_value->>'avatar_url' FROM public.app_config WHERE config_key = 'admin_support_profile')) as admin_avatar_url,
         a.created_at::text as created_at, 
         a.updated_at::text as updated_at
       FROM public.announcements a
       LEFT JOIN public.courses c ON c.id = a.target_course_id
       LEFT JOIN public.batches b ON b.id = a.target_batch_id
-      LEFT JOIN public.profiles pt ON pt.id = a.trainer_id
-      LEFT JOIN public.trainers tt ON tt.id = a.trainer_id
+      LEFT JOIN public.profiles pt ON (pt.id::text = a.trainer_id OR (a.trainer_name IS NOT NULL AND LOWER(pt.full_name) = LOWER(a.trainer_name)))
+      LEFT JOIN public.trainers tt ON (tt.id::text = a.trainer_id OR tt.profile_id = pt.id)
+      LEFT JOIN public.profiles pt2 ON pt2.id = tt.profile_id
       LEFT JOIN (
         SELECT avatar_url FROM public.profiles WHERE role IN ('admin', 'owner') AND avatar_url IS NOT NULL AND avatar_url != '' LIMIT 1
       ) pa ON true

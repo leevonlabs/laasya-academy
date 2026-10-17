@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/utils/avatar_helper.dart';
 import 'trainer_create_announcement_screen.dart';
 
 class TrainerAnnouncementsScreen extends StatefulWidget {
@@ -32,23 +33,51 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
   String get _trainerId =>
       widget.trainerProfile?['id'] ?? '';
 
+  bool _isMatchingTrainer(Map<String, dynamic> a) {
+    final senderRole = (a['sender_role'] ?? '').toString().toLowerCase();
+    final isTrainerSender = senderRole == 'trainer' || senderRole == 'guru' || a['trainer_id'] != null;
+    if (!isTrainerSender) return false;
+
+    final possibleIds = {
+      _trainerId,
+      widget.trainerProfile?['id']?.toString(),
+      widget.trainerProfile?['trainer_id']?.toString(),
+      widget.trainerProfile?['profile_id']?.toString(),
+      SupabaseService().currentUserProfile?['id']?.toString(),
+      SupabaseService().currentUserProfile?['trainer_id']?.toString(),
+      SupabaseService().currentUserProfile?['profile_id']?.toString(),
+    }.where((id) => id != null && id.toString().trim().isNotEmpty).toSet();
+
+    final aTrainerId = a['trainer_id']?.toString().trim();
+    if (aTrainerId != null && aTrainerId.isNotEmpty && possibleIds.contains(aTrainerId)) {
+      return true;
+    }
+
+    String normalize(String s) {
+      return s.toLowerCase()
+          .replaceAll(RegExp(r'\b(guru|smt|sri|dr|mr|mrs|prof)\.?\b', caseSensitive: false), '')
+          .replaceAll(RegExp(r'[^a-z0-9]'), '')
+          .trim();
+    }
+
+    final tNorm = normalize(_trainerName);
+    final aName = (a['trainer_name'] ?? a['created_by'] ?? '').toString();
+    final aNorm = normalize(aName);
+
+    if (tNorm.isNotEmpty && aNorm.isNotEmpty) {
+      if (tNorm.contains(aNorm) || aNorm.contains(tNorm)) return true;
+    }
+
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
     SupabaseService().markAllMessagesAsRead();
     final cached = SupabaseService().getCachedMessageAnnouncements();
     if (cached.isNotEmpty) {
-      _announcements = cached.where((a) {
-        final senderRole = (a['sender_role'] ?? '').toString().toLowerCase();
-        final aTrainerName = (a['trainer_name'] ?? a['created_by'] ?? '').toString().toLowerCase();
-        final tName = _trainerName.toLowerCase().trim();
-        final tId = _trainerId.trim();
-        final isTrainerSender = senderRole == 'trainer' || senderRole == 'guru' || a['trainer_id'] != null;
-        if (!isTrainerSender) return false;
-        if (tId.isNotEmpty && a['trainer_id']?.toString() == tId) return true;
-        if (tName.isNotEmpty && (aTrainerName.contains(tName) || tName.contains(aTrainerName))) return true;
-        return false;
-      }).toList();
+      _announcements = cached.where(_isMatchingTrainer).toList();
       if (_announcements.isNotEmpty) {
         _isLoading = false;
       }
@@ -100,23 +129,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
         if (data['success'] == true && data['announcements'] is List) {
           final all = List<Map<String, dynamic>>.from(data['announcements']);
           // Strictly display ONLY guru sent messages to students by this guru
-          _announcements = all.where((a) {
-            final senderRole = (a['sender_role'] ?? '').toString().toLowerCase();
-            final aTrainerName = (a['trainer_name'] ?? a['created_by'] ?? '').toString().toLowerCase();
-            final tName = _trainerName.toLowerCase().trim();
-            final tId = _trainerId.trim();
-
-            final isTrainerSender = senderRole == 'trainer' || senderRole == 'guru' || a['trainer_id'] != null;
-            if (!isTrainerSender) return false;
-
-            if (tId.isNotEmpty && a['trainer_id']?.toString() == tId) {
-              return true;
-            }
-            if (tName.isNotEmpty && (aTrainerName.contains(tName) || tName.contains(aTrainerName))) {
-              return true;
-            }
-            return false;
-          }).toList();
+          _announcements = all.where(_isMatchingTrainer).toList();
 
           // Chronological sort: oldest on top, latest below
           _announcements.sort((a, b) {
@@ -539,9 +552,10 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
 
   Widget _buildSenderAvatar(Map<String, dynamic> msg, bool isGuru) {
     if (isGuru) {
-      final avatarUrl = (msg['trainer_avatar_url'] ?? msg['avatar_url'] ?? '').toString();
+      final avatarUrl = (msg['trainer_avatar_url'] ?? msg['avatar_url'] ?? widget.trainerProfile?['avatar_url'] ?? SupabaseService().currentUserProfile?['avatar_url'] ?? '').toString().trim();
       final senderName = (msg['trainer_name'] ?? msg['created_by'] ?? _trainerName).toString();
       final initials = senderName.trim().split(' ').where((p) => p.isNotEmpty).map((p) => p[0]).take(2).join().toUpperCase();
+      final provider = getAvatarImageProvider(avatarUrl.isNotEmpty ? avatarUrl : null);
 
       return Container(
         margin: const EdgeInsets.only(top: 2),
@@ -559,8 +573,8 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
         child: CircleAvatar(
           radius: 17,
           backgroundColor: const Color(0xFF8A064D),
-          backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-          child: avatarUrl.isEmpty
+          backgroundImage: provider,
+          child: provider == null
               ? Text(
                   initials.isNotEmpty ? initials : 'G',
                   style: const TextStyle(
@@ -574,6 +588,9 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
       );
     } else {
       // Academy Administration / Director DP avatar
+      final adminAvatar = (msg['admin_avatar_url'] ?? msg['avatar_url'] ?? '').toString().trim();
+      final provider = getAvatarImageProvider(adminAvatar.isNotEmpty ? adminAvatar : null);
+
       return Container(
         margin: const EdgeInsets.only(top: 2),
         decoration: BoxDecoration(
@@ -590,19 +607,22 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
         child: CircleAvatar(
           radius: 17,
           backgroundColor: Colors.white,
-          child: ClipOval(
-            child: Image.asset(
-              'assets/images/header_logo.png',
-              width: 30,
-              height: 30,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const CircleAvatar(
-                radius: 17,
-                backgroundColor: Color(0xFF075E54),
-                child: Text('👑', style: TextStyle(fontSize: 14)),
-              ),
-            ),
-          ),
+          backgroundImage: provider,
+          child: provider == null
+              ? ClipOval(
+                  child: Image.asset(
+                    'assets/images/header_logo.png',
+                    width: 30,
+                    height: 30,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const CircleAvatar(
+                      radius: 17,
+                      backgroundColor: Color(0xFF075E54),
+                      child: Text('👑', style: TextStyle(fontSize: 14)),
+                    ),
+                  ),
+                )
+              : null,
         ),
       );
     }

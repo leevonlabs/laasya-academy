@@ -51,13 +51,23 @@ export default function LoginPage() {
         
         {/* Academy Brand Card Header */}
         <div className="bg-gradient-to-b from-[#8A064D] to-[#590231] text-white p-7 rounded-t-3xl text-center border-b border-[#F9E33A]/40 relative shadow-2xl">
-          <div className="mx-auto mb-3 flex items-center justify-center">
+          <div className="mx-auto mb-3 flex flex-col items-center justify-center gap-2">
+            <div className="bg-white px-5 py-2.5 rounded-2xl shadow-md border border-[#F9E33A]/50 max-w-[260px]">
+              <Image 
+                src="/academy_illustration.png" 
+                alt="Laasya Cultural Academy Arts" 
+                width={240} 
+                height={95} 
+                className="w-full h-auto object-contain mx-auto"
+                priority
+              />
+            </div>
             <Image 
               src="/header_logo.png" 
               alt="Laasya Cultural Academy Logo" 
-              width={280} 
-              height={82} 
-              className="object-contain drop-shadow-xl w-auto h-auto"
+              width={260} 
+              height={70} 
+              className="object-contain drop-shadow-xl w-auto h-auto mt-1"
               priority
             />
           </div>

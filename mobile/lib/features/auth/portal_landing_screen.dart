@@ -212,25 +212,25 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
 
                   // Academy Cultural Heritage Artwork Banner (Classical Dance, Music & Arts)
                   Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
+                      color: Colors.white, // Solid opaque white background to eliminate transparent artifacts
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.55), width: 1.2),
+                      border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.65), width: 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: LaasyaColors.primaryDark.withOpacity(0.12),
+                          color: LaasyaColors.primaryDark.withOpacity(0.08),
                           blurRadius: 10,
                           offset: const Offset(0, 3),
                         ),
                       ],
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.asset(
-                        'assets/images/cultural_arts_hero.jpg',
-                        height: 125,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
+                    child: Image.asset(
+                      'assets/images/cultural_banner.png',
+                      height: 130,
+                      width: double.infinity,
+                      fit: BoxFit.contain, // Displays the entire artwork fully without cropping
                     ),
                   ),
 

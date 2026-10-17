@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'notification_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -65,6 +66,13 @@ class FcmService {
       // Foreground message listener
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('[FCM] Foreground message: ${message.notification?.title} - ${message.notification?.body}');
+        final notif = message.notification;
+        if (notif != null) {
+          NotificationService.showAnnouncementNotification(
+            title: notif.title ?? 'Laasya Academy Notice',
+            message: notif.body ?? '',
+          );
+        }
       });
 
       // Tapped from background state
