@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/utils/avatar_helper.dart';
 import 'trainer_data_store.dart';
 import 'trainer_student_calendar_screen.dart';
 
@@ -301,8 +302,8 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
   }
 
   void _showFullLengthPhoto(BuildContext context, Map<String, dynamic> stu) {
-    final rawAvatar = stu['avatar_url']?.toString().trim();
-    if (rawAvatar == null || rawAvatar.isEmpty || rawAvatar.contains('unsplash.com')) {
+    final imageProvider = getAvatarImageProvider(stu['avatar_url']);
+    if (imageProvider == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No photo uploaded in system for ${stu['name'] ?? 'this student'}.'),
@@ -312,7 +313,6 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
       );
       return;
     }
-    final avatarUrl = rawAvatar;
     final name = stu['name']?.toString() ?? 'Student';
     final roll = stu['roll']?.toString() ?? '';
 
@@ -387,15 +387,9 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                   child: InteractiveViewer(
                     minScale: 1.0,
                     maxScale: 3.5,
-                    child: Image.network(
-                      avatarUrl,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return const Center(
-                          child: CircularProgressIndicator(color: LaasyaColors.accentGold),
-                        );
-                      },
+                    child: Image(
+                      image: imageProvider,
+                      fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
                           padding: const EdgeInsets.all(32),
@@ -433,8 +427,8 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
     final primaryColor = enrollments.isNotEmpty
         ? (enrollments.first['course_color'] as Color? ?? LaasyaColors.primary)
         : LaasyaColors.primary;
-    final rawAvatar = stu['avatar_url']?.toString().trim();
-    final hasPhoto = rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com');
+    final avatarProvider = getAvatarImageProvider(stu['avatar_url']);
+    final hasPhoto = avatarProvider != null;
 
     showModalBottomSheet(
       context: context,
@@ -471,7 +465,7 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                       CircleAvatar(
                         radius: 32,
                         backgroundColor: primaryColor.withOpacity(0.12),
-                        backgroundImage: hasPhoto ? NetworkImage(rawAvatar) : null,
+                        backgroundImage: avatarProvider,
                         child: hasPhoto
                             ? null
                             : Icon(Icons.person_rounded, size: 34, color: primaryColor.withOpacity(0.7)),
@@ -805,8 +799,8 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                       final primaryColor = enrollments.isNotEmpty
                           ? (enrollments.first['course_color'] as Color? ?? LaasyaColors.primary)
                           : LaasyaColors.primary;
-                      final rawAvatar = stu['avatar_url']?.toString().trim();
-                      final hasPhoto = rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com');
+                      final avatarProvider = getAvatarImageProvider(stu['avatar_url']);
+                      final hasPhoto = avatarProvider != null;
                       final courseNames = enrollments.map((e) => e['course_short_title'] as String? ?? '').toSet().where((c) => c.isNotEmpty).join(', ');
                       final displayCourse = courseNames.isNotEmpty ? courseNames : 'Classical Dance';
 
@@ -837,7 +831,7 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                                   child: CircleAvatar(
                                     radius: 22,
                                     backgroundColor: primaryColor.withOpacity(0.14),
-                                    backgroundImage: hasPhoto ? NetworkImage(rawAvatar) : null,
+                                    backgroundImage: avatarProvider,
                                     child: hasPhoto
                                         ? null
                                         : Icon(Icons.person_rounded, size: 24, color: primaryColor.withOpacity(0.7)),

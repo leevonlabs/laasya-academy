@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import '../../core/constants/colors.dart';
+import 'trainer_data_store.dart';
 
 class TrainerTimetableScreen extends StatefulWidget {
   final Map<String, dynamic>? trainerProfile;
@@ -17,7 +18,6 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
   final GlobalKey _timetableKey = GlobalKey();
 
   String _selectedDay = 'All'; // 'All', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
-  bool _filterOnlyMyBatches = false;
   bool _isDownloading = false;
 
   final List<String> _days = ['All', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -576,24 +576,90 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
     }
   }
 
+  List<Map<String, dynamic>> _getTrainerSchedule(String trainerName, String specialization) {
+    final List<Map<String, dynamic>> slots = [];
+    final storeCourses = TrainerDataStore().courses;
+
+    String normalizeDay(String raw) {
+      final l = raw.trim().toLowerCase();
+      if (l.startsWith('mon')) return 'Mon';
+      if (l.startsWith('tue')) return 'Tue';
+      if (l.startsWith('wed')) return 'Wed';
+      if (l.startsWith('thu')) return 'Thu';
+      if (l.startsWith('fri')) return 'Fri';
+      if (l.startsWith('sat')) return 'Sat';
+      if (l.startsWith('sun')) return 'Sun';
+      return raw.trim();
+    }
+
+    if (storeCourses.isNotEmpty) {
+      for (final course in storeCourses) {
+        final courseTitle = (course['title'] ?? course['short_title'] ?? 'Course').toString();
+        final batches = course['batches'] is List ? (course['batches'] as List) : [];
+        for (final b in batches) {
+          if (b is! Map) continue;
+          final batchName = (b['name'] ?? b['batch_number'] ?? 'Batch').toString();
+          final timings = (b['timings'] ?? '05:00 PM - 06:30 PM').toString();
+          final room = (b['room'] ?? 'Natya Mandapam').toString();
+          final daysRaw = b['days'];
+          List<String> days = [];
+          if (daysRaw is List) {
+            days = daysRaw.map((d) => normalizeDay(d.toString())).toList();
+          } else if (daysRaw != null && daysRaw.toString().isNotEmpty) {
+            days = daysRaw.toString().split(',').map((d) => normalizeDay(d.toString())).toList();
+          }
+          if (days.isEmpty) {
+            days = ['Mon', 'Wed', 'Fri'];
+          }
+
+          for (final day in days) {
+            slots.add({
+              'time': timings,
+              'day': day,
+              'course': courseTitle,
+              'batch': batchName,
+              'trainer': trainerName,
+              'room': room,
+            });
+          }
+        }
+      }
+    }
+
+    // If dynamic store produced slots, return them!
+    if (slots.isNotEmpty) {
+      return slots;
+    }
+
+    // Fallback: Filter _masterTimetable strictly for this trainer or course specialization
+    final tNameLower = trainerName.toLowerCase().trim();
+    final specLower = specialization.toLowerCase().trim();
+
+    return _masterTimetable.where((slot) {
+      final slotTrainer = (slot['trainer'] ?? '').toString().toLowerCase().trim();
+      final slotCourse = (slot['course'] ?? '').toString().toLowerCase().trim();
+      if (slotTrainer.isNotEmpty && (slotTrainer.contains(tNameLower) || tNameLower.contains(slotTrainer))) {
+        return true;
+      }
+      if (specLower.isNotEmpty && (slotCourse.contains(specLower) || specLower.contains(slotCourse))) {
+        return true;
+      }
+      return false;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final trainerName = (widget.trainerProfile?['full_name'] ?? 'Guru').toString();
     final specialization = (widget.trainerProfile?['specialization'] ?? widget.trainerProfile?['course_name'] ?? 'Faculty').toString();
 
-    // Filter master list
-    final filtered = _masterTimetable.where((slot) {
+    // Strictly get only this Guru's enrolled courses and batches
+    final allMySlots = _getTrainerSchedule(trainerName, specialization);
+
+    // Filter by selected day
+    final filtered = allMySlots.where((slot) {
       if (_selectedDay != 'All' && slot['day'] != _selectedDay) {
         return false;
-      }
-      if (_filterOnlyMyBatches) {
-        final slotTrainer = (slot['trainer'] ?? '').toString().toLowerCase();
-        final slotCourse = (slot['course'] ?? '').toString().toLowerCase();
-        final tNameLower = trainerName.toLowerCase();
-        final specLower = specialization.toLowerCase();
-        if (!slotTrainer.contains(tNameLower) && !tNameLower.contains(slotTrainer) && !slotCourse.contains(specLower)) {
-          return false;
-        }
       }
       return true;
     }).toList();
@@ -718,38 +784,34 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                     color: LaasyaColors.textDark,
                   ),
                 ),
-                InkWell(
-                  onTap: () => setState(() => _filterOnlyMyBatches = !_filterOnlyMyBatches),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _filterOnlyMyBatches ? const Color(0xFFFCE7F3) : Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: _filterOnlyMyBatches ? LaasyaColors.primary : Colors.grey.shade300,
-                        width: 1,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFCE7F3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: LaasyaColors.primary.withOpacity(0.35),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.verified_rounded,
+                        size: 14,
+                        color: LaasyaColors.primary,
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _filterOnlyMyBatches ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
-                          size: 14,
-                          color: _filterOnlyMyBatches ? LaasyaColors.primary : Colors.grey,
+                      const SizedBox(width: 5),
+                      Text(
+                        'Assigned Batches (${allMySlots.length})',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: LaasyaColors.primary,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'My Batches Only',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: _filterOnlyMyBatches ? LaasyaColors.primary : Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],

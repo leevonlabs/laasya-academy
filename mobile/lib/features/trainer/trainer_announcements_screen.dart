@@ -38,8 +38,20 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
     SupabaseService().markAllMessagesAsRead();
     final cached = SupabaseService().getCachedMessageAnnouncements();
     if (cached.isNotEmpty) {
-      _announcements = List<Map<String, dynamic>>.from(cached);
-      _isLoading = false;
+      _announcements = cached.where((a) {
+        final senderRole = (a['sender_role'] ?? '').toString().toLowerCase();
+        final aTrainerName = (a['trainer_name'] ?? a['created_by'] ?? '').toString().toLowerCase();
+        final tName = _trainerName.toLowerCase().trim();
+        final tId = _trainerId.trim();
+        final isTrainerSender = senderRole == 'trainer' || senderRole == 'guru' || a['trainer_id'] != null;
+        if (!isTrainerSender) return false;
+        if (tId.isNotEmpty && a['trainer_id']?.toString() == tId) return true;
+        if (tName.isNotEmpty && (aTrainerName.contains(tName) || tName.contains(aTrainerName))) return true;
+        return false;
+      }).toList();
+      if (_announcements.isNotEmpty) {
+        _isLoading = false;
+      }
     }
     _loadData();
   }
@@ -87,17 +99,20 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
         final data = jsonDecode(res.body);
         if (data['success'] == true && data['announcements'] is List) {
           final all = List<Map<String, dynamic>>.from(data['announcements']);
-          // Filter announcements that belong to this trainer or academy notices from admin
+          // Strictly display ONLY guru sent messages to students by this guru
           _announcements = all.where((a) {
             final senderRole = (a['sender_role'] ?? '').toString().toLowerCase();
-            final audience = (a['audience'] ?? '').toString().toLowerCase();
             final aTrainerName = (a['trainer_name'] ?? a['created_by'] ?? '').toString().toLowerCase();
-            final tName = _trainerName.toLowerCase();
-            if (senderRole == 'trainer' && (aTrainerName.contains(tName) || tName.contains(aTrainerName))) {
+            final tName = _trainerName.toLowerCase().trim();
+            final tId = _trainerId.trim();
+
+            final isTrainerSender = senderRole == 'trainer' || senderRole == 'guru' || a['trainer_id'] != null;
+            if (!isTrainerSender) return false;
+
+            if (tId.isNotEmpty && a['trainer_id']?.toString() == tId) {
               return true;
             }
-            if (a['trainer_id'] == _trainerId) return true;
-            if (senderRole == 'admin' || audience.contains('trainer') || audience.contains('guru') || audience.contains('all') || audience.isEmpty) {
+            if (tName.isNotEmpty && (aTrainerName.contains(tName) || tName.contains(aTrainerName))) {
               return true;
             }
             return false;

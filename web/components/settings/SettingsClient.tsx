@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   KeyRound, 
@@ -22,7 +22,14 @@ import {
   CheckCircle2,
   Mail,
   Shield,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Edit3,
+  Plus,
+  Trash2,
+  MapPin,
+  ExternalLink,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 import { StudentPasswordInfo, GuruPasswordInfo } from '@/lib/passwords';
 
@@ -44,16 +51,95 @@ export default function SettingsClient({
   const [students] = useState<StudentPasswordInfo[]>(initialStudents);
   const [gurus] = useState<GuruPasswordInfo[]>(initialGurus);
 
-  // Admin Profile State
-  const [adminName] = useState('Satya');
-  const [adminPhone] = useState('7780763121');
-  const [adminEmail] = useState('admin@laasyaacademy.com');
+  // Dynamic Admin Profile & Support Information
+  const [adminProfile, setAdminProfile] = useState<{
+    full_name: string;
+    avatar_url: string;
+    designation: string;
+    contacts: Array<{ title: string; phone: string }>;
+    emails: Array<{ title: string; email: string }>;
+    campus_address: string;
+    map_url: string;
+  }>({
+    full_name: 'Satya',
+    avatar_url: '',
+    designation: 'Academy Director & Operations Lead',
+    contacts: [{ title: 'Office Desk & Admissions', phone: '7780763121' }],
+    emails: [{ title: 'Official Inquiries', email: 'admin@laasyaacademy.com' }],
+    campus_address: 'Laasya Cultural Academy, Main Campus, Hyderabad',
+    map_url: 'https://maps.google.com/?q=Laasya+Cultural+Academy'
+  });
+
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const [editProfileForm, setEditProfileForm] = useState(adminProfile);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch('/api/settings/admin-profile')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.profile) {
+          setAdminProfile(data.profile);
+          setEditProfileForm(data.profile);
+        }
+      })
+      .catch(err => console.error('Error fetching admin profile:', err));
+  }, []);
+
+  const handleAvatarFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      showNotification('error', 'Image size must be less than 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setEditProfileForm(prev => ({ ...prev, avatar_url: base64 }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingProfile(true);
+    try {
+      const res = await fetch('/api/settings/admin-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_profile',
+          ...editProfileForm
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.profile) {
+        setAdminProfile(data.profile);
+        setIsEditProfileModalOpen(false);
+        showNotification('success', 'Admin profile and academy support directory updated successfully!');
+      } else {
+        showNotification('error', data.error || 'Failed to update admin profile');
+      }
+    } catch {
+      showNotification('error', 'Network error while saving admin profile');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   const [adminNewPassword, setAdminNewPassword] = useState('');
   const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [isUpdatingAdminPassword, setIsUpdatingAdminPassword] = useState(false);
-  const [copiedPhone, setCopiedPhone] = useState(false);
-  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(id);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
 
   // Modal State for Password Management
   const [selectedUser, setSelectedUser] = useState<{
@@ -78,17 +164,6 @@ export default function SettingsClient({
     setTimeout(() => setFeedback(null), 4000);
   };
 
-  const handleCopyPhone = () => {
-    navigator.clipboard.writeText(adminPhone);
-    setCopiedPhone(true);
-    setTimeout(() => setCopiedPhone(false), 2000);
-  };
-
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText(adminEmail);
-    setCopiedEmail(true);
-    setTimeout(() => setCopiedEmail(false), 2000);
-  };
 
   const handleUpdateAdminPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -306,60 +381,78 @@ export default function SettingsClient({
           {/* Admin Hero Card */}
           <div className="bg-gradient-to-r from-[#2D041A] via-[#590231] to-[#8A064D] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-[#D4AF37]/40 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
             <div className="flex items-center gap-5 z-10">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#D4AF37] to-[#F9E33A] p-1 shadow-lg shrink-0">
-                <div className="w-full h-full rounded-xl bg-[#3F0123] flex items-center justify-center text-3xl font-black text-[#F9E33A]">
-                  S
-                </div>
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#D4AF37] to-[#F9E33A] p-1 shadow-lg shrink-0 overflow-hidden">
+                {adminProfile.avatar_url ? (
+                  <img
+                    src={adminProfile.avatar_url}
+                    alt={adminProfile.full_name}
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-xl bg-[#3F0123] flex items-center justify-center text-3xl font-black text-[#F9E33A]">
+                    {adminProfile.full_name.charAt(0).toUpperCase() || 'S'}
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5">
                 <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/10 backdrop-blur-md text-[#F9E33A] text-[11px] font-bold border border-[#D4AF37]/30">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#F9E33A]" />
-                  <span>SUPER ADMINISTRATOR</span>
+                  <span>{adminProfile.designation.toUpperCase() || 'SUPER ADMINISTRATOR'}</span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-white">
-                  {adminName}
+                  {adminProfile.full_name}
                 </h2>
                 <div className="text-xs sm:text-sm text-rose-100/90 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleCopyPhone}
-                    className="flex items-center gap-1.5 font-mono font-bold text-[#F9E33A] bg-black/20 hover:bg-black/40 px-2.5 py-1 rounded-xl transition cursor-pointer border border-[#D4AF37]/20"
-                    title="Click to copy admin phone"
-                  >
-                    <Phone className="w-3.5 h-3.5" />
-                    <span>{adminPhone}</span>
-                    {copiedPhone ? <Check className="w-3 h-3 text-emerald-400 ml-1" /> : <Copy className="w-3 h-3 text-white/50 ml-1" />}
-                  </button>
-                  <span>•</span>
-                  <button
-                    type="button"
-                    onClick={handleCopyEmail}
-                    className="flex items-center gap-1.5 text-rose-100 bg-black/20 hover:bg-black/40 px-2.5 py-1 rounded-xl transition cursor-pointer border border-white/10"
-                    title="Click to copy admin email"
-                  >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>{adminEmail}</span>
-                    {copiedEmail ? <Check className="w-3 h-3 text-emerald-400 ml-1" /> : <Copy className="w-3 h-3 text-white/50 ml-1" />}
-                  </button>
+                  {adminProfile.contacts.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(adminProfile.contacts[0].phone, 'hero_phone')}
+                      className="flex items-center gap-1.5 font-mono font-bold text-[#F9E33A] bg-black/20 hover:bg-black/40 px-2.5 py-1 rounded-xl transition cursor-pointer border border-[#D4AF37]/20"
+                      title="Click to copy admin phone"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>{adminProfile.contacts[0].phone}</span>
+                      {copiedIndex === 'hero_phone' ? <Check className="w-3 h-3 text-emerald-400 ml-1" /> : <Copy className="w-3 h-3 text-white/50 ml-1" />}
+                    </button>
+                  )}
+                  {adminProfile.emails.length > 0 && (
+                    <>
+                      <span>•</span>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(adminProfile.emails[0].email, 'hero_email')}
+                        className="flex items-center gap-1.5 text-rose-100 bg-black/20 hover:bg-black/40 px-2.5 py-1 rounded-xl transition cursor-pointer border border-white/10"
+                        title="Click to copy admin email"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>{adminProfile.emails[0].email}</span>
+                        {copiedIndex === 'hero_email' ? <Check className="w-3 h-3 text-emerald-400 ml-1" /> : <Copy className="w-3 h-3 text-white/50 ml-1" />}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
 
             <div className="flex items-center gap-3 z-10 shrink-0">
-              <div className="bg-black/30 backdrop-blur-md border border-white/15 px-5 py-3 rounded-2xl text-center">
-                <span className="text-[10px] uppercase font-bold text-rose-200 block">Access Authority</span>
-                <span className="text-xs font-black text-emerald-300 mt-0.5 flex items-center justify-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Full System Governance
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditProfileForm(adminProfile);
+                  setIsEditProfileModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#F9E33A] to-[#D4AF37] hover:brightness-110 active:scale-95 text-[#2D041A] font-bold text-xs shadow-md shadow-black/20 transition cursor-pointer"
+              >
+                <Edit3 className="w-4 h-4 text-[#2D041A]" />
+                <span>Edit Profile</span>
+              </button>
             </div>
             {/* Background luxury gradient flare */}
             <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-[#D4AF37]/15 rounded-full blur-3xl pointer-events-none" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Column 1 & 2: Admin Details & Privileges */}
+            {/* Column 1 & 2: Admin Details */}
             <div className="lg:col-span-2 space-y-6">
               {/* Profile Details Card */}
               <div className="bg-white rounded-3xl p-6 shadow-xs border border-[#F0D5E4] space-y-5">
@@ -370,79 +463,111 @@ export default function SettingsClient({
                       <span>Executive Profile Details</span>
                     </h3>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Master administrative credentials registered for the academy management portal.
+                      Official contact and location information published across mobile applications.
                     </p>
                   </div>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    VERIFIED
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditProfileForm(adminProfile);
+                      setIsEditProfileModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#FFF2F8] hover:bg-[#FCE7F3] text-[#8A064D] text-xs font-bold border border-[#F0D5E4] transition cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  {/* Full Name */}
                   <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60">
-                    <span className="text-[11px] text-gray-500 font-semibold block">Full Legal Name</span>
-                    <span className="text-sm font-bold text-[#2D041A] mt-1 block">{adminName}</span>
+                    <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Full Name</span>
+                    <span className="text-sm font-bold text-[#2D041A] mt-1 block">{adminProfile.full_name}</span>
                   </div>
 
+                  {/* Designation */}
                   <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60">
-                    <span className="text-[11px] text-gray-500 font-semibold block">Primary Admin Login Number</span>
-                    <span className="text-sm font-mono font-bold text-[#8A064D] mt-1 flex items-center gap-1.5">
-                      <Phone className="w-4 h-4 text-[#8A064D]" />
-                      {adminPhone}
-                    </span>
-                    <span className="text-[10px] text-emerald-700 font-semibold mt-1 block">Used for Administrator Portal Sign In</span>
+                    <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Designation</span>
+                    <span className="text-sm font-bold text-gray-800 mt-1 block">{adminProfile.designation}</span>
                   </div>
 
-                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60">
-                    <span className="text-[11px] text-gray-500 font-semibold block">Official Academy Email</span>
-                    <span className="text-sm font-bold text-gray-800 mt-1 block">{adminEmail}</span>
-                  </div>
-
-                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60">
-                    <span className="text-[11px] text-gray-500 font-semibold block">Designation</span>
-                    <span className="text-sm font-bold text-gray-800 mt-1 block">Academy Director & Operations Lead</span>
-                  </div>
-
-                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60">
-                    <span className="text-[11px] text-gray-500 font-semibold block">Administrative Department</span>
-                    <span className="text-sm font-bold text-gray-800 mt-1 block">Central Governance & Academic Oversight</span>
-                  </div>
-
-                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60">
-                    <span className="text-[11px] text-gray-500 font-semibold block">Campus Base</span>
-                    <span className="text-sm font-bold text-gray-800 mt-1 block">Laasya Cultural Academy, Main Campus</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Administrative Access Rights */}
-              <div className="bg-white rounded-3xl p-6 shadow-xs border border-[#F0D5E4] space-y-4">
-                <div className="border-b border-gray-100 pb-3">
-                  <h3 className="font-bold text-base text-[#2D041A] flex items-center gap-2">
-                    <ShieldCheck className="w-5 h-5 text-[#8A064D]" />
-                    <span>System Privileges & Permissions</span>
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Authorized executive controls granted to this master administrator account.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  {[
-                    'Master Course & Timetable Management',
-                    'Guru / Faculty Assignment & Timings',
-                    '300 Students Database & Batch Assignments',
-                    'Real-time Fee Collection & Ledger Audit',
-                    'Attendance Registers & Batch Attendance Reports',
-                    'Video Library & Guru Drive Links Moderation',
-                    'Push Announcements & Broadcast Dispatches',
-                    'Student & Guru Password Reset Privileges'
-                  ].map((perm, idx) => (
-                    <div key={`perm-${idx}`} className="flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-50/70 border border-emerald-100 text-emerald-900 font-semibold text-xs">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>{perm}</span>
+                  {/* Contacts */}
+                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Contact Numbers</span>
+                      <span className="text-[10px] text-gray-400 font-medium">{adminProfile.contacts.length} registered</span>
                     </div>
-                  ))}
+                    <div className="space-y-2">
+                      {adminProfile.contacts.map((c, i) => (
+                        <div key={`contact-view-${i}`} className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-100">
+                          <div>
+                            <span className="text-[10px] font-bold text-[#8A064D] uppercase block">{c.title}</span>
+                            <span className="text-xs font-mono font-bold text-gray-900">{c.phone}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(c.phone, `contact_${i}`)}
+                            className="p-1.5 text-gray-400 hover:text-[#8A064D] rounded-lg hover:bg-gray-50 cursor-pointer"
+                            title="Copy number"
+                          >
+                            {copiedIndex === `contact_${i}` ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Academy Emails */}
+                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Academy Emails</span>
+                      <span className="text-[10px] text-gray-400 font-medium">{adminProfile.emails.length} registered</span>
+                    </div>
+                    <div className="space-y-2">
+                      {adminProfile.emails.map((e, i) => (
+                        <div key={`email-view-${i}`} className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-100">
+                          <div>
+                            <span className="text-[10px] font-bold text-blue-800 uppercase block">{e.title}</span>
+                            <span className="text-xs font-semibold text-gray-800">{e.email}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(e.email, `email_${i}`)}
+                            className="p-1.5 text-gray-400 hover:text-blue-700 rounded-lg hover:bg-gray-50 cursor-pointer"
+                            title="Copy email"
+                          >
+                            {copiedIndex === `email_${i}` ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Campus Address */}
+                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
+                    <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Campus Address</span>
+                    <span className="text-xs font-medium text-gray-800 mt-1 block leading-relaxed">{adminProfile.campus_address}</span>
+                  </div>
+
+                  {/* Map URL Link */}
+                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
+                    <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Map URL Link</span>
+                    {adminProfile.map_url ? (
+                      <a
+                        href={adminProfile.map_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#8A064D] hover:underline mt-1 break-all"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
+                        <span>{adminProfile.map_url}</span>
+                        <ExternalLink className="w-3 h-3 shrink-0" />
+                      </a>
+                    ) : (
+                      <span className="text-xs text-gray-400 mt-1 block italic">No Google Map link added yet</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -458,7 +583,7 @@ export default function SettingsClient({
                     Change Admin Password
                   </h3>
                   <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                    Update the password used to sign into the Admin portal with phone number <strong className="text-[#8A064D]">7780763121</strong>.
+                    Update the credentials used to sign into the Admin portal.
                   </p>
                 </div>
 
@@ -500,10 +625,6 @@ export default function SettingsClient({
                     />
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] leading-relaxed">
-                    <strong>Note:</strong> Current password is set to <code className="font-bold">123456789</code>. Updating here updates your credentials immediately.
-                  </div>
-
                   <button
                     type="submit"
                     disabled={isUpdatingAdminPassword}
@@ -525,6 +646,274 @@ export default function SettingsClient({
               </div>
             </div>
           </div>
+
+          {/* EDIT PROFILE MODAL */}
+          {isEditProfileModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 flex flex-col">
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-xs z-10">
+                  <div>
+                    <h3 className="font-bold text-lg text-[#2D041A]">Edit Administrator Profile</h3>
+                    <p className="text-xs text-gray-500">Update official contact, designation, and campus details</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditProfileModalOpen(false)}
+                    className="p-2 text-gray-400 hover:text-gray-700 rounded-xl hover:bg-gray-100 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveProfile} className="p-6 space-y-5">
+                  {/* Avatar Upload */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D041A] mb-2">Profile Image</label>
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl bg-[#FFF2F8] border-2 border-dashed border-[#F0D5E4] flex items-center justify-center overflow-hidden shrink-0">
+                        {editProfileForm.avatar_url ? (
+                          <img
+                            src={editProfileForm.avatar_url}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <ImageIcon className="w-6 h-6 text-[#8A064D]/50" />
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <input
+                          type="file"
+                          ref={avatarFileInputRef}
+                          onChange={handleAvatarFileUpload}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => avatarFileInputRef.current?.click()}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#8A064D] hover:bg-[#72043F] text-white text-xs font-bold cursor-pointer"
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Upload Image</span>
+                          </button>
+                          {editProfileForm.avatar_url && (
+                            <button
+                              type="button"
+                              onClick={() => setEditProfileForm(prev => ({ ...prev, avatar_url: '' }))}
+                              className="px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-gray-400">PNG, JPG or WEBP (Max 2MB)</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Full Name */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D041A] mb-1.5">Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editProfileForm.full_name}
+                      onChange={(e) => setEditProfileForm(prev => ({ ...prev, full_name: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 rounded-2xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
+                      placeholder="e.g. Satya"
+                    />
+                  </div>
+
+                  {/* Designation */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D041A] mb-1.5">Designation *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editProfileForm.designation}
+                      onChange={(e) => setEditProfileForm(prev => ({ ...prev, designation: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 rounded-2xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
+                      placeholder="e.g. Academy Director & Operations Lead"
+                    />
+                  </div>
+
+                  {/* Contacts List */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-bold text-[#2D041A]">
+                        Contact Numbers (Title & Phone)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setEditProfileForm(prev => ({
+                          ...prev,
+                          contacts: [...prev.contacts, { title: 'Office Helpline', phone: '' }]
+                        }))}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-[#8A064D] hover:underline cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Number</span>
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {editProfileForm.contacts.map((c, i) => (
+                        <div key={`edit-contact-${i}`} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={c.title}
+                            onChange={(e) => {
+                              const newC = [...editProfileForm.contacts];
+                              newC[i].title = e.target.value;
+                              setEditProfileForm(prev => ({ ...prev, contacts: newC }));
+                            }}
+                            placeholder="Title (e.g. Office Desk)"
+                            className="w-1/3 px-3 py-2 rounded-xl border border-gray-200 text-xs"
+                          />
+                          <input
+                            type="tel"
+                            value={c.phone}
+                            onChange={(e) => {
+                              const newC = [...editProfileForm.contacts];
+                              newC[i].phone = e.target.value;
+                              setEditProfileForm(prev => ({ ...prev, contacts: newC }));
+                            }}
+                            placeholder="Phone (e.g. 7780763121)"
+                            className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs font-mono"
+                          />
+                          {editProfileForm.contacts.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newC = editProfileForm.contacts.filter((_, idx) => idx !== i);
+                                setEditProfileForm(prev => ({ ...prev, contacts: newC }));
+                              }}
+                              className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Emails List */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-bold text-[#2D041A]">
+                        Academy Emails (Title & Email)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setEditProfileForm(prev => ({
+                          ...prev,
+                          emails: [...prev.emails, { title: 'Helpdesk Email', email: '' }]
+                        }))}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-[#8A064D] hover:underline cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Email</span>
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {editProfileForm.emails.map((em, i) => (
+                        <div key={`edit-email-${i}`} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={em.title}
+                            onChange={(e) => {
+                              const newE = [...editProfileForm.emails];
+                              newE[i].title = e.target.value;
+                              setEditProfileForm(prev => ({ ...prev, emails: newE }));
+                            }}
+                            placeholder="Title (e.g. Support)"
+                            className="w-1/3 px-3 py-2 rounded-xl border border-gray-200 text-xs"
+                          />
+                          <input
+                            type="email"
+                            value={em.email}
+                            onChange={(e) => {
+                              const newE = [...editProfileForm.emails];
+                              newE[i].email = e.target.value;
+                              setEditProfileForm(prev => ({ ...prev, emails: newE }));
+                            }}
+                            placeholder="Email (e.g. info@laasya.com)"
+                            className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs"
+                          />
+                          {editProfileForm.emails.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newE = editProfileForm.emails.filter((_, idx) => idx !== i);
+                                setEditProfileForm(prev => ({ ...prev, emails: newE }));
+                              }}
+                              className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Campus Address */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D041A] mb-1.5">Campus Address</label>
+                    <textarea
+                      rows={2}
+                      value={editProfileForm.campus_address}
+                      onChange={(e) => setEditProfileForm(prev => ({ ...prev, campus_address: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 rounded-2xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
+                      placeholder="Campus address..."
+                    />
+                  </div>
+
+                  {/* Map URL */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D041A] mb-1.5">Map URL Link</label>
+                    <input
+                      type="url"
+                      value={editProfileForm.map_url}
+                      onChange={(e) => setEditProfileForm(prev => ({ ...prev, map_url: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 rounded-2xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
+                      placeholder="https://maps.google.com/..."
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditProfileModalOpen(false)}
+                      className="px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingProfile}
+                      className="px-6 py-2.5 rounded-xl bg-[#8A064D] hover:bg-[#72043F] text-white text-xs font-bold transition shadow-md shadow-[#8A064D]/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isSavingProfile ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Saving Changes...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>Save Profile Changes</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* ============================================================= */

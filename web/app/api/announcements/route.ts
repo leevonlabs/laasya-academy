@@ -96,12 +96,14 @@ export async function POST(request: NextRequest) {
         }
       };
 
-      if (targetAudience.includes('trainer') || targetAudience.includes('guru')) {
-        sendFcmToRole('trainer', notifPayload).catch(e => console.error('[FCM] Error notifying gurus:', e));
+      if (body.target_batch_id) {
+        sendFcmToBatch(body.target_batch_id, notifPayload).catch(e => console.error('[FCM] Error notifying batch:', e));
+      } else if (targetAudience.includes('student') && (targetAudience.includes('guru') || targetAudience.includes('trainer'))) {
+        sendFcmToRole('all', notifPayload).catch(e => console.error('[FCM] Error notifying all:', e));
       } else if (targetAudience.includes('student') || targetAudience.includes('disciple')) {
         sendFcmToRole('student', notifPayload).catch(e => console.error('[FCM] Error notifying students:', e));
-      } else if (body.target_batch_id) {
-        sendFcmToBatch(body.target_batch_id, notifPayload).catch(e => console.error('[FCM] Error notifying batch:', e));
+      } else if (targetAudience.includes('trainer') || targetAudience.includes('guru')) {
+        sendFcmToRole('trainer', notifPayload).catch(e => console.error('[FCM] Error notifying gurus:', e));
       } else {
         sendFcmToRole('all', notifPayload).catch(e => console.error('[FCM] Error notifying all:', e));
       }

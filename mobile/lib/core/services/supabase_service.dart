@@ -1612,9 +1612,21 @@ class SupabaseService {
       _ensureReadStateLoaded();
     }
     final list = _cachedMessageAnnouncements.isNotEmpty ? _cachedMessageAnnouncements : _mockMessageAnnouncements;
+    final profile = currentUserProfile;
+    final role = (profile?['role'] ?? '').toString().toLowerCase();
+    final isTrainer = role.contains('trainer') || role.contains('guru') || role == 'teacher';
+
     final Set<String> seen = {};
     int count = 0;
     for (var m in list) {
+      if (isTrainer) {
+        final senderRole = (m['sender_role'] ?? '').toString().toLowerCase();
+        final isGuruMsg = senderRole.contains('trainer') ||
+            senderRole.contains('guru') ||
+            m['trainer_id'] != null ||
+            (m['trainer_name'] != null && m['trainer_name'].toString().trim().isNotEmpty);
+        if (isGuruMsg) continue;
+      }
       final id = m['id']?.toString() ?? '';
       if (id.isEmpty || seen.contains(id)) continue;
       seen.add(id);

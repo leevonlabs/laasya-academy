@@ -125,12 +125,14 @@ class LaasyaAlertService : Service() {
 
         try {
             startForeground(NOTIF_ID_FOREGROUND, builder.build())
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_DETACH)
+                stopForeground(STOP_FOREGROUND_REMOVE)
             } else {
                 @Suppress("DEPRECATION")
-                stopForeground(false)
+                stopForeground(true)
             }
+            nm.cancel(NOTIF_ID_FOREGROUND)
         } catch (_: Exception) {}
     }
 

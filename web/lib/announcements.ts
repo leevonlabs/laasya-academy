@@ -24,6 +24,8 @@ export interface Announcement {
   sender_role?: 'admin' | 'trainer' | string;
   trainer_id?: string | null;
   trainer_name?: string | null;
+  trainer_avatar_url?: string | null;
+  admin_avatar_url?: string | null;
   target_students?: string[] | string | null;
   target_student_names?: string[] | string | null;
   created_at: string;
@@ -101,11 +103,18 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
         a.sender_role,
         a.trainer_id,
         a.trainer_name,
+        COALESCE(pt.avatar_url, tt.avatar_url) as trainer_avatar_url,
+        pa.avatar_url as admin_avatar_url,
         a.created_at::text as created_at, 
         a.updated_at::text as updated_at
       FROM public.announcements a
       LEFT JOIN public.courses c ON c.id = a.target_course_id
       LEFT JOIN public.batches b ON b.id = a.target_batch_id
+      LEFT JOIN public.profiles pt ON pt.id = a.trainer_id
+      LEFT JOIN public.trainers tt ON tt.id = a.trainer_id
+      LEFT JOIN (
+        SELECT avatar_url FROM public.profiles WHERE role IN ('admin', 'owner') AND avatar_url IS NOT NULL AND avatar_url != '' LIMIT 1
+      ) pa ON true
       WHERE a.is_deleted = false
     `;
     const params: any[] = [];

@@ -78,7 +78,7 @@ class TrainerDataStore {
       for (var s in rawStudents) {
         if (s is Map) {
           final rawAvatar = s['avatar_url']?.toString().trim();
-          final validAvatar = (rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com'))
+          final validAvatar = (rawAvatar != null && rawAvatar.isNotEmpty && rawAvatar != 'null')
               ? rawAvatar
               : null;
 
@@ -422,7 +422,7 @@ class TrainerDataStore {
               'this_month_absent': stu['this_month_absent'] ?? 0,
               'fee_status': stu['fee_status'] ?? 'Paid',
               'rate': stu['rate'],
-              'avatar_url': (stu['avatar_url'] != null && stu['avatar_url'].toString().trim().isNotEmpty && !stu['avatar_url'].toString().contains('unsplash.com'))
+              'avatar_url': (stu['avatar_url'] != null && stu['avatar_url'].toString().trim().isNotEmpty && stu['avatar_url'].toString().trim() != 'null')
                   ? stu['avatar_url'].toString().trim()
                   : null,
               // Primary enrollment details for calendar defaults

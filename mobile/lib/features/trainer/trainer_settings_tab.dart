@@ -13,6 +13,7 @@ import 'trainer_share_video_screen.dart';
 import '../../core/services/alarm_service.dart';
 import '../../core/services/permission_service.dart';
 import '../../core/widgets/laasya_policy_dialog.dart';
+import '../settings/support_screen.dart';
 
 class TrainerSettingsTab extends StatefulWidget {
   const TrainerSettingsTab({super.key});
@@ -540,6 +541,25 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                         ),
                       );
                       setState(() {});
+                    },
+                  ),
+                  const Divider(height: 1, indent: 64),
+
+                  // 7. Support & Academy Helpdesk
+                  _settingsTile(
+                    icon: Icons.contact_support_rounded,
+                    iconBg: const Color(0xFFFCE7F3),
+                    iconColor: const Color(0xFF8A064D),
+                    title: 'Support & Helpdesk',
+                    subtitle: 'Campus contacts, director email & Google Maps location',
+                    badgeText: 'HELP',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SupportScreen(),
+                        ),
+                      );
                     },
                   ),
                 ],

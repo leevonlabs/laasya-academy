@@ -99,11 +99,16 @@ export async function sendFcmMessage(token: string, payload: FcmNotificationPayl
         title: payload.title,
         body: payload.body
       },
-      data: payload.data || {},
+      data: {
+        ...(payload.data || {}),
+        title: payload.title,
+        body: payload.body,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK'
+      },
       android: {
         priority: 'high' as const,
         notification: {
-          channel_id: 'laasya_class_alerts',
+          channel_id: 'laasya_announcements',
           sound: payload.sound || 'default',
           default_sound: true,
           default_vibrate_timings: true,
@@ -189,15 +194,18 @@ export async function registerDeviceToken(params: {
 export async function sendFcmToBatch(batchId: string, payload: FcmNotificationPayload): Promise<number> {
   if (!batchId) return 0;
 
-  // Find all tokens that contain this batchId or are linked to students enrolled in this batch
+  const batchIds = batchId.split(',').map(b => b.trim()).filter(Boolean);
+  if (batchIds.length === 0) return 0;
+
+  // Find all tokens that contain any of these batchIds or are linked to students enrolled in these batches
   const rows = await query<{ fcm_token: string }>(`
     SELECT DISTINCT dt.fcm_token 
     FROM public.device_tokens dt
     LEFT JOIN public.batch_enrollments be ON be.student_id = dt.user_id
-    WHERE dt.batch_ids @> $1::jsonb 
-       OR be.batch_id = $2
+    WHERE dt.batch_ids ?| $1::text[]
+       OR be.batch_id = ANY($2::text[])
        OR dt.role = 'admin';
-  `, [JSON.stringify([batchId]), batchId]);
+  `, [batchIds, batchIds]);
 
   let sent = 0;
   for (const r of rows) {

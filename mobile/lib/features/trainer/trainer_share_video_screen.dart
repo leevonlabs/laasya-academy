@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/utils/avatar_helper.dart';
 import 'trainer_create_share_video_screen.dart';
 
 class TrainerShareVideoScreen extends StatefulWidget {
@@ -231,14 +232,38 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     return result;
   }
 
-  // Pending students for current month
+  // Pending students for current month (includes each student who has pending batches, with only pending batch info)
   List<Map<String, dynamic>> get _pendingStudentsThisMonth {
-    return _computeStudentComplianceList().where((s) => s['is_pending'] == true).toList();
+    final List<Map<String, dynamic>> pendingList = [];
+    for (final s in _computeStudentComplianceList()) {
+      final pBatches = (s['pending_batches'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (pBatches.isNotEmpty) {
+        pendingList.add({
+          ...s,
+          'is_pending': true,
+          'batches': pBatches, // ONLY pending batch info!
+          'all_enrolled_batches': s['batches'],
+        });
+      }
+    }
+    return pendingList;
   }
 
-  // Success students for current month (completed for all enrolled batches)
+  // Success students for current month (includes each student who has completed batches, with only completed batch info)
   List<Map<String, dynamic>> get _successStudentsThisMonth {
-    return _computeStudentComplianceList().where((s) => s['is_pending'] == false).toList();
+    final List<Map<String, dynamic>> successList = [];
+    for (final s in _computeStudentComplianceList()) {
+      final cBatches = (s['completed_batches'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (cBatches.isNotEmpty) {
+        successList.add({
+          ...s,
+          'is_pending': false,
+          'batches': cBatches, // ONLY completed batch info!
+          'all_enrolled_batches': s['batches'],
+        });
+      }
+    }
+    return successList;
   }
 
   // Filtered performance students based on sub-tab (pending vs success), course, batch, student multi-select, and search bar
@@ -343,28 +368,41 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
 
   // Opens form for a specific student (pending or success)
   Future<void> _shareForStudent(Map<String, dynamic> student) async {
-    final pendingBatches = student['pending_batches'] as List<Map<String, dynamic>>? ?? [];
-    final allBatches = student['batches'] as List<Map<String, dynamic>>? ?? [];
+    final pendingBatches = (student['pending_batches'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final completedBatches = (student['completed_batches'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final enrolledBatches = (student['all_enrolled_batches'] ?? student['batches'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+
     final targetBatch = pendingBatches.isNotEmpty
         ? pendingBatches.first
-        : (allBatches.isNotEmpty ? allBatches.first : null);
+        : (enrolledBatches.isNotEmpty ? enrolledBatches.first : null);
 
     final studentDataForForm = {
       'id': student['id'],
       'name': student['name'],
       'roll_number': student['roll_number'],
       'phone': student['phone'],
+      'avatar_url': student['avatar_url'],
       'batch_name': targetBatch?['name'] ?? '',
       'course_title': targetBatch?['course_title'] ?? '',
+      'batches': enrolledBatches, // ONLY this student's enrolled batches!
+      'pending_batches': pendingBatches,
+      'completed_batches': completedBatches,
     };
+
+    // Filter courses & batches strictly to what this student is enrolled in
+    final studentBatchIds = enrolledBatches.map((b) => b['id']?.toString()).toSet();
+    final studentCourseIds = enrolledBatches.map((b) => b['course_id']?.toString()).toSet();
+
+    final filteredBatches = _myBatches.where((b) => studentBatchIds.contains(b['id']?.toString())).toList();
+    final filteredCourses = _myCourses.where((c) => studentCourseIds.contains(c['id']?.toString())).toList();
 
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => TrainerCreateShareVideoScreen(
           trainerProfile: widget.trainerProfile,
-          initialCourses: _myCourses,
-          initialBatches: _myBatches,
+          initialCourses: filteredCourses.isNotEmpty ? filteredCourses : _myCourses,
+          initialBatches: filteredBatches.isNotEmpty ? filteredBatches : enrolledBatches,
           preselectedStudent: studentDataForForm,
           preselectedCourseId: targetBatch?['course_id'],
           preselectedBatchId: targetBatch?['id'],
@@ -776,11 +814,13 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allAssigned = _computeStudentComplianceList();
-    final totalStudents = allAssigned.length;
-    final pendingCount = _pendingStudentsThisMonth.length;
-    final completedCount = totalStudents - pendingCount;
-    final double complianceRate = totalStudents > 0 ? (completedCount / totalStudents) : 1.0;
+    final pendingList = _pendingStudentsThisMonth;
+    final successList = _successStudentsThisMonth;
+    final pendingCount = pendingList.length;
+    final completedCount = successList.length;
+    final totalCount = pendingCount + completedCount;
+    final totalStudents = totalCount;
+    final double complianceRate = totalCount > 0 ? (completedCount / totalCount) : 1.0;
     final int compliancePercent = (complianceRate * 100).round();
 
     final filteredPerformance = _filteredPerformanceStudents;
@@ -1293,7 +1333,6 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                             final allBatches = student['batches'] as List<Map<String, dynamic>>? ?? [];
 
                             return Container(
-                              padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
@@ -1309,35 +1348,34 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                   ),
                                 ],
                               ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
+                              child: Stack(
                                 children: [
-                                  CircleAvatar(
-                                    radius: 22,
-                                    backgroundColor: isPending ? const Color(0xFFFFF2F8) : const Color(0xFFECFDF5),
-                                    backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
-                                        ? NetworkImage(avatarUrl)
-                                        : null,
-                                    child: (avatarUrl == null || avatarUrl.isEmpty)
-                                        ? Text(
-                                            initials,
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 15,
-                                              color: isPending ? const Color(0xFF8A064D) : const Color(0xFF047857),
-                                            ),
-                                          )
-                                        : null,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(14, 18, 14, 14),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
+                                        CircleAvatar(
+                                          radius: 22,
+                                          backgroundColor: isPending ? const Color(0xFFFFF2F8) : const Color(0xFFECFDF5),
+                                          backgroundImage: getAvatarImageProvider(avatarUrl),
+                                          child: (avatarUrl == null || avatarUrl.isEmpty)
+                                              ? Text(
+                                                  initials,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 15,
+                                                    color: isPending ? const Color(0xFF8A064D) : const Color(0xFF047857),
+                                                  ),
+                                                )
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
                                                 name,
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.bold,
@@ -1345,112 +1383,141 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                                   color: Color(0xFF2D041A),
                                                 ),
                                               ),
-                                            ),
-                                            // Red [Pending] or Green [Success] Status Badge on Top
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: isPending ? const Color(0xFFFDE8E8) : const Color(0xFFDEF7EC),
-                                                borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(
-                                                  color: isPending ? const Color(0xFFF8B4B4) : const Color(0xFF31C48D),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                'Student ID: $roll',
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  color: Colors.grey.shade700,
+                                                  fontWeight: FontWeight.w500,
                                                 ),
                                               ),
+                                              const SizedBox(height: 6),
+
+                                              // Display batch badges
+                                              Wrap(
+                                                spacing: 6,
+                                                runSpacing: 4,
+                                                children: isPending
+                                                    ? [
+                                                        ...pendingBatches.map((b) => Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFFFFF1F2),
+                                                            borderRadius: BorderRadius.circular(6),
+                                                            border: Border.all(color: const Color(0xFFFECDD3)),
+                                                          ),
+                                                          child: Text(
+                                                            '${b['name']} (Missing)',
+                                                            style: const TextStyle(
+                                                              color: Color(0xFFBE123C),
+                                                              fontSize: 10,
+                                                              fontWeight: FontWeight.bold,
+                                                            ),
+                                                          ),
+                                                        )),
+                                                        ...completedBatches.map((b) => Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFFF0FDF4),
+                                                            borderRadius: BorderRadius.circular(6),
+                                                          ),
+                                                          child: Text(
+                                                            '${b['name']} (Done)',
+                                                            style: const TextStyle(
+                                                              color: Color(0xFF15803D),
+                                                              fontSize: 10,
+                                                            ),
+                                                          ),
+                                                        )),
+                                                      ]
+                                                    : allBatches.map((b) => Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFECFDF5),
+                                                          borderRadius: BorderRadius.circular(6),
+                                                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                                                        ),
+                                                        child: Text(
+                                                          '${b['name']} (Covered)',
+                                                          style: const TextStyle(
+                                                            color: Color(0xFF047857),
+                                                            fontSize: 10,
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                      )).toList(),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+
+                                        // Action Button with pending text directly above it
+                                        Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          children: [
+                                            Container(
+                                              margin: const EdgeInsets.only(bottom: 4),
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: isPending ? const Color(0xFFFFF1F2) : const Color(0xFFECFDF5),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
                                               child: Text(
-                                                isPending ? '[Pending]' : '[Success]',
+                                                isPending ? 'pending' : 'success',
                                                 style: TextStyle(
-                                                  color: isPending ? const Color(0xFFE02424) : const Color(0xFF03543F),
-                                                  fontSize: 10.5,
-                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: isPending ? const Color(0xFFE02424) : const Color(0xFF047857),
+                                                  letterSpacing: 0.3,
                                                 ),
+                                              ),
+                                            ),
+                                            ElevatedButton.icon(
+                                              onPressed: () => _shareForStudent(student),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: isPending ? const Color(0xFF590231) : const Color(0xFF047857),
+                                                foregroundColor: Colors.white,
+                                                elevation: 0,
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                              ),
+                                              icon: const Icon(Icons.share_rounded, size: 14),
+                                              label: const Text(
+                                                'Share',
+                                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                                               ),
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          'Student ID: $roll',
-                                          style: TextStyle(
-                                            fontSize: 11.5,
-                                            color: Colors.grey.shade700,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-
-                                        // Display batch badges beside names
-                                        Wrap(
-                                          spacing: 6,
-                                          runSpacing: 4,
-                                          children: isPending
-                                              ? [
-                                                  ...pendingBatches.map((b) => Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xFFFFF1F2),
-                                                      borderRadius: BorderRadius.circular(6),
-                                                      border: Border.all(color: const Color(0xFFFECDD3)),
-                                                    ),
-                                                    child: Text(
-                                                      '${b['name']} (Missing)',
-                                                      style: const TextStyle(
-                                                        color: Color(0xFFBE123C),
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                  )),
-                                                  ...completedBatches.map((b) => Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xFFF0FDF4),
-                                                      borderRadius: BorderRadius.circular(6),
-                                                    ),
-                                                    child: Text(
-                                                      '${b['name']} (Done)',
-                                                      style: const TextStyle(
-                                                        color: Color(0xFF15803D),
-                                                        fontSize: 10,
-                                                      ),
-                                                    ),
-                                                  )),
-                                                ]
-                                              : allBatches.map((b) => Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFFECFDF5),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(color: const Color(0xFFA7F3D0)),
-                                                  ),
-                                                  child: Text(
-                                                    '${b['name']} (Covered)',
-                                                    style: const TextStyle(
-                                                      color: Color(0xFF047857),
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                )).toList(),
-                                        ),
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 10),
 
-                                  // Action Button Named just 'Share' (guru can send links to pending or success)
-                                  ElevatedButton.icon(
-                                    onPressed: () => _shareForStudent(student),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: isPending ? const Color(0xFF590231) : const Color(0xFF047857),
-                                      foregroundColor: Colors.white,
-                                      elevation: 0,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                    icon: const Icon(Icons.share_rounded, size: 14),
-                                    label: const Text(
-                                      'Share',
-                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  // Status badge at the right top corner of every grid card
+                                  Positioned(
+                                    top: 6,
+                                    right: 10,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isPending ? const Color(0xFFFDE8E8) : const Color(0xFFDEF7EC),
+                                        borderRadius: BorderRadius.circular(5),
+                                        border: Border.all(
+                                          color: isPending ? const Color(0xFFF8B4B4) : const Color(0xFF31C48D),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        isPending ? '[Pending]' : '[Success]',
+                                        style: TextStyle(
+                                          color: isPending ? const Color(0xFFE02424) : const Color(0xFF03543F),
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ],

@@ -56,6 +56,7 @@ class MainActivity: FlutterActivity() {
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        createNotificationChannels()
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -272,17 +273,29 @@ class MainActivity: FlutterActivity() {
             }
             nm.createNotificationChannel(classChannel)
 
-            // 2. Channel for Announcements (Normal system sound)
+            // 2. Channel for Announcements (High priority heads-up sound)
             val noticeChannel = NotificationChannel(
                 CHANNEL_ANNOUNCEMENTS,
                 "Academy Announcements",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Official announcements and circulars from Academy Administration"
                 enableVibration(true)
                 enableLights(true)
             }
             nm.createNotificationChannel(noticeChannel)
+
+            // 3. Channel for Alerts & Push Delivery
+            val alertChannel = NotificationChannel(
+                "laasya_class_alerts",
+                "Academy Realtime Alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Live priority alerts, push messages and student notifications"
+                enableVibration(true)
+                enableLights(true)
+            }
+            nm.createNotificationChannel(alertChannel)
         }
     }
 

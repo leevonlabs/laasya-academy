@@ -1101,7 +1101,10 @@ class _TrainerCreateShareVideoScreenState
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         isExpanded: true,
-                        value: _selectedBatchOption,
+                        value: (widget.preselectedStudent == null && _selectedBatchOption == 'all') ||
+                                currentBatches.any((b) => b['id']?.toString() == _selectedBatchOption)
+                            ? _selectedBatchOption
+                            : (currentBatches.isNotEmpty ? currentBatches.first['id']?.toString() : null),
                         items: [
                           if (widget.preselectedStudent == null)
                             DropdownMenuItem<String>(
@@ -1116,14 +1119,56 @@ class _TrainerCreateShareVideoScreenState
                               ),
                             ),
                           ...currentBatches.map((b) {
+                            final bId = b['id']?.toString();
+                            final isPreselected = widget.preselectedStudent != null;
+                            bool isSuccess = false;
+
+                            if (isPreselected) {
+                              final completedList = widget.preselectedStudent!['completed_batches'] as List?;
+                              if (completedList != null && completedList.any((cb) => cb['id']?.toString() == bId)) {
+                                isSuccess = true;
+                              }
+                            }
+
                             return DropdownMenuItem<String>(
                               value: b['id'],
-                              child: Text(
-                                '${b['name']} (${b['enrolled_count'] ?? 0} Students)',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF1E1E1E),
-                                ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      isPreselected
+                                          ? '${b['name']}'
+                                          : '${b['name']} (${b['enrolled_count'] ?? 0} Students)',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: isPreselected ? FontWeight.w600 : FontWeight.normal,
+                                        color: isPreselected
+                                            ? (isSuccess ? const Color(0xFF03543F) : const Color(0xFF991B1B))
+                                            : const Color(0xFF1E1E1E),
+                                      ),
+                                    ),
+                                  ),
+                                  if (isPreselected)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isSuccess ? const Color(0xFFDEF7EC) : const Color(0xFFFDE8E8),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: isSuccess ? const Color(0xFF31C48D) : const Color(0xFFF98080),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        isSuccess ? 'SUCCESS' : 'PENDING',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSuccess ? const Color(0xFF03543F) : const Color(0xFF991B1B),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             );
                           }),
@@ -1137,8 +1182,10 @@ class _TrainerCreateShareVideoScreenState
                                     'All Batches in $_selectedCourseTitle';
                               } else {
                                 final bObj = currentBatches
-                                    .firstWhere((b) => b['id'] == val);
-                                _selectedBatchName = bObj['name'];
+                                    .firstWhere((b) => b['id'] == val, orElse: () => {});
+                                if (bObj.isNotEmpty) {
+                                  _selectedBatchName = bObj['name'] ?? 'Batch';
+                                }
                               }
                               _updateAvailableStudents();
                             });

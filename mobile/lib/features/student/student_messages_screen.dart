@@ -4,9 +4,15 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/utils/avatar_helper.dart';
 
 class StudentMessagesScreen extends StatefulWidget {
-  const StudentMessagesScreen({super.key});
+  final bool? onlyAdmin;
+
+  const StudentMessagesScreen({
+    super.key,
+    this.onlyAdmin,
+  });
 
   @override
   State<StudentMessagesScreen> createState() => _StudentMessagesScreenState();
@@ -24,8 +30,21 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
     SupabaseService().markAllMessagesAsRead();
     _unreadCount = 0;
     final cached = SupabaseService().getCachedMessageAnnouncements();
+    final profile = SupabaseService().currentUserProfile;
+    final role = (profile?['role'] ?? '').toString().toLowerCase();
+    final isTrainer = widget.onlyAdmin == true || role.contains('trainer') || role.contains('guru') || role == 'teacher';
     if (cached.isNotEmpty) {
-      _messages = List<Map<String, dynamic>>.from(cached);
+      _messages = cached.where((m) {
+        if (isTrainer) {
+          final senderRole = (m['sender_role'] ?? '').toString().toLowerCase();
+          final isGuruMsg = senderRole.contains('trainer') ||
+              senderRole.contains('guru') ||
+              m['trainer_id'] != null ||
+              (m['trainer_name'] != null && m['trainer_name'].toString().trim().isNotEmpty);
+          if (isGuruMsg) return false;
+        }
+        return true;
+      }).toList();
       _isLoading = false;
     }
     _loadMessages();
@@ -44,6 +63,10 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
     final msgs = await SupabaseService().getMessageAnnouncements(forceRefresh: _messages.isEmpty);
     if (mounted) {
       final now = DateTime.now();
+      final profile = SupabaseService().currentUserProfile;
+      final role = (profile?['role'] ?? '').toString().toLowerCase();
+      final isTrainer = widget.onlyAdmin == true || role.contains('trainer') || role.contains('guru') || role == 'teacher';
+
       // Enforce 30-day lifespan rule: Automatically clear messages older than 30 days
       final validMsgs = msgs.where((m) {
         final dateStr = m['publish_date'] ?? m['created_at'];
@@ -54,6 +77,14 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
               return false;
             }
           } catch (_) {}
+        }
+        if (isTrainer) {
+          final senderRole = (m['sender_role'] ?? '').toString().toLowerCase();
+          final isGuruMsg = senderRole.contains('trainer') ||
+              senderRole.contains('guru') ||
+              m['trainer_id'] != null ||
+              (m['trainer_name'] != null && m['trainer_name'].toString().trim().isNotEmpty);
+          if (isGuruMsg) return false;
         }
         return true;
       }).toList();
@@ -817,9 +848,11 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
 
   Widget _buildSenderAvatar(Map<String, dynamic> msg, bool isGuru) {
     if (isGuru) {
-      final avatarUrl = (msg['trainer_avatar_url'] ?? msg['avatar_url'] ?? '').toString();
+      final avatarUrl = (msg['trainer_avatar_url'] ?? msg['avatar_url'] ?? '').toString().trim();
       final senderName = (msg['trainer_name'] ?? msg['sender_name'] ?? msg['created_by'] ?? 'Guru').toString();
       final initials = senderName.trim().split(' ').where((p) => p.isNotEmpty).map((p) => p[0]).take(2).join().toUpperCase();
+
+      final provider = getAvatarImageProvider(avatarUrl.isNotEmpty ? avatarUrl : null);
 
       return Container(
         margin: const EdgeInsets.only(top: 2),
@@ -837,8 +870,8 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
         child: CircleAvatar(
           radius: 17,
           backgroundColor: const Color(0xFF8A064D),
-          backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-          child: avatarUrl.isEmpty
+          backgroundImage: provider,
+          child: provider == null
               ? Text(
                   initials.isNotEmpty ? initials : 'G',
                   style: const TextStyle(
@@ -852,6 +885,9 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
       );
     } else {
       // Academy Administration / Director
+      final adminAvatar = (msg['admin_avatar_url'] ?? msg['avatar_url'] ?? '').toString().trim();
+      final provider = getAvatarImageProvider(adminAvatar.isNotEmpty ? adminAvatar : null);
+
       return Container(
         margin: const EdgeInsets.only(top: 2),
         decoration: BoxDecoration(
@@ -868,19 +904,22 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
         child: CircleAvatar(
           radius: 17,
           backgroundColor: Colors.white,
-          child: ClipOval(
-            child: Image.asset(
-              'assets/images/header_logo.png',
-              width: 30,
-              height: 30,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const CircleAvatar(
-                radius: 17,
-                backgroundColor: Color(0xFF075E54),
-                child: Text('👑', style: TextStyle(fontSize: 14)),
-              ),
-            ),
-          ),
+          backgroundImage: provider,
+          child: provider == null
+              ? ClipOval(
+                  child: Image.asset(
+                    'assets/images/header_logo.png',
+                    width: 30,
+                    height: 30,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const CircleAvatar(
+                      radius: 17,
+                      backgroundColor: Color(0xFF075E54),
+                      child: Text('👑', style: TextStyle(fontSize: 14)),
+                    ),
+                  ),
+                )
+              : null,
         ),
       );
     }
