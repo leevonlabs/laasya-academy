@@ -47,6 +47,9 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
       }).toList();
       _isLoading = false;
     }
+    SupabaseService().preloadTrainerAvatars().then((_) {
+      if (mounted) setState(() {});
+    });
     _loadMessages();
   }
 
@@ -848,8 +851,14 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
 
   Widget _buildSenderAvatar(Map<String, dynamic> msg, bool isGuru) {
     if (isGuru) {
-      final avatarUrl = (msg['trainer_avatar_url'] ?? msg['avatar_url'] ?? '').toString().trim();
+      String avatarUrl = (msg['trainer_avatar_url'] ?? msg['avatar_url'] ?? '').toString().trim();
       final senderName = (msg['trainer_name'] ?? msg['sender_name'] ?? msg['created_by'] ?? 'Guru').toString();
+      if (avatarUrl.isEmpty) {
+        final resolved = SupabaseService().getTrainerAvatar(msg['trainer_id']?.toString(), senderName);
+        if (resolved != null && resolved.isNotEmpty) {
+          avatarUrl = resolved;
+        }
+      }
       final initials = senderName.trim().split(' ').where((p) => p.isNotEmpty).map((p) => p[0]).take(2).join().toUpperCase();
 
       final provider = getAvatarImageProvider(avatarUrl.isNotEmpty ? avatarUrl : null);
@@ -885,7 +894,13 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
       );
     } else {
       // Academy Administration / Director
-      final adminAvatar = (msg['admin_avatar_url'] ?? msg['avatar_url'] ?? '').toString().trim();
+      String adminAvatar = (msg['admin_avatar_url'] ?? msg['avatar_url'] ?? '').toString().trim();
+      if (adminAvatar.isEmpty) {
+        final resolved = SupabaseService().getAdminAvatar();
+        if (resolved != null && resolved.isNotEmpty) {
+          adminAvatar = resolved;
+        }
+      }
       final provider = getAvatarImageProvider(adminAvatar.isNotEmpty ? adminAvatar : null);
 
       return Container(

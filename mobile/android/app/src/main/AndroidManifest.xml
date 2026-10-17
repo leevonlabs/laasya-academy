@@ -17,7 +17,7 @@
 
     <application
         android:label="Laasya Academy"
-        android:name="${applicationName}"
+        android:name=".LaasyaApplication"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
 

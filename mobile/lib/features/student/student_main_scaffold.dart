@@ -246,14 +246,11 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
 
           if (_isFirstPoll) {
             _isFirstPoll = false;
-            final nowMs = DateTime.now().millisecondsSinceEpoch;
-            // On startup, mark only truly stale alerts (older than 30 minutes) as processed,
-            // so recent alerts (e.g. within 30 mins) still notify if missed while closed!
+            // On startup, mark all existing past alerts as already processed
+            // so we NEVER trigger popup banners or alert sounds simply by opening the app!
             for (var a in alerts) {
               final alertId = a['id']?.toString() ?? '';
-              final createdAtMs = int.tryParse(a['created_at_ms']?.toString() ?? '') ?? 0;
-              final isVeryOld = createdAtMs > 0 && (nowMs - createdAtMs) > 1800000;
-              if (alertId.isNotEmpty && isVeryOld) {
+              if (alertId.isNotEmpty) {
                 _globalProcessedAlertIds.add(alertId);
                 AlarmService.markAlertProcessed(alertId);
               }

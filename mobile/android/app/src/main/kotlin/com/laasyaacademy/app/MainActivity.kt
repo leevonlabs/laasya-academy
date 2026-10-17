@@ -237,45 +237,7 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun createNotificationChannels() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-            // 1. Channel for Classes & Attendance (Normal system sound & vibration)
-            val classChannel = NotificationChannel(
-                CHANNEL_CLASSES,
-                "Class & Attendance Updates",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Notifications for class completion and attendance updates"
-                enableVibration(true)
-                enableLights(true)
-            }
-            nm.createNotificationChannel(classChannel)
-
-            // 2. Channel for Announcements (High priority heads-up sound)
-            val noticeChannel = NotificationChannel(
-                CHANNEL_ANNOUNCEMENTS,
-                "Academy Announcements",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Official announcements and circulars from Academy Administration"
-                enableVibration(true)
-                enableLights(true)
-            }
-            nm.createNotificationChannel(noticeChannel)
-
-            // 3. Channel for Alerts & Push Delivery
-            val alertChannel = NotificationChannel(
-                "laasya_class_alerts",
-                "Academy Realtime Alerts",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Live priority alerts, push messages and student notifications"
-                enableVibration(true)
-                enableLights(true)
-            }
-            nm.createNotificationChannel(alertChannel)
-        }
+        LaasyaApplication.ensureChannels(this)
     }
 
     private fun requestNotificationPermission() {

@@ -10,11 +10,44 @@ import 'notification_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // If needed, initialize Firebase for background isolates
   try {
     await Firebase.initializeApp();
   } catch (_) {}
   debugPrint('[FCM] Background message received: ${message.messageId} | ${message.notification?.title}');
+
+  try {
+    final title = message.notification?.title ?? message.data['title']?.toString() ?? '';
+    final body = message.notification?.body ?? message.data['body']?.toString() ?? '';
+    final id = message.data['id']?.toString() ?? message.messageId ?? '';
+    if (title.isNotEmpty || body.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString('laasya_cached_messages');
+      List<dynamic> list = [];
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        try {
+          list = jsonDecode(cachedStr);
+        } catch (_) {}
+      }
+      final exists = list.any((m) => m is Map && (m['id']?.toString() == id || (m['title'] == title && m['message'] == body)));
+      if (!exists) {
+        list.insert(0, {
+          'id': id.isNotEmpty ? id : 'fcm-${DateTime.now().millisecondsSinceEpoch}',
+          'title': title,
+          'message': body,
+          'publish_date': DateTime.now().toIso8601String().split('T').first,
+          'created_at': DateTime.now().toIso8601String(),
+          'created_by': message.data['sender']?.toString() ?? 'Academy Administration',
+          'sender_role': message.data['sender_role']?.toString() ?? 'admin',
+          'trainer_name': message.data['trainer_name']?.toString(),
+          'trainer_avatar_url': message.data['trainer_avatar_url']?.toString(),
+          'is_read': false,
+        });
+        await prefs.setString('laasya_cached_messages', jsonEncode(list));
+      }
+    }
+  } catch (e) {
+    debugPrint('[FCM] Background message cache error: $e');
+  }
 }
 
 class FcmService {

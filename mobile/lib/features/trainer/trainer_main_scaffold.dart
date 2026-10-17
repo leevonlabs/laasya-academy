@@ -139,13 +139,11 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
 
           if (_isFirstPoll) {
             _isFirstPoll = false;
-            final nowMs = DateTime.now().millisecondsSinceEpoch;
-            // On startup, mark only truly stale notices (older than 30 minutes) as processed
+            // On startup, mark all existing past notices as already processed
+            // so we NEVER trigger popup alerts simply by opening the app!
             for (var a in alerts) {
               final alertId = a['id']?.toString() ?? '';
-              final createdAtMs = int.tryParse(a['created_at_ms']?.toString() ?? '') ?? 0;
-              final isVeryOld = createdAtMs > 0 && (nowMs - createdAtMs) > 1800000;
-              if (alertId.isNotEmpty && isVeryOld) {
+              if (alertId.isNotEmpty) {
                 _globalProcessedAlertIds.add(alertId);
                 AlarmService.markAlertProcessed(alertId);
               }

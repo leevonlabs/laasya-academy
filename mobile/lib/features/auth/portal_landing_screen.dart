@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/fcm_service.dart';
 import '../../core/widgets/laasya_policy_dialog.dart';
 import '../student/student_main_scaffold.dart';
 import '../trainer/trainer_main_scaffold.dart';
@@ -68,6 +69,14 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
       if (profile == null) {
         throw Exception(
           'Invalid credentials. Please verify your ${_isStudent ? "mobile number / student roll no" : "registered phone number"} and password.',
+        );
+      }
+
+      final userId = (profile['id'] ?? profile['profile_id'] ?? '').toString();
+      if (userId.isNotEmpty) {
+        FcmService.registerDeviceToken(
+          userId: userId,
+          role: _isStudent ? 'student' : 'trainer',
         );
       }
 

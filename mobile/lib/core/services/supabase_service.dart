@@ -279,6 +279,87 @@ class SupabaseService {
       try {
         await _ensureReadStateLoaded();
       } catch (_) {}
+      preloadTrainerAvatars().catchError((_) {});
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // GURU & ADMIN AVATARS CACHE
+  // ---------------------------------------------------------------------------
+  final Map<String, String> _trainerAvatarMap = {};
+  String? _adminAvatarUrl;
+
+  String? getTrainerAvatar(String? trainerId, String? trainerName) {
+    if (trainerId != null && trainerId.trim().isNotEmpty) {
+      final tid = trainerId.trim().toLowerCase();
+      if (_trainerAvatarMap.containsKey(tid)) {
+        return _trainerAvatarMap[tid];
+      }
+    }
+    if (trainerName != null && trainerName.trim().isNotEmpty) {
+      final tname = trainerName.trim().toLowerCase();
+      if (_trainerAvatarMap.containsKey(tname)) {
+        return _trainerAvatarMap[tname];
+      }
+      for (final entry in _trainerAvatarMap.entries) {
+        if (entry.key.contains(tname) || tname.contains(entry.key)) {
+          return entry.value;
+        }
+      }
+    }
+    return null;
+  }
+
+  String? getAdminAvatar() => _adminAvatarUrl;
+
+  Future<void> preloadTrainerAvatars() async {
+    // 1. Direct Supabase query if available
+    if (_isInitialized && _client != null) {
+      try {
+        final profiles = await _client!
+            .from('profiles')
+            .select('id, full_name, role, avatar_url')
+            .or('role.eq.trainer,role.eq.owner,role.eq.admin');
+        for (var p in profiles) {
+          final av = p['avatar_url']?.toString();
+          if (av != null && av.trim().isNotEmpty) {
+            final role = (p['role'] ?? '').toString();
+            if (role == 'owner' || role == 'admin') {
+              _adminAvatarUrl = av;
+            }
+            final id = p['id']?.toString().toLowerCase();
+            final name = p['full_name']?.toString().toLowerCase().trim();
+            if (id != null && id.isNotEmpty) _trainerAvatarMap[id] = av;
+            if (name != null && name.isNotEmpty) _trainerAvatarMap[name] = av;
+          }
+        }
+      } catch (e) {
+        debugPrint('Supabase preloadTrainerAvatars notice: $e');
+      }
+    }
+
+    // 2. Fetch from backend API /api/trainers
+    try {
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/trainers');
+      final res = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is List) {
+          for (var item in decoded) {
+            if (item is Map) {
+              final av = item['avatar_url']?.toString();
+              if (av != null && av.trim().isNotEmpty) {
+                final id = item['id']?.toString().toLowerCase();
+                final name = (item['full_name'] ?? item['name'])?.toString().toLowerCase().trim();
+                if (id != null && id.isNotEmpty) _trainerAvatarMap[id] = av;
+                if (name != null && name.isNotEmpty) _trainerAvatarMap[name] = av;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('HTTP preloadTrainerAvatars notice: $e');
     }
   }
 
@@ -1437,6 +1518,11 @@ class SupabaseService {
           return true;
         }
 
+        final aud = (item['audience'] ?? '').toString().toLowerCase();
+        if (aud.contains('all') || aud.contains('student') || aud.contains('disciple')) {
+          return true;
+        }
+
         final targetBatchId = (item['target_batch_id'] ?? '').toString().toLowerCase();
         final targetCourseId = (item['target_course_id'] ?? '').toString().toLowerCase();
 
@@ -1474,6 +1560,10 @@ class SupabaseService {
       return List<Map<String, dynamic>>.from(_cachedMessageAnnouncements);
     }
 
+    if (_trainerAvatarMap.isEmpty) {
+      preloadTrainerAvatars().catchError((_) {});
+    }
+
     // 1. Direct Supabase query if initialized
     if (_isInitialized && _client != null) {
       try {
@@ -1500,6 +1590,18 @@ class SupabaseService {
             mapItem['image_url'] = _normalizeImageUrl(mapItem['image_url']);
             mapItem['date'] = mapItem['publish_date'] ?? 'Today';
             mapItem['is_read'] = false;
+
+            // Enrich with trainer & admin avatars
+            final tId = mapItem['trainer_id']?.toString();
+            final tName = (mapItem['trainer_name'] ?? mapItem['created_by'])?.toString();
+            final tAv = getTrainerAvatar(tId, tName);
+            if (tAv != null && (mapItem['trainer_avatar_url'] == null || mapItem['trainer_avatar_url'].toString().isEmpty)) {
+              mapItem['trainer_avatar_url'] = tAv;
+            }
+            if (_adminAvatarUrl != null && (mapItem['admin_avatar_url'] == null || mapItem['admin_avatar_url'].toString().isEmpty)) {
+              mapItem['admin_avatar_url'] = _adminAvatarUrl;
+            }
+
             valid.add(mapItem);
           }
           final filtered = _filterAnnouncementsForCurrentUser(valid);
@@ -1517,7 +1619,7 @@ class SupabaseService {
     // 2. HTTP API fallback
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements?announcementType=message');
-      final res = await http.get(uri).timeout(const Duration(seconds: 3));
+      final res = await http.get(uri).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['announcements'] is List) {
@@ -1537,6 +1639,18 @@ class SupabaseService {
                 } catch (_) {}
               }
               item['image_url'] = _normalizeImageUrl(item['image_url']);
+
+              // Enrich with trainer & admin avatars if missing
+              final tId = item['trainer_id']?.toString();
+              final tName = (item['trainer_name'] ?? item['created_by'])?.toString();
+              final tAv = getTrainerAvatar(tId, tName);
+              if (tAv != null && (item['trainer_avatar_url'] == null || item['trainer_avatar_url'].toString().isEmpty)) {
+                item['trainer_avatar_url'] = tAv;
+              }
+              if (_adminAvatarUrl != null && (item['admin_avatar_url'] == null || item['admin_avatar_url'].toString().isEmpty)) {
+                item['admin_avatar_url'] = _adminAvatarUrl;
+              }
+
               valid.add(item);
             }
             final filtered = _filterAnnouncementsForCurrentUser(valid);
