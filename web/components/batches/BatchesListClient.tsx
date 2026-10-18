@@ -25,8 +25,11 @@ import {
   Filter,
   CheckSquare,
   Square,
-  RotateCcw
+  RotateCcw,
+  IndianRupee
 } from 'lucide-react';
+import AiEnhanceButton from '@/components/common/AiEnhanceButton';
+import SearchableCombobox, { ComboboxOption } from '@/components/common/SearchableCombobox';
 import SearchableRoomSelect from './SearchableRoomSelect';
 import VacantRoomsView from './VacantRoomsView';
 import TimetableView from './TimetableView';
@@ -249,32 +252,41 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   };
 
   // -------------------------------------------------------------
-  // CREATE BATCH FORM STATE
+  // STATUS FILTER (All / Active / Inactive)
+  // -------------------------------------------------------------
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  // -------------------------------------------------------------
+  // CREATE BATCH FORM STATE (No drafted autofill)
   // -------------------------------------------------------------
   const [addCourseSearch, setAddCourseSearch] = useState('');
-  const [addCourseId, setAddCourseId] = useState(courses[0]?.id || '');
+  const [addCourseId, setAddCourseId] = useState('');
+  const [addTrainerSearch, setAddTrainerSearch] = useState('');
   const [addTrainerId, setAddTrainerId] = useState('');
   const [addBatchName, setAddBatchName] = useState('');
+  const [addMonthlyFee, setAddMonthlyFee] = useState<string>('');
+  const [addDescription, setAddDescription] = useState('');
   const [addRoom, setAddRoom] = useState('Natya Mandapam (Room 101)');
   const [addCapacity, setAddCapacity] = useState(25);
+  const [addIsActive, setAddIsActive] = useState(true);
   const [addSchedules, setAddSchedules] = useState<ScheduleEntry[]>([
-    { day: 'Monday', startTime: '09:00', endTime: '10:00', room: 'Natya Mandapam (Room 101)' },
-    { day: 'Wednesday', startTime: '10:00', endTime: '11:00', room: 'Sangeetha Shala (Room 102)' }
+    { day: 'Monday', startTime: '09:00', endTime: '10:00', room: 'Natya Mandapam (Room 101)' }
   ]);
 
-  // When opening Add Modal
+  // When opening Add Modal - clean blank state with no drafted autofill
   const openAddModal = () => {
-    const defaultCourseId = courses[0]?.id || '';
-    setAddCourseId(defaultCourseId);
+    setAddCourseId('');
     setAddCourseSearch('');
-    const matchingGurus = getGurusForCourse(defaultCourseId);
-    setAddTrainerId(matchingGurus[0]?.id || trainers[0]?.id || '');
-    setAddBatchName(getNextSequentialBatchName(defaultCourseId, batches));
-    setAddRoom('Natya Mandapam (Room 101)');
+    setAddTrainerId('');
+    setAddTrainerSearch('');
+    setAddBatchName('');
+    setAddMonthlyFee('');
+    setAddDescription('');
+    setAddRoom(rooms[0]?.name || 'Natya Mandapam (Room 101)');
     setAddCapacity(25);
+    setAddIsActive(true);
     setAddSchedules([
-      { day: 'Monday', startTime: '09:00', endTime: '10:00', room: rooms[0]?.name || 'Natya Mandapam (Room 101)' },
-      { day: 'Wednesday', startTime: '10:00', endTime: '11:00', room: rooms[1]?.name || rooms[0]?.name || 'Sangeetha Shala (Room 102)' }
+      { day: 'Monday', startTime: '09:00', endTime: '10:00', room: rooms[0]?.name || 'Natya Mandapam (Room 101)' }
     ]);
     setIsAddOpen(true);
   };
@@ -284,15 +296,21 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     setAddCourseId(newCrsId);
     const matchingGurus = getGurusForCourse(newCrsId);
     setAddTrainerId(matchingGurus[0]?.id || trainers[0]?.id || '');
-    setAddBatchName(getNextSequentialBatchName(newCrsId, batches));
+    if (newCrsId) {
+      setAddBatchName(getNextSequentialBatchName(newCrsId, batches));
+    }
   };
 
   // -------------------------------------------------------------
   // EDIT BATCH FORM STATE
   // -------------------------------------------------------------
+  const [editCourseSearch, setEditCourseSearch] = useState('');
   const [editCourseId, setEditCourseId] = useState('');
+  const [editTrainerSearch, setEditTrainerSearch] = useState('');
   const [editTrainerId, setEditTrainerId] = useState('');
   const [editBatchName, setEditBatchName] = useState('');
+  const [editMonthlyFee, setEditMonthlyFee] = useState<string>('0');
+  const [editDescription, setEditDescription] = useState('');
   const [editRoom, setEditRoom] = useState('');
   const [editCapacity, setEditCapacity] = useState(25);
   const [editIsActive, setEditIsActive] = useState(true);
@@ -301,8 +319,12 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   const openEditModal = (batch: Batch) => {
     setEditingBatch(batch);
     setEditCourseId(batch.course_id);
+    setEditCourseSearch('');
     setEditTrainerId(batch.trainer_id);
+    setEditTrainerSearch('');
     setEditBatchName(batch.name);
+    setEditMonthlyFee(batch.monthly_fee !== undefined ? String(batch.monthly_fee) : '0');
+    setEditDescription(batch.description || '');
     setEditRoom(batch.room_or_hall || 'Natya Mandapam (Room 101)');
     setEditCapacity(batch.max_capacity || 25);
     setEditIsActive(batch.is_active ?? true);
@@ -345,7 +367,6 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     }
   };
 
-
   const removeScheduleRow = (index: number, mode: 'add' | 'edit') => {
     if (mode === 'add') {
       if (addSchedules.length <= 1) return;
@@ -364,8 +385,10 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     }
   };
 
-  // Filtered Batches based on multi-select courses and search query
+  // Filtered Batches based on multi-select courses, status filter, and search query
   const filteredBatches = batches.filter(b => {
+    if (statusFilter === 'active' && b.is_active === false) return false;
+    if (statusFilter === 'inactive' && b.is_active !== false) return false;
     const matchesCourse = selectedCourseIds.length === 0 || selectedCourseIds.includes(b.course_id);
     const matchesSearch = 
       b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -392,29 +415,187 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   const activeBatchesCount = useMemo(() => batches.filter(b => b.is_active !== false).length, [batches]);
   const fillRate = totalCapacity > 0 ? Math.round((totalEnrolled / totalCapacity) * 100) : 0;
 
-  // Available gurus for current Add Course selection
+  // Available gurus for current Add Course selection (with search)
   const addMatchingGurus = useMemo(() => {
-    return getGurusForCourse(addCourseId);
-  }, [addCourseId, courses, trainers]);
+    const gurus = addCourseId ? getGurusForCourse(addCourseId) : trainers;
+    if (!addTrainerSearch.trim()) return gurus;
+    const q = addTrainerSearch.toLowerCase();
+    return gurus.filter(t => t.full_name.toLowerCase().includes(q) || (t.display_title || '').toLowerCase().includes(q));
+  }, [addCourseId, courses, trainers, addTrainerSearch]);
 
-  // Available gurus for current Edit Course selection
+  // Available gurus for current Edit Course selection (with search)
   const editMatchingGurus = useMemo(() => {
-    return getGurusForCourse(editCourseId);
-  }, [editCourseId, courses, trainers]);
+    const gurus = editCourseId ? getGurusForCourse(editCourseId) : trainers;
+    if (!editTrainerSearch.trim()) return gurus;
+    const q = editTrainerSearch.toLowerCase();
+    return gurus.filter(t => t.full_name.toLowerCase().includes(q) || (t.display_title || '').toLowerCase().includes(q));
+  }, [editCourseId, courses, trainers, editTrainerSearch]);
 
   // Courses filtered by search input inside Add Modal
   const addFilteredCourses = useMemo(() => {
     if (!addCourseSearch.trim()) return courses;
     const q = addCourseSearch.toLowerCase();
-    return courses.filter(c => c.title.toLowerCase().includes(q) || c.code.toLowerCase().includes(q));
+    return courses.filter(c => c.title.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.category.toLowerCase().includes(q));
   }, [courses, addCourseSearch]);
+
+  // Courses filtered by search input inside Edit Modal
+  const editFilteredCourses = useMemo(() => {
+    if (!editCourseSearch.trim()) return courses;
+    const q = editCourseSearch.toLowerCase();
+    return courses.filter(c => c.title.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.category.toLowerCase().includes(q));
+  }, [courses, editCourseSearch]);
+
+  // Combobox options for courses
+  const courseComboboxOptions = useMemo<ComboboxOption[]>(() => {
+    return courses.map(c => ({
+      id: c.id,
+      label: c.title,
+      subtitle: `${c.code} • ${c.category || 'General'}`,
+      badge: c.category
+    }));
+  }, [courses]);
+
+  // Helper to build guru options for a course
+  const getGuruComboboxOptions = (courseId?: string): ComboboxOption[] => {
+    const matching = getGurusForCourse(courseId || '');
+    const otherGurus = trainers.filter(t => !matching.some(m => m.id === t.id));
+    return [...matching, ...otherGurus].map(t => ({
+      id: t.id,
+      label: t.full_name,
+      subtitle: t.specializations?.join(', ') || t.display_title || 'Faculty Guru',
+      badge: matching.some(m => m.id === t.id) ? 'Assigned Guru' : undefined
+    }));
+  };
+
+  const toMinutes = (timeStr: string) => {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':');
+    return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+  };
+
+  const checkScheduleConflict = (
+    schedules: ScheduleEntry[],
+    currentBatchId?: string
+  ): { hasConflict: boolean; message?: string } => {
+    for (let i = 0; i < schedules.length; i++) {
+      const s = schedules[i];
+      if (!s.room || !s.day || !s.startTime || !s.endTime) continue;
+      const sStart = toMinutes(s.startTime);
+      const sEnd = toMinutes(s.endTime);
+      if (sEnd <= sStart) {
+        return {
+          hasConflict: true,
+          message: `Invalid slot on ${s.day}: End time (${s.endTime}) must be later than start time (${s.startTime}).`
+        };
+      }
+
+      // Intra-batch overlap check
+      for (let j = i + 1; j < schedules.length; j++) {
+        const other = schedules[j];
+        if (
+          other.day.toLowerCase() === s.day.toLowerCase() &&
+          other.room.trim().toLowerCase() === s.room.trim().toLowerCase()
+        ) {
+          const oStart = toMinutes(other.startTime);
+          const oEnd = toMinutes(other.endTime);
+          if (sStart < oEnd && sEnd > oStart) {
+            return {
+              hasConflict: true,
+              message: `Schedule conflict within batch: ${s.room} has overlapping slots on ${s.day}!`
+            };
+          }
+        }
+      }
+
+      // Check against all active batches
+      for (const b of batches) {
+        if (currentBatchId && b.id === currentBatchId) continue;
+        if (b.is_active === false) continue;
+
+        if (b.schedules && b.schedules.length > 0) {
+          for (const slot of b.schedules) {
+            const slotRoom = slot.room || b.room_or_hall || '';
+            if (
+              slot.day.toLowerCase() === s.day.toLowerCase() &&
+              slotRoom.trim().toLowerCase() === s.room.trim().toLowerCase()
+            ) {
+              const bStart = toMinutes(slot.startTime);
+              const bEnd = toMinutes(slot.endTime);
+              if (sStart < bEnd && sEnd > bStart) {
+                return {
+                  hasConflict: true,
+                  message: `Time slot conflict: Room "${s.room}" is already occupied on ${s.day} (${slot.startTime.substring(0, 5)} - ${slot.endTime.substring(0, 5)}) by batch "${b.name}" (${b.course_title}).`
+                };
+              }
+            }
+          }
+        } else {
+          const bDays = b.days_of_week || [];
+          const bRoom = b.room_or_hall || '';
+          if (
+            bDays.some(d => d.toLowerCase() === s.day.toLowerCase()) &&
+            bRoom.trim().toLowerCase() === s.room.trim().toLowerCase()
+          ) {
+            const bStart = toMinutes(b.start_time);
+            const bEnd = toMinutes(b.end_time);
+            if (sStart < bEnd && sEnd > bStart) {
+              return {
+                hasConflict: true,
+                message: `Time slot conflict: Room "${s.room}" is already occupied on ${s.day} (${b.start_time.substring(0, 5)} - ${b.end_time.substring(0, 5)}) by batch "${b.name}" (${b.course_title}).`
+              };
+            }
+          }
+        }
+      }
+    }
+    return { hasConflict: false };
+  };
+
+  const addConflict = useMemo(() => checkScheduleConflict(addSchedules), [addSchedules, batches]);
+  const editConflict = useMemo(() => checkScheduleConflict(editSchedules, editingBatch?.id), [editSchedules, editingBatch, batches]);
+
+  // Quick toggle batch status directly from card
+  const handleToggleBatchStatus = async (batch: Batch, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nextStatus = batch.is_active === false ? true : false;
+    try {
+      const res = await fetch('/api/batches', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: batch.id, is_active: nextStatus })
+      });
+      if (!res.ok) throw new Error('Failed to update status');
+      setBatches(prev => prev.map(b => b.id === batch.id ? { ...b, is_active: nextStatus } : b));
+      showFeedback('success', `Batch "${batch.name}" marked as ${nextStatus ? 'Active' : 'Inactive'}`);
+    } catch (err: any) {
+      showFeedback('error', err.message || 'Error updating batch status');
+    }
+  };
 
   // -------------------------------------------------------------
   // SUBMIT HANDLERS
   // -------------------------------------------------------------
   const handleCreateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addBatchName.trim()) return;
+    if (!addBatchName.trim()) {
+      showFeedback('error', 'Please enter a batch name');
+      return;
+    }
+    if (!addCourseId) {
+      showFeedback('error', 'Please select a course for this batch');
+      return;
+    }
+    if (!addTrainerId) {
+      showFeedback('error', 'Please assign a Guru to this batch');
+      return;
+    }
+
+    const conflict = checkScheduleConflict(addSchedules);
+    if (conflict.hasConflict) {
+      showFeedback('error', conflict.message || 'Room and time conflict detected!');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -435,6 +616,9 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
           end_time: primaryEnd,
           room_or_hall: primaryRoom,
           max_capacity: Number(addCapacity),
+          monthly_fee: Number(addMonthlyFee || 0),
+          description: addDescription.trim(),
+          is_active: addIsActive,
           schedules: addSchedules
         })
       });
@@ -453,6 +637,9 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
         course_title: crs?.title || 'Course',
         course_category: crs?.category || 'Category',
         trainer_name: trn?.full_name || 'Guru',
+        monthly_fee: Number(addMonthlyFee || 0),
+        description: addDescription.trim(),
+        is_active: addIsActive,
         enrolled_count: 0,
         schedules: addSchedules
       };
@@ -470,6 +657,13 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingBatch) return;
+
+    const conflict = checkScheduleConflict(editSchedules, editingBatch.id);
+    if (conflict.hasConflict) {
+      showFeedback('error', conflict.message || 'Room and time conflict detected!');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -491,6 +685,8 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
           end_time: primaryEnd,
           room_or_hall: primaryRoom,
           max_capacity: Number(editCapacity),
+          monthly_fee: Number(editMonthlyFee || 0),
+          description: editDescription.trim(),
           is_active: editIsActive,
           schedules: editSchedules
         })
@@ -520,13 +716,14 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 end_time: primaryEnd,
                 room_or_hall: primaryRoom,
                 max_capacity: Number(editCapacity),
+                monthly_fee: Number(editMonthlyFee || 0),
+                description: editDescription.trim(),
                 is_active: editIsActive,
                 schedules: editSchedules
               }
             : b
         )
       );
-
 
       if (viewingBatch && viewingBatch.id === editingBatch.id) {
         setViewingBatch({
@@ -542,7 +739,10 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
           end_time: primaryEnd,
           room_or_hall: editRoom.trim(),
           max_capacity: Number(editCapacity),
-          is_active: editIsActive
+          monthly_fee: Number(editMonthlyFee || 0),
+          description: editDescription.trim(),
+          is_active: editIsActive,
+          schedules: editSchedules
         });
       }
 
@@ -585,7 +785,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   if (showTimetable) {
     return (
       <div className="space-y-6">
-        <TimetableView onBack={() => setShowTimetable(false)} />
+        <TimetableView onBack={() => setShowTimetable(false)} batches={batches} />
       </div>
     );
   }
@@ -1090,19 +1290,34 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
               )}
             </div>
 
-          </div>
+              {/* Status Filter Dropdown beside Course Filter */}
+              <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-2 rounded-2xl border border-[#F0D5E4]">
+                <span className="text-[11px] font-bold text-[#8A064D] uppercase tracking-wider">Status:</span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="bg-transparent text-xs font-bold text-[#2D041A] focus:outline-none cursor-pointer"
+                >
+                  <option value="all">All Batches ({batches.length})</option>
+                  <option value="active">Active Batches ({batches.filter(b => b.is_active !== false).length})</option>
+                  <option value="inactive">Inactive Batches ({batches.filter(b => b.is_active === false).length})</option>
+                </select>
+              </div>
+
+            </div>
 
           {/* Right Group: Results counter & Reset button */}
           <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
             <span className="text-xs font-semibold text-gray-500">
               Showing <strong className="text-[#8A064D]">{filteredBatches.length}</strong> of {batches.length} batches
             </span>
-            {(selectedCourseIds.length > 0 || searchQuery.trim() !== '') && (
+            {(selectedCourseIds.length > 0 || searchQuery.trim() !== '' || statusFilter !== 'all') && (
               <button
                 type="button"
                 onClick={() => {
                   setSelectedCourseIds([]);
                   setSearchQuery('');
+                  setStatusFilter('all');
                 }}
                 className="text-xs text-rose-600 hover:text-rose-800 font-bold hover:underline flex items-center gap-1 cursor-pointer"
               >
@@ -1162,19 +1377,21 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
               className="bg-white rounded-3xl p-6 border border-[#F0D5E4] shadow-xs hover:shadow-xl hover:border-[#8A064D]/40 transition-all duration-200 flex flex-col justify-between group"
             >
               <div>
-                {/* Header: Course Category & Active Badge */}
+                {/* Header: Course Category & Active/Inactive Toggle Badge */}
                 <div className="flex items-center justify-between gap-2 mb-3.5">
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#8A064D] bg-[#FFF2F8] border border-[#F0D5E4] px-3.5 py-1 rounded-full shadow-2xs">
                     <Sparkles className="w-3.5 h-3.5 text-[#8A064D]" />
                     <span>{b.course_category}</span>
                   </span>
+                  
+                  {/* Status Indicator (No editing button) */}
                   <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full ${
                     b.is_active !== false 
                       ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' 
-                      : 'text-amber-700 bg-amber-50 border border-amber-200'
+                      : 'text-rose-700 bg-rose-50 border border-rose-200'
                   }`}>
-                    <span className={`w-2 h-2 rounded-full ${b.is_active !== false ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                    <span>{b.is_active !== false ? 'Active Slot' : 'Paused'}</span>
+                    <span className={`w-2 h-2 rounded-full ${b.is_active !== false ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                    <span>{b.is_active !== false ? 'Active' : 'Inactive'}</span>
                   </span>
                 </div>
 
@@ -1187,78 +1404,25 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                   <span className="truncate">{b.course_title}</span>
                 </div>
 
-                {/* Faculty, Schedule & Hall Details */}
+                {/* Main Card Body: Guru Assigned & Monthly Price Only (No Timings) */}
                 <div className="mt-4 space-y-2.5 text-sm text-gray-800 bg-gray-50/90 p-4 rounded-2xl border border-gray-150">
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600 flex items-center gap-2 font-medium">
                       <Users className="w-4 h-4 text-[#8A064D]" />
-                      <span>Guru</span>
+                      <span>Guru Assigned</span>
                     </span>
                     <strong className="text-gray-900 font-bold">{b.trainer_name}</strong>
                   </div>
 
-                  {b.schedules && b.schedules.length > 0 ? (
-                    <div className="pt-2 border-t border-gray-200/60 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                          Weekly Day & Room Slots
-                        </span>
-                        <span className="text-[10px] bg-white border border-[#F0D5E4] text-[#8A064D] px-2 py-0.5 rounded-full font-bold shadow-2xs">
-                          {b.schedules.length} Slots
-                        </span>
-                      </div>
-                      <div className="space-y-1.5">
-                        {b.schedules.map((slot, sIdx) => (
-                          <div key={sIdx} className="bg-white p-2 rounded-xl border border-gray-200/80 flex items-center justify-between text-xs shadow-2xs">
-                            <div className="flex items-center gap-1.5 font-bold text-[#8A064D]">
-                              <span className="bg-[#FFF2F8] text-[#8A064D] px-1.5 py-0.5 rounded-md text-[11px] border border-[#F0D5E4]">
-                                {slot.day?.substring(0, 3)}
-                              </span>
-                              <span className="font-mono text-gray-800 text-[11px]">
-                                {slot.startTime?.substring(0, 5)} - {slot.endTime?.substring(0, 5)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 truncate max-w-[130px]" title={slot.room}>
-                              <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
-                              <span className="truncate">{slot.room}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600 flex items-center gap-2 font-medium">
-                          <Clock className="w-4 h-4 text-[#8A064D]" />
-                          <span>Timing</span>
-                        </span>
-                        <strong className="text-gray-900 font-bold font-mono">
-                          {b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)}
-                        </strong>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600 flex items-center gap-2 font-medium">
-                          <MapPin className="w-4 h-4 text-[#8A064D]" />
-                          <span>Hall / Room</span>
-                        </span>
-                        <strong className="text-gray-900 font-bold truncate max-w-[160px] text-right">
-                          {b.room_or_hall || 'Main Hall'}
-                        </strong>
-                      </div>
-                      {/* Class Days Pills */}
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {(b.days_of_week || []).map((day, idx) => (
-                          <span 
-                            key={idx}
-                            className="text-xs font-bold bg-[#FFF9FB] text-gray-800 border border-[#F0D5E4] px-2.5 py-0.5 rounded-xl shadow-2xs"
-                          >
-                            {day.substring(0, 3)}
-                          </span>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                  <div className="flex items-center justify-between pt-2.5 border-t border-gray-200/60">
+                    <span className="text-gray-600 flex items-center gap-2 font-medium">
+                      <IndianRupee className="w-4 h-4 text-[#8A064D]" />
+                      <span>Monthly Fee</span>
+                    </span>
+                    <strong className="text-emerald-700 font-extrabold text-base tabular-nums">
+                      ₹{Number(b.monthly_fee || 0).toLocaleString('en-IN')}<span className="text-xs font-normal text-gray-500"> / mo</span>
+                    </strong>
+                  </div>
                 </div>
               </div>
 
@@ -1280,7 +1444,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                   />
                 </div>
 
-                {/* Actions: View Details, Edit, Delete */}
+                {/* Actions: View Details, Edit, Delete (All 3 buttons preserved) */}
                 <div className="flex items-center justify-between pt-1">
                   <button
                     onClick={() => setViewingBatch(b)}
@@ -1363,23 +1527,43 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
 
             <div className="space-y-4">
               {/* Highlight Grid */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-rose-100">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Assigned Faculty Guru</span>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Assigned Guru</span>
                   <span className="text-sm font-bold text-gray-900 mt-1 flex items-center gap-1.5">
                     <Users className="w-4 h-4 text-[#8A064D]" />
-                    <span>{viewingBatch.trainer_name}</span>
+                    <span className="truncate">{viewingBatch.trainer_name}</span>
                   </span>
                 </div>
 
-                <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-100">
+                <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-200">
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Monthly Fee</span>
+                  <span className="text-sm font-extrabold text-emerald-700 mt-1 flex items-center gap-1 tabular-nums">
+                    <IndianRupee className="w-4 h-4 text-emerald-600" />
+                    <span>₹{Number(viewingBatch.monthly_fee || 0).toLocaleString('en-IN')}<span className="text-[10px] font-normal text-gray-500"> / mo</span></span>
+                  </span>
+                </div>
+
+                <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-100 col-span-2 sm:col-span-1">
                   <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Room / Hall</span>
                   <span className="text-sm font-bold text-gray-900 mt-1 flex items-center gap-1.5">
                     <MapPin className="w-4 h-4 text-[#8A064D]" />
-                    <span>{viewingBatch.room_or_hall || 'Main Hall'}</span>
+                    <span className="truncate">{viewingBatch.room_or_hall || 'Main Hall'}</span>
                   </span>
                 </div>
               </div>
+
+              {/* Batch Description if present */}
+              {viewingBatch.description && (
+                <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-rose-100/80">
+                  <span className="text-[10px] font-bold text-[#8A064D] uppercase tracking-wider block mb-1">
+                    Batch Description &amp; Syllabus
+                  </span>
+                  <p className="text-xs text-gray-700 leading-relaxed font-medium">
+                    {viewingBatch.description}
+                  </p>
+                </div>
+              )}
 
               {/* Schedule Details */}
               <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2">
@@ -1502,74 +1686,115 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
 
             <form onSubmit={handleCreateBatch} className="space-y-4">
               
-              {/* 1. Searchable Course Dropdown */}
+              {/* 1. Searchable Course Dropdown (Type directly to filter) */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Select Course <span className="text-[10px] text-gray-400">(Searchable)</span>
+                  Select Course <span className="text-rose-500">*</span> <span className="text-[10px] text-gray-400 font-normal">(Type directly to search)</span>
                 </label>
-                <div className="space-y-1.5">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
-                    <input
-                      type="text"
-                      placeholder="Type to filter courses..."
-                      value={addCourseSearch}
-                      onChange={(e) => setAddCourseSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#8A064D]"
-                    />
-                  </div>
-                  <select
-                    value={addCourseId}
-                    onChange={(e) => handleAddCourseChange(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] font-medium"
-                  >
-                    {addFilteredCourses.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.title} ({c.code}) — {c.category}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableCombobox
+                  options={courseComboboxOptions}
+                  value={addCourseId}
+                  onChange={(id) => handleAddCourseChange(id)}
+                  placeholder="Type course name (e.g. Bharatanatyam, Kuchipudi, Carnatic)..."
+                  required
+                />
               </div>
 
-              {/* 2. Assign Guru / Faculty (Filtered by Course) */}
+              {/* 2. Assign Guru / Faculty (Searchable Combobox) */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Assign Guru / Faculty <span className="text-[10px] text-[#8A064D] font-semibold">(Assigned to {courses.find(c => c.id === addCourseId)?.title})</span>
+                  Assign Guru / Faculty <span className="text-rose-500">*</span> <span className="text-[10px] text-gray-400 font-normal">(Type directly to search)</span>
                 </label>
-                <select
+                <SearchableCombobox
+                  options={getGuruComboboxOptions(addCourseId)}
                   value={addTrainerId}
-                  onChange={(e) => setAddTrainerId(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] font-medium"
-                >
-                  {addMatchingGurus.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.full_name} {t.display_title ? `— (${t.display_title})` : ''}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(id) => setAddTrainerId(id)}
+                  placeholder="Type Guru name (e.g. Sri Guru, Smt...)..."
+                  required
+                />
               </div>
 
-              {/* 3. Batch Name (Sequential by default) */}
+              {/* 3. Batch Name */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Batch Name <span className="text-[10px] text-emerald-600 font-normal">(Auto-generated sequential numbering)</span>
+                  Batch Name <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
+                  placeholder="e.g. Kuchipudi Morning Batch 1"
                   value={addBatchName}
                   onChange={(e) => setAddBatchName(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
                 />
               </div>
 
-              {/* 4. Weekly Class Schedule Builder (Multi-day) */}
+              {/* 4. Monthly Fee & Capacity */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Monthly Fee (₹) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      step={50}
+                      placeholder="e.g. 2500"
+                      value={addMonthlyFee}
+                      onChange={(e) => setAddMonthlyFee(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Class Capacity (Max)</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={addCapacity}
+                    onChange={(e) => setAddCapacity(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                </div>
+              </div>
+
+              {/* 5. Batch Description with AI Enhance */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-gray-700">Batch Description / Notes</label>
+                  <AiEnhanceButton
+                    value={addDescription}
+                    context={`Batch Name: ${addBatchName || 'Batch'}, Course: ${courses.find(c => c.id === addCourseId)?.title || 'Course'}`}
+                    onEnhance={(enhanced: string) => setAddDescription(enhanced)}
+                  />
+                </div>
+                <textarea
+                  rows={2}
+                  value={addDescription}
+                  onChange={(e) => setAddDescription(e.target.value)}
+                  placeholder="Enter batch focus, curriculum details, or notes..."
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] resize-none"
+                />
+              </div>
+
+              {/* Conflict Alert Banner if occupied */}
+              {addConflict.hasConflict && (
+                <div className="p-3 bg-rose-50 border border-rose-300 rounded-2xl flex items-start gap-2.5 text-xs text-rose-800 animate-in fade-in shadow-xs">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span className="font-semibold">{addConflict.message}</span>
+                </div>
+              )}
+
+              {/* 6. Weekly Class Schedule Builder (Multi-day) */}
               <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
-                    <span>Weekly Class Schedule</span>
+                    <span>Weekly Class Schedule Timings</span>
                   </label>
                   <button
                     type="button"
@@ -1577,7 +1802,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                     className="text-xs font-semibold text-[#8A064D] hover:text-[#70043E] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
-                    <span>Add another weekly class schedule</span>
+                    <span>Add schedule slot</span>
                   </button>
                 </div>
 
@@ -1644,40 +1869,44 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 </div>
               </div>
 
-              {/* 5. Room & Capacity */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* 7. Room Selection */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Room / Hall Selection</label>
+                <SearchableRoomSelect
+                  value={addRoom}
+                  onChange={(rName, rCap) => {
+                    setAddRoom(rName);
+                    if (rCap) setAddCapacity(rCap);
+                  }}
+                  rooms={rooms}
+                  onRoomCreated={(newRoom) => {
+                    setRooms(prev => [...prev.filter(r => r.id !== newRoom.id), newRoom].sort((a, b) => a.name.localeCompare(b.name)));
+                    setAddRoom(newRoom.name);
+                    if (newRoom.capacity) setAddCapacity(newRoom.capacity);
+                    showFeedback('success', `Room "${newRoom.name}" created and selected!`);
+                  }}
+                  onRoomDeleted={(roomId) => {
+                    setRooms(prev => prev.filter(r => r.id !== roomId));
+                    showFeedback('success', 'Room deleted');
+                  }}
+                />
+              </div>
+
+              {/* 8. Active / Inactive Status Toggle */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Room / Hall Name</label>
-                  <SearchableRoomSelect
-                    value={addRoom}
-                    onChange={(rName, rCap) => {
-                      setAddRoom(rName);
-                      if (rCap) setAddCapacity(rCap);
-                    }}
-                    rooms={rooms}
-                    onRoomCreated={(newRoom) => {
-                      setRooms(prev => [...prev.filter(r => r.id !== newRoom.id), newRoom].sort((a, b) => a.name.localeCompare(b.name)));
-                      setAddRoom(newRoom.name);
-                      if (newRoom.capacity) setAddCapacity(newRoom.capacity);
-                      showFeedback('success', `Room "${newRoom.name}" created and selected!`);
-                    }}
-                    onRoomDeleted={(roomId) => {
-                      setRooms(prev => prev.filter(r => r.id !== roomId));
-                      showFeedback('success', 'Room deleted');
-                    }}
-                  />
+                  <span className="text-xs font-semibold text-gray-700 block">Batch Active Status</span>
+                  <span className="text-[10px] text-gray-400">When inactive, batch is omitted from timetable & today schedule</span>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Class Capacity (Max)</label>
+                <label className="relative inline-flex items-center cursor-pointer">
                   <input
-                    type="number"
-                    required
-                    min={1}
-                    value={addCapacity}
-                    onChange={(e) => setAddCapacity(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    type="checkbox"
+                    checked={addIsActive}
+                    onChange={(e) => setAddIsActive(e.target.checked)}
+                    className="sr-only peer"
                   />
-                </div>
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8A064D]"></div>
+                </label>
               </div>
 
               <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
@@ -1710,7 +1939,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
               <div>
                 <h3 className="font-bold text-base text-[#2D041A]">Edit Batch: {editingBatch.name}</h3>
-                <p className="text-xs text-gray-500">Edit course, Guru, schedule entries, room, and capacity.</p>
+                <p className="text-xs text-gray-500">Edit course, Guru, schedule entries, room, monthly fee, and capacity.</p>
               </div>
               <button
                 onClick={() => setEditingBatch(null)}
@@ -1722,9 +1951,41 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
 
             <form onSubmit={handleSaveEdit} className="space-y-4">
               
-              {/* Batch Name */}
+              {/* 1. Searchable Course Selector (Type directly to search) */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Batch Name</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Course <span className="text-rose-500">*</span> <span className="text-[10px] text-gray-400 font-normal">(Type directly to search)</span>
+                </label>
+                <SearchableCombobox
+                  options={courseComboboxOptions}
+                  value={editCourseId}
+                  onChange={(id) => {
+                    setEditCourseId(id);
+                    const matched = getGurusForCourse(id);
+                    setEditTrainerId(matched[0]?.id || trainers[0]?.id || '');
+                  }}
+                  placeholder="Type course name..."
+                  required
+                />
+              </div>
+
+              {/* 2. Searchable Assigned Guru */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Assigned Guru <span className="text-rose-500">*</span> <span className="text-[10px] text-gray-400 font-normal">(Type directly to search)</span>
+                </label>
+                <SearchableCombobox
+                  options={getGuruComboboxOptions(editCourseId)}
+                  value={editTrainerId}
+                  onChange={(id) => setEditTrainerId(id)}
+                  placeholder="Type Guru name..."
+                  required
+                />
+              </div>
+
+              {/* 3. Batch Name */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Batch Name <span className="text-rose-500">*</span></label>
                 <input
                   type="text"
                   required
@@ -1734,46 +1995,71 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 />
               </div>
 
-              {/* Course & Guru Selectors */}
+              {/* 4. Monthly Fee & Capacity */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Course</label>
-                  <select
-                    value={editCourseId}
-                    onChange={(e) => {
-                      const cId = e.target.value;
-                      setEditCourseId(cId);
-                      const matched = getGurusForCourse(cId);
-                      setEditTrainerId(matched[0]?.id || trainers[0]?.id || '');
-                    }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
-                  >
-                    {courses.map(c => (
-                      <option key={c.id} value={c.id}>{c.title} ({c.code})</option>
-                    ))}
-                  </select>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Monthly Fee (₹) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      step={50}
+                      value={editMonthlyFee}
+                      onChange={(e) => setEditMonthlyFee(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                    />
+                  </div>
                 </div>
-
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Assigned Guru</label>
-                  <select
-                    value={editTrainerId}
-                    onChange={(e) => setEditTrainerId(e.target.value)}
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Class Capacity</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={editCapacity}
+                    onChange={(e) => setEditCapacity(Number(e.target.value))}
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
-                  >
-                    {editMatchingGurus.map(t => (
-                      <option key={t.id} value={t.id}>{t.full_name}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
               </div>
 
-              {/* Multi-Schedule Builder */}
+              {/* 5. Batch Description with AI Enhance */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-gray-700">Batch Description / Notes</label>
+                  <AiEnhanceButton
+                    value={editDescription}
+                    context={`Batch Name: ${editBatchName}, Course: ${courses.find(c => c.id === editCourseId)?.title || 'Course'}`}
+                    onEnhance={(enhanced: string) => setEditDescription(enhanced)}
+                  />
+                </div>
+                <textarea
+                  rows={2}
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Enter batch focus, curriculum details, or notes..."
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] resize-none"
+                />
+              </div>
+
+              {/* Conflict Alert Banner if occupied */}
+              {editConflict.hasConflict && (
+                <div className="p-3 bg-rose-50 border border-rose-300 rounded-2xl flex items-start gap-2.5 text-xs text-rose-800 animate-in fade-in shadow-xs">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span className="font-semibold">{editConflict.message}</span>
+                </div>
+              )}
+
+              {/* 6. Multi-Schedule Builder */}
               <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
-                    <span>Weekly Class Schedule</span>
+                    <span>Weekly Class Schedule Timings</span>
                   </label>
                   <button
                     type="button"
@@ -1781,7 +2067,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                     className="text-xs font-semibold text-[#8A064D] hover:text-[#70043E] bg-[#FFF2F8] border border-rose-100 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
-                    <span>Add another weekly class schedule</span>
+                    <span>Add schedule slot</span>
                   </button>
                 </div>
 
@@ -1848,45 +2134,35 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 </div>
               </div>
 
-              {/* Room & Capacity */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Room / Hall Name</label>
-                  <SearchableRoomSelect
-                    value={editRoom}
-                    onChange={(rName, rCap) => {
-                      setEditRoom(rName);
-                      if (rCap) setEditCapacity(rCap);
-                    }}
-                    rooms={rooms}
-                    onRoomCreated={(newRoom) => {
-                      setRooms(prev => [...prev.filter(r => r.id !== newRoom.id), newRoom].sort((a, b) => a.name.localeCompare(b.name)));
-                      setEditRoom(newRoom.name);
-                      if (newRoom.capacity) setEditCapacity(newRoom.capacity);
-                      showFeedback('success', `Room "${newRoom.name}" created and selected!`);
-                    }}
-                    onRoomDeleted={(roomId) => {
-                      setRooms(prev => prev.filter(r => r.id !== roomId));
-                      showFeedback('success', 'Room deleted');
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Class Capacity</label>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    value={editCapacity}
-                    onChange={(e) => setEditCapacity(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
-                  />
-                </div>
+              {/* 7. Room Selection */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Room / Hall Selection</label>
+                <SearchableRoomSelect
+                  value={editRoom}
+                  onChange={(rName, rCap) => {
+                    setEditRoom(rName);
+                    if (rCap) setEditCapacity(rCap);
+                  }}
+                  rooms={rooms}
+                  onRoomCreated={(newRoom) => {
+                    setRooms(prev => [...prev.filter(r => r.id !== newRoom.id), newRoom].sort((a, b) => a.name.localeCompare(b.name)));
+                    setEditRoom(newRoom.name);
+                    if (newRoom.capacity) setEditCapacity(newRoom.capacity);
+                    showFeedback('success', `Room "${newRoom.name}" created and selected!`);
+                  }}
+                  onRoomDeleted={(roomId) => {
+                    setRooms(prev => prev.filter(r => r.id !== roomId));
+                    showFeedback('success', 'Room deleted');
+                  }}
+                />
               </div>
 
-              {/* Active Toggle */}
+              {/* 8. Active Toggle */}
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                <span className="text-xs font-semibold text-gray-700">Batch Active Status</span>
+                <div>
+                  <span className="text-xs font-semibold text-gray-700 block">Batch Active Status</span>
+                  <span className="text-[10px] text-gray-400">When inactive, batch is omitted from timetable & today schedule</span>
+                </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"

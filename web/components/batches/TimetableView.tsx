@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   ArrowLeft, 
@@ -14,9 +14,11 @@ import {
   Info,
   CheckCircle2
 } from 'lucide-react';
+import { Batch } from '@/lib/academy';
 
 interface Props {
   onBack?: () => void;
+  batches?: Batch[];
 }
 
 interface TimetableSlot {
@@ -344,8 +346,16 @@ const TIME_ROWS: Array<{
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export default function TimetableView({ onBack }: Props) {
+export default function TimetableView({ onBack, batches }: Props) {
   const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('ALL');
+
+  const inactiveBatchNames = useMemo(() => {
+    return new Set(
+      (batches || [])
+        .filter(b => b.is_active === false)
+        .map(b => b.name.toLowerCase().trim())
+    );
+  }, [batches]);
 
   const handlePrint = () => {
     window.print();
@@ -456,10 +466,11 @@ export default function TimetableView({ onBack }: Props) {
 
                   {/* Day Columns */}
                   {DAYS.map(day => {
-                    const slots = row.slots[day] || [];
+                    const rawSlots = row.slots[day] || [];
+                    const activeSlots = rawSlots.filter(s => !inactiveBatchNames.has(s.batch.toLowerCase().trim()));
                     const filteredSlots = selectedCourseFilter === 'ALL'
-                      ? slots
-                      : slots.filter(s => s.course === selectedCourseFilter);
+                      ? activeSlots
+                      : activeSlots.filter(s => s.course === selectedCourseFilter);
 
                     return (
                       <td key={day} className="p-1.5 border-r border-[#F0D5E4]/80 last:border-r-0 align-top min-w-[130px]">

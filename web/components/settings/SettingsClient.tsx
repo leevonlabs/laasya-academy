@@ -326,12 +326,21 @@ export default function SettingsClient({
         </div>
       )}
 
-      {/* Top Header & 2-Page Segmented Tab Switcher */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#F0D5E4]">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF2F8] text-[#8A064D] text-[11px] font-bold border border-[#F0D5E4] mb-1.5 shadow-2xs">
-            <SettingsIcon className="w-3.5 h-3.5 text-[#8A064D]" />
-            <span>ACADEMY SETTINGS</span>
+            {activeSection === 'admin-profile' ? (
+              <>
+                <ShieldCheck className="w-3.5 h-3.5 text-[#8A064D]" />
+                <span>ADMIN PROFILE</span>
+              </>
+            ) : (
+              <>
+                <KeyRound className="w-3.5 h-3.5 text-[#8A064D]" />
+                <span>PASSWORD MANAGEMENT</span>
+              </>
+            )}
           </div>
           <h1 className="text-2xl font-serif font-black tracking-tight text-[#2D041A]">
             {activeSection === 'admin-profile' ? 'Admin Profile & Master Access' : 'Password Management Desk'}
@@ -341,35 +350,6 @@ export default function SettingsClient({
               ? 'Administrator records, official contact number, executive authority privileges, and password security.'
               : 'Manage, reset, and set passwords for students and faculty Gurus with single-click default credentials.'}
           </p>
-        </div>
-
-        {/* 2-Page Segmented Navigation Switcher */}
-        <div className="inline-flex p-1.5 bg-[#FFF2F8] border border-[#F0D5E4] rounded-2xl shadow-2xs self-start sm:self-center">
-          <button
-            type="button"
-            onClick={() => switchSection('admin-profile')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeSection === 'admin-profile'
-                ? 'bg-[#8A064D] text-white shadow-xs'
-                : 'text-[#6E3955] hover:text-[#8A064D] hover:bg-white/60'
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4" />
-            <span>Admin Profile</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => switchSection('passwords')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeSection === 'passwords'
-                ? 'bg-[#8A064D] text-white shadow-xs'
-                : 'text-[#6E3955] hover:text-[#8A064D] hover:bg-white/60'
-            }`}
-          >
-            <KeyRound className="w-4 h-4" />
-            <span>Password Management</span>
-          </button>
         </div>
       </div>
 

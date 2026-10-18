@@ -496,6 +496,7 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                           builder: (_) => StudentVideoLibraryScreen(
                             studentCourse: specialization,
                             studentBatch: 'All Batches',
+                            isTrainer: true,
                           ),
                         ),
                       );

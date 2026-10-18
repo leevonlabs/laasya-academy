@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
-import '../../core/utils/avatar_helper.dart';
 import 'trainer_create_announcement_screen.dart';
 
 class TrainerAnnouncementsScreen extends StatefulWidget {
@@ -24,7 +23,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
   List<Map<String, dynamic>> _announcements = [];
   List<Map<String, dynamic>> _myCourses = [];
   List<Map<String, dynamic>> _myBatches = [];
-  String _searchQuery = '';
+  final ScrollController _scrollController = ScrollController();
 
   String get _trainerName =>
       widget.trainerProfile?['full_name'] ?? 'Faculty Guru';
@@ -71,6 +70,75 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
     return false;
   }
 
+  DateTime _getExactMessageDateTime(dynamic item) {
+    if (item is Map<String, dynamic> || item is Map) {
+      final rawCreated = item['created_at'];
+      if (rawCreated != null && rawCreated.toString().trim().isNotEmpty) {
+        try {
+          return DateTime.parse(rawCreated.toString()).toLocal();
+        } catch (_) {}
+      }
+      final rawPub = (item['publish_date'] ?? item['date'])?.toString().trim();
+      final rawTime = (item['publish_time'] ?? item['time'])?.toString().trim();
+      if (rawPub != null && rawPub.isNotEmpty) {
+        try {
+          DateTime base = DateTime.parse(rawPub).toLocal();
+          if (rawTime != null && rawTime.isNotEmpty) {
+            final match = RegExp(r'(\d+):(\d+)\s*(AM|PM)?', caseSensitive: false).firstMatch(rawTime);
+            if (match != null) {
+              int h = int.parse(match.group(1)!);
+              int m = int.parse(match.group(2)!);
+              final ap = match.group(3)?.toUpperCase();
+              if (ap == 'PM' && h < 12) h += 12;
+              if (ap == 'AM' && h == 12) h = 0;
+              return DateTime(base.year, base.month, base.day, h, m);
+            }
+          }
+          return base;
+        } catch (_) {}
+      }
+    } else if (item != null) {
+      final s = item.toString().trim();
+      if (s.isNotEmpty) {
+        try {
+          return DateTime.parse(s).toLocal();
+        } catch (_) {}
+      }
+    }
+    return DateTime(2000);
+  }
+
+  String _getDateGroupLabel(dynamic val) {
+    final dt = _getExactMessageDateTime(val);
+    if (dt.year <= 2000) return 'RECENT';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final msgDay = DateTime(dt.year, dt.month, dt.day);
+
+    final diffDays = today.difference(msgDay).inDays;
+    if (diffDays == 0) {
+      return 'TODAY';
+    } else if (diffDays == 1) {
+      return 'YESTERDAY';
+    } else {
+      const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+      final dayStr = dt.day.toString().padLeft(2, '0');
+      final monthStr = months[dt.month - 1];
+      return '$dayStr $monthStr ${dt.year}';
+    }
+  }
+
+  String _formatMessageTime(Map<String, dynamic> msg) {
+    final dt = _getExactMessageDateTime(msg);
+    if (dt.year > 2000) {
+      final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      final minute = dt.minute.toString().padLeft(2, '0');
+      return '$hour:$minute $amPm';
+    }
+    return (msg['time'] ?? '10:00 AM').toString();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -78,11 +146,45 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
     final cached = SupabaseService().getCachedMessageAnnouncements();
     if (cached.isNotEmpty) {
       _announcements = cached.where(_isMatchingTrainer).toList();
+      _sortAnnouncements();
       if (_announcements.isNotEmpty) {
         _isLoading = false;
+        _scrollToBottom();
       }
     }
     _loadData();
+  }
+
+  void _sortAnnouncements() {
+    _announcements.sort((a, b) {
+      final da = _getExactMessageDateTime(a);
+      final db = _getExactMessageDateTime(b);
+      return da.compareTo(db);
+    });
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+    Future.delayed(const Duration(milliseconds: 60), () {
+      if (mounted && _scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted && _scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -130,15 +232,9 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
           final all = List<Map<String, dynamic>>.from(data['announcements']);
           // Strictly display ONLY guru sent messages to students by this guru
           _announcements = all.where(_isMatchingTrainer).toList();
-
-          // Chronological sort: oldest on top, latest below
-          _announcements.sort((a, b) {
-            final da = DateTime.tryParse(a['publish_date'] ?? a['created_at'] ?? '') ?? DateTime(2000);
-            final db = DateTime.tryParse(b['publish_date'] ?? b['created_at'] ?? '') ?? DateTime(2000);
-            return da.compareTo(db);
-          });
-
+          _sortAnnouncements();
           SupabaseService().markAllMessagesAsRead(_announcements);
+          _scrollToBottom();
           return;
         }
       }
@@ -150,27 +246,11 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
     try {
       final msgs = await SupabaseService().getMessageAnnouncements(forceRefresh: true);
       _announcements = msgs.where(_isMatchingTrainer).toList();
-      _announcements.sort((a, b) {
-        final da = DateTime.tryParse(a['publish_date'] ?? a['created_at'] ?? '') ?? DateTime(2000);
-        final db = DateTime.tryParse(b['publish_date'] ?? b['created_at'] ?? '') ?? DateTime(2000);
-        return da.compareTo(db);
-      });
+      _sortAnnouncements();
       SupabaseService().markAllMessagesAsRead(_announcements);
+      _scrollToBottom();
     } catch (e) {
       debugPrint('Error loading announcements fallback: $e');
-    }
-  }
-
-  String _formatDate(dynamic dateVal) {
-    if (dateVal == null) return '--';
-    final s = dateVal.toString();
-    if (s.isEmpty) return '--';
-    try {
-      final dt = DateTime.parse(s.contains('T') ? s : '$s 00:00:00');
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return '${dt.day.toString().padLeft(2, '0')} ${months[dt.month - 1]} ${dt.year}';
-    } catch (_) {
-      return s;
     }
   }
 
@@ -193,453 +273,350 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _announcements.where((a) {
-      if (_searchQuery.isEmpty) return true;
-      final q = _searchQuery.toLowerCase();
-      final title = (a['title'] ?? '').toString().toLowerCase();
-      final msg = (a['message'] ?? '').toString().toLowerCase();
-      final course = (a['target_course_title'] ?? '').toString().toLowerCase();
-      return title.contains(q) || msg.contains(q) || course.contains(q);
-    }).toList();
-
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF8FA),
+      backgroundColor: const Color(0xFFECE5DD), // WhatsApp chat neutral background
       appBar: AppBar(
         backgroundColor: const Color(0xFF590231),
         foregroundColor: Colors.white,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        elevation: 1,
+        titleSpacing: 0,
+        title: Row(
           children: [
-            const Text(
-              'Messages',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF8A064D),
+                border: Border.all(color: LaasyaColors.accentGold, width: 1.5),
+              ),
+              child: const Center(
+                child: Icon(Icons.campaign_rounded, color: LaasyaColors.accentGold, size: 20),
+              ),
             ),
-            Text(
-              'Guru & Academy Broadcast • $_trainerName',
-              style: const TextStyle(fontSize: 11, color: LaasyaColors.accentGold),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Announcements',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  Text(
+                    'Faculty Broadcast • $_trainerName',
+                    style: const TextStyle(fontSize: 11, color: LaasyaColors.accentGold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+            onPressed: _loadData,
+            tooltip: 'Refresh announcements',
+          ),
+        ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: LaasyaColors.primary))
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              color: LaasyaColors.primary,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header Action Card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF075E54), Color(0xFF128C7E)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(10),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // WhatsApp-style Message Feed
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: LaasyaColors.primary))
+                  : _announcements.isEmpty
+                      ? Center(
+                          child: Container(
+                            margin: const EdgeInsets.all(24),
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
                                 ),
-                                child: const Icon(Icons.campaign_rounded, color: Colors.white, size: 22),
-                              ),
-                              const SizedBox(width: 10),
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Direct Faculty Announcements',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    SizedBox(height: 2),
-                                    Text(
-                                      'Send notifications to your enrolled students',
-                                      style: TextStyle(color: Colors.white70, fontSize: 11),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: _openCreateAnnouncementSheet,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFF9E33A),
-                                foregroundColor: const Color(0xFF2D041A),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(vertical: 11),
-                                elevation: 0,
-                              ),
-                              icon: const Icon(Icons.add_comment_rounded, size: 18),
-                              label: const Text(
-                                'Create New Announcement',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                              ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Search bar
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFF0D5E4)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.02),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: TextField(
-                        onChanged: (val) => setState(() => _searchQuery = val),
-                        decoration: InputDecoration(
-                          icon: const Icon(Icons.search_rounded, color: Colors.grey, size: 20),
-                          border: InputBorder.none,
-                          hintText: 'Search announcements...',
-                          hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 18, color: Colors.grey),
-                                  onPressed: () => setState(() => _searchQuery = ''),
-                                )
-                              : null,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Section Heading
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Broadcast History (${filtered.length})',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: LaasyaColors.textDark,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDEF7EC),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'Managed by Admin',
-                            style: TextStyle(
-                              color: Color(0xFF03543F),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // List of Announcements
-                    if (filtered.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(28),
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFFF0D5E4)),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(Icons.mark_chat_unread_outlined, size: 44, color: Colors.grey.shade400),
-                            const SizedBox(height: 10),
-                            Text(
-                              _searchQuery.isNotEmpty
-                                  ? 'No broadcasts matching "$_searchQuery"'
-                                  : 'No announcements sent yet',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Use the button above to broadcast messages to your enrolled batches.',
-                              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, idx) {
-                          final ann = filtered[idx];
-                          final title = ann['title'] ?? 'Announcement';
-                          final message = ann['message'] ?? '';
-                          final course = ann['target_course_title'] ?? 'Enrolled Course';
-                          final batch = ann['target_batch_name'] ?? 'All Batches';
-                          final dateStr = _formatDate(ann['publish_date'] ?? ann['created_at']);
-                          final typeTag = ann['type_tag'] ?? 'General';
-
-                          final senderRole = (ann['sender_role'] ?? '').toString().toLowerCase();
-                          final isAdmin = senderRole == 'admin' || (ann['trainer_id'] == null && (ann['trainer_name'] == null || (ann['trainer_name'] ?? '').toString().isEmpty));
-
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildSenderAvatar(ann, !isAdmin),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(3),
-                                      topRight: Radius.circular(16),
-                                      bottomLeft: Radius.circular(16),
-                                      bottomRight: Radius.circular(16),
-                                    ),
-                                    border: Border.all(
-                                      color: isAdmin ? const Color(0xFFBBF7D0) : const Color(0xFFF0D5E4),
-                                      width: 1,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.04),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFDEF7EC),
+                                    shape: BoxShape.circle,
                                   ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(14),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  child: const Icon(Icons.campaign_outlined, size: 36, color: Color(0xFF03543F)),
+                                ),
+                                const SizedBox(height: 14),
+                                const Text(
+                                  'No Announcements Sent Yet',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: LaasyaColors.textDark,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'Use the button below to broadcast notices to students enrolled in your batches.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _loadData,
+                          color: LaasyaColors.primary,
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
+                            itemCount: _announcements.length,
+                            itemBuilder: (context, index) {
+                              final ann = _announcements[index];
+                              final title = ann['title'] ?? 'Announcement';
+                              final message = ann['message'] ?? '';
+                              final course = ann['target_course_title'] ?? 'Enrolled Course';
+                              final batch = ann['target_batch_name'] ?? 'All Batches';
+                              final typeTag = ann['type_tag'] ?? 'General';
+                              final timeStr = _formatMessageTime(ann);
+                              final targetStudentNames = (ann['target_student_names'] ?? '').toString();
+
+                              // Date Header Divider logic
+                              final currentGroup = _getDateGroupLabel(ann);
+                              bool showDateHeader = false;
+                              if (index == 0) {
+                                showDateHeader = true;
+                              } else {
+                                final prevMsg = _announcements[index - 1];
+                                final prevGroup = _getDateGroupLabel(prevMsg);
+                                showDateHeader = currentGroup != prevGroup;
+                              }
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (showDateHeader)
+                                      Container(
+                                        alignment: Alignment.center,
+                                        margin: const EdgeInsets.only(top: 8, bottom: 12),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4.5),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.95),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: Colors.grey.shade300, width: 0.8),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.04),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Text(
+                                            currentGroup,
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.5,
+                                              color: Color(0xFF555555),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                    // WhatsApp-style Sent Chat Bubble
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Container(
+                                        constraints: BoxConstraints(
+                                          maxWidth: MediaQuery.of(context).size.width * 0.86,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE7FFDB), // WhatsApp sent bubble tone
+                                          borderRadius: const BorderRadius.only(
+                                            topLeft: Radius.circular(14),
+                                            topRight: Radius.circular(14),
+                                            bottomLeft: Radius.circular(14),
+                                            bottomRight: Radius.circular(3),
+                                          ),
+                                          border: Border.all(color: const Color(0xFFBCE3A8), width: 0.8),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.04),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 1),
+                                            ),
+                                          ],
+                                        ),
+                                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
+                                            // Top info chips (Type tag & Course • Batch)
                                             Row(
+                                              mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                   decoration: BoxDecoration(
-                                                    color: isAdmin ? const Color(0xFFF0FDF4) : const Color(0xFFFFF2F8),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(
-                                                      color: isAdmin ? const Color(0xFF86EFAC) : const Color(0xFFF0D5E4),
-                                                      width: 0.8,
-                                                    ),
-                                                  ),
-                                                  child: Text(
-                                                    isAdmin ? 'ACADEMY ADMIN' : 'YOU (GURU)',
-                                                    style: TextStyle(
-                                                      color: isAdmin ? const Color(0xFF15803D) : const Color(0xFF8A064D),
-                                                      fontSize: 9.5,
-                                                      fontWeight: FontWeight.w900,
-                                                      letterSpacing: 0.5,
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 6),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFFFFF2F8),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(color: const Color(0xFFF0D5E4), width: 0.8),
+                                                    color: const Color(0xFF075E54),
+                                                    borderRadius: BorderRadius.circular(4),
                                                   ),
                                                   child: Text(
                                                     typeTag.toUpperCase(),
                                                     style: const TextStyle(
-                                                      color: LaasyaColors.primary,
-                                                      fontSize: 9.5,
+                                                      color: Colors.white,
+                                                      fontSize: 8.5,
                                                       fontWeight: FontWeight.bold,
+                                                      letterSpacing: 0.4,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Flexible(
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white.withOpacity(0.85),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                      border: Border.all(color: const Color(0xFF86EFAC), width: 0.6),
+                                                    ),
+                                                    child: Text(
+                                                      '$course • $batch',
+                                                      style: const TextStyle(
+                                                        color: Color(0xFF075E54),
+                                                        fontSize: 9.5,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ),
                                                 ),
                                               ],
                                             ),
+                                            if (targetStudentNames.isNotEmpty) ...[
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'To: $targetStudentNames',
+                                                style: const TextStyle(
+                                                  fontSize: 9.5,
+                                                  fontStyle: FontStyle.italic,
+                                                  color: Color(0xFF1B5E20),
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                            const SizedBox(height: 6),
+
+                                            // Title
                                             Text(
-                                              dateStr,
-                                              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                              title,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF1E1E1E),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+
+                                            // Message
+                                            Text(
+                                              message,
+                                              style: const TextStyle(
+                                                fontSize: 12.5,
+                                                color: Colors.black87,
+                                                height: 1.35,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 6),
+
+                                            // Time & Double-Check Mark
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              mainAxisAlignment: MainAxisAlignment.end,
+                                              children: [
+                                                const Spacer(),
+                                                Text(
+                                                  timeStr,
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.grey.shade700,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                const Icon(
+                                                  Icons.done_all_rounded,
+                                                  size: 14,
+                                                  color: Color(0xFF34B7F1), // WhatsApp blue double-ticks
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          title,
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold,
-                                            color: LaasyaColors.textDark,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          message,
-                                          style: const TextStyle(fontSize: 12.5, color: Colors.black87, height: 1.35),
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFFFF9FB),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: const Color(0xFFF0D5E4)),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                isAdmin ? Icons.verified_user_rounded : Icons.school_rounded,
-                                                size: 13,
-                                                color: isAdmin ? const Color(0xFF15803D) : LaasyaColors.primary,
-                                              ),
-                                              const SizedBox(width: 5),
-                                              Flexible(
-                                                child: Text(
-                                                  isAdmin ? 'Academy Direct Broadcast' : '$course • $batch',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: isAdmin ? const Color(0xFF15803D) : LaasyaColors.primary,
-                                                  ),
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                  ],
+                              );
+                            },
+                          ),
+                        ),
+            ),
+
+            // Bottom Sticky Bar: WhatsApp Typing Bar replaced with "+ Create New Announcement" Button
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F0F0),
+                border: Border(top: BorderSide(color: Colors.grey.shade300, width: 0.8)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 6,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _openCreateAnnouncementSheet,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF075E54), // WhatsApp / Academy Green
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    elevation: 1,
+                  ),
+                  icon: const Icon(Icons.add_comment_rounded, size: 20, color: Color(0xFFF9E33A)),
+                  label: const Text(
+                    '+ Create New Announcement',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
                 ),
               ),
             ),
+          ],
+        ),
+      ),
     );
-  }
-
-  Widget _buildSenderAvatar(Map<String, dynamic> msg, bool isGuru) {
-    if (isGuru) {
-      final avatarUrl = (msg['trainer_avatar_url'] ?? msg['avatar_url'] ?? widget.trainerProfile?['avatar_url'] ?? SupabaseService().currentUserProfile?['avatar_url'] ?? '').toString().trim();
-      final senderName = (msg['trainer_name'] ?? msg['created_by'] ?? _trainerName).toString();
-      final initials = senderName.trim().split(' ').where((p) => p.isNotEmpty).map((p) => p[0]).take(2).join().toUpperCase();
-      final provider = getAvatarImageProvider(avatarUrl.isNotEmpty ? avatarUrl : null);
-
-      return Container(
-        margin: const EdgeInsets.only(top: 2),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFF9E33A), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: CircleAvatar(
-          radius: 17,
-          backgroundColor: const Color(0xFF8A064D),
-          backgroundImage: provider,
-          child: provider == null
-              ? Text(
-                  initials.isNotEmpty ? initials : 'G',
-                  style: const TextStyle(
-                    color: Color(0xFFF9E33A),
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                )
-              : null,
-        ),
-      );
-    } else {
-      // Academy Administration / Director DP avatar
-      final adminAvatar = (msg['admin_avatar_url'] ?? msg['avatar_url'] ?? '').toString().trim();
-      final provider = getAvatarImageProvider(adminAvatar.isNotEmpty ? adminAvatar : null);
-
-      return Container(
-        margin: const EdgeInsets.only(top: 2),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFF075E54), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: CircleAvatar(
-          radius: 17,
-          backgroundColor: Colors.white,
-          backgroundImage: provider,
-          child: provider == null
-              ? ClipOval(
-                  child: Image.asset(
-                    'assets/images/header_logo.png',
-                    width: 30,
-                    height: 30,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const CircleAvatar(
-                      radius: 17,
-                      backgroundColor: Color(0xFF075E54),
-                      child: Text('👑', style: TextStyle(fontSize: 14)),
-                    ),
-                  ),
-                )
-              : null,
-        ),
-      );
-    }
   }
 }

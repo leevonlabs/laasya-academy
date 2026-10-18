@@ -80,13 +80,13 @@ export default function AttendanceListClient({
   // -------------------------------------------------------------
   const [activeTab, setActiveTab] = useState<'course_wise' | 'complete' | 'guru_attendance'>('course_wise');
 
-  // Base Records from database with Live Realtime Sync
+  // Base Records from database
   const [allRecords, setAllRecords] = useState<AttendanceAuditRecord[]>(initialAuditRecords);
-  const [isLiveSyncing, setIsLiveSyncing] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   const fetchLatestAuditRecords = useCallback(async () => {
     try {
-      setIsLiveSyncing(true);
+      setIsRefreshing(true);
       const res = await fetch('/api/attendance');
       if (res.ok) {
         const fresh = await res.json();
@@ -95,27 +95,21 @@ export default function AttendanceListClient({
         }
       }
     } catch (err) {
-      console.warn('Realtime sync notice:', err);
+      console.warn('Attendance refresh notice:', err);
     } finally {
-      setIsLiveSyncing(false);
+      setIsRefreshing(false);
     }
   }, []);
 
-  useEffect(() => {
-    // Sync every 4 seconds so Admin dashboard immediately reflects roll-calls marked by Gurus
-    const timer = setInterval(fetchLatestAuditRecords, 4000);
-    return () => clearInterval(timer);
-  }, [fetchLatestAuditRecords]);
-
   // -------------------------------------------------------------
-  // TAB 3: GURU ATTENDANCE STATE & SYNC
+  // TAB 3: GURU ATTENDANCE STATE
   // -------------------------------------------------------------
   const [guruRecords, setGuruRecords] = useState<GuruAttendanceAuditRecord[]>(initialGuruAuditRecords);
-  const [isGuruSyncing, setIsGuruSyncing] = useState<boolean>(false);
+  const [isGuruRefreshing, setIsGuruRefreshing] = useState<boolean>(false);
 
   const fetchLatestGuruAuditRecords = useCallback(async () => {
     try {
-      setIsGuruSyncing(true);
+      setIsGuruRefreshing(true);
       const res = await fetch('/api/attendance?guruAudit=true');
       if (res.ok) {
         const json = await res.json();
@@ -124,19 +118,11 @@ export default function AttendanceListClient({
         }
       }
     } catch (err) {
-      console.warn('Guru attendance sync notice:', err);
+      console.warn('Guru attendance refresh notice:', err);
     } finally {
-      setIsGuruSyncing(false);
+      setIsGuruRefreshing(false);
     }
   }, []);
-
-  useEffect(() => {
-    if (activeTab === 'guru_attendance') {
-      fetchLatestGuruAuditRecords();
-      const guruTimer = setInterval(fetchLatestGuruAuditRecords, 5000);
-      return () => clearInterval(guruTimer);
-    }
-  }, [activeTab, fetchLatestGuruAuditRecords]);
 
   // -------------------------------------------------------------
   // TAB 1: COURSE-WISE DRILL-DOWN STATE
@@ -218,7 +204,7 @@ export default function AttendanceListClient({
   const [completeEndDate, setCompleteEndDate] = useState<string>(TODAY_STR);
   const [completeSearchQuery, setCompleteSearchQuery] = useState<string>('');
   const [completeStatusFilter, setCompleteStatusFilter] = useState<string>('All');
-  const [completeStudentId, setCompleteStudentId] = useState<string>('');
+  const [completeSelectedStudentIds, setCompleteSelectedStudentIds] = useState<string[]>([]);
   const [completePreset, setCompletePreset] = useState<string>('This Month');
 
   // Searchable student options for Tab 2
@@ -391,8 +377,10 @@ export default function AttendanceListClient({
         return false;
       }
 
-      // 2. Match batch ('all' or specific batch id)
-      if (selectedBatchFilter !== 'all' && r.batch_id !== selectedBatchFilter) {
+      // 2. Match batch (multi-selection)
+      if (selectedBatchIds.length > 0 && !selectedBatchIds.includes(r.batch_id)) {
+        return false;
+      } else if (selectedBatchIds.length === 0 && selectedBatchFilter !== 'all' && r.batch_id !== selectedBatchFilter) {
         return false;
       }
 
@@ -419,15 +407,15 @@ export default function AttendanceListClient({
 
       return true;
     });
-  }, [allRecords, activeCourseIds, selectedCourseId, selectedBatchFilter, batchYearMonth, batchStatusFilter, batchSelectedStudentIds, batchSearchQuery]);
+  }, [allRecords, activeCourseIds, selectedCourseId, selectedBatchIds, selectedBatchFilter, batchYearMonth, batchStatusFilter, batchSelectedStudentIds, batchSearchQuery]);
 
   // -------------------------------------------------------------
   // TAB 2 FILTERED RECORDS
   // -------------------------------------------------------------
   const filteredCompleteRecords = useMemo(() => {
     return allRecords.filter((r) => {
-      // Filter by Student
-      if (completeStudentId && r.student_id !== completeStudentId) return false;
+      // Filter by Student (Multi-select)
+      if (completeSelectedStudentIds.length > 0 && !completeSelectedStudentIds.includes(r.student_id)) return false;
       // Filter by Month & Year (MonthPicker)
       if (completeYearMonth && r.session_date) {
         if (!r.session_date.startsWith(completeYearMonth)) return false;
@@ -448,7 +436,7 @@ export default function AttendanceListClient({
       }
       return true;
     });
-  }, [allRecords, completeStudentId, completeYearMonth, completeStartDate, completeEndDate, completeStatusFilter, completeSearchQuery]);
+  }, [allRecords, completeSelectedStudentIds, completeYearMonth, completeStartDate, completeEndDate, completeStatusFilter, completeSearchQuery]);
 
   // Stats calculation
   const getStats = (records: AttendanceAuditRecord[]) => {
@@ -540,11 +528,11 @@ export default function AttendanceListClient({
           ) : (
             <button
               onClick={fetchLatestGuruAuditRecords}
-              disabled={isGuruSyncing}
+              disabled={isGuruRefreshing}
               className="bg-[#590231] hover:bg-[#780442] text-white border border-[#EBB128] px-4 py-2.5 rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-60"
             >
-              <RefreshCw className={`w-4 h-4 text-[#F9E33A] ${isGuruSyncing ? 'animate-spin' : ''}`} />
-              <span>{isGuruSyncing ? 'Refreshing...' : 'Live Sync'}</span>
+              <RefreshCw className={`w-4 h-4 text-[#F9E33A] ${isGuruRefreshing ? 'animate-spin' : ''}`} />
+              <span>{isGuruRefreshing ? 'Refreshing...' : 'Refresh Audit'}</span>
             </button>
           )}
         </div>
@@ -808,26 +796,26 @@ export default function AttendanceListClient({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                  {/* 1. Batch Filter (All Batches by default) */}
+                  {/* 1. Batch Filter (Searchable Multi-selection, No Time) */}
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                      Batch Filter
+                      Batch Filter (Multi)
                     </label>
-                    <select
-                      value={selectedBatchFilter}
-                      onChange={(e) => setSelectedBatchFilter(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-[#8A064D] focus:bg-white cursor-pointer transition shadow-2xs"
-                    >
-                      <option value="all">All Batches ({currentCourseBatches.length})</option>
-                      {currentCourseBatches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name} ({b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)})
-                        </option>
-                      ))}
-                    </select>
+                    <BatchMultiSearchSelect
+                      batches={currentCourseBatches.map(b => ({
+                        id: b.id,
+                        name: b.name,
+                        course_id: b.course_id,
+                        course_title: currentCourse?.title || ''
+                      }))}
+                      selectedIds={selectedBatchIds}
+                      onChange={setSelectedBatchIds}
+                      placeholder="All Batches (Multi-select)"
+                      className="w-full"
+                    />
                   </div>
 
-                  {/* 2. Month & Year Filter (MonthPicker from Reference Image 2) */}
+                  {/* 2. Month & Year Filter (MonthPicker) */}
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
                       Month & Year
@@ -882,7 +870,7 @@ export default function AttendanceListClient({
                     <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
                     <input
                       type="text"
-                      placeholder="Quick search student name, roll number, remarks..."
+                      placeholder="Quick search student name, roll number..."
                       value={batchSearchQuery}
                       onChange={(e) => setBatchSearchQuery(e.target.value)}
                       className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
@@ -946,14 +934,12 @@ export default function AttendanceListClient({
                         <th className="py-3 px-4">Assigned Guru</th>
                         <th className="py-3 px-4">Date</th>
                         <th className="py-3 px-4">Status</th>
-                        <th className="py-3 px-4">Verification</th>
-                        <th className="py-3 px-4">Remarks</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {filteredBatchRecords.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className="py-12 text-center text-gray-400">
+                          <td colSpan={7} className="py-12 text-center text-gray-400">
                             <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                             <p className="font-bold text-gray-600 text-sm">No attendance records found matching filters.</p>
                             <p className="text-xs text-gray-400 mt-1">Try selecting "All Batches" or clearing student and month filters.</p>
@@ -992,17 +978,6 @@ export default function AttendanceListClient({
                                   <span>Absent</span>
                                 </span>
                               )}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <div className="text-gray-700 font-medium text-xs">
-                                {r.check_in_method === 'trainer_manual' ? 'Guru Verified' :
-                                 r.check_in_method === 'student_code' ? 'PIN Check-in' :
-                                 r.check_in_method === 'student_qr' ? 'QR Scanner' :
-                                 r.check_in_method || 'Verified'}
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 text-gray-500 text-xs">
-                              {r.remarks || '—'}
                             </td>
                           </tr>
                         ))
@@ -1057,14 +1032,14 @@ export default function AttendanceListClient({
 
             {/* Filter Bar: Student Search Dropdown, Status Filter, Search */}
             <div className="pt-3 border-t border-gray-100 flex flex-col md:flex-row items-stretch md:items-end gap-3">
-              {/* Student Searchable Dropdown */}
+              {/* Student Searchable Dropdown (Multi-select) */}
               <div className="min-w-[240px] flex-1">
-                <label className="block text-[11px] font-semibold text-gray-500 mb-1">Filter by Student</label>
-                <StudentSearchSelect
+                <label className="block text-[11px] font-semibold text-gray-500 mb-1">Filter by Student (Multi)</label>
+                <StudentMultiSearchSelect
                   students={studentOptions}
-                  value={completeStudentId}
-                  onChange={(studentId) => setCompleteStudentId(studentId)}
-                  placeholder="All Students (Filter by Student)"
+                  selectedIds={completeSelectedStudentIds}
+                  onChange={setCompleteSelectedStudentIds}
+                  placeholder="All Students (Multi-select)"
                   className="w-full"
                 />
               </div>
@@ -1099,12 +1074,12 @@ export default function AttendanceListClient({
               </div>
 
               {/* Reset Button */}
-              {(completeStudentId || completeStatusFilter !== 'All' || completeSearchQuery || completeMonthLabel) && (
+              {(completeSelectedStudentIds.length > 0 || completeStatusFilter !== 'All' || completeSearchQuery || completeMonthLabel) && (
                 <div className="pb-0.5">
                   <button
                     type="button"
                     onClick={() => {
-                      setCompleteStudentId('');
+                      setCompleteSelectedStudentIds([]);
                       setCompleteStatusFilter('All');
                       setCompleteSearchQuery('');
                       setCompleteMonthLabel('');
@@ -1178,14 +1153,12 @@ export default function AttendanceListClient({
                     <th className="py-4 px-5">Batch</th>
                     <th className="py-4 px-5">Attendance Date</th>
                     <th className="py-4 px-5">Status</th>
-                    <th className="py-4 px-5">Verification Method</th>
-                    <th className="py-4 px-5">Remarks</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {filteredCompleteRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-gray-400">
+                      <td colSpan={6} className="py-12 text-center text-gray-400">
                         <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                         <p className="font-semibold text-gray-600">No attendance records found for the selected period.</p>
                         <p className="text-xs text-gray-400 mt-1">Try selecting a different month or clearing filters.</p>
@@ -1223,22 +1196,6 @@ export default function AttendanceListClient({
                             </span>
                           )}
                         </td>
-                        <td className="py-4 px-5">
-                          <div className="text-gray-800 font-medium text-xs">
-                            {r.check_in_method === 'trainer_manual' ? 'Guru Verified' :
-                             r.check_in_method === 'student_code' ? 'PIN Check-in' :
-                             r.check_in_method === 'student_qr' ? 'QR Scanner' :
-                             r.check_in_method || 'Verified'}
-                          </div>
-                          {r.check_in_time && (
-                            <div className="text-xs text-gray-400 font-mono mt-0.5">
-                              {r.check_in_time.substring(11, 16)} IST
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-4 px-5 text-gray-500 text-xs">
-                          {r.remarks || '—'}
-                        </td>
                       </tr>
                     ))
                   )}
@@ -1258,7 +1215,7 @@ export default function AttendanceListClient({
           initialRecords={guruRecords}
           trainers={trainers}
           courses={courses}
-          isLiveSyncing={isGuruSyncing}
+          isLiveSyncing={isGuruRefreshing}
           onRefresh={fetchLatestGuruAuditRecords}
         />
       )}

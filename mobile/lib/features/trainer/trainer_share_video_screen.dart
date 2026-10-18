@@ -39,8 +39,9 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
   String _perfSearchQuery = '';
 
   // Filters for Shared tab
-  String _sharedMonthFilter = 'all'; // 'all' or '1'..'12'
-  String _sharedYearFilter = 'all';  // 'all' or '2026', etc.
+  String _sharedFromMonth = '1';   // '1'..'12'
+  String _sharedToMonth = '12';    // '1'..'12'
+  String _sharedYearFilter = '2026';  // scrollable up to 2050, no 'all'
   String _sharedBatchFilter = 'all';
   String _sharedSearchQuery = '';
 
@@ -64,10 +65,10 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
   @override
   void initState() {
     super.initState();
-    // Default shared month & year to current month
     final now = DateTime.now();
-    _sharedMonthFilter = now.month.toString();
     _sharedYearFilter = now.year.toString();
+    _sharedFromMonth = '1';
+    _sharedToMonth = '12';
     _loadData();
   }
 
@@ -195,25 +196,31 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
 
       final List<Map<String, dynamic>> pendingBatches = [];
       final List<Map<String, dynamic>> completedBatches = [];
+      Map<String, dynamic>? latestCompletedVideo;
 
       for (final batch in enrolledBatches) {
         final batchId = batch['id'].toString();
         // Check if there is any performance video for this student in this batch this month
-        final isCovered = thisMonthPerfVideos.any((v) {
+        Map<String, dynamic>? matchingVideo;
+        for (final v in thisMonthPerfVideos) {
           final targetStudentId = v['target_student_id']?.toString();
           bool matchesStudent = targetStudentId == sId;
           if (!matchesStudent && v['target_students'] is List) {
             matchesStudent = (v['target_students'] as List).any((ts) => ts is Map && ts['id']?.toString() == sId);
           }
-          if (!matchesStudent) return false;
+          if (matchesStudent) {
+            final vBatchId = v['target_batch_id']?.toString();
+            // Matches if video was batch-specific for this batch or course-wide/all batches
+            if (vBatchId == null || vBatchId == 'all' || vBatchId == batchId) {
+              matchingVideo = v;
+              latestCompletedVideo ??= v;
+              break;
+            }
+          }
+        }
 
-          final vBatchId = v['target_batch_id']?.toString();
-          // Matches if video was batch-specific for this batch or course-wide/all batches
-          return vBatchId == null || vBatchId == 'all' || vBatchId == batchId;
-        });
-
-        if (isCovered) {
-          completedBatches.add(batch);
+        if (matchingVideo != null) {
+          completedBatches.add({...batch, 'video': matchingVideo});
         } else {
           pendingBatches.add(batch);
         }
@@ -226,6 +233,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
         'pending_batches': pendingBatches,
         'completed_batches': completedBatches,
         'total_batches_count': enrolledBatches.length,
+        'last_completed_video': latestCompletedVideo,
       });
     }
 
@@ -308,40 +316,38 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     }).toList();
   }
 
-  // Filtered shared videos
-  List<Map<String, dynamic>> get _filteredSharedVideos {
+  // General shared videos (non-performance videos)
+  List<Map<String, dynamic>> get _generalSharedVideos {
     return _mySharedItems.where((item) {
-      // 1. Month filter
-      if (_sharedMonthFilter != 'all') {
-        final dateVal = item['event_date'] ?? item['created_at'];
-        if (dateVal != null) {
-          try {
-            final dt = DateTime.parse(
-              dateVal.toString().contains('T') ? dateVal.toString() : '${dateVal.toString()} 00:00:00',
-            );
-            if (dt.month.toString() != _sharedMonthFilter) return false;
-          } catch (_) {
-            return false;
-          }
+      final cat = (item['category'] ?? '').toString().toLowerCase();
+      if (cat == 'performance' || cat == 'student_performance') return false;
+      if (item['target_student_id'] != null && item['target_student_id'].toString().isNotEmpty) return false;
+      return true;
+    }).toList();
+  }
+
+  // Filtered shared videos (strictly general videos shared via "+ Share New Video Link")
+  List<Map<String, dynamic>> get _filteredSharedVideos {
+    return _generalSharedVideos.where((item) {
+      // 2. Year filter (scrollable to 2050, no "All Years")
+      final dateVal = item['event_date'] ?? item['created_at'];
+      if (dateVal != null) {
+        try {
+          final dt = DateTime.parse(
+            dateVal.toString().contains('T') ? dateVal.toString() : '${dateVal.toString()} 00:00:00',
+          );
+          if (dt.year.toString() != _sharedYearFilter) return false;
+
+          // 3. Month range filter (from month to to month)
+          final fromM = int.tryParse(_sharedFromMonth) ?? 1;
+          final toM = int.tryParse(_sharedToMonth) ?? 12;
+          if (dt.month < fromM || dt.month > toM) return false;
+        } catch (_) {
+          return false;
         }
       }
 
-      // 2. Year filter
-      if (_sharedYearFilter != 'all') {
-        final dateVal = item['event_date'] ?? item['created_at'];
-        if (dateVal != null) {
-          try {
-            final dt = DateTime.parse(
-              dateVal.toString().contains('T') ? dateVal.toString() : '${dateVal.toString()} 00:00:00',
-            );
-            if (dt.year.toString() != _sharedYearFilter) return false;
-          } catch (_) {
-            return false;
-          }
-        }
-      }
-
-      // 3. Batch filter
+      // 4. Batch filter
       if (_sharedBatchFilter != 'all') {
         final bId = item['target_batch_id']?.toString();
         if (bId != _sharedBatchFilter) return false;
@@ -354,14 +360,30 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
         final desc = (item['description'] ?? '').toString().toLowerCase();
         final course = (item['target_course_title'] ?? '').toString().toLowerCase();
         final batch = (item['target_batch_name'] ?? '').toString().toLowerCase();
-        final student = (item['target_student_name'] ?? '').toString().toLowerCase();
-        if (!title.contains(q) && !desc.contains(q) && !course.contains(q) && !batch.contains(q) && !student.contains(q)) {
+        if (!title.contains(q) && !desc.contains(q) && !course.contains(q) && !batch.contains(q)) {
           return false;
         }
       }
 
       return true;
     }).toList();
+  }
+
+  // Organized group-wise (by Batch / Group)
+  Map<String, List<Map<String, dynamic>>> get _groupedSharedVideos {
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final item in _filteredSharedVideos) {
+      final batchName = (item['target_batch_name'] ?? '').toString().trim();
+      final courseTitle = (item['target_course_title'] ?? '').toString().trim();
+      String groupKey = 'All Batches (Academy Wide)';
+      if (batchName.isNotEmpty && batchName.toLowerCase() != 'null') {
+        groupKey = courseTitle.isNotEmpty ? '$batchName • $courseTitle' : batchName;
+      } else if (courseTitle.isNotEmpty && courseTitle.toLowerCase() != 'null') {
+        groupKey = courseTitle;
+      }
+      grouped.putIfAbsent(groupKey, () => []).add(item);
+    }
+    return grouped;
   }
 
   // --- ACTIONS ---
@@ -453,14 +475,17 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     }
   }
 
-  // Single button Month & Year picker modal for Shared Videos page
+  // Month Range & Year picker modal for Shared Videos page (Scrolls to 2050, no "All Years")
   void _openMonthYearPicker() {
+    final availableYears = List.generate(2050 - 2024 + 1, (i) => (2024 + i).toString());
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (ctx) {
-        String tempMonth = _sharedMonthFilter;
-        String tempYear = _sharedYearFilter;
+        String tempFromMonth = _sharedFromMonth;
+        String tempToMonth = _sharedToMonth;
+        String tempYear = availableYears.contains(_sharedYearFilter) ? _sharedYearFilter : DateTime.now().year.toString();
         return StatefulBuilder(
           builder: (sheetCtx, setSheetState) {
             return Container(
@@ -477,62 +502,96 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Filter Month & Year',
+                        'Filter Month Range & Year',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D041A)),
                       ),
                       TextButton(
                         onPressed: () {
                           setSheetState(() {
-                            tempMonth = 'all';
-                            tempYear = 'all';
+                            tempFromMonth = '1';
+                            tempToMonth = '12';
+                            tempYear = DateTime.now().year.toString();
                           });
                         },
-                        child: const Text('Reset to All', style: TextStyle(color: Color(0xFF8A064D), fontWeight: FontWeight.bold)),
+                        child: const Text('Reset', style: TextStyle(color: Color(0xFF8A064D), fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
+
+                  // Year Selector (Scrollable up to 2050, no "All Years")
+                  DropdownButtonFormField<String>(
+                    value: tempYear,
+                    menuMaxHeight: 280,
+                    decoration: InputDecoration(
+                      labelText: 'Select Year (2024 - 2050)',
+                      labelStyle: const TextStyle(fontSize: 12),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    items: availableYears.map((y) => DropdownMenuItem(
+                      value: y,
+                      child: Text(y, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    )).toList(),
+                    onChanged: (val) {
+                      if (val != null) setSheetState(() => tempYear = val);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Month Range Selector (From Month -> To Month)
                   Row(
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: tempMonth,
+                          value: tempFromMonth,
+                          menuMaxHeight: 250,
                           decoration: InputDecoration(
-                            labelText: 'Month',
+                            labelText: 'From Month',
                             labelStyle: const TextStyle(fontSize: 12),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          items: [
-                            const DropdownMenuItem(value: 'all', child: Text('All Months', style: TextStyle(fontSize: 13))),
-                            ...List.generate(12, (i) => DropdownMenuItem(
-                              value: (i + 1).toString(),
-                              child: Text(_monthNames[i], style: const TextStyle(fontSize: 13)),
-                            )),
-                          ],
+                          items: List.generate(12, (i) => DropdownMenuItem(
+                            value: (i + 1).toString(),
+                            child: Text(_monthNames[i], style: const TextStyle(fontSize: 12.5)),
+                          )),
                           onChanged: (val) {
-                            if (val != null) setSheetState(() => tempMonth = val);
+                            if (val != null) {
+                              setSheetState(() {
+                                tempFromMonth = val;
+                                if (int.parse(tempToMonth) < int.parse(val)) {
+                                  tempToMonth = val;
+                                }
+                              });
+                            }
                           },
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: tempYear,
+                          value: tempToMonth,
+                          menuMaxHeight: 250,
                           decoration: InputDecoration(
-                            labelText: 'Year',
+                            labelText: 'To Month',
                             labelStyle: const TextStyle(fontSize: 12),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          items: const [
-                            DropdownMenuItem(value: 'all', child: Text('All Years', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: '2025', child: Text('2025', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: '2026', child: Text('2026', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: '2027', child: Text('2027', style: TextStyle(fontSize: 13))),
-                          ],
+                          items: List.generate(12, (i) => DropdownMenuItem(
+                            value: (i + 1).toString(),
+                            child: Text(_monthNames[i], style: const TextStyle(fontSize: 12.5)),
+                          )),
                           onChanged: (val) {
-                            if (val != null) setSheetState(() => tempYear = val);
+                            if (val != null) {
+                              setSheetState(() {
+                                tempToMonth = val;
+                                if (int.parse(tempFromMonth) > int.parse(val)) {
+                                  tempFromMonth = val;
+                                }
+                              });
+                            }
                           },
                         ),
                       ),
@@ -550,7 +609,8 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                       ),
                       onPressed: () {
                         setState(() {
-                          _sharedMonthFilter = tempMonth;
+                          _sharedFromMonth = tempFromMonth;
+                          _sharedToMonth = tempToMonth;
                           _sharedYearFilter = tempYear;
                         });
                         Navigator.pop(sheetCtx);
@@ -568,17 +628,16 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
   }
 
   String get _sharedMonthYearLabel {
-    if (_sharedMonthFilter == 'all' && _sharedYearFilter == 'all') {
-      return 'All Time';
-    }
-    if (_sharedMonthFilter != 'all' && _sharedYearFilter != 'all') {
-      final mIdx = int.tryParse(_sharedMonthFilter);
-      final mName = (mIdx != null && mIdx >= 1 && mIdx <= 12) ? _monthNames[mIdx - 1].substring(0, 3) : '';
-      return '$mName $_sharedYearFilter';
-    }
-    if (_sharedMonthFilter != 'all') {
-      final mIdx = int.tryParse(_sharedMonthFilter);
-      return (mIdx != null && mIdx >= 1 && mIdx <= 12) ? _monthNames[mIdx - 1] : 'Month';
+    final fromIdx = int.tryParse(_sharedFromMonth);
+    final toIdx = int.tryParse(_sharedToMonth);
+    if (fromIdx != null && toIdx != null) {
+      if (fromIdx == 1 && toIdx == 12) {
+        return 'Full Year $_sharedYearFilter';
+      }
+      if (fromIdx == toIdx) {
+        return '${_monthNames[fromIdx - 1].substring(0, 3)} $_sharedYearFilter';
+      }
+      return '${_monthNames[fromIdx - 1].substring(0, 3)} - ${_monthNames[toIdx - 1].substring(0, 3)} $_sharedYearFilter';
     }
     return _sharedYearFilter;
   }
@@ -812,6 +871,27 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     }
   }
 
+  String _formatDateTime(dynamic dateVal) {
+    if (dateVal == null) return '';
+    final s = dateVal.toString().trim();
+    if (s.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(s.contains('T') ? s : '$s 00:00:00');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final day = dt.day.toString().padLeft(2, '0');
+      final m = months[dt.month - 1];
+      final y = dt.year;
+      int hour = dt.hour;
+      final ampm = hour >= 12 ? 'PM' : 'AM';
+      hour = hour % 12;
+      if (hour == 0) hour = 12;
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '$day $m $y, $hour:$min $ampm';
+    } catch (_) {
+      return s;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final pendingList = _pendingStudentsThisMonth;
@@ -824,7 +904,6 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
     final int compliancePercent = (complianceRate * 100).round();
 
     final filteredPerformance = _filteredPerformanceStudents;
-    final filteredShared = _filteredSharedVideos;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8FA),
@@ -1044,7 +1123,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      'Shared Videos (${_mySharedItems.length})',
+                                      'Shared Videos (${_generalSharedVideos.length})',
                                       style: TextStyle(
                                         fontSize: 12.5,
                                         fontWeight: FontWeight.bold,
@@ -1448,74 +1527,123 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                                         ),
                                                       )).toList(),
                                               ),
+
+                                               // Date and Time displayed on each grid item
+                                               Builder(
+                                                 builder: (_) {
+                                                   if (!isPending) {
+                                                     final completedVideo = student['last_completed_video'] ??
+                                                         (completedBatches.isNotEmpty ? completedBatches.first['video'] : null);
+                                                     final dateText = _formatDateTime(completedVideo?['created_at'] ?? completedVideo?['event_date']);
+                                                     if (dateText.isNotEmpty) {
+                                                       return Padding(
+                                                         padding: const EdgeInsets.only(top: 6),
+                                                         child: Row(
+                                                           children: [
+                                                             const Icon(Icons.access_time_filled_rounded, size: 12, color: Color(0xFF047857)),
+                                                             const SizedBox(width: 4),
+                                                             Text(
+                                                               dateText,
+                                                               style: const TextStyle(
+                                                                 fontSize: 11,
+                                                                 color: Color(0xFF047857),
+                                                                 fontWeight: FontWeight.w600,
+                                                               ),
+                                                             ),
+                                                           ],
+                                                         ),
+                                                       );
+                                                     }
+                                                   }
+                                                   return Padding(
+                                                     padding: const EdgeInsets.only(top: 6),
+                                                     child: Row(
+                                                       children: [
+                                                         Icon(Icons.schedule_rounded, size: 12, color: Colors.grey.shade500),
+                                                         const SizedBox(width: 4),
+                                                         Text(
+                                                           'Cycle: ',
+                                                           style: TextStyle(
+                                                             fontSize: 10.5,
+                                                             color: Colors.grey.shade600,
+                                                             fontWeight: FontWeight.w500,
+                                                           ),
+                                                         ),
+                                                       ],
+                                                     ),
+                                                   );
+                                                 },
+                                               ),
                                             ],
                                           ),
                                         ),
                                         const SizedBox(width: 10),
 
-                                        // Action Button with pending text directly above it
-                                        Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment: CrossAxisAlignment.center,
-                                          children: [
-                                            Container(
-                                              margin: const EdgeInsets.only(bottom: 4),
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                              decoration: BoxDecoration(
-                                                color: isPending ? const Color(0xFFFFF1F2) : const Color(0xFFECFDF5),
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                isPending ? 'pending' : 'success',
-                                                style: TextStyle(
-                                                  fontSize: 9.5,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: isPending ? const Color(0xFFE02424) : const Color(0xFF047857),
-                                                  letterSpacing: 0.3,
-                                                ),
-                                              ),
+                                        // Action Button: Share on Pending, Edit on Success
+                                        if (isPending)
+                                          ElevatedButton.icon(
+                                            onPressed: () => _shareForStudent(student),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF590231),
+                                              foregroundColor: Colors.white,
+                                              elevation: 0,
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                             ),
-                                            ElevatedButton.icon(
-                                              onPressed: () => _shareForStudent(student),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: isPending ? const Color(0xFF590231) : const Color(0xFF047857),
-                                                foregroundColor: Colors.white,
-                                                elevation: 0,
-                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                              ),
-                                              icon: const Icon(Icons.share_rounded, size: 14),
-                                              label: const Text(
-                                                'Share',
-                                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                              ),
+                                            icon: const Icon(Icons.share_rounded, size: 14),
+                                            label: const Text(
+                                              'Share',
+                                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                                             ),
-                                          ],
-                                        ),
+                                          )
+                                        else
+                                          ElevatedButton.icon(
+                                            onPressed: () {
+                                              final completedVideo = student['last_completed_video'] ??
+                                                  (completedBatches.isNotEmpty ? completedBatches.first['video'] : null);
+                                              if (completedVideo != null) {
+                                                _openDetails(Map<String, dynamic>.from(completedVideo));
+                                              } else {
+                                                _shareForStudent(student);
+                                              }
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF1D4ED8),
+                                              foregroundColor: Colors.white,
+                                              elevation: 0,
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            ),
+                                            icon: const Icon(Icons.edit_rounded, size: 14),
+                                            label: const Text(
+                                              'Edit',
+                                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ),
 
                                   // Status badge at the right top corner of every grid card
                                   Positioned(
-                                    top: 6,
+                                    top: 8,
                                     right: 10,
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
-                                        color: isPending ? const Color(0xFFFDE8E8) : const Color(0xFFDEF7EC),
-                                        borderRadius: BorderRadius.circular(5),
+                                        color: isPending ? const Color(0xFFFFF1F2) : const Color(0xFFECFDF5),
+                                        borderRadius: BorderRadius.circular(6),
                                         border: Border.all(
-                                          color: isPending ? const Color(0xFFF8B4B4) : const Color(0xFF31C48D),
-                                          width: 0.8,
+                                          color: isPending ? const Color(0xFFFECDD3) : const Color(0xFFA7F3D0),
+                                          width: 1,
                                         ),
                                       ),
                                       child: Text(
-                                        isPending ? '[Pending]' : '[Success]',
+                                        isPending ? 'Pending' : 'Success',
                                         style: TextStyle(
-                                          color: isPending ? const Color(0xFFE02424) : const Color(0xFF03543F),
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.bold,
+                                          color: isPending ? const Color(0xFFE11D48) : const Color(0xFF047857),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
                                     ),
@@ -1630,225 +1758,247 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                       ),
                       const SizedBox(height: 14),
 
-                      // Shared Videos Grid / List
-                      if (filteredShared.isEmpty)
-                        Container(
-                          padding: const EdgeInsets.all(28),
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0xFFF0D5E4)),
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(Icons.video_collection_outlined, size: 44, color: Colors.grey.shade400),
-                              const SizedBox(height: 10),
-                              const Text(
-                                'No shared videos match the selected filters',
-                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Use the "+ Share New Video Link" button above to share videos with students.',
-                                style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        )
-                      else
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: filteredShared.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (context, idx) {
-                            final item = filteredShared[idx];
-                            final title = (item['title'] ?? 'Shared Video').toString();
-                            final course = (item['target_course_title'] ?? 'Assigned Course').toString();
-                            final batch = (item['target_batch_name'] ?? 'All Batches').toString();
-                            final dateStr = _formatDate(item['event_date'] ?? item['created_at']);
-                            final driveUrl = (item['drive_url'] ?? '').toString().trim();
-                            final youtubeUrl = (item['youtube_url'] ?? '').toString().trim();
-                            final targetStudentName = (item['target_student_name'] ?? '').toString();
-                            final hasDrive = driveUrl.isNotEmpty;
-                            final hasYoutube = youtubeUrl.isNotEmpty;
-
-                            final cat = (item['category'] ?? '').toString().toLowerCase();
-                            final isPerformance = cat == 'performance' || cat == 'student_performance';
-
-                            // Boundary color: Green for Performance, Blue for General
-                            final boundaryColor = isPerformance
-                                ? const Color(0xFF10B981) // Emerald Green
-                                : const Color(0xFF3B82F6); // Vibrant Blue
-
+                      // Shared Videos Grid / List (Organized Group-Wise)
+                      Builder(
+                        builder: (_) {
+                          final grouped = _groupedSharedVideos;
+                          if (grouped.isEmpty) {
                             return Container(
+                              padding: const EdgeInsets.all(28),
+                              width: double.infinity,
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: boundaryColor, width: 1.8),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.02),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: const Color(0xFFF0D5E4)),
+                              ),
+                              child: Column(
+                                children: [
+                                  Icon(Icons.video_collection_outlined, size: 44, color: Colors.grey.shade400),
+                                  const SizedBox(height: 10),
+                                  const Text(
+                                    'No shared videos match the selected filters',
+                                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Use the "+ Share New Video Link" button above to share videos with students.',
+                                    style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                                    textAlign: TextAlign.center,
                                   ),
                                 ],
                               ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(14),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Row 1: Student highlighted on top (Left) and Date on right-top
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      children: [
-                                        // Highlight student name on top (without text saying performance or general)
-                                        if (isPerformance && targetStudentName.isNotEmpty)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFECFDF5),
-                                              borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(color: const Color(0xFFA7F3D0)),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(Icons.person_pin_rounded, size: 14, color: Color(0xFF047857)),
-                                                const SizedBox(width: 5),
-                                                Text(
-                                                  targetStudentName,
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: Color(0xFF047857),
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          )
-                                        else
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFEFF6FF),
-                                              borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(color: const Color(0xFFBFDBFE)),
-                                            ),
-                                            child: const Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.groups_rounded, size: 14, color: Color(0xFF1D4ED8)),
-                                                SizedBox(width: 5),
-                                                Text(
-                                                  'All Students',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Color(0xFF1D4ED8),
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-
-                                        // Right top of the grid: Date
-                                        Text(
-                                          dateStr,
-                                          style: TextStyle(
-                                            fontSize: 11.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-
-                                    // Course and Batch below student name
-                                    Text(
-                                      '$course • $batch',
-                                      style: const TextStyle(
-                                        color: Color(0xFF8A064D),
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-
-                                    // Title
-                                    Text(
-                                      title,
-                                      style: const TextStyle(
-                                        fontSize: 14.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: LaasyaColors.textDark,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-
-                                    // Action Buttons: Open Drive / YouTube and "Details" button
-                                    Row(
-                                      children: [
-                                        if (hasDrive) ...[
-                                          Expanded(
-                                            child: ElevatedButton.icon(
-                                              onPressed: () => _launchExternalUrl(driveUrl),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: const Color(0xFF03543F),
-                                                foregroundColor: Colors.white,
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                                elevation: 0,
-                                              ),
-                                              icon: const Icon(Icons.open_in_new_rounded, size: 14),
-                                              label: const Text('Drive', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                        ],
-                                        if (hasYoutube) ...[
-                                          Expanded(
-                                            child: ElevatedButton.icon(
-                                              onPressed: () => _launchExternalUrl(youtubeUrl),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: const Color(0xFFE53E3E),
-                                                foregroundColor: Colors.white,
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                                elevation: 0,
-                                              ),
-                                              icon: const Icon(Icons.play_arrow_rounded, size: 15),
-                                              label: const Text('YouTube', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                        ],
-
-                                        // Details Button (Opens prefilled details view with Edit and Delete options)
-                                        OutlinedButton.icon(
-                                          onPressed: () => _openDetails(item),
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor: const Color(0xFF590231),
-                                            side: const BorderSide(color: Color(0xFF8A064D), width: 1.2),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                          ),
-                                          icon: const Icon(Icons.tune_rounded, size: 14),
-                                          label: const Text('Details', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
                             );
-                          },
-                        ),
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: grouped.entries.map((entry) {
+                              final groupName = entry.key;
+                              final videos = entry.value;
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Group Section Header
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 8, bottom: 10),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFDF2F8),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: const Color(0xFFFBCFE8)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.groups_rounded, size: 16, color: Color(0xFF8A064D)),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            groupName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                              color: Color(0xFF8A064D),
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(color: const Color(0xFFFBCFE8)),
+                                          ),
+                                          child: Text(
+                                            '${videos.length} ${videos.length == 1 ? "video" : "videos"}',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF8A064D),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Video Cards inside this group
+                                  ...videos.map((item) {
+                                    final title = (item['title'] ?? 'Shared Video').toString();
+                                    final course = (item['target_course_title'] ?? 'Assigned Course').toString();
+                                    final batch = (item['target_batch_name'] ?? 'All Batches').toString();
+                                    final dateStr = _formatDate(item['event_date'] ?? item['created_at']);
+                                    final driveUrl = (item['drive_url'] ?? '').toString().trim();
+                                    final youtubeUrl = (item['youtube_url'] ?? '').toString().trim();
+                                    final hasDrive = driveUrl.isNotEmpty;
+                                    final hasYoutube = youtubeUrl.isNotEmpty;
+
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: const Color(0xFF3B82F6), width: 1.8),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.02),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(14),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Row 1: Group badge on Left and Date on right-top
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              crossAxisAlignment: CrossAxisAlignment.center,
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFEFF6FF),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                                                  ),
+                                                  child: const Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(Icons.groups_rounded, size: 14, color: Color(0xFF1D4ED8)),
+                                                      SizedBox(width: 5),
+                                                      Text(
+                                                        'All Enrolled Students',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Color(0xFF1D4ED8),
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Text(
+                                                  dateStr,
+                                                  style: TextStyle(
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 8),
+
+                                            // Course and Batch below group badge
+                                            Text(
+                                              '$course • $batch',
+                                              style: const TextStyle(
+                                                color: Color(0xFF8A064D),
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 6),
+
+                                            // Title
+                                            Text(
+                                              title,
+                                              style: const TextStyle(
+                                                fontSize: 14.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: LaasyaColors.textDark,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 12),
+
+                                            // Action Buttons: Open Drive / YouTube and Details
+                                            Row(
+                                              children: [
+                                                if (hasDrive) ...[
+                                                  Expanded(
+                                                    child: ElevatedButton.icon(
+                                                      onPressed: () => _launchExternalUrl(driveUrl),
+                                                      style: ElevatedButton.styleFrom(
+                                                        backgroundColor: const Color(0xFF03543F),
+                                                        foregroundColor: Colors.white,
+                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                                        elevation: 0,
+                                                      ),
+                                                      icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                                                      label: const Text('Drive', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                ],
+                                                if (hasYoutube) ...[
+                                                  Expanded(
+                                                    child: ElevatedButton.icon(
+                                                      onPressed: () => _launchExternalUrl(youtubeUrl),
+                                                      style: ElevatedButton.styleFrom(
+                                                        backgroundColor: const Color(0xFFE53E3E),
+                                                        foregroundColor: Colors.white,
+                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                                        elevation: 0,
+                                                      ),
+                                                      icon: const Icon(Icons.play_arrow_rounded, size: 15),
+                                                      label: const Text('YouTube', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                ],
+
+                                                // Details Button (Opens prefilled details view with Edit and Delete options)
+                                                OutlinedButton.icon(
+                                                  onPressed: () => _openDetails(item),
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: const Color(0xFF590231),
+                                                    side: const BorderSide(color: Color(0xFF8A064D), width: 1.2),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                                  ),
+                                                  icon: const Icon(Icons.tune_rounded, size: 14),
+                                                  label: const Text('Details', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                  const SizedBox(height: 6),
+                                ],
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
                     ],
                   ],
                 ),

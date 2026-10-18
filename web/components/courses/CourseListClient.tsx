@@ -154,7 +154,6 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
   const [editCode, setEditCode] = useState<string>('');
   const [editCategory, setEditCategory] = useState<string>('');
   const [editFee, setEditFee] = useState<number>(0);
-  const [editDuration, setEditDuration] = useState<number>(12);
   const [editDesc, setEditDesc] = useState<string>('');
   const [editImageUrl, setEditImageUrl] = useState<string>('');
   const [editIsActive, setEditIsActive] = useState<boolean>(true);
@@ -169,7 +168,6 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
   const [isCreatingNewCategory, setIsCreatingNewCategory] = useState(false);
   const [customNewCategory, setCustomNewCategory] = useState('');
   const [newFee, setNewFee] = useState(2000);
-  const [newDuration, setNewDuration] = useState(12);
   const [newDesc, setNewDesc] = useState('');
   const [newImageUrl, setNewImageUrl] = useState('');
 
@@ -267,7 +265,6 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
     setIsCreatingNewCategory(false);
     setCustomNewCategory('');
     setNewFee(2000);
-    setNewDuration(12);
     setNewDesc('');
     setNewImageUrl('');
     setIsAddOpen(true);
@@ -279,7 +276,6 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
     setEditCode(course.code);
     setEditCategory(course.category || '');
     setEditFee(Number(course.monthly_fee) || 0);
-    setEditDuration(course.duration_months || 12);
     setEditDesc(course.description || '');
     setEditImageUrl(course.image_url || getCourseImage(course));
     setEditIsActive(course.is_active ?? true);
@@ -435,7 +431,6 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
           code: newCode.trim().toUpperCase(),
           category: finalCategory,
           monthly_fee: Number(newFee),
-          duration_months: Number(newDuration),
           description: newDesc.trim(),
           image_url: newImageUrl.trim() || undefined
         })
@@ -489,7 +484,6 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
           code: editCode.trim().toUpperCase(),
           category: finalCategory,
           monthly_fee: Number(editFee),
-          duration_months: Number(editDuration),
           description: editDesc.trim(),
           is_active: editIsActive,
           image_url: editImageUrl.trim() || undefined
@@ -511,7 +505,6 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 code: editCode.trim().toUpperCase(),
                 category: finalCategory,
                 monthly_fee: Number(editFee),
-                duration_months: Number(editDuration),
                 description: editDesc.trim(),
                 is_active: editIsActive,
                 image_url: editImageUrl.trim() || c.image_url
@@ -527,7 +520,6 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
           code: editCode.trim().toUpperCase(),
           category: finalCategory,
           monthly_fee: Number(editFee),
-          duration_months: Number(editDuration),
           description: editDesc.trim(),
           is_active: editIsActive,
           image_url: editImageUrl.trim() || viewingCourse.image_url
@@ -610,7 +602,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
               </span>
             </div>
             <p className="text-xs font-medium text-gray-500 mt-1">
-              Configure course disciplines, monthly tuition fees, categories, assigned gurus, and syllabus.
+              Configure course disciplines, categories, assigned gurus, and syllabus.
             </p>
           </div>
 
@@ -988,11 +980,9 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
 
                 {/* Bottom Meta & Action Buttons */}
                 <div className="mt-5 pt-4 border-t border-[#F0D5E4]/60 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-[#6E3955] uppercase font-black tracking-wider block">Monthly Fee</span>
-                    <span className="text-lg font-black text-[#8A064D] flex items-center tabular-nums">
-                      ₹{Number(c.monthly_fee).toLocaleString('en-IN')}
-                      <span className="text-xs font-bold text-[#6E3955] ml-1">/ mo</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-3 py-1 rounded-xl">
+                      {c.batch_count || 0} Batches
                     </span>
                   </div>
 
@@ -1092,10 +1082,9 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
               {/* Highlight Grid */}
               <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-rose-100 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-black text-[#590231] uppercase tracking-wider block">Monthly Tuition Fee</span>
-                  <span className="text-lg font-black text-[#8A064D] mt-0.5 flex items-center">
-                    ₹{Number(viewingCourse.monthly_fee).toLocaleString('en-IN')}
-                    <span className="text-xs font-bold text-gray-500 ml-1">/ month</span>
+                  <span className="text-[10px] font-black text-[#590231] uppercase tracking-wider block">Course Batches</span>
+                  <span className="text-base font-black text-[#8A064D] mt-0.5 flex items-center">
+                    {viewingCourse.batch_count || 0} Batches
                   </span>
                 </div>
                 <div className="text-right">
@@ -1314,19 +1303,6 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                  Monthly Fee (INR ₹) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min={0}
-                  value={editFee}
-                  onChange={(e) => setEditFee(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
-                />
-              </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -1516,19 +1492,6 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                  Monthly Fee (₹) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min={0}
-                  value={newFee}
-                  onChange={(e) => setNewFee(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
-                />
-              </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">

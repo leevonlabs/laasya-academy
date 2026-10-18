@@ -142,6 +142,11 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
   const [complianceSearch, setComplianceSearch] = useState('');
   const [guruShareViewMode, setGuruShareViewMode] = useState<'compliance_grid' | 'media_archive'>('compliance_grid');
 
+  // Video Details Modal States (Item 5)
+  const [viewingPerformanceVideo, setViewingPerformanceVideo] = useState<GuruComplianceDisciple | null>(null);
+  const [viewingGeneralVideo, setViewingGeneralVideo] = useState<VideoLibraryItem | null>(null);
+  const [viewingAllVideoItem, setViewingAllVideoItem] = useState<VideoLibraryItem | null>(null);
+
   const fetchComplianceData = async (month: string, year: string) => {
     setIsLoadingCompliance(true);
     try {
@@ -370,9 +375,13 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
     });
   }, [items, selectedCourseSubpage, subpageSearch, subpageYearMonth]);
 
-  // All Videos Tab Filtered Items
+  // All Videos Tab Filtered Items (Admin Sent Links History Only)
   const allVideosFilteredItems = useMemo(() => {
     return items.filter(item => {
+      // Strictly exclude guru shared video links (display only links admin has sent to gurus and students)
+      const isGuruShared = item.shared_by_type === 'guru' || item.category === 'guru_share' || Boolean(item.trainer_id);
+      if (isGuruShared) return false;
+
       if (allVideosSearch.trim()) {
         const q = allVideosSearch.toLowerCase();
         const matchTitle = item.title?.toLowerCase().includes(q);
@@ -1176,28 +1185,17 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                       Provide either a Google Drive folder link, a YouTube link, or both. Students will see the corresponding platforms directly in their mobile app.
                     </p>
 
-                    {/* Date & Category */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                          EVENT SHOOT DATE
-                        </label>
-                        <input
-                          type="date"
-                          value={subpageShareDate}
-                          onChange={e => setSubpageShareDate(e.target.value)}
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                          SHARING CATEGORY
-                        </label>
-                        <div className="px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-[#DEF7EC] text-[#03543F] font-bold text-xs flex items-center gap-2">
-                          <Check className="w-4 h-4 text-emerald-600" />
-                          <span>Course Event Folder & Practice Video</span>
-                        </div>
-                      </div>
+                    {/* Event Shoot Date */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        EVENT SHOOT DATE
+                      </label>
+                      <input
+                        type="date"
+                        value={subpageShareDate}
+                        onChange={e => setSubpageShareDate(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
+                      />
                     </div>
 
                     {/* Description / Instructions */}
@@ -1222,8 +1220,8 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                       />
                     </div>
 
-                    {/* SELECT TARGET BATCHES [can select all and multiple] (RED OUTLINE CONTAINER FROM REFERENCE IMAGE) */}
-                    <div className="p-4 rounded-2xl border-2 border-[#E02424] bg-white space-y-3">
+                    {/* SELECT TARGET BATCHES [can select all and multiple] */}
+                    <div className="p-4 rounded-2xl border border-gray-200 bg-gray-50/50 space-y-3">
                       <div className="flex items-center justify-between">
                         <div>
                           <label className="block text-xs font-extrabold text-[#2D041A] uppercase tracking-wider">
@@ -1772,7 +1770,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {allVideosFilteredItems.map((item, idx) => {
                   const formattedDate = item.event_date
                     ? new Date(item.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -1783,125 +1781,53 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                       key={`all-items-${item.id}-${idx}`}
                       className="bg-white rounded-3xl p-5 border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
                     >
-                      {/* Top Badges & Actions */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#DEF7EC] text-[#03543F] border border-emerald-200">
-                              EVENT MEDIA
-                            </span>
-                            <span className="px-2.5 py-0.5 rounded-lg text-[10.5px] font-bold bg-[#FFF2F8] text-[#8A064D] border border-rose-100">
-                              {item.access_level === 'All Students'
-                                ? 'All 18 Courses'
-                                : item.target_course_title || 'Universal Shoot'}
-                            </span>
-                            {item.target_batch_name && item.target_batch_name !== 'All Batches' && (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-700">
-                                {item.target_batch_name}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-gray-400 font-medium flex items-center gap-1">
-                              <Calendar className="w-3 h-3 text-gray-400" />
-                              {formattedDate}
-                            </span>
-                            <button
-                              onClick={() => handleOpenEditItem(item)}
-                              title="Edit Link Info"
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-[#8A064D] hover:bg-[#FFF2F8] transition cursor-pointer"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteItem(item.id)}
-                              title="Delete Link"
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
+                      <div className="space-y-2.5">
                         {/* Title */}
-                        <h4 className="font-bold text-base text-[#2D041A] leading-snug pt-1">
+                        <h4 className="font-bold text-base text-[#2D041A] leading-snug line-clamp-2">
                           {item.title}
                         </h4>
 
+                        {/* Date of Share */}
+                        <div className="text-xs text-gray-500 font-medium flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
+                          <span>Date of share: <strong className="text-gray-700">{formattedDate}</strong></span>
+                        </div>
+
                         {/* Description */}
-                        {item.description && (
-                          <p className="text-xs text-gray-600 bg-[#FFF9FB] p-2.5 rounded-xl border border-[#F0D5E4]/60 line-clamp-2">
-                            {item.description}
-                          </p>
-                        )}
+                        <p className="text-xs text-gray-600 bg-[#FFF9FB] p-3 rounded-2xl border border-[#F0D5E4]/60 line-clamp-3 leading-relaxed">
+                          {item.description || 'No description provided for this shared video link.'}
+                        </p>
                       </div>
 
-                      {/* Interactive Media Links Deck */}
-                      <div className="space-y-2 pt-2 border-t border-gray-100">
-                        {item.drive_url && (
-                          <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                                <LinkIcon className="w-4 h-4" />
-                              </div>
-                              <div className="min-w-0">
-                                <span className="text-[11px] font-bold text-emerald-900 block truncate">Google Drive Media Folder</span>
-                                <span className="text-[10px] text-emerald-700 font-mono truncate block max-w-xs">{item.drive_url}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => copyToClipboard(item.drive_url!, `${item.id}-drive`, 'Drive Link')}
-                                className="px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-800 text-[11px] font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
-                              >
-                                {copiedId === `${item.id}-drive` ? 'Copied' : 'Copy'}
-                              </button>
-                              <a
-                                href={item.drive_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-3 py-1.5 rounded-xl bg-[#03543F] hover:bg-[#023e2f] text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                              >
-                                <span>Open Drive</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            </div>
-                          </div>
-                        )}
-
-                        {item.youtube_url && (
-                          <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-rose-50/70 border border-rose-200/80">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                                <Video className="w-4 h-4" />
-                              </div>
-                              <div className="min-w-0">
-                                <span className="text-[11px] font-bold text-rose-950 block truncate">YouTube Recording Broadcast</span>
-                                <span className="text-[10px] text-rose-700 font-mono truncate block max-w-xs">{item.youtube_url}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => copyToClipboard(item.youtube_url!, `${item.id}-yt`, 'YouTube Link')}
-                                className="px-2.5 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-800 text-[11px] font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
-                              >
-                                {copiedId === `${item.id}-yt` ? 'Copied' : 'Copy'}
-                              </button>
-                              <a
-                                href={item.youtube_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                              >
-                                <span>Open YouTube</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            </div>
-                          </div>
-                        )}
+                      {/* Action Buttons: View Details, Edit, Delete */}
+                      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => setViewingAllVideoItem(item)}
+                          className="py-2 px-1.5 rounded-xl bg-[#2D041A] hover:bg-[#48082B] text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs border border-[#48082B] cursor-pointer"
+                          title="View Complete Video Details"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
+                          <span>Details</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditItem(item)}
+                          className="py-2 px-1.5 rounded-xl bg-[#FFF2F8] hover:bg-[#8A064D] text-[#8A064D] hover:text-white text-xs font-bold transition flex items-center justify-center gap-1 border border-[#F0D5E4] shadow-2xs cursor-pointer"
+                          title="Edit Link Info"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="py-2 px-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 text-xs font-bold transition flex items-center justify-center gap-1 border border-rose-200 shadow-2xs cursor-pointer"
+                          title="Delete Link"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Delete</span>
+                        </button>
                       </div>
                     </div>
                   );
@@ -2274,11 +2200,11 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                           <thead>
                             <tr className="border-b border-gray-200 bg-[#FFF9FB] text-[11px] font-black text-gray-600 uppercase tracking-wider">
                               <th className="py-3 px-4">Student</th>
+                              <th className="py-3 px-4">Course</th>
                               <th className="py-3 px-4">Batch</th>
-                              <th className="py-3 px-4">Video Title & Recording Date</th>
-                              <th className="py-3 px-4">Description</th>
-                              <th className="py-3 px-4">Media Links</th>
+                              <th className="py-3 px-4">Date</th>
                               <th className="py-3 px-4 text-center">Status</th>
+                              <th className="py-3 px-4 text-center">Action</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 text-xs">
@@ -2288,74 +2214,41 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                                   <div className="font-bold text-gray-900">{disciple.student_name}</div>
                                   <div className="text-[11px] font-mono text-gray-500">{disciple.roll_number}</div>
                                 </td>
+                                <td className="py-3.5 px-4 font-semibold text-gray-800">
+                                  {disciple.course_title || selectedGuruForModal?.courses?.[0]?.title || 'Course'}
+                                </td>
                                 <td className="py-3.5 px-4 font-semibold text-gray-700">
                                   <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-800 text-[11px]">
                                     {disciple.batch_name}
                                   </span>
                                 </td>
-                                <td className="py-3.5 px-4">
-                                  <div className="font-bold text-[#2D041A]">{disciple.video_title}</div>
-                                  {disciple.event_date && (
-                                    <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                <td className="py-3.5 px-4 text-gray-600">
+                                  {disciple.event_date ? (
+                                    <div className="flex items-center gap-1">
                                       <Calendar className="w-3 h-3 text-gray-400" />
                                       <span>
                                         {new Date(disciple.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                                       </span>
                                     </div>
+                                  ) : (
+                                    '—'
                                   )}
-                                </td>
-                                <td className="py-3.5 px-4 text-gray-600 max-w-xs">
-                                  <p className="line-clamp-2 text-[11.5px]">{disciple.description || '—'}</p>
-                                </td>
-                                <td className="py-3.5 px-4">
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    {disciple.drive_url && (
-                                      <div className="flex items-center gap-1">
-                                        <a
-                                          href={disciple.drive_url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="px-2.5 py-1 rounded-lg bg-[#03543F] hover:bg-[#023e2f] text-white text-[10.5px] font-bold transition flex items-center gap-1"
-                                        >
-                                          <span>Drive</span>
-                                          <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                        <button
-                                          type="button"
-                                          onClick={() => copyToClipboard(disciple.drive_url!, `${disciple.student_id}-gd`, 'Drive Link')}
-                                          className="px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-bold transition cursor-pointer"
-                                        >
-                                          {copiedId === `${disciple.student_id}-gd` ? 'Copied' : 'Copy'}
-                                        </button>
-                                      </div>
-                                    )}
-                                    {disciple.youtube_url && (
-                                      <div className="flex items-center gap-1">
-                                        <a
-                                          href={disciple.youtube_url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[10.5px] font-bold transition flex items-center gap-1"
-                                        >
-                                          <span>YouTube</span>
-                                          <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                        <button
-                                          type="button"
-                                          onClick={() => copyToClipboard(disciple.youtube_url!, `${disciple.student_id}-yt`, 'YouTube Link')}
-                                          className="px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-bold transition cursor-pointer"
-                                        >
-                                          {copiedId === `${disciple.student_id}-yt` ? 'Copied' : 'Copy'}
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
                                 </td>
                                 <td className="py-3.5 px-4 text-center">
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-[#DEF7EC] text-[#03543F] border border-emerald-300">
                                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                     <span>Received</span>
                                   </span>
+                                </td>
+                                <td className="py-3.5 px-4 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewingPerformanceVideo(disciple)}
+                                    className="px-3 py-1.5 rounded-xl bg-[#2D041A] hover:bg-[#48082B] text-white text-[11px] font-bold transition flex items-center justify-center gap-1 mx-auto shadow-2xs border border-[#48082B] cursor-pointer"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
+                                    <span>Details</span>
+                                  </button>
                                 </td>
                               </tr>
                             ))}
@@ -2923,11 +2816,12 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-gray-200 bg-[#FFF9FB] text-[11px] font-black text-gray-600 uppercase tracking-wider">
-                        <th className="py-3 px-4">Faculty Guru</th>
-                        <th className="py-3 px-4">Target Course & Batch</th>
-                        <th className="py-3 px-4">Video Title & Date</th>
-                        <th className="py-3 px-4">Description</th>
-                        <th className="py-3 px-4">Media Links</th>
+                        <th className="py-3 px-4">Guru</th>
+                        <th className="py-3 px-4">Course</th>
+                        <th className="py-3 px-4">Batch</th>
+                        <th className="py-3 px-4">Date</th>
+                        <th className="py-3 px-4 text-center">Status</th>
+                        <th className="py-3 px-4 text-center">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-xs">
@@ -2943,67 +2837,35 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                                 {stripGuruPrefix(item.trainer_name || item.created_by || 'Faculty Guru')}
                               </span>
                             </td>
-                            <td className="py-3.5 px-4">
-                              <div className="font-bold text-gray-800">{item.target_course_title || 'General Course'}</div>
-                              {item.target_batch_name && (
-                                <span className="inline-block px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-gray-100 text-gray-700 border border-gray-200 mt-0.5">
-                                  {item.target_batch_name}
-                                </span>
-                              )}
+                            <td className="py-3.5 px-4 font-semibold text-gray-800">
+                              {item.target_course_title || 'General Course'}
                             </td>
-                            <td className="py-3.5 px-4">
-                              <div className="font-bold text-[#2D041A]">{item.title}</div>
-                              <div className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
+                            <td className="py-3.5 px-4 font-semibold text-gray-700">
+                              <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-800 text-[11px]">
+                                {item.target_batch_name || 'All Batches'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-gray-600">
+                              <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3 text-gray-400" />
                                 <span>{formattedDate}</span>
                               </div>
                             </td>
-                            <td className="py-3.5 px-4 text-gray-600 max-w-xs">
-                              <p className="line-clamp-2 text-[11.5px]">{item.description || '—'}</p>
+                            <td className="py-3.5 px-4 text-center">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-[#DEF7EC] text-[#03543F] border border-emerald-300">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Shared</span>
+                              </span>
                             </td>
-                            <td className="py-3.5 px-4">
-                              <div className="flex flex-wrap items-center gap-2">
-                                {item.drive_url && (
-                                  <div className="flex items-center gap-1">
-                                    <a
-                                      href={item.drive_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="px-2.5 py-1 rounded-lg bg-[#03543F] hover:bg-[#023e2f] text-white text-[10.5px] font-bold transition flex items-center gap-1 shadow-2xs"
-                                    >
-                                      <span>Drive</span>
-                                      <ExternalLink className="w-3 h-3" />
-                                    </a>
-                                    <button
-                                      type="button"
-                                      onClick={() => copyToClipboard(item.drive_url!, `${item.id}-drive`, 'Drive Link')}
-                                      className="px-2 py-1 rounded-lg bg-white border border-emerald-200 text-emerald-800 text-[10px] font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
-                                    >
-                                      {copiedId === `${item.id}-drive` ? 'Copied' : 'Copy'}
-                                    </button>
-                                  </div>
-                                )}
-                                {item.youtube_url && (
-                                  <div className="flex items-center gap-1">
-                                    <a
-                                      href={item.youtube_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[10.5px] font-bold transition flex items-center gap-1 shadow-2xs"
-                                    >
-                                      <span>YouTube</span>
-                                      <ExternalLink className="w-3 h-3" />
-                                    </a>
-                                    <button
-                                      type="button"
-                                      onClick={() => copyToClipboard(item.youtube_url!, `${item.id}-yt`, 'YouTube Link')}
-                                      className="px-2 py-1 rounded-lg bg-white border border-rose-200 text-rose-800 text-[10px] font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
-                                    >
-                                      {copiedId === `${item.id}-yt` ? 'Copied' : 'Copy'}
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setViewingGeneralVideo(item)}
+                                className="px-3 py-1.5 rounded-xl bg-[#2D041A] hover:bg-[#48082B] text-white text-[11px] font-bold transition flex items-center justify-center gap-1 mx-auto shadow-2xs border border-[#48082B] cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
+                                <span>View Details</span>
+                              </button>
                             </td>
                           </tr>
                         );
@@ -3103,27 +2965,16 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
               </p>
 
               {/* Event Date */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Event Shoot Date
-                  </label>
-                  <input
-                    type="date"
-                    value={universalDate}
-                    onChange={e => setUniversalDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Sharing Category
-                  </label>
-                  <div className="px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-[#DEF7EC] text-[#03543F] font-bold text-xs flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-600" />
-                    <span>Event Folder (Universal Shoot)</span>
-                  </div>
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Event Shoot Date
+                </label>
+                <input
+                  type="date"
+                  value={universalDate}
+                  onChange={e => setUniversalDate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] text-gray-900"
+                />
               </div>
 
               {/* Description / Instructions */}
@@ -3859,6 +3710,520 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                 className="px-4 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold"
               >
                 Close View
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 7. PERFORMANCE VIDEO DETAILS MODAL (STUDENT SPECIFIC RECORDING)       */}
+      {/* ===================================================================== */}
+      {viewingPerformanceVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-[#F0D5E4] overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4.5 bg-gradient-to-r from-[#590231] to-[#8A064D] text-white flex items-center justify-between">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-[#D4AF37] text-[10.5px] font-bold border border-[#D4AF37]/30 uppercase tracking-wider inline-block mb-1">
+                  Performance Recording Details
+                </span>
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-[#D4AF37]" />
+                  <span>{viewingPerformanceVideo.student_name}</span>
+                </h3>
+                <p className="text-xs text-rose-100">
+                  Monthly performance video submitted for student review & archiving
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingPerformanceVideo(null)}
+                className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/10 cursor-pointer transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Key Attributes Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Student Roll No</span>
+                  <span className="text-xs font-mono font-bold text-[#8A064D] block mt-0.5">{viewingPerformanceVideo.roll_number}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Course</span>
+                  <span className="text-xs font-bold text-gray-900 block mt-0.5 truncate">{viewingPerformanceVideo.course_title || selectedGuruForModal?.courses?.[0]?.title || 'Enrolled Course'}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Batch</span>
+                  <span className="text-xs font-bold text-gray-900 block mt-0.5 truncate">{viewingPerformanceVideo.batch_name}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-[#DEF7EC] border border-emerald-200">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#03543F] block">Status</span>
+                  <span className="text-xs font-bold text-emerald-800 block mt-0.5 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Received</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Video Title & Date */}
+              <div className="space-y-1 bg-white p-4 rounded-2xl border border-gray-200">
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span className="font-bold text-gray-600 uppercase text-[10px] tracking-wider">Video Title</span>
+                  {viewingPerformanceVideo.event_date && (
+                    <span className="flex items-center gap-1 font-medium">
+                      <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
+                      <span>{new Date(viewingPerformanceVideo.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    </span>
+                  )}
+                </div>
+                <h4 className="text-sm sm:text-base font-bold text-[#2D041A]">
+                  {viewingPerformanceVideo.video_title || 'Untitled Performance Video'}
+                </h4>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                  Description & Student Feedback
+                </span>
+                <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-[#F0D5E4] text-xs text-gray-700 leading-relaxed min-h-[60px]">
+                  {viewingPerformanceVideo.description || 'No additional notes or description provided.'}
+                </div>
+              </div>
+
+              {/* Media Links Card */}
+              <div className="p-4 rounded-2xl border border-[#F0D5E4] bg-white space-y-3">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-700 block">
+                  Shared Media Links
+                </span>
+                <div className="space-y-2.5">
+                  {viewingPerformanceVideo.drive_url ? (
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <LinkIcon className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <span className="font-mono text-gray-700 truncate">{viewingPerformanceVideo.drive_url}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(viewingPerformanceVideo.drive_url!, `modal-perf-drive`, 'Drive Link')}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-emerald-200 text-emerald-800 font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                        >
+                          {copiedId === `modal-perf-drive` ? 'Copied' : 'Copy'}
+                        </button>
+                        <a
+                          href={viewingPerformanceVideo.drive_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 rounded-lg bg-[#03543F] hover:bg-[#023e2f] text-white font-bold transition flex items-center gap-1 shadow-2xs"
+                        >
+                          <span>Open</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {viewingPerformanceVideo.youtube_url ? (
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-rose-50/60 border border-rose-200 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Video className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span className="font-mono text-gray-700 truncate">{viewingPerformanceVideo.youtube_url}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(viewingPerformanceVideo.youtube_url!, `modal-perf-yt`, 'YouTube Link')}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-rose-200 text-rose-800 font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
+                        >
+                          {copiedId === `modal-perf-yt` ? 'Copied' : 'Copy'}
+                        </button>
+                        <a
+                          href={viewingPerformanceVideo.youtube_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition flex items-center gap-1 shadow-2xs"
+                        >
+                          <span>Open</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {!viewingPerformanceVideo.drive_url && !viewingPerformanceVideo.youtube_url && (
+                    <p className="text-xs text-gray-500 italic">No media URLs attached to this entry.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-200 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setViewingPerformanceVideo(null)}
+                className="px-5 py-2 rounded-xl bg-[#590231] hover:bg-[#740340] text-white text-xs font-bold transition cursor-pointer shadow-2xs"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 8. GENERAL GURU VIDEO DETAILS MODAL                                   */}
+      {/* ===================================================================== */}
+      {viewingGeneralVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-[#F0D5E4] overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4.5 bg-gradient-to-r from-[#590231] to-[#8A064D] text-white flex items-center justify-between">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-[#D4AF37] text-[10.5px] font-bold border border-[#D4AF37]/30 uppercase tracking-wider inline-block mb-1">
+                  General Video Details
+                </span>
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <Video className="w-5 h-5 text-[#D4AF37]" />
+                  <span>{viewingGeneralVideo.title}</span>
+                </h3>
+                <p className="text-xs text-rose-100">
+                  Shared by Faculty Guru for batch practice and reference
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingGeneralVideo(null)}
+                className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/10 cursor-pointer transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Key Attributes Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Guru</span>
+                  <span className="text-xs font-bold text-[#8A064D] block mt-0.5 truncate">
+                    {stripGuruPrefix(viewingGeneralVideo.trainer_name || viewingGeneralVideo.created_by || 'Faculty Guru')}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Course</span>
+                  <span className="text-xs font-bold text-gray-900 block mt-0.5 truncate">
+                    {viewingGeneralVideo.target_course_title || 'General Course'}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Batch</span>
+                  <span className="text-xs font-bold text-gray-900 block mt-0.5 truncate">
+                    {viewingGeneralVideo.target_batch_name || 'All Batches'}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-[#DEF7EC] border border-emerald-200">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#03543F] block">Status</span>
+                  <span className="text-xs font-bold text-emerald-800 block mt-0.5 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Shared</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Title & Date */}
+              <div className="space-y-1 bg-white p-4 rounded-2xl border border-gray-200">
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span className="font-bold text-gray-600 uppercase text-[10px] tracking-wider">Video Title</span>
+                  {viewingGeneralVideo.event_date && (
+                    <span className="flex items-center gap-1 font-medium">
+                      <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
+                      <span>{new Date(viewingGeneralVideo.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    </span>
+                  )}
+                </div>
+                <h4 className="text-sm sm:text-base font-bold text-[#2D041A]">
+                  {viewingGeneralVideo.title}
+                </h4>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                  Description & Instructions
+                </span>
+                <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-[#F0D5E4] text-xs text-gray-700 leading-relaxed min-h-[60px]">
+                  {viewingGeneralVideo.description || 'No description provided.'}
+                </div>
+              </div>
+
+              {/* Media Links Card */}
+              <div className="p-4 rounded-2xl border border-[#F0D5E4] bg-white space-y-3">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-700 block">
+                  Shared Media Links
+                </span>
+                <div className="space-y-2.5">
+                  {viewingGeneralVideo.drive_url ? (
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <LinkIcon className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <span className="font-mono text-gray-700 truncate">{viewingGeneralVideo.drive_url}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(viewingGeneralVideo.drive_url!, `modal-gen-drive`, 'Drive Link')}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-emerald-200 text-emerald-800 font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                        >
+                          {copiedId === `modal-gen-drive` ? 'Copied' : 'Copy'}
+                        </button>
+                        <a
+                          href={viewingGeneralVideo.drive_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 rounded-lg bg-[#03543F] hover:bg-[#023e2f] text-white font-bold transition flex items-center gap-1 shadow-2xs"
+                        >
+                          <span>Open</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {viewingGeneralVideo.youtube_url ? (
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-rose-50/60 border border-rose-200 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Video className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span className="font-mono text-gray-700 truncate">{viewingGeneralVideo.youtube_url}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(viewingGeneralVideo.youtube_url!, `modal-gen-yt`, 'YouTube Link')}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-rose-200 text-rose-800 font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
+                        >
+                          {copiedId === `modal-gen-yt` ? 'Copied' : 'Copy'}
+                        </button>
+                        <a
+                          href={viewingGeneralVideo.youtube_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition flex items-center gap-1 shadow-2xs"
+                        >
+                          <span>Open</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {!viewingGeneralVideo.drive_url && !viewingGeneralVideo.youtube_url && (
+                    <p className="text-xs text-gray-500 italic">No media URLs attached to this entry.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-200 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setViewingGeneralVideo(null)}
+                className="px-5 py-2 rounded-xl bg-[#590231] hover:bg-[#740340] text-white text-xs font-bold transition cursor-pointer shadow-2xs"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 9. ALL VIDEOS (ADMIN BROADCAST) DETAILS MODAL                         */}
+      {/* ===================================================================== */}
+      {viewingAllVideoItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-[#F0D5E4] overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4.5 bg-gradient-to-r from-[#590231] to-[#8A064D] text-white flex items-center justify-between">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-[#D4AF37] text-[10.5px] font-bold border border-[#D4AF37]/30 uppercase tracking-wider inline-block mb-1">
+                  Universal Shared Link Details
+                </span>
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-[#D4AF37]" />
+                  <span>{viewingAllVideoItem.title}</span>
+                </h3>
+                <p className="text-xs text-rose-100">
+                  Admin distributed link record accessible across courses and batches
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingAllVideoItem(null)}
+                className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/10 cursor-pointer transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Key Attributes Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Date of Share</span>
+                  <span className="text-xs font-bold text-gray-900 block mt-0.5 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
+                    <span>
+                      {viewingAllVideoItem.event_date
+                        ? new Date(viewingAllVideoItem.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : 'Recent Shoot'}
+                    </span>
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Target Course</span>
+                  <span className="text-xs font-bold text-gray-900 block mt-0.5 truncate">
+                    {viewingAllVideoItem.target_course_title || 'Universal Broadcast'}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Target Batch</span>
+                  <span className="text-xs font-bold text-gray-900 block mt-0.5 truncate">
+                    {viewingAllVideoItem.target_batch_name || 'All Batches'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Title Card */}
+              <div className="space-y-1 bg-white p-4 rounded-2xl border border-gray-200">
+                <span className="font-bold text-gray-600 uppercase text-[10px] tracking-wider block">
+                  Event Shoot Title
+                </span>
+                <h4 className="text-sm sm:text-base font-bold text-[#2D041A]">
+                  {viewingAllVideoItem.title}
+                </h4>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                  Description & Student Instructions
+                </span>
+                <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-[#F0D5E4] text-xs text-gray-700 leading-relaxed min-h-[60px]">
+                  {viewingAllVideoItem.description || 'No description provided.'}
+                </div>
+              </div>
+
+              {/* Media Links Card */}
+              <div className="p-4 rounded-2xl border border-[#F0D5E4] bg-white space-y-3">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-700 block">
+                  Shared Media Links
+                </span>
+                <div className="space-y-2.5">
+                  {viewingAllVideoItem.drive_url ? (
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <LinkIcon className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <span className="font-mono text-gray-700 truncate">{viewingAllVideoItem.drive_url}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(viewingAllVideoItem.drive_url!, `modal-all-drive`, 'Drive Link')}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-emerald-200 text-emerald-800 font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                        >
+                          {copiedId === `modal-all-drive` ? 'Copied' : 'Copy'}
+                        </button>
+                        <a
+                          href={viewingAllVideoItem.drive_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 rounded-lg bg-[#03543F] hover:bg-[#023e2f] text-white font-bold transition flex items-center gap-1 shadow-2xs"
+                        >
+                          <span>Open</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {viewingAllVideoItem.youtube_url ? (
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-rose-50/60 border border-rose-200 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Video className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span className="font-mono text-gray-700 truncate">{viewingAllVideoItem.youtube_url}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(viewingAllVideoItem.youtube_url!, `modal-all-yt`, 'YouTube Link')}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-rose-200 text-rose-800 font-bold hover:bg-rose-50 transition cursor-pointer shadow-2xs"
+                        >
+                          {copiedId === `modal-all-yt` ? 'Copied' : 'Copy'}
+                        </button>
+                        <a
+                          href={viewingAllVideoItem.youtube_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition flex items-center gap-1 shadow-2xs"
+                        >
+                          <span>Open</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {!viewingAllVideoItem.drive_url && !viewingAllVideoItem.youtube_url && (
+                    <p className="text-xs text-gray-500 italic">No media URLs attached to this entry.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer with Edit, Delete, Close */}
+            <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = viewingAllVideoItem;
+                    setViewingAllVideoItem(null);
+                    handleOpenEditItem(item);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-[#FFF2F8] hover:bg-[#8A064D] text-[#8A064D] hover:text-white text-xs font-bold transition flex items-center gap-1.5 border border-[#F0D5E4] cursor-pointer shadow-2xs"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = viewingAllVideoItem.id;
+                    setViewingAllVideoItem(null);
+                    handleDeleteItem(id);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition flex items-center gap-1.5 border border-rose-200 cursor-pointer shadow-2xs"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Delete</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewingAllVideoItem(null)}
+                className="px-5 py-2 rounded-xl bg-[#590231] hover:bg-[#740340] text-white text-xs font-bold transition cursor-pointer shadow-2xs"
+              >
+                Close
               </button>
             </div>
           </div>

@@ -701,8 +701,9 @@ class SupabaseService {
         'batch': 'Bharathanatyam - Batch A (Beginners)',
         'room_or_hall': 'Natya Mandapam (Room 101)',
         'total_monthly_fee': 2000,
+        'fixed_discount': 500,
         'advance_paid': 1000,
-        'due_amount': 1000,
+        'due_amount': 500,
         'due_status': 'yellow',
         'due_date': '10th Oct 2026',
         'next_due_date': '10th Nov 2026',
@@ -806,6 +807,9 @@ class SupabaseService {
                 profileData['address'] = student['address'];
                 profileData['advance_paid'] = student['advance_paid'] ?? 0;
                 profileData['total_monthly_fee'] = student['total_monthly_fee'] ?? 2000;
+                profileData['fixed_discount'] = student['fixed_discount'] ?? 0;
+                profileData['scheme_id'] = student['scheme_id'];
+                profileData['student_id'] = student['id'];
                 profileData['due_amount'] = student['due_amount'] ?? 0;
                 profileData['due_status'] = student['due_status'] ?? 'green';
               }
@@ -1490,23 +1494,43 @@ class SupabaseService {
 
     final role = (profile['role'] ?? '').toString().toLowerCase();
     final isTrainer = role.contains('trainer') || role.contains('guru') || role == 'teacher';
-    final myId = (profile['id'] ?? profile['profile_id'] ?? '').toString().toLowerCase();
-    final myName = (profile['full_name'] ?? '').toString().toLowerCase();
-    final myRoll = (profile['roll_number'] ?? '').toString().toLowerCase();
+    final myId = (profile['id'] ?? profile['profile_id'] ?? '').toString().toLowerCase().trim();
+    final myName = (profile['full_name'] ?? '').toString().toLowerCase().trim();
+    final myRoll = (profile['roll_number'] ?? '').toString().toLowerCase().trim();
 
     final enrolledBatchIds = <String>{};
     final enrolledCourseIds = <String>{};
+    final enrolledCourseNames = <String>{};
+    final enrolledBatchNames = <String>{};
+    final enrolledTrainerNames = <String>{};
+    final enrolledTrainerIds = <String>{};
+
     final enrolled = profile['enrolled_courses'];
     if (enrolled is List) {
       for (var e in enrolled) {
         if (e is Map) {
-          final bId = e['batch_id']?.toString().toLowerCase();
-          if (bId != null && bId.isNotEmpty) enrolledBatchIds.add(bId);
-          final cId = e['course_id']?.toString().toLowerCase();
-          if (cId != null && cId.isNotEmpty) enrolledCourseIds.add(cId);
+          final bId = (e['batch_id'] ?? '').toString().toLowerCase().trim();
+          if (bId.isNotEmpty) enrolledBatchIds.add(bId);
+          final cId = (e['course_id'] ?? e['id'] ?? '').toString().toLowerCase().trim();
+          if (cId.isNotEmpty) enrolledCourseIds.add(cId);
+          final cName = (e['course_title'] ?? e['title'] ?? e['course'] ?? '').toString().toLowerCase().trim();
+          if (cName.isNotEmpty) enrolledCourseNames.add(cName);
+          final bName = (e['batch_name'] ?? e['name'] ?? e['batch'] ?? '').toString().toLowerCase().trim();
+          if (bName.isNotEmpty) enrolledBatchNames.add(bName);
+          final tName = (e['trainer_name'] ?? '').toString().toLowerCase().trim();
+          if (tName.isNotEmpty) enrolledTrainerNames.add(tName);
+          final tId = (e['trainer_id'] ?? '').toString().toLowerCase().trim();
+          if (tId.isNotEmpty) enrolledTrainerIds.add(tId);
         }
       }
     }
+
+    final profCourse = (profile['course'] ?? '').toString().toLowerCase().trim();
+    if (profCourse.isNotEmpty) enrolledCourseNames.add(profCourse);
+    final profBatch = (profile['batch'] ?? '').toString().toLowerCase().trim();
+    if (profBatch.isNotEmpty) enrolledBatchNames.add(profBatch);
+    final profTrainer = (profile['trainer_name'] ?? '').toString().toLowerCase().trim();
+    if (profTrainer.isNotEmpty) enrolledTrainerNames.add(profTrainer);
 
     return items.where((item) {
       final senderRole = (item['sender_role'] ?? '').toString().toLowerCase();
@@ -1529,6 +1553,7 @@ class SupabaseService {
         if (tName.isNotEmpty && (tName.contains(myName) || myName.contains(tName))) return true;
         return false;
       } else {
+        // STUDENT VIEW
         if (!isGuruMsg) {
           final aud = (item['audience'] ?? '').toString().toLowerCase();
           if (aud.contains('trainer') && !aud.contains('student') && !aud.contains('all')) {
@@ -1537,25 +1562,14 @@ class SupabaseService {
           return true;
         }
 
-        final aud = (item['audience'] ?? '').toString().toLowerCase();
-        if (aud.contains('all') || aud.contains('student') || aud.contains('disciple')) {
-          return true;
-        }
+        // GURU / TRAINER MESSAGE:
+        // A Guru can ONLY send messages to students enrolled in their own batches/courses!
 
-        final targetBatchId = (item['target_batch_id'] ?? '').toString().toLowerCase();
-        final targetCourseId = (item['target_course_id'] ?? '').toString().toLowerCase();
-
-        if (targetBatchId.isNotEmpty && targetBatchId != 'all') {
-          if (enrolledBatchIds.contains(targetBatchId)) return true;
-        }
-        if (targetCourseId.isNotEmpty && targetCourseId != 'all') {
-          if (enrolledCourseIds.contains(targetCourseId)) return true;
-        }
-
+        // 1. If individual target students are specified
         final targetStudents = item['target_students'];
         if (targetStudents is List && targetStudents.isNotEmpty) {
           for (var s in targetStudents) {
-            final sStr = s.toString().toLowerCase();
+            final sStr = (s is Map ? (s['id'] ?? s['roll_number'] ?? s['name']) : s).toString().toLowerCase();
             if (sStr.contains(myId) || (myRoll.isNotEmpty && sStr.contains(myRoll)) || (myName.isNotEmpty && sStr.contains(myName))) {
               return true;
             }
@@ -1563,12 +1577,43 @@ class SupabaseService {
           return false;
         }
 
-        if (targetBatchId == 'all' || targetBatchId.isEmpty) {
-          if (targetCourseId.isNotEmpty && enrolledCourseIds.contains(targetCourseId)) {
-            return true;
+        // 2. Check target batch
+        final targetBatchId = (item['target_batch_id'] ?? '').toString().toLowerCase().trim();
+        if (targetBatchId.isNotEmpty && targetBatchId != 'all') {
+          if (enrolledBatchIds.contains(targetBatchId)) return true;
+          return false; // Specifically targeted a batch student is not in
+        }
+
+        // 3. Check target course
+        final targetCourseId = (item['target_course_id'] ?? '').toString().toLowerCase().trim();
+        final targetCourseTitle = (item['target_course_title'] ?? '').toString().toLowerCase().trim();
+        if (targetCourseId.isNotEmpty && targetCourseId != 'all') {
+          if (enrolledCourseIds.contains(targetCourseId)) return true;
+          return false; // Specifically targeted a course student is not in
+        }
+        if (targetCourseTitle.isNotEmpty && targetCourseTitle != 'all') {
+          bool courseMatches = false;
+          for (final c in enrolledCourseNames) {
+            if (c.contains(targetCourseTitle) || targetCourseTitle.contains(c)) {
+              courseMatches = true;
+              break;
+            }
+          }
+          if (courseMatches) return true;
+          return false;
+        }
+
+        // 4. Check trainer match
+        final tId = (item['trainer_id'] ?? '').toString().toLowerCase().trim();
+        final tName = (item['trainer_name'] ?? item['created_by'] ?? '').toString().toLowerCase().trim();
+        if (tId.isNotEmpty && enrolledTrainerIds.contains(tId)) return true;
+        if (tName.isNotEmpty) {
+          for (final et in enrolledTrainerNames) {
+            if (et.contains(tName) || tName.contains(et)) return true;
           }
         }
 
+        // If not matching student's enrolled batch, course, or trainer, HIDE it!
         return false;
       }
     }).toList();

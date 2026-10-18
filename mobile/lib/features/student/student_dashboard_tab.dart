@@ -618,6 +618,7 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
 
     // Tuition Fee Attributes (Relocated from Profile Page)
     final totalFee = _profile?['total_monthly_fee'] ?? 2000;
+    final fixedDiscount = _profile?['fixed_discount'] ?? 0;
     final advancePaid = _profile?['advance_paid'] ?? 2000;
     final dueAmount = _profile?['due_amount'] ?? 0;
     final dueStatus = _profile?['due_status'] ?? 'green';
@@ -919,65 +920,124 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                     ],
                   ),
 
-                  // DUE DATE PROMINENTLY DISPLAYED WHEN DUE IS PENDING (MANDATED REQUIREMENT)
+                  // =========================================================
+                  // TOTAL FIXED MONTHLY DISCOUNT (HIGHLIGHTED IN RED IN REF IMAGE)
+                  // =========================================================
                   const SizedBox(height: 12),
-                  if (dueAmount > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFDF2F2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFF8B4B4)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.event_busy_rounded, size: 16, color: Color(0xFF9B1C1C)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: RichText(
-                              text: TextSpan(
-                                style: const TextStyle(fontSize: 11.5, color: Color(0xFF9B1C1C)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF2F8),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFF0D5E4), width: 1.2),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8A064D),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: const Icon(Icons.local_offer_rounded, size: 16, color: Color(0xFFF9E33A)),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'TOTAL FIXED MONTHLY DISCOUNT',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.6,
+                                  color: Color(0xFF8A064D),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Row(
                                 children: [
-                                  const TextSpan(text: 'Due Date: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  TextSpan(
-                                    text: '${_profile?['due_date'] ?? '10th Oct 2026'} ',
-                                    style: const TextStyle(fontWeight: FontWeight.w900, decoration: TextDecoration.underline),
+                                  Text(
+                                    '₹$fixedDiscount',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF2D041A),
+                                    ),
                                   ),
-                                  TextSpan(
-                                    text: '• Pending Amount ₹$dueAmount',
-                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    (fixedDiscount is num && fixedDiscount > 0)
+                                        ? 'discount saved every month'
+                                        : 'Standard academy fee (No discount)',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: (fixedDiscount is num && fixedDiscount > 0)
+                                          ? const Color(0xFF047857)
+                                          : Colors.grey.shade600,
+                                    ),
                                   ),
                                 ],
                               ),
+                            ],
+                          ),
+                        ),
+                        if (fixedDiscount is num && fixedDiscount > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDEF7EC),
+                              borderRadius: BorderRadius.circular(7),
+                              border: Border.all(color: const Color(0xFF31C48D).withOpacity(0.4)),
+                            ),
+                            child: const Text(
+                              'Scheme Applied',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF03543F),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  // Due cycle / pending dues indicator below discount
+                  const SizedBox(height: 8),
+                  if (dueAmount > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDF2F2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.event_busy_rounded, size: 14, color: Color(0xFF9B1C1C)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Due Date: ${_profile?['due_date'] ?? '10th Oct 2026'} • Pending Amount ₹$dueAmount',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF9B1C1C)),
                             ),
                           ),
                         ],
                       ),
                     )
                   else
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDEF7EC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF31C48D).withOpacity(0.35)),
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
                       child: Row(
                         children: [
-                          const Icon(Icons.verified_rounded, size: 16, color: Color(0xFF03543F)),
-                          const SizedBox(width: 8),
+                          const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF03543F)),
+                          const SizedBox(width: 6),
                           Expanded(
-                            child: RichText(
-                              text: TextSpan(
-                                style: const TextStyle(fontSize: 11.5, color: Color(0xFF03543F)),
-                                children: [
-                                  const TextSpan(text: 'No Dues Pending • Next Due Cycle: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  TextSpan(
-                                    text: '${_profile?['next_due_date'] ?? '10th Nov 2026'}',
-                                    style: const TextStyle(fontWeight: FontWeight.w900),
-                                  ),
-                                ],
-                              ),
+                            child: Text(
+                              'No Dues Pending • Next Due Cycle: ${_profile?['next_due_date'] ?? '5th of next month'}',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF03543F)),
                             ),
                           ),
                         ],

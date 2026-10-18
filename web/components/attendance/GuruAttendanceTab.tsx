@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { GuruAttendanceAuditRecord, Course, Trainer } from '@/lib/academy';
 import CourseMultiSearchSelect, { CourseOption } from '@/components/common/CourseMultiSearchSelect';
 import BatchMultiSearchSelect, { BatchOption } from '@/components/common/BatchMultiSearchSelect';
+import TrainerMultiSearchSelect, { TrainerOption } from '@/components/common/TrainerMultiSearchSelect';
 import MonthPicker from '@/components/common/MonthPicker';
 import { 
   GraduationCap, 
@@ -61,11 +62,12 @@ export default function GuruAttendanceTab({
   const [selectedGuruId, setSelectedGuruId] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
-  // LEVEL 1: GRID FILTERS STATE
+  // LEVEL 1: GRID FILTERS STATE (Searchable Multi-Select Course, Batch, Guru)
   // ---------------------------------------------------------------------------
   const [gridSearchQuery, setGridSearchQuery] = useState('');
-  const [gridSelectedDiscipline, setGridSelectedDiscipline] = useState('All');
-  const [gridComplianceFilter, setGridComplianceFilter] = useState<'all' | 'high' | 'attention'>('all');
+  const [gridSelectedGuruIds, setGridSelectedGuruIds] = useState<string[]>([]);
+  const [gridSelectedCourseIds, setGridSelectedCourseIds] = useState<string[]>([]);
+  const [gridSelectedBatchIds, setGridSelectedBatchIds] = useState<string[]>([]);
 
   // ---------------------------------------------------------------------------
   // LEVEL 2: DEDICATED GURU VIEW FILTERS STATE
@@ -147,6 +149,55 @@ export default function GuruAttendanceTab({
   }, [records, trainers.length]);
 
   // ---------------------------------------------------------------------------
+  // LEVEL 1: FILTER OPTIONS (COURSES, BATCHES, GURUS)
+  // ---------------------------------------------------------------------------
+  const level1CourseOptions: CourseOption[] = useMemo(() => {
+    return courses.map(c => ({
+      id: c.id,
+      title: c.title,
+      category: c.category
+    }));
+  }, [courses]);
+
+  const level1BatchOptions: BatchOption[] = useMemo(() => {
+    const batchMap = new Map<string, BatchOption>();
+    for (const r of records) {
+      if (r.batch_id && r.batch_name) {
+        batchMap.set(r.batch_id, {
+          id: r.batch_id,
+          name: r.batch_name,
+          course_id: r.course_id,
+          course_title: r.course_title
+        });
+      }
+    }
+    for (const t of trainers) {
+      if (t.assigned_batches && Array.isArray(t.assigned_batches)) {
+        for (const b of t.assigned_batches) {
+          if (b.id && b.name) {
+            batchMap.set(b.id, {
+              id: b.id,
+              name: b.name,
+              course_id: b.course_id,
+              course_title: b.course_title
+            });
+          }
+        }
+      }
+    }
+    return Array.from(batchMap.values());
+  }, [records, trainers]);
+
+  const level1TrainerOptions: TrainerOption[] = useMemo(() => {
+    return trainers.map(t => ({
+      id: t.id,
+      full_name: t.full_name,
+      display_title: t.display_title,
+      specialization: (t.specializations || []).join(', ')
+    }));
+  }, [trainers]);
+
+  // ---------------------------------------------------------------------------
   // FILTERED GURUS FOR LEVEL 1 GRID
   // ---------------------------------------------------------------------------
   const filteredGurus = useMemo(() => {
@@ -154,7 +205,30 @@ export default function GuruAttendanceTab({
       const trainerRecs = getTrainerRecords(trainer);
       const coursesTaught = getTrainerCourses(trainer, trainerRecs);
 
-      // 1. Text Search
+      // 1. Guru Filter (Multi-select)
+      if (gridSelectedGuruIds.length > 0 && !gridSelectedGuruIds.includes(trainer.id)) {
+        return false;
+      }
+
+      // 2. Course Filter (Multi-select)
+      if (gridSelectedCourseIds.length > 0) {
+        const selectedCourses = courses.filter(c => gridSelectedCourseIds.includes(c.id));
+        const teachesAny = selectedCourses.some(sc =>
+          coursesTaught.some(ct => ct.toLowerCase().includes(sc.title.toLowerCase()) || sc.title.toLowerCase().includes(ct.toLowerCase())) ||
+          trainerRecs.some(r => gridSelectedCourseIds.includes(r.course_id))
+        );
+        if (!teachesAny) return false;
+      }
+
+      // 3. Batch Filter (Multi-select)
+      if (gridSelectedBatchIds.length > 0) {
+        const teachesBatch =
+          (trainer.assigned_batches && trainer.assigned_batches.some(b => gridSelectedBatchIds.includes(b.id))) ||
+          trainerRecs.some(r => gridSelectedBatchIds.includes(r.batch_id));
+        if (!teachesBatch) return false;
+      }
+
+      // 4. Text Search
       if (gridSearchQuery.trim()) {
         const q = gridSearchQuery.toLowerCase();
         const matchesName = (trainer.full_name || '').toLowerCase().includes(q);
@@ -163,36 +237,9 @@ export default function GuruAttendanceTab({
         if (!matchesName && !matchesTitle && !matchesCourse) return false;
       }
 
-      // 2. Discipline Filter
-      if (gridSelectedDiscipline !== 'All') {
-        const qDisc = gridSelectedDiscipline.toLowerCase();
-        const matches = coursesTaught.some(c => c.toLowerCase().includes(qDisc));
-        if (!matches) return false;
-      }
-
-      // 3. Compliance Filter
-      if (gridComplianceFilter !== 'all') {
-        const present = trainerRecs.filter(r => r.guru_status === 'present').length;
-        const absent = trainerRecs.filter(r => r.guru_status === 'absent').length;
-        const past = present + absent;
-        const rate = past > 0 ? Math.round((present / past) * 100) : 100;
-
-        if (gridComplianceFilter === 'high' && rate < 80) return false;
-        if (gridComplianceFilter === 'attention' && rate >= 80 && absent === 0) return false;
-      }
-
       return true;
     });
-  }, [trainers, gridSearchQuery, gridSelectedDiscipline, gridComplianceFilter, recordsByTrainerId]);
-
-  // All distinct disciplines/categories
-  const disciplineOptions = useMemo(() => {
-    const set = new Set<string>();
-    courses.forEach(c => {
-      if (c.category) set.add(c.category);
-    });
-    return ['All', ...Array.from(set)];
-  }, [courses]);
+  }, [trainers, gridSelectedGuruIds, gridSelectedCourseIds, gridSelectedBatchIds, gridSearchQuery, courses, recordsByTrainerId]);
 
   // ---------------------------------------------------------------------------
   // LEVEL 2: CURRENT GURU & FILTERED DATE-WISE RECORDS
@@ -868,36 +915,30 @@ export default function GuruAttendanceTab({
               <GraduationCap className="w-3.5 h-3.5" />
               <span>Guru Roster & Accountability Protocol</span>
             </span>
-            {isLiveSyncing && (
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-semibold flex items-center gap-1">
-                <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                Live Sync
-              </span>
-            )}
           </div>
           <h2 className="text-lg sm:text-xl font-bold tracking-tight">
             Faculty Guru Attendance & Class Roll-Call Audit
           </h2>
           <p className="text-xs text-rose-100/90 max-w-2xl mt-0.5 leading-relaxed">
-            Gurus are verified <strong>Present</strong> when they mark students' roll-call and close the class session. Click <strong>Details</strong> on any Guru card to view their complete date-wise audit.
+            Faculty attendance is recorded based on current class session statuses and student roll-calls. Click <strong>View Attendance Details</strong> on any Guru card to view their complete session audit.
           </p>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onRefresh}
-            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer text-xs flex items-center gap-1.5 font-semibold"
-            title="Refresh All Gurus"
+            className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer text-xs flex items-center gap-1.5 font-bold shadow-2xs"
+            title="Refresh Guru Attendance"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLiveSyncing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Refresh</span>
           </button>
         </div>
       </div>
 
       {/* 2. Global KPIs Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-        <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-xs flex items-center justify-between">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white p-3.5 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Faculty Gurus</p>
             <p className="text-xl font-black text-gray-900 mt-0.5">{globalStats.totalGurus}</p>
@@ -907,7 +948,7 @@ export default function GuruAttendanceTab({
           </div>
         </div>
 
-        <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-xs flex items-center justify-between">
+        <div className="bg-white p-3.5 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Classes</p>
             <p className="text-xl font-black text-gray-900 mt-0.5">{globalStats.totalSessions}</p>
@@ -917,7 +958,7 @@ export default function GuruAttendanceTab({
           </div>
         </div>
 
-        <div className="bg-white p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-xs flex items-center justify-between">
+        <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 bg-emerald-50/20 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Conducted (Present)</p>
             <p className="text-xl font-black text-emerald-700 mt-0.5">{globalStats.presentSessions}</p>
@@ -927,7 +968,7 @@ export default function GuruAttendanceTab({
           </div>
         </div>
 
-        <div className="bg-white p-3.5 rounded-xl border border-rose-200 bg-rose-50/20 shadow-xs flex items-center justify-between">
+        <div className="bg-white p-3.5 rounded-2xl border border-rose-200 bg-rose-50/20 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Missed (Absent)</p>
             <p className="text-xl font-black text-rose-700 mt-0.5">{globalStats.absentSessions}</p>
@@ -936,76 +977,102 @@ export default function GuruAttendanceTab({
             <XCircle className="w-4 h-4" />
           </div>
         </div>
-
-        <div className="bg-white p-3.5 rounded-xl border border-[#D4AF37]/40 bg-[#FFFDF5] shadow-xs flex items-center justify-between col-span-2 sm:col-span-1">
-          <div>
-            <p className="text-[10px] font-bold text-[#8A064D] uppercase tracking-wider">Overall Compliance</p>
-            <p className="text-xl font-black text-[#590231] mt-0.5">{globalStats.complianceRate}%</p>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/20 text-[#590231] flex items-center justify-center font-bold">
-            <Award className="w-4 h-4" />
-          </div>
-        </div>
       </div>
 
-      {/* 3. Search Bar & Discipline Filter Pills */}
-      <div className="bg-white p-3.5 rounded-2xl border border-[#F0D5E4] shadow-xs space-y-2.5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Search Box */}
-          <div className="relative flex-1">
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search faculty guru by name, title, or discipline..."
-              value={gridSearchQuery}
-              onChange={(e) => setGridSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-4 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] font-medium"
+      {/* 3. Searchable Multi-Selection Filter Toolbar (Guru, Course, Batch, Text) */}
+      <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Guru Multi-select */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+              Filter Gurus (Multi)
+            </label>
+            <TrainerMultiSearchSelect
+              trainers={level1TrainerOptions}
+              selectedIds={gridSelectedGuruIds}
+              onChange={setGridSelectedGuruIds}
+              placeholder="All Gurus (Multi-select)"
+              className="w-full"
             />
           </div>
 
-          {/* Compliance Filter Selector */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-xs font-semibold text-gray-500">Compliance:</span>
-            <select
-              value={gridComplianceFilter}
-              onChange={(e) => setGridComplianceFilter(e.target.value as any)}
-              className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
-            >
-              <option value="all">All Gurus ({trainers.length})</option>
-              <option value="high">High Compliance (≥80%)</option>
-              <option value="attention">Needs Attention (&lt;80% or Absent)</option>
-            </select>
+          {/* Course Multi-select */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+              Filter Courses (Multi)
+            </label>
+            <CourseMultiSearchSelect
+              courses={level1CourseOptions}
+              selectedIds={gridSelectedCourseIds}
+              onChange={setGridSelectedCourseIds}
+              placeholder="All Courses (Multi-select)"
+              className="w-full"
+            />
+          </div>
+
+          {/* Batch Multi-select */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+              Filter Batches (Multi)
+            </label>
+            <BatchMultiSearchSelect
+              batches={level1BatchOptions}
+              selectedIds={gridSelectedBatchIds}
+              onChange={setGridSelectedBatchIds}
+              placeholder="All Batches (Multi-select)"
+              className="w-full"
+            />
           </div>
         </div>
 
-        {/* Discipline Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
-          {disciplineOptions.map((disc) => (
-            <button
-              key={disc}
-              onClick={() => setGridSelectedDiscipline(disc)}
-              className={`px-3 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-                gridSelectedDiscipline === disc
-                  ? 'bg-[#8A064D] text-white shadow-2xs'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {disc}
-            </button>
-          ))}
+        {/* Text Search & Reset Toolbar */}
+        <div className="pt-2 border-t border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Quick search by guru name, title, or discipline..."
+              value={gridSearchQuery}
+              onChange={(e) => setGridSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] font-medium"
+            />
+          </div>
+
+          <div className="flex items-center justify-between sm:justify-end gap-3">
+            <span className="text-xs text-gray-500 font-semibold">
+              Showing <strong className="text-[#8A064D]">{filteredGurus.length}</strong> of {trainers.length} Gurus
+            </span>
+
+            {(gridSelectedGuruIds.length > 0 || gridSelectedCourseIds.length > 0 || gridSelectedBatchIds.length > 0 || gridSearchQuery.trim()) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setGridSelectedGuruIds([]);
+                  setGridSelectedCourseIds([]);
+                  setGridSelectedBatchIds([]);
+                  setGridSearchQuery('');
+                }}
+                className="text-xs text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Filters</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 4. Guru Cards Grid */}
+      {/* 4. Guru Cards Grid (No compliance percentage displayed) */}
       {filteredGurus.length === 0 ? (
         <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center text-gray-500 text-xs space-y-2">
           <User className="w-8 h-8 text-gray-300 mx-auto" />
           <p className="font-semibold text-gray-700">No Gurus match the selected criteria.</p>
           <button
             onClick={() => {
+              setGridSelectedGuruIds([]);
+              setGridSelectedCourseIds([]);
+              setGridSelectedBatchIds([]);
               setGridSearchQuery('');
-              setGridSelectedDiscipline('All');
-              setGridComplianceFilter('all');
             }}
             className="text-xs text-[#8A064D] font-bold hover:underline cursor-pointer"
           >
@@ -1020,8 +1087,6 @@ export default function GuruAttendanceTab({
             const present = trainerRecs.filter(r => r.guru_status === 'present').length;
             const absent = trainerRecs.filter(r => r.guru_status === 'absent').length;
             const total = trainerRecs.length;
-            const past = present + absent;
-            const complianceRate = past > 0 ? Math.round((present / past) * 100) : 100;
             const avatar = guru.avatar_url;
 
             return (
@@ -1030,7 +1095,7 @@ export default function GuruAttendanceTab({
                 className="bg-white rounded-2xl p-4 border border-[#F0D5E4] shadow-xs hover:shadow-md hover:border-[#8A064D]/50 transition-all flex flex-col justify-between group"
               >
                 <div>
-                  {/* Top Bar: Avatar & Compliance Badge */}
+                  {/* Top Bar: Avatar & Active Status Indicator (No Compliance %) */}
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="relative">
                       <div className="w-13 h-13 rounded-full border-2 border-[#D4AF37] overflow-hidden bg-rose-100 shadow-2xs">
@@ -1049,14 +1114,8 @@ export default function GuruAttendanceTab({
                       <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-2xs" title="Active Faculty" />
                     </div>
 
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                      complianceRate >= 90
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : complianceRate >= 70
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-rose-100 text-rose-800'
-                    }`}>
-                      {complianceRate}% Present
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold text-gray-600 bg-gray-100 border border-gray-200">
+                      Faculty Member
                     </span>
                   </div>
 
@@ -1089,7 +1148,7 @@ export default function GuruAttendanceTab({
                     )}
                   </div>
 
-                  {/* Quick Attendance Stats */}
+                  {/* Quick Attendance Stats: Conducted, Missed, Total (No Compliance %) */}
                   <div className="mt-3.5 pt-3 border-t border-gray-100 grid grid-cols-3 gap-1.5 text-center">
                     <div className="p-1.5 rounded-lg bg-emerald-50/60 border border-emerald-100">
                       <p className="text-[10px] font-bold text-emerald-700 uppercase">Conducted</p>
@@ -1099,9 +1158,9 @@ export default function GuruAttendanceTab({
                       <p className="text-[10px] font-bold text-rose-700 uppercase">Missed</p>
                       <p className="text-xs font-black text-rose-800 mt-0.5">{absent}</p>
                     </div>
-                    <div className="p-1.5 rounded-lg bg-[#FFF2F8] border border-rose-100">
-                      <p className="text-[10px] font-bold text-[#8A064D] uppercase">Compliance</p>
-                      <p className="text-xs font-black text-[#8A064D] mt-0.5">{complianceRate}%</p>
+                    <div className="p-1.5 rounded-lg bg-gray-50 border border-gray-200">
+                      <p className="text-[10px] font-bold text-gray-600 uppercase">Total</p>
+                      <p className="text-xs font-black text-gray-800 mt-0.5">{total}</p>
                     </div>
                   </div>
                 </div>

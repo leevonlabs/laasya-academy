@@ -167,6 +167,9 @@ export async function POST(request: NextRequest) {
           s.roll_number,
           s.status as student_status,
           s.advance_paid,
+          s.fixed_discount,
+          s.total_monthly_fee,
+          s.scheme_id,
           s.parent_name,
           s.parent_contact,
           s.address,
@@ -227,9 +230,11 @@ export async function POST(request: NextRequest) {
           `, [student.student_id]);
 
           const enrollment = enrollments[0];
-          const fee = Number(enrollment?.monthly_fee) || 2000;
+          const standardFee = student.total_monthly_fee != null ? Number(student.total_monthly_fee) : (Number(enrollment?.monthly_fee) || 2000);
+          const discount = Number(student.fixed_discount) || 0;
           const advance = Number(student.advance_paid) || 0;
-          const due = Math.max(0, fee - advance);
+          const netMonthly = Math.max(0, standardFee - discount);
+          const due = Math.max(0, netMonthly - advance);
 
           function formatTime12(timeStr?: string): string {
             if (!timeStr) return '';
@@ -266,7 +271,7 @@ export async function POST(request: NextRequest) {
               room: e.room_or_hall || 'Natya Mandapam (Room 101)',
               start_date: '01 Jan 2026',
               status: 'Active',
-              fee: `₹${e.monthly_fee || fee} / month`,
+              fee: `₹${e.monthly_fee || standardFee} / month`,
               attendance_rate: 92,
               month_attendance: '92% (11/12 classes)',
               month_attended: 11,
@@ -296,7 +301,10 @@ export async function POST(request: NextRequest) {
             room_or_hall: enrollment?.room_or_hall || 'Natya Mandapam (Room 101)',
             trainer_name: enrollment?.trainer_name || 'Assigned Guru',
             timings: formattedEnrollments[0]?.timings || 'Mon, Wed, Fri • 17:00 - 18:30',
-            total_monthly_fee: fee,
+            total_monthly_fee: standardFee,
+            fixed_discount: discount,
+            scheme_id: student.scheme_id || null,
+            net_monthly_fee: netMonthly,
             advance_paid: advance,
             due_amount: due,
             due_status: due > 0 ? 'red' : 'green',

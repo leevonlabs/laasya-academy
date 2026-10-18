@@ -6,8 +6,7 @@ export interface Course {
   code: string;
   category: string;
   description: string;
-  duration_months: number;
-  monthly_fee: number;
+  monthly_fee?: number;
   is_active: boolean;
   batch_count?: number;
   image_url?: string;
@@ -91,6 +90,7 @@ export interface Student {
   status: 'active' | 'inactive' | 'suspended';
   enrollment_date: string;
   advance_paid?: number;
+  fixed_discount?: number;
   total_monthly_fee?: number;
   due_amount?: number;
   due_date?: string;
@@ -137,10 +137,24 @@ export interface Batch {
   room_or_hall: string;
   room?: string;
   monthly_fee?: number;
+  description?: string;
   max_capacity: number;
   is_active: boolean;
   enrolled_count: number;
   schedules?: BatchScheduleSlot[];
+}
+
+export interface Scheme {
+  id: string;
+  name: string;
+  description: string;
+  course_ids: string[];
+  batch_ids: string[];
+  total_monthly_fee: number;
+  fixed_discount: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 
@@ -303,7 +317,7 @@ export async function getCourses(category?: string): Promise<Course[]> {
   let sql = `
     SELECT 
       c.id, c.title, c.code, COALESCE(c.category, '') as category, c.description, 
-      c.duration_months, c.monthly_fee, c.is_active, c.image_url,
+      c.monthly_fee, c.is_active, c.image_url,
       COUNT(b.id)::int as batch_count
     FROM public.courses c
     LEFT JOIN public.batches b ON b.course_id = c.id
@@ -328,15 +342,14 @@ export async function createCourse(data: {
   code: string;
   category: string;
   description: string;
-  duration_months: number;
-  monthly_fee: number;
+  monthly_fee?: number;
   image_url?: string;
 }) {
   return queryOne<Course>(`
-    INSERT INTO public.courses (title, code, category, description, duration_months, monthly_fee, is_active, image_url)
-    VALUES ($1, $2, $3, $4, $5, $6, true, $7)
+    INSERT INTO public.courses (title, code, category, description, monthly_fee, is_active, image_url)
+    VALUES ($1, $2, $3, $4, $5, true, $6)
     RETURNING *;
-  `, [data.title, data.code, data.category || '', data.description, data.duration_months, data.monthly_fee, data.image_url || null]);
+  `, [data.title, data.code, data.category || '', data.description, data.monthly_fee || 0, data.image_url || null]);
 }
 
 export async function updateCourse(id: string, data: {
@@ -344,7 +357,6 @@ export async function updateCourse(id: string, data: {
   code?: string;
   category?: string;
   monthly_fee?: number;
-  duration_months?: number;
   description?: string;
   is_active?: boolean;
   image_url?: string;
@@ -356,9 +368,8 @@ export async function updateCourse(id: string, data: {
         category = CASE WHEN $4::text IS NOT NULL THEN $4 ELSE category END,
         monthly_fee = COALESCE($5, monthly_fee),
         description = COALESCE($6, description),
-        duration_months = COALESCE($7, duration_months),
-        is_active = COALESCE($8, is_active),
-        image_url = CASE WHEN $9::text IS NOT NULL THEN $9 ELSE image_url END,
+        is_active = COALESCE($7, is_active),
+        image_url = CASE WHEN $8::text IS NOT NULL THEN $8 ELSE image_url END,
         updated_at = now()
     WHERE id = $1
     RETURNING *;
@@ -369,7 +380,6 @@ export async function updateCourse(id: string, data: {
     data.category !== undefined ? data.category : null, 
     data.monthly_fee,
     data.description, 
-    data.duration_months, 
     data.is_active,
     data.image_url !== undefined ? data.image_url : null
   ]);
@@ -646,6 +656,7 @@ export async function getStudents(): Promise<Student[]> {
       s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, 
       TO_CHAR(s.enrollment_date, 'YYYY-MM-DD') as enrollment_date,
       COALESCE(s.advance_paid, 0)::numeric as advance_paid,
+      COALESCE(s.fixed_discount, 0)::numeric as fixed_discount,
       COUNT(DISTINCT be.batch_id)::int as enrolled_batches_count,
       ROUND(
         COALESCE(
@@ -658,7 +669,7 @@ export async function getStudents(): Promise<Student[]> {
     JOIN public.profiles p ON p.id = s.profile_id
     LEFT JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
     LEFT JOIN public.attendance a ON a.student_id = s.id
-    GROUP BY s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone, s.avatar_url, p.avatar_url, s.age, p.age, s.date_of_birth, s.gender, p.gender, s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, s.enrollment_date, s.advance_paid
+    GROUP BY s.id, s.profile_id, s.roll_number, p.full_name, p.email, p.phone, s.avatar_url, p.avatar_url, s.age, p.age, s.date_of_birth, s.gender, p.gender, s.parent_name, s.parent_relation, s.parent_contact, s.address, s.status, s.enrollment_date, s.advance_paid, s.fixed_discount
     ORDER BY 
       CASE WHEN s.roll_number ~ '^LCA-[0-9]+$' THEN CAST(SUBSTRING(s.roll_number FROM 5) AS INT) ELSE 999999 END ASC,
       p.full_name ASC;
@@ -690,7 +701,7 @@ export async function getStudents(): Promise<Student[]> {
         c.id as course_id,
         c.title as course_title,
         c.category as course_category,
-        c.monthly_fee,
+        COALESCE(b.monthly_fee, c.monthly_fee, 0)::numeric as monthly_fee,
         t.id as trainer_id,
         tp.full_name as trainer_name,
         b.days_of_week,
@@ -826,13 +837,15 @@ export async function getStudents(): Promise<Student[]> {
     // Total Monthly Fee: sum of fees of all courses the student has joined
     const totalMonthly = st.enrolled_batches.reduce((sum, b) => sum + (Number(b.monthly_fee) || 0), 0);
     st.total_monthly_fee = totalMonthly;
+    const fixedDiscount = Number(st.fixed_discount || 0);
+    const netMonthly = Math.max(0, totalMonthly - fixedDiscount);
 
     const advPaid = Number(st.advance_paid || 0);
     const invData = invoiceMap.get(st.id);
 
-    // Due amount: total monthly amount to be paid (for current month) - advance that paid
-    let rawDue = totalMonthly - advPaid;
-    if (invData && invData.balance > totalMonthly) {
+    // Due amount: net monthly amount to be paid (for current month) - advance that paid
+    let rawDue = netMonthly - advPaid;
+    if (invData && invData.balance > netMonthly) {
       // If student has accumulated overdue invoices from past months
       rawDue = invData.balance - advPaid;
     }
@@ -846,7 +859,7 @@ export async function getStudents(): Promise<Student[]> {
     // Red: More than current month amount
     if (rawDue <= 0) {
       st.due_status = 'green';
-    } else if (rawDue > totalMonthly) {
+    } else if (rawDue > netMonthly) {
       st.due_status = 'red';
     } else {
       st.due_status = 'yellow';
@@ -871,6 +884,8 @@ export async function createStudent(data: {
   emergency_contact?: string;
   joining_date?: string;
   advance_paid?: number;
+  fixed_discount?: number;
+  status?: 'active' | 'inactive' | 'suspended';
   batch_ids?: string[];
 }) {
   // Automatically generate unique student ID in sequence: LCA-1, LCA-2, LCA-3...
@@ -928,23 +943,26 @@ export async function createStudent(data: {
 
   const joiningDate = data.joining_date || new Date().toISOString().split('T')[0];
   const advancePaid = Number(data.advance_paid || 0);
+  const fixedDiscount = Number(data.fixed_discount || 0);
+  const studentStatus = data.status || 'active';
   const dob = data.date_of_birth?.trim() || null;
 
   const student = await queryOne<Student>(`
     INSERT INTO public.students (
       profile_id, roll_number, parent_name, parent_relation,
-      parent_contact, address, emergency_contact, status, enrollment_date, advance_paid, avatar_url, age, gender, date_of_birth
+      parent_contact, address, emergency_contact, status, enrollment_date, advance_paid, fixed_discount, avatar_url, age, gender, date_of_birth
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9, $10, $11, $12, $13::date)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::date)
     ON CONFLICT (profile_id) DO UPDATE SET
       parent_name = EXCLUDED.parent_name,
       parent_relation = EXCLUDED.parent_relation,
       parent_contact = EXCLUDED.parent_contact,
       address = EXCLUDED.address,
       emergency_contact = EXCLUDED.emergency_contact,
-      status = 'active',
+      status = EXCLUDED.status,
       enrollment_date = EXCLUDED.enrollment_date,
       advance_paid = EXCLUDED.advance_paid,
+      fixed_discount = EXCLUDED.fixed_discount,
       avatar_url = COALESCE(EXCLUDED.avatar_url, students.avatar_url),
       age = COALESCE(EXCLUDED.age, students.age),
       gender = COALESCE(EXCLUDED.gender, students.gender),
@@ -958,8 +976,10 @@ export async function createStudent(data: {
     data.parent_contact || data.phone,
     data.address || 'Kannamangala, Bangalore',
     data.emergency_contact || data.parent_contact || data.phone,
+    studentStatus,
     joiningDate,
     advancePaid,
+    fixedDiscount,
     data.avatar_url || null,
     age,
     gender,
@@ -982,6 +1002,7 @@ export async function createStudent(data: {
     email: data.email,
     phone: data.phone,
     advance_paid: advancePaid,
+    fixed_discount: fixedDiscount,
     avatar_url: data.avatar_url || null,
     age: age || undefined,
     date_of_birth: dob || undefined,
@@ -1003,6 +1024,7 @@ export async function updateStudent(id: string, data: {
   address?: string;
   joining_date?: string;
   advance_paid?: number;
+  fixed_discount?: number;
   status?: 'active' | 'inactive' | 'suspended';
   batch_ids?: string[];
 }) {
@@ -1052,6 +1074,7 @@ export async function updateStudent(id: string, data: {
         age = COALESCE($10, age),
         gender = COALESCE($11, gender),
         date_of_birth = COALESCE($12::date, date_of_birth),
+        fixed_discount = COALESCE($13, fixed_discount),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
@@ -1061,7 +1084,8 @@ export async function updateStudent(id: string, data: {
     data.avatar_url !== undefined ? data.avatar_url : null,
     age !== undefined ? age : null,
     gender !== undefined ? gender : null,
-    dob
+    dob,
+    data.fixed_discount !== undefined ? data.fixed_discount : null
   ]);
 
   // Update batch enrollments if batch_ids provided
@@ -1141,6 +1165,8 @@ export async function getBatches(): Promise<Batch[]> {
       b.id, b.course_id, c.title as course_title, c.category as course_category,
       b.trainer_id, p.full_name as trainer_name,
       b.name, b.days_of_week, b.start_time, b.end_time, b.room_or_hall,
+      COALESCE(b.monthly_fee, 0)::numeric as monthly_fee,
+      COALESCE(b.description, '') as description,
       b.max_capacity, b.is_active, b.schedules,
       COUNT(DISTINCT CASE WHEN st.status = 'active' THEN be.id END)::int as enrolled_count
     FROM public.batches b
@@ -1149,7 +1175,7 @@ export async function getBatches(): Promise<Batch[]> {
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batch_enrollments be ON be.batch_id = b.id AND be.status = 'active'
     LEFT JOIN public.students st ON st.id = be.student_id
-    GROUP BY b.id, b.course_id, c.title, c.category, b.trainer_id, p.full_name, b.schedules
+    GROUP BY b.id, b.course_id, c.title, c.category, b.trainer_id, p.full_name, b.monthly_fee, b.description, b.schedules
     ORDER BY b.start_time, b.name;
   `;
   return query<Batch>(sql);
@@ -1164,19 +1190,25 @@ export async function createBatch(data: {
   end_time: string;
   room_or_hall: string;
   max_capacity: number;
+  monthly_fee?: number;
+  description?: string;
+  is_active?: boolean;
   schedules?: BatchScheduleSlot[];
 }) {
   return queryOne<Batch>(`
     INSERT INTO public.batches (
       course_id, trainer_id, name, days_of_week, 
       start_time, end_time, room_or_hall, max_capacity, 
-      is_active, schedules
+      monthly_fee, description, is_active, schedules
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     RETURNING *;
   `, [
     data.course_id, data.trainer_id, data.name, data.days_of_week,
     data.start_time, data.end_time, data.room_or_hall, data.max_capacity,
+    Number(data.monthly_fee || 0),
+    data.description || '',
+    data.is_active !== undefined ? data.is_active : true,
     JSON.stringify(data.schedules || [])
   ]);
 }
@@ -1190,6 +1222,8 @@ export async function updateBatch(id: string, data: {
   end_time?: string;
   room_or_hall?: string;
   max_capacity?: number;
+  monthly_fee?: number;
+  description?: string;
   is_active?: boolean;
   schedules?: BatchScheduleSlot[];
 }) {
@@ -1203,14 +1237,19 @@ export async function updateBatch(id: string, data: {
         end_time = COALESCE($7, end_time),
         room_or_hall = COALESCE($8, room_or_hall),
         max_capacity = COALESCE($9, max_capacity),
-        is_active = COALESCE($10, is_active),
-        schedules = COALESCE($11::jsonb, schedules),
+        monthly_fee = COALESCE($10, monthly_fee),
+        description = COALESCE($11, description),
+        is_active = COALESCE($12, is_active),
+        schedules = COALESCE($13::jsonb, schedules),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
   `, [
     id, data.name, data.course_id, data.trainer_id, data.days_of_week,
-    data.start_time, data.end_time, data.room_or_hall, data.max_capacity, data.is_active,
+    data.start_time, data.end_time, data.room_or_hall, data.max_capacity,
+    data.monthly_fee !== undefined ? data.monthly_fee : null,
+    data.description !== undefined ? data.description : null,
+    data.is_active !== undefined ? data.is_active : null,
     data.schedules ? JSON.stringify(data.schedules) : null
   ]);
 }
@@ -1244,7 +1283,7 @@ export async function getSessions(dateFilter?: string, startDate?: string, endDa
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batch_enrollments be ON be.batch_id = b.id AND be.status = 'active'
     LEFT JOIN public.attendance a ON a.session_id = s.id
-    WHERE 1=1
+    WHERE 1=1 AND b.is_active = true
   `;
   const params: any[] = [];
   if (startDate && endDate) {
@@ -1488,5 +1527,100 @@ export async function getGuruAttendanceAuditRecords(options?: {
     return rows.filter(r => r.guru_status === options.status);
   }
   return rows;
+}
+
+// -------------------------------------------------------------
+// SCHEMES
+// -------------------------------------------------------------
+export async function getSchemes(): Promise<Scheme[]> {
+  const sql = `
+    SELECT 
+      id, 
+      name, 
+      COALESCE(description, '') as description, 
+      COALESCE(course_ids, '[]'::jsonb) as course_ids, 
+      COALESCE(batch_ids, '[]'::jsonb) as batch_ids, 
+      COALESCE(total_monthly_fee, 0)::numeric as total_monthly_fee, 
+      COALESCE(fixed_discount, 0)::numeric as fixed_discount, 
+      COALESCE(is_active, true) as is_active, 
+      TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at,
+      TO_CHAR(updated_at, 'YYYY-MM-DD HH24:MI:SS') as updated_at
+    FROM public.schemes
+    ORDER BY created_at DESC;
+  `;
+  const rows = await query<any>(sql);
+  return rows.map(r => ({
+    ...r,
+    course_ids: Array.isArray(r.course_ids) ? r.course_ids : (typeof r.course_ids === 'string' ? JSON.parse(r.course_ids) : []),
+    batch_ids: Array.isArray(r.batch_ids) ? r.batch_ids : (typeof r.batch_ids === 'string' ? JSON.parse(r.batch_ids) : []),
+    total_monthly_fee: Number(r.total_monthly_fee || 0),
+    fixed_discount: Number(r.fixed_discount || 0),
+    is_active: r.is_active !== false
+  }));
+}
+
+export async function createScheme(data: {
+  name: string;
+  description?: string;
+  course_ids: string[];
+  batch_ids: string[];
+  total_monthly_fee: number;
+  fixed_discount: number;
+  is_active?: boolean;
+}) {
+  return queryOne<Scheme>(`
+    INSERT INTO public.schemes (
+      name, description, course_ids, batch_ids, total_monthly_fee, fixed_discount, is_active
+    )
+    VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, $6, $7)
+    RETURNING *;
+  `, [
+    data.name.trim(),
+    data.description || '',
+    JSON.stringify(data.course_ids || []),
+    JSON.stringify(data.batch_ids || []),
+    Number(data.total_monthly_fee || 0),
+    Number(data.fixed_discount || 0),
+    data.is_active !== undefined ? data.is_active : true
+  ]);
+}
+
+export async function updateScheme(id: string, data: {
+  name?: string;
+  description?: string;
+  course_ids?: string[];
+  batch_ids?: string[];
+  total_monthly_fee?: number;
+  fixed_discount?: number;
+  is_active?: boolean;
+}) {
+  return queryOne<Scheme>(`
+    UPDATE public.schemes
+    SET name = COALESCE($2, name),
+        description = COALESCE($3, description),
+        course_ids = COALESCE($4::jsonb, course_ids),
+        batch_ids = COALESCE($5::jsonb, batch_ids),
+        total_monthly_fee = COALESCE($6, total_monthly_fee),
+        fixed_discount = COALESCE($7, fixed_discount),
+        is_active = COALESCE($8, is_active),
+        updated_at = now()
+    WHERE id = $1
+    RETURNING *;
+  `, [
+    id,
+    data.name ? data.name.trim() : null,
+    data.description !== undefined ? data.description : null,
+    data.course_ids ? JSON.stringify(data.course_ids) : null,
+    data.batch_ids ? JSON.stringify(data.batch_ids) : null,
+    data.total_monthly_fee !== undefined ? Number(data.total_monthly_fee) : null,
+    data.fixed_discount !== undefined ? Number(data.fixed_discount) : null,
+    data.is_active !== undefined ? data.is_active : null
+  ]);
+}
+
+export async function deleteScheme(id: string) {
+  return queryOne<Scheme>(`
+    DELETE FROM public.schemes WHERE id = $1 RETURNING *;
+  `, [id]);
 }
 

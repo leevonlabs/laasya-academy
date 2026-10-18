@@ -74,7 +74,7 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
     if (type == 'video' || type == 'video_shared' || title.contains('video') || message.contains('drive vault') || message.contains('learning video')) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const StudentVideoLibraryScreen()),
+        MaterialPageRoute(builder: (_) => const StudentVideoLibraryScreen(isTrainer: true)),
       );
       return;
     }
@@ -266,7 +266,7 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
                           label: const Text('Open Learning Video Library', style: TextStyle(fontWeight: FontWeight.bold)),
                           onPressed: () {
                             Navigator.pop(ctx);
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentVideoLibraryScreen()));
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentVideoLibraryScreen(isTrainer: true)));
                           },
                         ),
                       ),

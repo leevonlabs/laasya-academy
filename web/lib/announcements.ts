@@ -104,7 +104,7 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
         a.trainer_id,
         a.trainer_name,
         COALESCE(pt.avatar_url, tt.avatar_url, pt2.avatar_url) as trainer_avatar_url,
-        COALESCE(pa.avatar_url, (SELECT config_value->>'avatar_url' FROM public.app_config WHERE config_key = 'admin_support_profile')) as admin_avatar_url,
+        COALESCE(NULLIF((SELECT config_value->>'avatar_url' FROM public.app_config WHERE config_key = 'admin_support_profile'), ''), NULLIF(pa.avatar_url, '')) as admin_avatar_url,
         a.created_at::text as created_at, 
         a.updated_at::text as updated_at
       FROM public.announcements a

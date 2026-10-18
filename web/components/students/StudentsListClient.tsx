@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Student, Batch, Course, StudentEnrolledBatch } from '@/lib/academy';
+import { Student, Batch, Course, Scheme, StudentEnrolledBatch } from '@/lib/academy';
 import PhotoUploadInput from '@/components/common/PhotoUploadInput';
+import SearchableCombobox, { ComboboxOption } from '@/components/common/SearchableCombobox';
+import MultiSelectCombobox, { MultiSelectOption } from '@/components/common/MultiSelectCombobox';
 import { 
   GraduationCap, 
   Search, 
@@ -37,18 +39,32 @@ interface Props {
   initialStudents: Student[];
   batches: Batch[];
   courses: Course[];
+  schemes?: Scheme[];
 }
 
-export default function StudentsListClient({ initialStudents, batches, courses }: Props) {
+export default function StudentsListClient({ initialStudents, batches, courses, schemes = [] }: Props) {
   const [students, setStudents] = useState<Student[]>(initialStudents);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Status Filter: 'active' by default as required
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
 
-  // Course & Batch Filters (group up all students in selected course or batch)
-  const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('all');
-  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
+  // Multi-Selection Course & Batch Filters (searchable dropdowns)
+  const [selectedCourseFilters, setSelectedCourseFilters] = useState<string[]>([]);
+  const [selectedBatchFilters, setSelectedBatchFilters] = useState<string[]>([]);
+
+  // Sort By Options
+  type SortOption = 
+    | 'default' 
+    | 'fee_desc' 
+    | 'fee_asc' 
+    | 'discount_desc' 
+    | 'discount_asc' 
+    | 'due_desc' 
+    | 'due_asc' 
+    | 'joining_desc' 
+    | 'joining_asc';
+  const [sortBy, setSortBy] = useState<SortOption>('default');
 
   // View mode: 'grid' as first preference
   const [viewMode, setViewMode] = useState<'grid' | 'row'>('grid');
@@ -118,6 +134,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   const [editAddress, setEditAddress] = useState('');
   const [editJoiningDate, setEditJoiningDate] = useState('');
   const [editAdvancePaid, setEditAdvancePaid] = useState<number>(0);
+  const [editFixedDiscount, setEditFixedDiscount] = useState<number>(0);
   const [editStatus, setEditStatus] = useState<'active' | 'inactive' | 'suspended'>('active');
   const [editCourseSelections, setEditCourseSelections] = useState<{ courseId: string; batchIds: string[] }[]>([]);
   const [activeEditCourseId, setActiveEditCourseId] = useState<string>('');
@@ -144,6 +161,8 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   const [address, setAddress] = useState('');
   const [joiningDate, setJoiningDate] = useState('2026-09-30');
   const [advancePaid, setAdvancePaid] = useState<number>(0);
+  const [fixedDiscount, setFixedDiscount] = useState<number>(0);
+  const [newStatus, setNewStatus] = useState<'active' | 'inactive'>('active');
   const [courseSelections, setCourseSelections] = useState<{ courseId: string; batchIds: string[] }[]>([]);
   const [activeCourseId, setActiveCourseId] = useState<string>('');
   const selectedCourseIds = useMemo(() => {
@@ -153,6 +172,88 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     return Array.from(new Set(courseSelections.flatMap(s => s.batchIds)));
   }, [courseSelections]);
   const [savingNew, setSavingNew] = useState(false);
+  const [selectedSchemeId, setSelectedSchemeId] = useState<string>('');
+  const [editSelectedSchemeId, setEditSelectedSchemeId] = useState<string>('');
+
+  const editAvailableBatches = useMemo(() => {
+    return batches.filter(b => editSelectedCourseIds.includes(b.course_id));
+  }, [batches, editSelectedCourseIds]);
+
+  const registerAvailableBatches = useMemo(() => {
+    return batches.filter(b => selectedCourseIds.includes(b.course_id));
+  }, [batches, selectedCourseIds]);
+
+  // Course options for student enrollment (Searchable Combobox)
+  const studentCourseOptions = useMemo<ComboboxOption[]>(() => {
+    return courses.map(c => ({
+      id: c.id,
+      label: c.title,
+      subtitle: `${c.code} • ${c.category || 'General'}`,
+      badge: c.category
+    }));
+  }, [courses]);
+
+  // Active Scheme options for combo selection
+  const schemeComboboxOptions = useMemo<ComboboxOption[]>(() => {
+    return (schemes || []).filter(s => s.is_active !== false).map(s => ({
+      id: s.id,
+      label: `${s.name} (Discount: ₹${s.fixed_discount || 0}/mo)`,
+      subtitle: s.description || 'Special Academy Scheme Combo Offer',
+      badge: `₹${s.fixed_discount || 0}/mo OFF`
+    }));
+  }, [schemes]);
+
+  const handleApplyScheme = (schemeId: string, mode: 'register' | 'edit') => {
+    if (!schemeId) {
+      if (mode === 'register') {
+        setSelectedSchemeId('');
+        setCourseSelections([]);
+        setFixedDiscount(0);
+        showToast('Scheme removed — auto-filled courses, batches and discount cleared.');
+      } else {
+        setEditSelectedSchemeId('');
+        setEditCourseSelections([]);
+        setEditFixedDiscount(0);
+        showToast('Scheme removed — auto-filled courses, batches and discount cleared.');
+      }
+      return;
+    }
+
+    const scheme = (schemes || []).find(s => s.id === schemeId);
+    if (!scheme) return;
+
+    const schemeBatchIds: string[] = Array.isArray(scheme.batch_ids) ? scheme.batch_ids : [];
+    const newSelections: { courseId: string; batchIds: string[] }[] = [];
+    schemeBatchIds.forEach(bId => {
+      const b = batches.find(item => item.id === bId);
+      if (b && b.course_id) {
+        let entry = newSelections.find(s => s.courseId === b.course_id);
+        if (!entry) {
+          entry = { courseId: b.course_id, batchIds: [] };
+          newSelections.push(entry);
+        }
+        if (!entry.batchIds.includes(bId)) {
+          entry.batchIds.push(bId);
+        }
+      }
+    });
+
+    if (mode === 'register') {
+      setSelectedSchemeId(schemeId);
+      if (scheme.fixed_discount !== undefined) {
+        setFixedDiscount(Number(scheme.fixed_discount));
+      }
+      setCourseSelections(newSelections);
+      showToast(`Applied Scheme "${scheme.name}" — batches and discount auto-filled!`);
+    } else {
+      setEditSelectedSchemeId(schemeId);
+      if (scheme.fixed_discount !== undefined) {
+        setEditFixedDiscount(Number(scheme.fixed_discount));
+      }
+      setEditCourseSelections(newSelections);
+      showToast(`Applied Scheme "${scheme.name}" — batches and discount auto-filled!`);
+    }
+  };
 
   // Deactivation confirmation modal state
   const [deactivatingStudent, setDeactivatingStudent] = useState<Student | null>(null);
@@ -225,13 +326,27 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     return currentMonthDueDate;
   };
 
-  // Dynamic available batches for the filter dropdown
-  const availableBatchesForFilter = useMemo(() => {
-    if (selectedCourseFilter === 'all') return batches;
-    return batches.filter(
-      b => b.course_id === selectedCourseFilter || b.course_title?.toLowerCase() === selectedCourseFilter.toLowerCase()
-    );
-  }, [batches, selectedCourseFilter]);
+  // Multi-selection options for Course and Batch filters
+  const courseFilterOptions = useMemo<MultiSelectOption[]>(() => {
+    return courses.map(c => ({
+      id: c.id,
+      label: c.title,
+      subtitle: `${c.code || ''} • ${c.category || 'General'}`,
+      badge: c.category
+    }));
+  }, [courses]);
+
+  const batchFilterOptions = useMemo<MultiSelectOption[]>(() => {
+    const list = selectedCourseFilters.length === 0
+      ? batches
+      : batches.filter(b => selectedCourseFilters.includes(b.course_id));
+    return list.map(b => ({
+      id: b.id,
+      label: b.name,
+      subtitle: `${b.course_title || 'Course'} • ${b.trainer_name || 'Guru'}`,
+      badge: b.room_or_hall
+    }));
+  }, [batches, selectedCourseFilters]);
 
   // Filter students based on status, search query, course, and batch
   const filteredStudents = useMemo(() => {
@@ -240,18 +355,18 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       if (statusFilter === 'active' && s.status !== 'active') return false;
       if (statusFilter === 'inactive' && s.status !== 'inactive' && s.status !== 'suspended') return false;
 
-      // 2. Course Filter
-      if (selectedCourseFilter !== 'all') {
+      // 2. Multi-select Course Filter
+      if (selectedCourseFilters.length > 0) {
         const matchesCourse = (s.enrolled_batches || []).some(
-          b => b.course_id === selectedCourseFilter || b.course_title?.toLowerCase() === selectedCourseFilter.toLowerCase()
+          b => selectedCourseFilters.includes(b.course_id)
         );
         if (!matchesCourse) return false;
       }
 
-      // 3. Batch Filter
-      if (selectedBatchFilter !== 'all') {
+      // 3. Multi-select Batch Filter
+      if (selectedBatchFilters.length > 0) {
         const matchesBatch = (s.enrolled_batches || []).some(
-          b => b.batch_id === selectedBatchFilter || b.batch_name?.toLowerCase() === selectedBatchFilter.toLowerCase()
+          b => selectedBatchFilters.includes(b.batch_id)
         );
         if (!matchesBatch) return false;
       }
@@ -271,7 +386,32 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
       return true;
     });
-  }, [students, statusFilter, selectedCourseFilter, selectedBatchFilter, searchQuery]);
+  }, [students, statusFilter, selectedCourseFilters, selectedBatchFilters, searchQuery]);
+
+  // Sort filtered students based on selected sortBy option
+  const sortedStudents = useMemo(() => {
+    const list = [...filteredStudents];
+    switch (sortBy) {
+      case 'fee_desc':
+        return list.sort((a, b) => (Number(b.total_monthly_fee) || 0) - (Number(a.total_monthly_fee) || 0));
+      case 'fee_asc':
+        return list.sort((a, b) => (Number(a.total_monthly_fee) || 0) - (Number(b.total_monthly_fee) || 0));
+      case 'discount_desc':
+        return list.sort((a, b) => (Number(b.fixed_discount) || 0) - (Number(a.fixed_discount) || 0));
+      case 'discount_asc':
+        return list.sort((a, b) => (Number(a.fixed_discount) || 0) - (Number(b.fixed_discount) || 0));
+      case 'due_desc':
+        return list.sort((a, b) => (Number(b.due_amount) || 0) - (Number(a.due_amount) || 0));
+      case 'due_asc':
+        return list.sort((a, b) => (Number(a.due_amount) || 0) - (Number(b.due_amount) || 0));
+      case 'joining_desc':
+        return list.sort((a, b) => new Date(b.enrollment_date || 0).getTime() - new Date(a.enrollment_date || 0).getTime());
+      case 'joining_asc':
+        return list.sort((a, b) => new Date(a.enrollment_date || 0).getTime() - new Date(b.enrollment_date || 0).getTime());
+      default:
+        return list;
+    }
+  }, [filteredStudents, sortBy]);
 
   // Counts for tabs
   const activeCount = useMemo(() => students.filter(s => s.status === 'active').length, [students]);
@@ -324,6 +464,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     setEditAddress(s.address || '');
     setEditJoiningDate(s.enrollment_date ? s.enrollment_date.substring(0, 10) : '2026-09-30');
     setEditAdvancePaid(Number(s.advance_paid || 0));
+    setEditFixedDiscount(Number(s.fixed_discount || 0));
     setEditStatus(s.status || 'active');
 
     // Group enrolled batches by course
@@ -342,6 +483,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     }
     setEditCourseSelections(initialSelections);
     setActiveEditCourseId('');
+    setEditSelectedSchemeId('');
     setPageMode('edit');
   };
 
@@ -360,6 +502,9 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     setAddress('');
     setJoiningDate(new Date().toISOString().split('T')[0]);
     setAdvancePaid(0);
+    setFixedDiscount(0);
+    setNewStatus('active');
+    setSelectedSchemeId('');
     // Start with empty course selection
     setCourseSelections([]);
     setActiveCourseId('');
@@ -408,6 +553,16 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         }))
         .filter(s => s.batchIds.length > 0)
     );
+
+    if (selectedSchemeId) {
+      const activeScheme = (schemes || []).find(s => s.id === selectedSchemeId);
+      const schemeBatchIds: string[] = Array.isArray(activeScheme?.batch_ids) ? activeScheme!.batch_ids : [];
+      if (schemeBatchIds.includes(batchId)) {
+        setFixedDiscount(0);
+        setSelectedSchemeId('');
+        showToast('Batch enrolled by active scheme was removed — fixed monthly discount cleared.');
+      }
+    }
   };
 
   // Course & Batch sequential handlers for Edit Student
@@ -450,6 +605,16 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         }))
         .filter(s => s.batchIds.length > 0)
     );
+
+    if (editSelectedSchemeId) {
+      const activeScheme = (schemes || []).find(s => s.id === editSelectedSchemeId);
+      const schemeBatchIds: string[] = Array.isArray(activeScheme?.batch_ids) ? activeScheme!.batch_ids : [];
+      if (schemeBatchIds.includes(batchId)) {
+        setEditFixedDiscount(0);
+        setEditSelectedSchemeId('');
+        showToast('Batch enrolled by active scheme was removed — fixed monthly discount cleared.');
+      }
+    }
   };
 
   // Backward-compatibility course and batch togglers for modal views
@@ -554,6 +719,8 @@ export default function StudentsListClient({ initialStudents, batches, courses }
           address: address.trim(),
           joining_date: joiningDate,
           advance_paid: Number(advancePaid || 0),
+          fixed_discount: Number(fixedDiscount || 0),
+          status: newStatus,
           batch_ids: selectedBatchIds
         })
       });
@@ -574,7 +741,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
           course_id: b?.course_id || '',
           course_title: b?.course_title || 'Course',
           course_category: b?.course_category || 'Academy Arts',
-          monthly_fee: Number(b?.course_title ? (courses.find(c => c.id === b.course_id)?.monthly_fee || 2000) : 2000),
+          monthly_fee: Number(b?.monthly_fee || (courses.find(c => c.id === b?.course_id)?.monthly_fee || 2000)),
           trainer_id: b?.trainer_id || '',
           trainer_name: b?.trainer_name || 'Academy Guru',
           days_of_week: b?.days_of_week || [],
@@ -587,8 +754,10 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
       const totalMonthly = enrolledBatchObjects.reduce((acc, b) => acc + (b.monthly_fee || 0), 0);
       const adv = Number(advancePaid || 0);
-      // Formula: total monthly fee to be paid (for current month) - advance that paid
-      const due = totalMonthly - adv;
+      const disc = Number(fixedDiscount || 0);
+      const netMonthly = Math.max(0, totalMonthly - disc);
+      // Formula: net monthly fee to be paid (for current month) - advance that paid
+      const due = netMonthly - adv;
 
       const fullStudent: Student = {
         ...created,
@@ -603,13 +772,14 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         parent_relation: parentRelation,
         parent_contact: parentContact || phone.trim(),
         address: address.trim(),
-        status: 'active',
+        status: newStatus,
         enrollment_date: joiningDate,
         advance_paid: adv,
+        fixed_discount: disc,
         total_monthly_fee: totalMonthly,
         due_amount: due,
         due_date: currentMonthDueDate,
-        due_status: due <= 0 ? 'green' : due > totalMonthly ? 'red' : 'yellow',
+        due_status: due <= 0 ? 'green' : due > netMonthly ? 'red' : 'yellow',
         enrolled_batches_count: selectedBatchIds.length,
         attendance_rate: 100,
         enrolled_batches: enrolledBatchObjects
@@ -618,6 +788,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       setStudents(prev => [fullStudent, ...prev]);
       showToast(`Student ${fullName} (${fullStudent.roll_number}) registered successfully!`);
       setIsAddOpen(false);
+      setPageMode('list');
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -650,6 +821,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
           address: editAddress.trim(),
           joining_date: editJoiningDate,
           advance_paid: Number(editAdvancePaid || 0),
+          fixed_discount: Number(editFixedDiscount || 0),
           status: editStatus,
           batch_ids: editSelectedBatchIds
         })
@@ -669,7 +841,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
           course_id: b?.course_id || '',
           course_title: b?.course_title || 'Course',
           course_category: b?.course_category || 'Academy Arts',
-          monthly_fee: Number(courses.find(c => c.id === b?.course_id)?.monthly_fee || 2000),
+          monthly_fee: Number(b?.monthly_fee || (courses.find(c => c.id === b?.course_id)?.monthly_fee || 2000)),
           trainer_id: b?.trainer_id || '',
           trainer_name: b?.trainer_name || 'Academy Guru',
           days_of_week: b?.days_of_week || [],
@@ -682,8 +854,10 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
       const totalMonthly = updatedBatchObjects.reduce((acc, b) => acc + (b.monthly_fee || 0), 0);
       const adv = Number(editAdvancePaid || 0);
-      // Formula: total monthly fee to be paid (for current month) - advance that paid
-      const due = totalMonthly - adv;
+      const disc = Number(editFixedDiscount || 0);
+      const netMonthly = Math.max(0, totalMonthly - disc);
+      // Formula: net monthly fee to be paid (for current month) - advance that paid
+      const due = netMonthly - adv;
 
       setStudents(prev =>
         prev.map(s =>
@@ -703,10 +877,11 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 address: editAddress.trim(),
                 enrollment_date: editJoiningDate,
                 advance_paid: adv,
+                fixed_discount: disc,
                 status: editStatus,
                 total_monthly_fee: totalMonthly,
                 due_amount: due,
-                due_status: due <= 0 ? 'green' : due > totalMonthly ? 'red' : 'yellow',
+                due_status: due <= 0 ? 'green' : due > netMonthly ? 'red' : 'yellow',
                 enrolled_batches_count: editSelectedBatchIds.length,
                 enrolled_batches: updatedBatchObjects
               }
@@ -781,9 +956,11 @@ export default function StudentsListClient({ initialStudents, batches, courses }
   // Helper for due amount color styling and formatted values
   const getDueAmountDisplay = (s: Student) => {
     const monthly = Number(s.total_monthly_fee || 0);
+    const disc = Number(s.fixed_discount || 0);
+    const netMonthly = Math.max(0, monthly - disc);
     const adv = Number(s.advance_paid || 0);
-    // Formula: total monthly amount to be paid (for current month) - advance that paid
-    const due = s.due_amount !== undefined ? Number(s.due_amount) : (monthly - adv);
+    // Formula: net monthly amount to be paid (for current month) - advance that paid
+    const due = s.due_amount !== undefined ? Number(s.due_amount) : (netMonthly - adv);
 
     // Green: Zero or negative due amount (fully paid or advance payment)
     if (due <= 0) {
@@ -797,8 +974,8 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         dotClass: 'bg-emerald-600'
       };
     } 
-    // Red: Fee remains unpaid for more than one month (more than current month amount)
-    else if (due > monthly) {
+    // Red: Fee remains unpaid for more than one month (more than current month net amount)
+    else if (due > netMonthly) {
       return {
         due,
         text: `₹${due.toLocaleString('en-IN')}`,
@@ -806,7 +983,7 @@ export default function StudentsListClient({ initialStudents, batches, courses }
         dotClass: 'bg-rose-600'
       };
     } 
-    // Yellow: Current month's fee is pending (and <= current monthly amount)
+    // Yellow: Current month's fee is pending (and <= current net monthly amount)
     else {
       return {
         due,
@@ -817,16 +994,13 @@ export default function StudentsListClient({ initialStudents, batches, courses }
     }
   };
 
-  // Batches available for register modal courses
-  const registerAvailableBatches = batches.filter(b => selectedCourseIds.includes(b.course_id));
-  const editAvailableBatches = batches.filter(b => editSelectedCourseIds.includes(b.course_id));
-
   // DEDICATED FULL PAGE FOR REGISTERING NEW DISCIPLE
   if (pageMode === 'register') {
-    const totalMonthlyCalculated = registerAvailableBatches
+    const totalMonthlyCalculated = batches
       .filter(b => selectedBatchIds.includes(b.id))
-      .reduce((acc, b) => acc + (b.monthly_fee || 0), 0);
-    const calculatedDue = totalMonthlyCalculated - Number(advancePaid || 0);
+      .reduce((acc, b) => acc + (Number(b.monthly_fee) || 0), 0);
+    const netMonthlyCalculated = Math.max(0, totalMonthlyCalculated - Number(fixedDiscount || 0));
+    const calculatedDue = netMonthlyCalculated - Number(advancePaid || 0);
 
     return (
       <div className="space-y-6 pb-12 animate-in fade-in duration-200">
@@ -1027,7 +1201,51 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               </div>
             </div>
 
-            {/* Course & Batch Enrollment Card - Sequential Selection Workflow */}
+            {/* Separate Dedicated Scheme Selection Card */}
+            {schemes && schemes.length > 0 && (
+              <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                  <div>
+                    <h3 className="text-xs font-black text-[#590231] uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-[#8A064D]" />
+                      <span>Academy Combo Scheme (Optional)</span>
+                    </h3>
+                    <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+                      Select a predefined combo scheme to automatically bundle courses, batches, and apply a fixed monthly discount.
+                    </p>
+                  </div>
+                  {selectedSchemeId && (
+                    <button
+                      type="button"
+                      onClick={() => handleApplyScheme('', 'register')}
+                      className="px-2.5 py-1 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition cursor-pointer"
+                    >
+                      Clear Scheme
+                    </button>
+                  )}
+                </div>
+                <SearchableCombobox
+                  options={schemeComboboxOptions}
+                  value={selectedSchemeId}
+                  placeholder="Search & choose a scheme to auto-fill courses, batches & discount..."
+                  onChange={(id) => handleApplyScheme(id, 'register')}
+                />
+                {selectedSchemeId && (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold flex items-center justify-between">
+                    <span>✓ Active Scheme applied: Courses, batches, and monthly discount auto-configured.</span>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyScheme('', 'register')}
+                      className="text-rose-600 font-bold hover:underline ml-2 cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Course & Batch Enrollment Card - Side-by-Side Selection Layout */}
             <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-5">
               <div className="border-b border-gray-100 pb-3">
                 <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
@@ -1035,80 +1253,101 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   <span>Course &amp; Batch Enrollment</span>
                 </h2>
                 <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                  Select a course from the downward dropdown, then choose a batch. Once a batch is clicked, it is selected and redirects ready for the next course selection. A course can be selected multiple times, but a batch cannot be selected again.
+                  Select a course on the left, then pick its batch on the right. You can repeat this iteratively to enroll in multiple courses and batches.
                 </p>
               </div>
 
-              {/* Sequential Downward Dropdowns Container */}
-              <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] space-y-4">
-                {/* 1. Course Selection Dropdown (Opens downwards) */}
-                <div>
-                  <label className="block text-xs font-black text-gray-800 uppercase tracking-wide mb-1.5">
-                    Select Course / Discipline <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={activeCourseId}
-                    onChange={(e) => setActiveCourseId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] transition cursor-pointer"
-                  >
-                    <option value="">-- Choose Course from Dropdown --</option>
-                    {courses.map(crs => (
-                      <option key={crs.id} value={crs.id}>
-                        {crs.title} ({crs.category}) — ₹{crs.monthly_fee}/month
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Side-by-Side Selection: Left Course, Right Batches */}
+              <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                  {/* Left Column: Course Selection */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
+                      Select Course <span className="text-rose-500">*</span>
+                    </label>
+                    <SearchableCombobox
+                      options={studentCourseOptions}
+                      value={activeCourseId}
+                      placeholder="Type or click to search course (e.g. Bharatanatyam, Vocal)..."
+                      onChange={(id) => setActiveCourseId(id)}
+                    />
+                  </div>
 
-                {/* 2. Batch Selection Dropdown (Automatically redirects/reveals upon course selection, opens downwards) */}
-                {activeCourseId && (
-                  <div className="animate-in fade-in duration-150 pt-2 border-t border-[#F0D5E4]">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-xs font-black text-[#8A064D] uppercase tracking-wide">
-                        Select Batch for {courses.find(c => c.id === activeCourseId)?.title} <span className="text-rose-500">*</span>
+                  {/* Right Column: Available Batches for Selected Course */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-black text-[#590231] uppercase tracking-wide truncate">
+                        {activeCourseId
+                          ? `Batches: ${courses.find(c => c.id === activeCourseId)?.title || 'Course'}`
+                          : 'Available Batches'} <span className="text-rose-500">*</span>
                       </label>
-                      <span className="text-[10px] font-semibold text-gray-500">
-                        (Batches already chosen cannot be selected again)
-                      </span>
+                      {activeCourseId && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveCourseId('')}
+                          className="text-[11px] font-semibold text-gray-400 hover:text-gray-600 cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
                     </div>
 
-                    {(() => {
-                      const availableBatches = batches.filter(
-                        b => b.course_id === activeCourseId && !selectedBatchIds.includes(b.id)
-                      );
+                    {!activeCourseId ? (
+                      <div className="p-3.5 text-center rounded-xl bg-white border border-dashed border-gray-200 text-xs text-gray-400 min-h-[46px] flex items-center justify-center">
+                        Select a course on the left to see available batches and fees.
+                      </div>
+                    ) : (
+                      (() => {
+                        const availableBatches = batches.filter(
+                          b => b.course_id === activeCourseId && !selectedBatchIds.includes(b.id)
+                        );
 
-                      if (availableBatches.length === 0) {
+                        if (availableBatches.length === 0) {
+                          return (
+                            <div className="p-3 text-center rounded-xl bg-white border border-dashed border-gray-200 text-xs text-gray-500">
+                              All batches for this course are already selected.
+                            </div>
+                          );
+                        }
+
                         return (
-                          <div className="p-3 text-center rounded-xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
-                            No remaining batches available for this course (or all batches already selected).
+                          <div className="space-y-2 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
+                            {availableBatches.map(b => (
+                              <div
+                                key={b.id}
+                                onClick={() => handleSelectBatch(b.id)}
+                                className="p-2.5 bg-white rounded-xl border border-rose-200 hover:border-[#8A064D] hover:shadow-xs transition cursor-pointer flex items-center justify-between gap-2 group"
+                              >
+                                <div className="min-w-0">
+                                  <span className="font-bold text-xs text-[#2D041A] group-hover:text-[#8A064D] block truncate">
+                                    {b.name}
+                                  </span>
+                                  <span className="text-[10px] text-gray-500 block truncate">
+                                    {b.days_of_week?.join(', ')} • {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)} • {b.trainer_name || 'Guru'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-black tabular-nums">
+                                    ₹{Number(b.monthly_fee || 0).toLocaleString('en-IN')}/mo
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="px-2 py-1 rounded-lg bg-[#8A064D] text-white text-[10px] font-bold"
+                                  >
+                                    + Add
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         );
-                      }
-
-                      return (
-                        <select
-                          defaultValue=""
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              handleSelectBatch(e.target.value);
-                            }
-                          }}
-                          className="w-full px-3.5 py-2.5 bg-white border-2 border-[#8A064D] rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] transition cursor-pointer shadow-2xs"
-                        >
-                          <option value="">-- Click to Select Batch (Selects &amp; Redirects to Course) --</option>
-                          {availableBatches.map(b => (
-                            <option key={b.id} value={b.id}>
-                              {b.name} • {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)} ({b.days_of_week?.join(', ')}) • Guru: {b.trainer_name}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
+                      })()
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
-              {/* Selected / Enrolled Batches Cards */}
+              {/* Selected / Enrolled Batches Cards with Course & Batch Name Side-by-Side */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-black text-[#590231] uppercase tracking-wider">
@@ -1117,15 +1356,14 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   <span className="text-xs font-black text-[#8A064D]">
                     Total Monthly Fee: ₹{selectedBatchIds.reduce((sum, bId) => {
                       const b = batches.find(x => x.id === bId);
-                      const crs = courses.find(c => c.id === b?.course_id);
-                      return sum + (crs?.monthly_fee || 2000);
+                      return sum + (Number(b?.monthly_fee) || 0);
                     }, 0).toLocaleString('en-IN')}
                   </span>
                 </div>
 
                 {selectedBatchIds.length === 0 ? (
                   <div className="p-4 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
-                    No batches selected yet. Select a course and batch above to enroll the student.
+                    No batches selected yet. Select a course and batch above to enroll.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1134,18 +1372,26 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                       const crs = courses.find(c => c.id === b?.course_id);
                       return (
                         <div key={bId} className="p-3.5 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] flex items-start justify-between gap-3 shadow-2xs">
-                          <div className="min-w-0">
-                            <span className="text-[10px] font-black text-[#8A064D] uppercase tracking-wider block truncate">
-                              {crs?.title || 'Course'}
-                            </span>
-                            <span className="text-xs font-bold text-[#2D041A] block truncate mt-0.5">
-                              {b?.name || 'Batch'}
-                            </span>
-                            <span className="text-[10px] text-gray-500 block mt-1">
-                              {b?.start_time?.slice(0, 5)} - {b?.end_time?.slice(0, 5)} • Guru: {b?.trainer_name || 'Assigned Guru'}
-                            </span>
-                            <span className="text-[11px] font-extrabold text-emerald-700 block mt-1">
-                              ₹{crs?.monthly_fee || 2000}/mo
+                          <div className="min-w-0 flex-1">
+                            {/* Course and Batch Name Side by Side */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-black text-[#8A064D] uppercase tracking-wide">
+                                {crs?.title || 'Course'}
+                              </span>
+                              <span className="text-gray-300 font-bold">•</span>
+                              <span className="text-xs font-bold text-[#2D041A]">
+                                {b?.name || 'Batch'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
+                              <span>Guru: <strong className="text-gray-700">{b?.trainer_name || 'Assigned'}</strong></span>
+                              <span>•</span>
+                              <span>{b?.start_time?.slice(0, 5)} - {b?.end_time?.slice(0, 5)}</span>
+                              <span>•</span>
+                              <span>Room: {b?.room_or_hall || 'Hall'}</span>
+                            </div>
+                            <span className="text-[11px] font-extrabold text-emerald-700 block mt-1 tabular-nums">
+                              ₹{Number(b?.monthly_fee || 0).toLocaleString('en-IN')}/mo
                             </span>
                           </div>
                           <button
@@ -1232,7 +1478,22 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   />
                 </div>
 
-                <div className="sm:col-span-2">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Fixed Monthly Discount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={fixedDiscount}
+                    onChange={(e) => setFixedDiscount(Number(e.target.value))}
+                    placeholder="e.g. 500"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                  <span className="text-[10px] text-gray-500 font-medium">Deducted every month from total fee</span>
+                </div>
+
+                <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                     Advance Paid (₹)
                   </label>
@@ -1243,6 +1504,36 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                     onChange={(e) => setAdvancePaid(Number(e.target.value))}
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-emerald-800 focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                   />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Student Status
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewStatus('active')}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                        newStatus === 'active'
+                          ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      Active
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewStatus('inactive')}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                        newStatus === 'inactive'
+                          ? 'bg-rose-500 text-white border-rose-600 shadow-xs'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      Inactive
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1258,6 +1549,14 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 <div className="flex justify-between items-center text-gray-700">
                   <span className="font-semibold">Total Monthly Tuition:</span>
                   <span className="font-black text-sm text-[#2D041A]">₹{totalMonthlyCalculated.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between items-center text-gray-700">
+                  <span className="font-semibold">Fixed Monthly Discount:</span>
+                  <span className="font-black text-emerald-700">-₹{Number(fixedDiscount || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between items-center text-gray-700 pt-1 border-t border-[#F0D5E4]/50">
+                  <span className="font-bold">Net Monthly Tuition:</span>
+                  <span className="font-black text-sm text-[#2D041A]">₹{netMonthlyCalculated.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between items-center text-gray-700">
                   <span className="font-semibold">Advance Payment Applied:</span>
@@ -1296,10 +1595,11 @@ export default function StudentsListClient({ initialStudents, batches, courses }
 
   // DEDICATED FULL PAGE FOR EDITING DISCIPLE
   if (pageMode === 'edit' && editingStudent) {
-    const totalMonthlyCalculated = editAvailableBatches
+    const totalMonthlyCalculated = batches
       .filter(b => editSelectedBatchIds.includes(b.id))
-      .reduce((acc, b) => acc + (b.monthly_fee || 0), 0);
-    const calculatedDue = totalMonthlyCalculated - Number(editAdvancePaid || 0);
+      .reduce((acc, b) => acc + (Number(b.monthly_fee) || 0), 0);
+    const netMonthlyCalculated = Math.max(0, totalMonthlyCalculated - Number(editFixedDiscount || 0));
+    const calculatedDue = netMonthlyCalculated - Number(editAdvancePaid || 0);
 
     return (
       <div className="space-y-6 pb-12 animate-in fade-in duration-200">
@@ -1505,7 +1805,51 @@ export default function StudentsListClient({ initialStudents, batches, courses }
               </div>
             </div>
 
-            {/* Course & Batch Enrollment Card - Sequential Selection Workflow */}
+            {/* Separate Dedicated Scheme Selection Card */}
+            {schemes && schemes.length > 0 && (
+              <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                  <div>
+                    <h3 className="text-xs font-black text-[#590231] uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-[#8A064D]" />
+                      <span>Academy Combo Scheme (Optional)</span>
+                    </h3>
+                    <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+                      Select a predefined combo scheme to automatically bundle courses, batches, and apply a fixed monthly discount.
+                    </p>
+                  </div>
+                  {editSelectedSchemeId && (
+                    <button
+                      type="button"
+                      onClick={() => handleApplyScheme('', 'edit')}
+                      className="px-2.5 py-1 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition cursor-pointer"
+                    >
+                      Clear Scheme
+                    </button>
+                  )}
+                </div>
+                <SearchableCombobox
+                  options={schemeComboboxOptions}
+                  value={editSelectedSchemeId}
+                  placeholder="Search & choose a scheme to auto-fill courses, batches & discount..."
+                  onChange={(id) => handleApplyScheme(id, 'edit')}
+                />
+                {editSelectedSchemeId && (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold flex items-center justify-between">
+                    <span>✓ Active Scheme applied: Courses, batches, and monthly discount auto-configured.</span>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyScheme('', 'edit')}
+                      className="text-rose-600 font-bold hover:underline ml-2 cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Course & Batch Enrollment Card - Side-by-Side Selection Layout */}
             <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-5">
               <div className="border-b border-gray-100 pb-3">
                 <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
@@ -1513,80 +1857,101 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   <span>Enrolled Courses &amp; Batches</span>
                 </h2>
                 <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                  Select a course from the downward dropdown, then choose a batch. Once a batch is clicked, it is selected and redirects ready for the next course selection. A course can be selected multiple times, but a batch cannot be selected again.
+                  Select a course on the left, then pick its batch on the right. You can repeat this iteratively to enroll in multiple courses and batches.
                 </p>
               </div>
 
-              {/* Sequential Downward Dropdowns Container */}
-              <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] space-y-4">
-                {/* 1. Course Selection Dropdown (Opens downwards) */}
-                <div>
-                  <label className="block text-xs font-black text-gray-800 uppercase tracking-wide mb-1.5">
-                    Select Course / Discipline <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={activeEditCourseId}
-                    onChange={(e) => setActiveEditCourseId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] transition cursor-pointer"
-                  >
-                    <option value="">-- Choose Course from Dropdown --</option>
-                    {courses.map(crs => (
-                      <option key={crs.id} value={crs.id}>
-                        {crs.title} ({crs.category}) — ₹{crs.monthly_fee}/month
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Side-by-Side Selection: Left Course, Right Batches */}
+              <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                  {/* Left Column: Course Selection */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
+                      Select Course <span className="text-rose-500">*</span>
+                    </label>
+                    <SearchableCombobox
+                      options={studentCourseOptions}
+                      value={activeEditCourseId}
+                      placeholder="Type or click to search course (e.g. Bharatanatyam, Vocal)..."
+                      onChange={(id) => setActiveEditCourseId(id)}
+                    />
+                  </div>
 
-                {/* 2. Batch Selection Dropdown (Automatically redirects/reveals upon course selection, opens downwards) */}
-                {activeEditCourseId && (
-                  <div className="animate-in fade-in duration-150 pt-2 border-t border-[#F0D5E4]">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-xs font-black text-[#8A064D] uppercase tracking-wide">
-                        Select Batch for {courses.find(c => c.id === activeEditCourseId)?.title} <span className="text-rose-500">*</span>
+                  {/* Right Column: Available Batches for Selected Course */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-black text-[#590231] uppercase tracking-wide truncate">
+                        {activeEditCourseId
+                          ? `Batches: ${courses.find(c => c.id === activeEditCourseId)?.title || 'Course'}`
+                          : 'Available Batches'} <span className="text-rose-500">*</span>
                       </label>
-                      <span className="text-[10px] font-semibold text-gray-500">
-                        (Batches already chosen cannot be selected again)
-                      </span>
+                      {activeEditCourseId && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveEditCourseId('')}
+                          className="text-[11px] font-semibold text-gray-400 hover:text-gray-600 cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
                     </div>
 
-                    {(() => {
-                      const availableBatches = batches.filter(
-                        b => b.course_id === activeEditCourseId && !editSelectedBatchIds.includes(b.id)
-                      );
+                    {!activeEditCourseId ? (
+                      <div className="p-3.5 text-center rounded-xl bg-white border border-dashed border-gray-200 text-xs text-gray-400 min-h-[46px] flex items-center justify-center">
+                        Select a course on the left to see available batches and fees.
+                      </div>
+                    ) : (
+                      (() => {
+                        const availableBatches = batches.filter(
+                          b => b.course_id === activeEditCourseId && !editSelectedBatchIds.includes(b.id)
+                        );
 
-                      if (availableBatches.length === 0) {
+                        if (availableBatches.length === 0) {
+                          return (
+                            <div className="p-3 text-center rounded-xl bg-white border border-dashed border-gray-200 text-xs text-gray-500">
+                              All batches for this course are already selected.
+                            </div>
+                          );
+                        }
+
                         return (
-                          <div className="p-3 text-center rounded-xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
-                            No remaining batches available for this course (or all batches already selected).
+                          <div className="space-y-2 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
+                            {availableBatches.map(b => (
+                              <div
+                                key={b.id}
+                                onClick={() => handleSelectEditBatch(b.id)}
+                                className="p-2.5 bg-white rounded-xl border border-rose-200 hover:border-[#8A064D] hover:shadow-xs transition cursor-pointer flex items-center justify-between gap-2 group"
+                              >
+                                <div className="min-w-0">
+                                  <span className="font-bold text-xs text-[#2D041A] group-hover:text-[#8A064D] block truncate">
+                                    {b.name}
+                                  </span>
+                                  <span className="text-[10px] text-gray-500 block truncate">
+                                    {b.days_of_week?.join(', ')} • {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)} • {b.trainer_name || 'Guru'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-black tabular-nums">
+                                    ₹{Number(b.monthly_fee || 0).toLocaleString('en-IN')}/mo
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="px-2 py-1 rounded-lg bg-[#8A064D] text-white text-[10px] font-bold"
+                                  >
+                                    + Add
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         );
-                      }
-
-                      return (
-                        <select
-                          defaultValue=""
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              handleSelectEditBatch(e.target.value);
-                            }
-                          }}
-                          className="w-full px-3.5 py-2.5 bg-white border-2 border-[#8A064D] rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] transition cursor-pointer shadow-2xs"
-                        >
-                          <option value="">-- Click to Select Batch (Selects &amp; Redirects to Course) --</option>
-                          {availableBatches.map(b => (
-                            <option key={b.id} value={b.id}>
-                              {b.name} • {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)} ({b.days_of_week?.join(', ')}) • Guru: {b.trainer_name}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
+                      })()
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
-              {/* Selected / Enrolled Batches Cards */}
+              {/* Selected / Enrolled Batches Cards with Course & Batch Name Side-by-Side */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-black text-[#590231] uppercase tracking-wider">
@@ -1595,15 +1960,14 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   <span className="text-xs font-black text-[#8A064D]">
                     Total Monthly Fee: ₹{editSelectedBatchIds.reduce((sum, bId) => {
                       const b = batches.find(x => x.id === bId);
-                      const crs = courses.find(c => c.id === b?.course_id);
-                      return sum + (crs?.monthly_fee || 2000);
+                      return sum + (Number(b?.monthly_fee) || 0);
                     }, 0).toLocaleString('en-IN')}
                   </span>
                 </div>
 
                 {editSelectedBatchIds.length === 0 ? (
                   <div className="p-4 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
-                    No batches selected yet. Select a course and batch above to enroll the student.
+                    No batches selected yet. Select a course and batch above to enroll.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1612,18 +1976,26 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                       const crs = courses.find(c => c.id === b?.course_id);
                       return (
                         <div key={bId} className="p-3.5 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] flex items-start justify-between gap-3 shadow-2xs">
-                          <div className="min-w-0">
-                            <span className="text-[10px] font-black text-[#8A064D] uppercase tracking-wider block truncate">
-                              {crs?.title || 'Course'}
-                            </span>
-                            <span className="text-xs font-bold text-[#2D041A] block truncate mt-0.5">
-                              {b?.name || 'Batch'}
-                            </span>
-                            <span className="text-[10px] text-gray-500 block mt-1">
-                              {b?.start_time?.slice(0, 5)} - {b?.end_time?.slice(0, 5)} • Guru: {b?.trainer_name || 'Assigned Guru'}
-                            </span>
-                            <span className="text-[11px] font-extrabold text-emerald-700 block mt-1">
-                              ₹{crs?.monthly_fee || 2000}/mo
+                          <div className="min-w-0 flex-1">
+                            {/* Course and Batch Name Side by Side */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-black text-[#8A064D] uppercase tracking-wide">
+                                {crs?.title || 'Course'}
+                              </span>
+                              <span className="text-gray-300 font-bold">•</span>
+                              <span className="text-xs font-bold text-[#2D041A]">
+                                {b?.name || 'Batch'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
+                              <span>Guru: <strong className="text-gray-700">{b?.trainer_name || 'Assigned'}</strong></span>
+                              <span>•</span>
+                              <span>{b?.start_time?.slice(0, 5)} - {b?.end_time?.slice(0, 5)}</span>
+                              <span>•</span>
+                              <span>Room: {b?.room_or_hall || 'Hall'}</span>
+                            </div>
+                            <span className="text-[11px] font-extrabold text-emerald-700 block mt-1 tabular-nums">
+                              ₹{Number(b?.monthly_fee || 0).toLocaleString('en-IN')}/mo
                             </span>
                           </div>
                           <button
@@ -1708,7 +2080,22 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                   />
                 </div>
 
-                <div className="sm:col-span-2">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Fixed Monthly Discount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editFixedDiscount}
+                    onChange={(e) => setEditFixedDiscount(Number(e.target.value))}
+                    placeholder="e.g. 500"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                  <span className="text-[10px] text-gray-500 font-medium">Deducted every month from total fee</span>
+                </div>
+
+                <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                     Advance Paid (₹)
                   </label>
@@ -1719,6 +2106,36 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                     onChange={(e) => setEditAdvancePaid(Number(e.target.value))}
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-emerald-800 focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                   />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Student Status
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditStatus('active')}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                        editStatus === 'active'
+                          ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      Active
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditStatus('inactive')}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                        editStatus === 'inactive'
+                          ? 'bg-rose-500 text-white border-rose-600 shadow-xs'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      Inactive
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1734,6 +2151,14 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 <div className="flex justify-between items-center text-gray-700">
                   <span className="font-semibold">Total Monthly Tuition:</span>
                   <span className="font-black text-sm text-[#2D041A]">₹{totalMonthlyCalculated.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between items-center text-gray-700">
+                  <span className="font-semibold">Fixed Monthly Discount:</span>
+                  <span className="font-black text-emerald-700">-₹{Number(editFixedDiscount || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between items-center text-gray-700 pt-1 border-t border-[#F0D5E4]/50">
+                  <span className="font-bold">Net Monthly Tuition:</span>
+                  <span className="font-black text-sm text-[#2D041A]">₹{netMonthlyCalculated.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between items-center text-gray-700">
                   <span className="font-semibold">Advance Payment Applied:</span>
@@ -1925,51 +2350,67 @@ export default function StudentsListClient({ initialStudents, batches, courses }
           </button>
         </div>
 
-        {/* Course and Batch Grouping Filters */}
+        {/* Course and Batch Grouping Multi-Select Filters */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Course Filter Dropdown */}
+          {/* Multi-Selection Searchable Course Filter */}
+          <MultiSelectCombobox
+            label="Courses"
+            options={courseFilterOptions}
+            selectedIds={selectedCourseFilters}
+            onChange={(ids) => {
+              setSelectedCourseFilters(ids);
+              // Clean up batch filters that no longer belong to selected courses
+              if (ids.length > 0) {
+                setSelectedBatchFilters(prev =>
+                  prev.filter(bId => {
+                    const b = batches.find(x => x.id === bId);
+                    return b && ids.includes(b.course_id);
+                  })
+                );
+              }
+            }}
+            placeholder="All Courses"
+          />
+
+          {/* Multi-Selection Searchable Batch Filter */}
+          <MultiSelectCombobox
+            label="Batches"
+            options={batchFilterOptions}
+            selectedIds={selectedBatchFilters}
+            onChange={(ids) => setSelectedBatchFilters(ids)}
+            placeholder="All Batches"
+          />
+
+          {/* Sort By Dropdown */}
           <div className="flex items-center gap-1.5 bg-white px-3 py-2 rounded-2xl border border-[#F0D5E4] shadow-xs">
-            <span className="text-[11px] font-bold text-[#8A064D] uppercase tracking-wider">Course:</span>
+            <span className="text-[11px] font-bold text-[#8A064D] uppercase tracking-wider">Sort By:</span>
             <select
-              value={selectedCourseFilter}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSelectedCourseFilter(val);
-                setSelectedBatchFilter('all');
-              }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
               className="bg-transparent text-xs font-bold text-[#2D041A] focus:outline-none cursor-pointer"
             >
-              <option value="all">All Courses ({courses.length})</option>
-              {courses.map(c => (
-                <option key={c.id} value={c.id}>{c.title}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Batch Filter Dropdown */}
-          <div className="flex items-center gap-1.5 bg-white px-3 py-2 rounded-2xl border border-[#F0D5E4] shadow-xs">
-            <span className="text-[11px] font-bold text-[#8A064D] uppercase tracking-wider">Batch:</span>
-            <select
-              value={selectedBatchFilter}
-              onChange={(e) => setSelectedBatchFilter(e.target.value)}
-              className="bg-transparent text-xs font-bold text-[#2D041A] focus:outline-none cursor-pointer max-w-[200px] truncate"
-            >
-              <option value="all">All Batches ({availableBatchesForFilter.length})</option>
-              {availableBatchesForFilter.map(b => (
-                <option key={b.id} value={b.id}>{b.name} ({b.course_title})</option>
-              ))}
+              <option value="default">Default</option>
+              <option value="fee_desc">Monthly Fee: High to Low</option>
+              <option value="fee_asc">Monthly Fee: Low to High</option>
+              <option value="discount_desc">Discount: High to Low</option>
+              <option value="discount_asc">Discount: Low to High</option>
+              <option value="due_desc">Due Amount: High to Low</option>
+              <option value="due_asc">Due Amount: Low to High</option>
+              <option value="joining_desc">Joining: Latest to Oldest</option>
+              <option value="joining_asc">Joining: Oldest to Latest</option>
             </select>
           </div>
 
           {/* Reset Filters */}
-          {(selectedCourseFilter !== 'all' || selectedBatchFilter !== 'all') && (
+          {(selectedCourseFilters.length > 0 || selectedBatchFilters.length > 0 || sortBy !== 'default') && (
             <button
               onClick={() => {
-                setSelectedCourseFilter('all');
-                setSelectedBatchFilter('all');
+                setSelectedCourseFilters([]);
+                setSelectedBatchFilters([]);
+                setSortBy('default');
               }}
               className="px-3 py-2 rounded-2xl text-xs font-bold bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] hover:bg-rose-100 transition flex items-center gap-1 cursor-pointer"
-              title="Reset course and batch filters"
+              title="Reset all filters and sorting"
             >
               <X className="w-3.5 h-3.5" />
               <span>Reset</span>
@@ -1982,69 +2423,54 @@ export default function StudentsListClient({ initialStudents, batches, courses }
       {/* 3. MAIN STUDENTS GRID (DISPLAY ONLY REQUIRED FIELDS) */}
       {/* ===================================================================== */}
       {viewMode === 'grid' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-          {filteredStudents.length === 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4 gap-4">
+          {sortedStudents.length === 0 ? (
             <div className="col-span-full py-16 text-center text-[#6E3955] bg-white rounded-3xl border border-[#F0D5E4]">
               <AlertTriangle className="w-8 h-8 text-[#8A064D]/30 mx-auto mb-2" />
               <p className="font-bold text-[#2D041A]">No {statusFilter !== 'all' ? statusFilter : ''} students found.</p>
               <p className="text-xs text-[#6E3955] mt-1 font-medium">Try switching filters or clearing your search.</p>
             </div>
           ) : (
-            filteredStudents.map((s) => {
+            sortedStudents.map((s) => {
+              const isStudentActive = s.status === 'active';
               const dueInfo = getDueAmountDisplay(s);
               const monthlyFee = s.total_monthly_fee || 0;
+              const discount = Number(s.fixed_discount || 0);
+              const netAmount = Math.max(0, monthlyFee - discount);
 
               return (
                 <div
                   key={s.id}
-                  className="bg-white rounded-3xl border border-[#F0D5E4]/90 p-5 shadow-xs hover:shadow-md hover:border-[#8A064D]/40 transition flex flex-col justify-between group"
+                  className={`bg-white rounded-3xl p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between group ${
+                    isStudentActive
+                      ? 'border-2 border-emerald-500'
+                      : 'border-2 border-rose-500'
+                  }`}
                 >
                   <div>
-                    {/* Top Bar: Status Badge & Student ID */}
+                    {/* Top Bar: Student ID on Left & Joining Date on Right */}
                     <div className="flex items-center justify-between mb-3.5">
                       <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100/80 px-3 py-1 rounded-xl shadow-2xs tabular-nums">
                         {s.roll_number}
                       </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                          s.status === 'active'
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                            : 'bg-gray-100 text-gray-600 border border-gray-200'
-                        }`}>
-                          <span className={`w-2 h-2 rounded-full ${s.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                          <span className="capitalize">{s.status || 'Active'}</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleStudentStatus(s);
-                          }}
-                          title={`Click to turn ${s.status === 'active' ? 'OFF (Deactivate)' : 'ON (Activate)'}`}
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border transition cursor-pointer shadow-2xs ${
-                            s.status === 'active'
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
-                              : 'bg-gray-200 hover:bg-gray-300 text-gray-700 border-gray-300'
-                          }`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${s.status === 'active' ? 'bg-[#F9E33A]' : 'bg-gray-400'}`} />
-                          <span>{s.status === 'active' ? 'ON' : 'OFF'}</span>
-                        </button>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 px-2.5 py-0.5 rounded-xl shadow-2xs">
+                        <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
+                        <span className="font-bold text-[#2D041A]">{formatDdMonthName(s.enrollment_date, true)}</span>
                       </div>
                     </div>
 
                     {/* Combined Live Attendance Counts: Current Month & Last Month */}
                     {s.total_attendance && (
-                      <div className="mb-3.5 p-2 px-3 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]/80 flex items-center justify-between text-[11px] font-semibold text-gray-700">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-gray-500 font-medium">This Month:</span>
+                      <div className="mb-3.5 p-2 px-2.5 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]/80 flex items-center justify-between text-[10.5px] font-semibold text-gray-700">
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span className="text-[10px] text-gray-500 font-medium shrink-0">This Mo:</span>
                           <span className="font-black text-emerald-600 tabular-nums">{s.total_attendance.this_month_held}</span>
                           <span className="text-gray-400">/</span>
                           <span className="font-black text-rose-600 tabular-nums">{s.total_attendance.this_month_absent}</span>
                         </div>
-                        <span className="text-gray-300">|</span>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-gray-500 font-medium">Last Month:</span>
+                        <span className="text-gray-300 mx-1 shrink-0">|</span>
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span className="text-[10px] text-gray-500 font-medium shrink-0">Last Mo:</span>
                           <span className="font-black text-emerald-600 tabular-nums">{s.total_attendance.last_month_held}</span>
                           <span className="text-gray-400">/</span>
                           <span className="font-black text-rose-600 tabular-nums">{s.total_attendance.last_month_absent}</span>
@@ -2079,59 +2505,66 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                       </div>
                     </div>
 
-                    {/* Fee Details Box: Total Monthly Fee, Due Amount with Color, Due Date */}
-                    <div className="mt-4 p-4 bg-[#FFF9FB]/70 rounded-2xl border border-[#F0D5E4]/60 space-y-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#6E3955] font-semibold text-xs uppercase tracking-wide">Total Monthly Fee:</span>
-                        <span className="font-extrabold text-[#2D041A] text-base tabular-nums">
+                    {/* Fee Details Box: Total Amount, Total Discount, Net Amount, Due Amount */}
+                    <div className="mt-4 p-4 bg-[#FFF9FB]/70 rounded-2xl border border-[#F0D5E4]/60 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-[#6E3955] font-semibold uppercase tracking-wide">Total Amount:</span>
+                        <span className="font-extrabold text-[#2D041A] tabular-nums">
                           ₹{monthlyFee.toLocaleString('en-IN')}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#6E3955] font-semibold text-xs uppercase tracking-wide">Due Amount:</span>
-                        <span className={`px-3 py-1 rounded-xl text-xs font-extrabold flex items-center gap-1.5 tabular-nums ${dueInfo.badgeClass}`}>
-                          <span className={`w-2 h-2 rounded-full ${dueInfo.dotClass}`} />
-                          <span>{dueInfo.text}</span>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-[#6E3955] font-semibold uppercase tracking-wide">Total Discount:</span>
+                        <span className="font-extrabold text-emerald-700 tabular-nums">
+                          -₹{discount.toLocaleString('en-IN')}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#6E3955] font-semibold text-xs uppercase tracking-wide">Joining Date:</span>
-                        <span className="font-mono font-bold text-[#2D041A] bg-white px-2.5 py-1 rounded-xl border border-[#F0D5E4] text-xs shadow-2xs tabular-nums">
-                          {formatDdMonthName(s.enrollment_date, true)}
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-[#F0D5E4]/40">
+                        <span className="text-[#6E3955] font-bold uppercase tracking-wide">Net Amount:</span>
+                        <span className="font-extrabold text-[#2D041A] tabular-nums">
+                          ₹{netAmount.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-[#F0D5E4]/40">
+                        <span className="text-[#6E3955] font-bold uppercase tracking-wide">Due Amount:</span>
+                        <span className={`px-2.5 py-0.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 tabular-nums ${dueInfo.badgeClass}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${dueInfo.dotClass}`} />
+                          <span>{dueInfo.text}</span>
                         </span>
                       </div>
                     </div>
                   </div>
 
                   {/* Action Buttons Below: Details, Edit, Delete with refined, cohesive styling */}
-                  <div className="mt-5 pt-3.5 border-t border-[#F0D5E4]/50 flex items-center gap-2.5">
+                  <div className="mt-4 pt-3 border-t border-[#F0D5E4]/50 grid grid-cols-3 gap-1.5">
                     <button
                       onClick={() => setDetailStudent(s)}
-                      className="flex-1 py-2.5 px-3 rounded-xl bg-[#2D041A] hover:bg-[#48082B] active:scale-95 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs border border-[#48082B] cursor-pointer"
+                      className="py-2 px-1.5 rounded-xl bg-[#2D041A] hover:bg-[#48082B] active:scale-95 text-white text-[11px] font-bold transition flex items-center justify-center gap-1 shadow-2xs border border-[#48082B] cursor-pointer"
                       title="View Complete Student Details"
                     >
-                      <Eye className="w-4 h-4 text-[#F9E33A]" />
-                      <span>Details</span>
+                      <Eye className="w-3.5 h-3.5 text-[#F9E33A] shrink-0" />
+                      <span className="truncate">Details</span>
                     </button>
 
                     <button
                       onClick={() => handleOpenEdit(s)}
-                      className="flex-1 py-2.5 px-3 rounded-xl bg-[#FFF5F9] hover:bg-[#FCE7F3] active:scale-95 text-[#8A064D] hover:text-[#70043E] text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs border border-[#E8BFD5] cursor-pointer"
+                      className="py-2 px-1.5 rounded-xl bg-[#FFF5F9] hover:bg-[#FCE7F3] active:scale-95 text-[#8A064D] hover:text-[#70043E] text-[11px] font-bold transition flex items-center justify-center gap-1 shadow-2xs border border-[#E8BFD5] cursor-pointer"
                       title="Edit Student Information"
                     >
-                      <Edit3 className="w-4 h-4 text-[#8A064D]" />
-                      <span>Edit</span>
+                      <Edit3 className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
+                      <span className="truncate">Edit</span>
                     </button>
 
                     <button
                       onClick={() => setDeletingStudent(s)}
-                      className="py-2.5 px-3.5 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 hover:text-rose-800 text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs border border-rose-200 cursor-pointer"
+                      className="py-2 px-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 hover:text-rose-800 text-[11px] font-bold transition flex items-center justify-center gap-1 shadow-2xs border border-rose-200 cursor-pointer"
                       title="Delete Student"
                     >
-                      <Trash2 className="w-4 h-4 text-rose-600" />
-                      <span>Delete</span>
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                      <span className="truncate">Delete</span>
                     </button>
                   </div>
                 </div>
@@ -2159,14 +2592,14 @@ export default function StudentsListClient({ initialStudents, batches, courses }
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F0D5E4]/40 text-sm">
-                {filteredStudents.length === 0 ? (
+                {sortedStudents.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-[#6E3955]">
                       No students found matching your criteria.
                     </td>
                   </tr>
                 ) : (
-                  filteredStudents.map((s) => {
+                  sortedStudents.map((s) => {
                     const dueInfo = getDueAmountDisplay(s);
                     const monthlyFee = s.total_monthly_fee || 0;
 

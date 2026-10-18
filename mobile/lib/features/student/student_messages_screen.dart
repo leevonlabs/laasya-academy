@@ -45,12 +45,38 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
         }
         return true;
       }).toList();
+
+      // Sort chronologically: oldest on top, newest at the bottom
+      _messages.sort((a, b) {
+        final da = _getExactMessageDateTime(a);
+        final db = _getExactMessageDateTime(b);
+        return da.compareTo(db);
+      });
       _isLoading = false;
+      _scrollToBottom();
     }
     SupabaseService().preloadTrainerAvatars().then((_) {
       if (mounted) setState(() {});
     });
     _loadMessages();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+    Future.delayed(const Duration(milliseconds: 60), () {
+      if (mounted && _scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted && _scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
   }
 
   @override
@@ -72,14 +98,9 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
 
       // Enforce 30-day lifespan rule: Automatically clear messages older than 30 days
       final validMsgs = msgs.where((m) {
-        final dateStr = m['publish_date'] ?? m['created_at'];
-        if (dateStr != null) {
-          try {
-            final dt = DateTime.parse(dateStr.toString().split('T')[0]);
-            if (now.difference(dt).inDays > 30) {
-              return false;
-            }
-          } catch (_) {}
+        final dt = _getExactMessageDateTime(m);
+        if (dt.year > 2000 && now.difference(dt).inDays > 30) {
+          return false;
         }
         if (isTrainer) {
           final senderRole = (m['sender_role'] ?? '').toString().toLowerCase();
@@ -92,10 +113,10 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
         return true;
       }).toList();
 
-      // Sort chronologically: oldest at top, latest at bottom (chat stream style)
+      // Sort chronologically: oldest at top (8am), newest at bottom (9pm)
       validMsgs.sort((a, b) {
-        final da = _parseMessageDate(a['publish_date'] ?? a['created_at']) ?? DateTime(2000);
-        final db = _parseMessageDate(b['publish_date'] ?? b['created_at']) ?? DateTime(2000);
+        final da = _getExactMessageDateTime(a);
+        final db = _getExactMessageDateTime(b);
         return da.compareTo(db);
       });
 
@@ -108,37 +129,52 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
       // Mark as read after user has seen the messages
       SupabaseService().markAllMessagesAsRead(validMsgs);
 
-      // Smoothly scroll down to latest message
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-        }
-      });
+      // Automatically position at the bottom so newest messages are visible first
+      _scrollToBottom();
     }
   }
 
-  DateTime? _parseMessageDate(dynamic dateVal) {
-    if (dateVal == null) return null;
-    final s = dateVal.toString().trim();
-    if (s.isEmpty) return null;
-    try {
-      if (s.contains('T')) {
-        return DateTime.parse(s);
-      } else if (s.contains('-') && s.length >= 10) {
-        final parts = s.split('-');
-        if (parts.length >= 3) {
-          return DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2].substring(0, 2)));
-        }
+  DateTime _getExactMessageDateTime(dynamic item) {
+    if (item is Map) {
+      final rawCreated = item['created_at'];
+      if (rawCreated != null && rawCreated.toString().trim().isNotEmpty) {
+        try {
+          return DateTime.parse(rawCreated.toString()).toLocal();
+        } catch (_) {}
       }
-      return DateTime.parse(s);
-    } catch (_) {
-      return null;
+      final rawPub = (item['publish_date'] ?? item['date'])?.toString().trim();
+      final rawTime = (item['publish_time'] ?? item['time'])?.toString().trim();
+      if (rawPub != null && rawPub.isNotEmpty) {
+        try {
+          DateTime base = DateTime.parse(rawPub).toLocal();
+          if (rawTime != null && rawTime.isNotEmpty) {
+            final match = RegExp(r'(\d+):(\d+)\s*(AM|PM)?', caseSensitive: false).firstMatch(rawTime);
+            if (match != null) {
+              int h = int.parse(match.group(1)!);
+              int m = int.parse(match.group(2)!);
+              final ap = match.group(3)?.toUpperCase();
+              if (ap == 'PM' && h < 12) h += 12;
+              if (ap == 'AM' && h == 12) h = 0;
+              return DateTime(base.year, base.month, base.day, h, m);
+            }
+          }
+          return base;
+        } catch (_) {}
+      }
+    } else if (item != null) {
+      final s = item.toString().trim();
+      if (s.isNotEmpty) {
+        try {
+          return DateTime.parse(s).toLocal();
+        } catch (_) {}
+      }
     }
+    return DateTime(2000);
   }
 
-  String _getDateGroupLabel(dynamic dateVal) {
-    final dt = _parseMessageDate(dateVal);
-    if (dt == null) return dateVal?.toString().toUpperCase() ?? 'RECENT';
+  String _getDateGroupLabel(dynamic val) {
+    final dt = _getExactMessageDateTime(val);
+    if (dt.year <= 2000) return 'RECENT';
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final msgDay = DateTime(dt.year, dt.month, dt.day);
@@ -157,24 +193,13 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
   }
 
   String _formatMessageTime(Map<String, dynamic> msg) {
-    try {
-      final rawCreated = msg['created_at'];
-      if (rawCreated != null && rawCreated.toString().trim().isNotEmpty) {
-        final dt = DateTime.parse(rawCreated.toString()).toLocal();
-        final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
-        final amPm = dt.hour >= 12 ? 'PM' : 'AM';
-        final minute = dt.minute.toString().padLeft(2, '0');
-        return '$hour:$minute $amPm';
-      }
-      final rawPub = msg['publish_date'] ?? msg['date'];
-      if (rawPub != null && rawPub.toString().trim().isNotEmpty) {
-        final dt = DateTime.parse(rawPub.toString()).toLocal();
-        final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
-        final amPm = dt.hour >= 12 ? 'PM' : 'AM';
-        final minute = dt.minute.toString().padLeft(2, '0');
-        return '$hour:$minute $amPm';
-      }
-    } catch (_) {}
+    final dt = _getExactMessageDateTime(msg);
+    if (dt.year > 2000) {
+      final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      final minute = dt.minute.toString().padLeft(2, '0');
+      return '$hour:$minute $amPm';
+    }
     return (msg['time'] ?? '10:00 AM').toString();
   }
 
@@ -540,16 +565,14 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                               final actionLinks = _parseActionLinks(msg['action_links']);
 
                               // Compute date grouping
-                              final rawDate = msg['publish_date'] ?? msg['date'] ?? msg['created_at'];
-                              final currentGroup = _getDateGroupLabel(rawDate);
+                              final currentGroup = _getDateGroupLabel(msg);
 
                               bool showDateHeader = false;
                               if (index == 0) {
                                 showDateHeader = true;
                               } else {
                                 final prevMsg = _messages[index - 1];
-                                final prevRawDate = prevMsg['publish_date'] ?? prevMsg['date'] ?? prevMsg['created_at'];
-                                final prevGroup = _getDateGroupLabel(prevRawDate);
+                                final prevGroup = _getDateGroupLabel(prevMsg);
                                 showDateHeader = currentGroup != prevGroup;
                               }
 
@@ -893,15 +916,17 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
         ),
       );
     } else {
-      // Academy Administration / Director
-      String adminAvatar = (msg['admin_avatar_url'] ?? msg['avatar_url'] ?? '').toString().trim();
-      if (adminAvatar.isEmpty) {
+      String adminAvatar = (msg['admin_avatar_url'] ?? '').toString().trim();
+      if (adminAvatar.isEmpty || adminAvatar == 'null') {
+        adminAvatar = (msg['avatar_url'] ?? '').toString().trim();
+      }
+      if (adminAvatar.isEmpty || adminAvatar == 'null') {
         final resolved = SupabaseService().getAdminAvatar();
-        if (resolved != null && resolved.isNotEmpty) {
+        if (resolved != null && resolved.isNotEmpty && resolved != 'null') {
           adminAvatar = resolved;
         }
       }
-      final provider = getAvatarImageProvider(adminAvatar.isNotEmpty ? adminAvatar : null);
+      final provider = getAvatarImageProvider((adminAvatar.isNotEmpty && adminAvatar != 'null') ? adminAvatar : null);
 
       return Container(
         margin: const EdgeInsets.only(top: 2),

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Trainer, Course, Batch } from '@/lib/academy';
 import GuruPhotoUploadInput from '@/components/common/GuruPhotoUploadInput';
+import MultiSelectCombobox, { MultiSelectOption } from '@/components/common/MultiSelectCombobox';
 import { 
   Users, 
   Plus, 
@@ -46,6 +47,8 @@ export default function TrainersListClient({
   const [trainers, setTrainers] = useState<Trainer[]>(initialTrainers);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [selectedCourseFilters, setSelectedCourseFilters] = useState<string[]>([]);
+  const [selectedBatchFilters, setSelectedBatchFilters] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -141,21 +144,69 @@ export default function TrainersListClient({
     });
   };
 
-  // Filter Trainers by Search and Status
+  // Multi-select combobox options for Courses
+  const courseFilterOptions = useMemo<MultiSelectOption[]>(() => {
+    return courses.map(c => ({
+      id: c.id,
+      label: c.title,
+      subtitle: c.code,
+      badge: c.category
+    }));
+  }, [courses]);
+
+  // Multi-select combobox options for Batches
+  const batchFilterOptions = useMemo<MultiSelectOption[]>(() => {
+    const list = selectedCourseFilters.length > 0
+      ? batches.filter(b => selectedCourseFilters.includes(b.course_id))
+      : batches;
+
+    return list.map(b => ({
+      id: b.id,
+      label: b.name,
+      subtitle: b.course_title ? `${b.course_title} • ${b.trainer_name || 'Guru'}` : (b.trainer_name || 'Guru'),
+      badge: b.start_time && b.end_time ? `${b.start_time.slice(0, 5)} - ${b.end_time.slice(0, 5)}` : undefined
+    }));
+  }, [batches, selectedCourseFilters]);
+
+  // Filter Trainers by Search, Status, Course Multi-selection, and Batch Multi-selection
   const filteredTrainers = trainers.filter(t => {
     const matchesStatus = 
       statusFilter === 'all' ? true :
       statusFilter === 'active' ? (t.is_active !== false) :
       (t.is_active === false);
 
-    const matchesSearch = 
-      t.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.display_title && t.display_title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (t.phone && t.phone.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (t.email && t.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      t.specializations?.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (!matchesStatus) return false;
 
-    return matchesStatus && matchesSearch;
+    // Search Query match
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = 
+        t.full_name.toLowerCase().includes(q) ||
+        (t.display_title && t.display_title.toLowerCase().includes(q)) ||
+        (t.phone && t.phone.toLowerCase().includes(q)) ||
+        (t.email && t.email.toLowerCase().includes(q)) ||
+        t.specializations?.some(s => s.toLowerCase().includes(q));
+      if (!matchesSearch) return false;
+    }
+
+    // Course Multi-select Filter
+    if (selectedCourseFilters.length > 0) {
+      const guruCourses = getGuruCourses(t).map(c => c.toLowerCase().trim());
+      const selectedTitles = courses
+        .filter(c => selectedCourseFilters.includes(c.id))
+        .map(c => c.title.toLowerCase().trim());
+      const matchesCourse = selectedTitles.some(title => guruCourses.includes(title));
+      if (!matchesCourse) return false;
+    }
+
+    // Batch Multi-select Filter
+    if (selectedBatchFilters.length > 0) {
+      const guruBatches = getGuruBatches(t);
+      const matchesBatch = guruBatches.some(b => selectedBatchFilters.includes(b.id));
+      if (!matchesBatch) return false;
+    }
+
+    return true;
   });
 
   const activeCount = trainers.filter(t => t.is_active !== false).length;
@@ -1234,55 +1285,99 @@ export default function TrainersListClient({
         </div>
       </div>
 
-      {/* Status Filter Pills */}
-      <div className="flex items-center gap-2.5">
-        <button
-          onClick={() => setStatusFilter('all')}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-2 ${
-            statusFilter === 'all'
-              ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
-              : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
-          }`}
-        >
-          <span>All Gurus</span>
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
-            statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-[#FFF2F8] text-[#8A064D]'
-          }`}>
-            {trainers.length}
-          </span>
-        </button>
-        <button
-          onClick={() => setStatusFilter('active')}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-2 ${
-            statusFilter === 'active'
-              ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
-              : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-          <span>Active</span>
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
-            statusFilter === 'active' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-800'
-          }`}>
-            {activeCount}
-          </span>
-        </button>
-        <button
-          onClick={() => setStatusFilter('inactive')}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-2 ${
-            statusFilter === 'inactive'
-              ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
-              : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-zinc-400"></span>
-          <span>Inactive / Leave</span>
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold tabular-nums ${
-            statusFilter === 'inactive' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-          }`}>
-            {inactiveCount}
-          </span>
-        </button>
+      {/* Status & Multi-selection Filters */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-[#F0D5E4] shadow-2xs">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Status Filter Pills */}
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+              statusFilter === 'all'
+                ? 'bg-[#8A064D] text-white shadow-xs'
+                : 'bg-gray-50 text-[#521D38] border border-gray-200 hover:bg-[#FFF9FB]'
+            }`}
+          >
+            <span>All Gurus</span>
+            <span className={`text-[10.5px] px-1.5 py-0.2 rounded-full font-extrabold tabular-nums ${
+              statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-[#FFF2F8] text-[#8A064D]'
+            }`}>
+              {trainers.length}
+            </span>
+          </button>
+          <button
+            onClick={() => setStatusFilter('active')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+              statusFilter === 'active'
+                ? 'bg-[#8A064D] text-white shadow-xs'
+                : 'bg-gray-50 text-[#521D38] border border-gray-200 hover:bg-[#FFF9FB]'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>Active</span>
+            <span className={`text-[10.5px] px-1.5 py-0.2 rounded-full font-extrabold tabular-nums ${
+              statusFilter === 'active' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-800'
+            }`}>
+              {activeCount}
+            </span>
+          </button>
+          <button
+            onClick={() => setStatusFilter('inactive')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+              statusFilter === 'inactive'
+                ? 'bg-[#8A064D] text-white shadow-xs'
+                : 'bg-gray-50 text-[#521D38] border border-gray-200 hover:bg-[#FFF9FB]'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-zinc-400"></span>
+            <span>Inactive</span>
+            <span className={`text-[10.5px] px-1.5 py-0.2 rounded-full font-extrabold tabular-nums ${
+              statusFilter === 'inactive' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+            }`}>
+              {inactiveCount}
+            </span>
+          </button>
+
+          <div className="h-5 w-px bg-gray-200 mx-1 hidden sm:block" />
+
+          {/* 1. Multi-Selection Searchable Course Filter */}
+          <MultiSelectCombobox
+            label="Courses"
+            options={courseFilterOptions}
+            selectedIds={selectedCourseFilters}
+            onChange={setSelectedCourseFilters}
+            placeholder="All Courses"
+          />
+
+          {/* 2. Multi-Selection Searchable Batch Filter */}
+          <MultiSelectCombobox
+            label="Batches"
+            options={batchFilterOptions}
+            selectedIds={selectedBatchFilters}
+            onChange={setSelectedBatchFilters}
+            placeholder="All Batches"
+          />
+
+          {/* Reset Filters */}
+          {(selectedCourseFilters.length > 0 || selectedBatchFilters.length > 0 || searchQuery || statusFilter !== 'all') && (
+            <button
+              onClick={() => {
+                setStatusFilter('all');
+                setSearchQuery('');
+                setSelectedCourseFilters([]);
+                setSelectedBatchFilters([]);
+              }}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] hover:bg-rose-100 transition flex items-center gap-1 cursor-pointer"
+              title="Reset all filters"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Reset</span>
+            </button>
+          )}
+        </div>
+
+        <div className="text-xs font-semibold text-gray-500">
+          Showing <strong className="text-[#8A064D]">{filteredTrainers.length}</strong> of {trainers.length} Gurus
+        </div>
       </div>
 
       {/* =================================================================== */}

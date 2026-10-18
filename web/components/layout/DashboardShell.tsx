@@ -73,21 +73,17 @@ export default function DashboardShell({ user, children }: Props) {
     { label: 'Gurus (14)', href: '/trainers', icon: Users },
     { label: 'Students', href: '/students', icon: GraduationCap },
     { label: 'Batches', href: '/batches', icon: Calendar },
+    { label: 'Schemes', href: '/schemes', icon: Sparkles },
     { label: 'Video Library', href: '/video-library', icon: Video },
     { label: 'Today Schedule', href: '/schedule', icon: Clock },
     { label: 'Attendance Audit', href: '/attendance', icon: ClipboardCheck },
+    { label: 'Admin Profile', href: '/admin-profile', icon: ShieldCheck },
+    { label: 'Password Management', href: '/password-management', icon: KeyRound },
   ];
 
-  const settingsNavItems = [
-    { label: 'Admin Profile', href: '/settings/admin-profile', icon: ShieldCheck },
-    { label: 'Password Management', href: '/settings/passwords', icon: KeyRound },
-  ];
-
-  const allNavItems = [...academyNavItems, ...settingsNavItems];
-
-  const currentNavItem = allNavItems.find(item => 
+  const currentNavItem = academyNavItems.find(item => 
     pathname === item.href || (item.href !== '/overview' && pathname.startsWith(`${item.href}/`))
-  ) || (pathname.startsWith('/settings') ? settingsNavItems[0] : academyNavItems[0]);
+  ) || academyNavItems[0];
 
   return (
     <div className="min-h-screen flex bg-[#FFF9FB]" suppressHydrationWarning>
@@ -206,46 +202,7 @@ export default function DashboardShell({ user, children }: Props) {
             );
           })}
 
-          {/* Settings Section with Page Heading */}
-          <div className="pt-3 mt-3 border-t border-[#8A064D]/60 space-y-1">
-            {!isCollapsed && (
-              <div className="px-3 pt-1 pb-2 text-[11px] font-black uppercase tracking-wider text-[#F9E33A]/90 flex items-center gap-1.5">
-                <Settings className="w-3 h-3 text-[#F9E33A]" />
-                <span>Settings</span>
-              </div>
-            )}
 
-            {settingsNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  prefetch={true}
-                  onClick={() => setIsMobileOpen(false)}
-                  title={isCollapsed ? item.label : undefined}
-                  className={`flex items-center ${isCollapsed ? 'justify-center px-2 py-2.5' : 'px-3.5 py-2.5'} rounded-xl text-[15px] font-bold transition-all duration-150 group relative ${
-                    isActive
-                      ? 'bg-[#8A064D] text-white shadow-sm ring-1 ring-[#F9E33A]/50 font-black'
-                      : 'text-rose-100/85 hover:bg-white/10 hover:text-white'
-                  }`}
-                >
-                  {/* Active indicator bar */}
-                  {isActive && !isCollapsed && (
-                    <span className="absolute left-1 top-2.5 bottom-2.5 w-1 bg-[#F9E33A] rounded-full" />
-                  )}
-
-                  <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 pl-1.5'} min-w-0`}>
-                    <Icon className={`w-5 h-5 text-[#F9E33A] shrink-0 ${isActive ? 'scale-110 drop-shadow-xs' : 'group-hover:scale-110'} transition-transform`} />
-                    {!isCollapsed && (
-                      <span className="truncate tracking-wide">{item.label}</span>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
         </nav>
 
         {/* Director Profile & Logout Footer */}

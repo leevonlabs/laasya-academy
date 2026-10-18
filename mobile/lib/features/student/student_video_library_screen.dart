@@ -8,11 +8,17 @@ import 'event_folder_details_screen.dart';
 class StudentVideoLibraryScreen extends StatefulWidget {
   final String? studentCourse;
   final String? studentBatch;
+  final String? studentId;
+  final String? studentRoll;
+  final bool isTrainer;
 
   const StudentVideoLibraryScreen({
     super.key,
     this.studentCourse,
     this.studentBatch,
+    this.studentId,
+    this.studentRoll,
+    this.isTrainer = false,
   });
 
   @override
@@ -24,15 +30,18 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
   String _activeTab = 'my_course'; // 'my_course' or 'all'
+  bool _isTrainerUser = false;
+  String _studentId = '';
+  String _studentRoll = '';
+  String _studentCourse = '';
+  String _studentBatch = '';
+  Map<String, dynamic>? _userProfile;
 
-  // Multi-Year & Month Filter State (Side-scrolling multi-year selection)
-  Set<int> _selectedYears = {2026};
+  // Multi-Year & Month Filter State (Side-scrolling multi-year selection up to 2050)
+  Set<int> _selectedYears = {DateTime.now().year};
   int? _selectedMonth = 10; // Default: October (10), null = All Months
 
-  static const List<int> _availableYears = [
-    2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030,
-    2031, 2032, 2033, 2034, 2035, 2036, 2037, 2038, 2039, 2040
-  ];
+  static final List<int> _availableYears = List<int>.generate(31, (i) => 2020 + i);
 
   static const List<String> _monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -46,8 +55,8 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
 
   String get _displayMonthYear {
     String yearPart;
-    if (_selectedYears.isEmpty || _selectedYears.length == _availableYears.length) {
-      yearPart = 'All Years';
+    if (_selectedYears.isEmpty) {
+      yearPart = '${DateTime.now().year}';
     } else if (_selectedYears.length == 1) {
       yearPart = '${_selectedYears.first}';
     } else {
@@ -70,6 +79,16 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
     _unreadCount = 0;
     _folders = SupabaseService().getCachedStudentEventFolders();
     _isLoading = _folders.isEmpty;
+
+    final prof = SupabaseService().currentUserProfile;
+    final role = (prof?['role'] ?? '').toString().toLowerCase();
+    _isTrainerUser = widget.isTrainer || role.contains('trainer') || role.contains('guru') || role == 'teacher';
+    _studentId = widget.studentId ?? prof?['id']?.toString() ?? '';
+    _studentRoll = widget.studentRoll ?? prof?['roll_number']?.toString() ?? '';
+    _studentCourse = widget.studentCourse ?? prof?['course']?.toString() ?? 'Bharathanatyam';
+    _studentBatch = widget.studentBatch ?? prof?['batch']?.toString() ?? '';
+    _userProfile = prof;
+
     _loadEventFolders();
   }
 
@@ -215,35 +234,16 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
               const SizedBox(height: 14),
 
               // Side-Scrolling Multi-Year Selector Header
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'SELECT YEARS (SIDE-SCROLL)',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.8,
                       color: Color(0xFF8A064D),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () {
-                      setSheetState(() {
-                        if (tempYears.length == _availableYears.length) {
-                          tempYears = {2026};
-                        } else {
-                          tempYears = Set.from(_availableYears);
-                        }
-                      });
-                    },
-                    child: Text(
-                      tempYears.length == _availableYears.length ? 'Reset to 2026' : 'Select All Years',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF8A064D),
-                      ),
                     ),
                   ),
                 ],
@@ -256,44 +256,6 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                 physics: const BouncingScrollPhysics(),
                 child: Row(
                   children: [
-                    // All Years toggle chip
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: InkWell(
-                        onTap: () {
-                          setSheetState(() {
-                            if (tempYears.length == _availableYears.length) {
-                              tempYears = {2026};
-                            } else {
-                              tempYears = Set.from(_availableYears);
-                            }
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: tempYears.length == _availableYears.length
-                                ? LaasyaColors.primary
-                                : const Color(0xFFFFF9FB),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: tempYears.length == _availableYears.length
-                                  ? LaasyaColors.primary
-                                  : const Color(0xFFF0D5E4),
-                            ),
-                          ),
-                          child: Text(
-                            'All Years',
-                            style: TextStyle(
-                              color: tempYears.length == _availableYears.length ? Colors.white : Colors.black87,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                     ..._availableYears.map((y) {
                       final isSelected = tempYears.contains(y);
                       return Padding(
@@ -739,27 +701,119 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
     );
   }
 
-  bool _matchesCourse(Map<String, dynamic> item) {
-    final studentCourse = (widget.studentCourse ?? 'Bharathanatyam').toLowerCase().trim();
-    final access = (item['access_level'] ?? '').toString().toLowerCase();
-    if (access == 'all students' || access.contains('all')) return true;
-
-    final itemCourse = (item['target_course_title'] ?? '').toString().toLowerCase().trim();
-    if (itemCourse.contains(studentCourse) || studentCourse.contains(itemCourse)) {
+  bool _isItemVisible(Map<String, dynamic> item) {
+    if (_isTrainerUser) {
+      // 4. Video Library page (Guru Login)
+      // - Display only video links shared by the Admin.
+      // - Do not display video links shared by the Guru to students.
+      final sharedByType = (item['shared_by_type'] ?? '').toString().toLowerCase();
+      final trId = (item['trainer_id'] ?? '').toString();
+      if (sharedByType == 'guru' || trId.isNotEmpty) {
+        return false;
+      }
       return true;
     }
 
-    final tc = item['target_courses'];
-    if (tc is List) {
-      for (var c in tc) {
-        final cTitle = (c is Map ? c['title'] : c).toString().toLowerCase();
-        if (cTitle.contains(studentCourse) || studentCourse.contains(cTitle)) {
-          return true;
+    // 9. Video Library page (Student Login)
+    // - Do not display every video link shared by every Guru.
+    // - Display links only when the Admin or Guru has shared them with the specific student's enrolled batch or course.
+    // - Display the student's performance videos shared by the Guru as well.
+    final cat = (item['category'] ?? '').toString().toLowerCase();
+    final isPerformance = cat == 'performance' || cat == 'student_performance' || item['target_student_id'] != null;
+
+    // 1. Student's own performance videos shared by Guru
+    if (isPerformance) {
+      final tStudentId = (item['target_student_id'] ?? '').toString().toLowerCase().trim();
+      final tStudentRoll = (item['target_student_roll'] ?? item['roll_number'] ?? '').toString().toLowerCase().trim();
+      final tStudentName = (item['target_student_name'] ?? '').toString().toLowerCase().trim();
+      final myId = _studentId.toLowerCase().trim();
+      final myRoll = _studentRoll.toLowerCase().trim();
+      final myName = (_userProfile?['full_name'] ?? '').toString().toLowerCase().trim();
+
+      if (myId.isNotEmpty && tStudentId.isNotEmpty && tStudentId == myId) return true;
+      if (myRoll.isNotEmpty && tStudentRoll.isNotEmpty && (tStudentRoll == myRoll || tStudentRoll.contains(myRoll))) return true;
+      if (myName.isNotEmpty && tStudentName.isNotEmpty && (tStudentName == myName || tStudentName.contains(myName) || myName.contains(tStudentName))) return true;
+      if (item['target_students'] is List) {
+        for (final ts in item['target_students'] as List) {
+          if (ts is Map) {
+            final sId = ts['id']?.toString().toLowerCase().trim() ?? '';
+            final sRoll = ts['roll']?.toString().toLowerCase().trim() ?? '';
+            if (myId.isNotEmpty && sId == myId) return true;
+            if (myRoll.isNotEmpty && sRoll == myRoll) return true;
+          }
+        }
+      }
+      // Strictly hide performance videos of other students
+      return false;
+    }
+
+    // 2. Admin Universal broadcast links (available to all students across all courses)
+    final sharedBy = (item['shared_by_type'] ?? '').toString().toLowerCase();
+    final trId = (item['trainer_id'] ?? '').toString();
+    final access = (item['access_level'] ?? '').toString().toLowerCase();
+    final itemCourse = (item['target_course_title'] ?? '').toString().trim().toLowerCase();
+    final itemBatch = (item['target_batch_name'] ?? '').toString().trim().toLowerCase();
+    final isUniversal = access == 'all students' || access == 'universal' ||
+        (itemCourse.contains('all 18') && itemBatch.contains('all'));
+
+    if (sharedBy != 'guru' && trId.isEmpty && isUniversal) {
+      return true;
+    }
+
+    // 3. Admin or Guru General links matching student's enrolled course & batch
+    final enrolledCourseNames = <String>{};
+    final enrolledBatchNames = <String>{};
+    if (_studentCourse.isNotEmpty) enrolledCourseNames.add(_studentCourse.toLowerCase().trim());
+    if (_studentBatch.isNotEmpty) enrolledBatchNames.add(_studentBatch.toLowerCase().trim());
+
+    final enrolledList = _userProfile?['enrolled_courses'];
+    if (enrolledList is List) {
+      for (final e in enrolledList) {
+        if (e is Map) {
+          final cName = (e['course_title'] ?? e['title'] ?? e['course'] ?? '').toString().toLowerCase().trim();
+          if (cName.isNotEmpty) enrolledCourseNames.add(cName);
+          final bName = (e['batch_name'] ?? e['name'] ?? e['batch'] ?? '').toString().toLowerCase().trim();
+          if (bName.isNotEmpty) enrolledBatchNames.add(bName);
         }
       }
     }
 
-    if (itemCourse.isEmpty) return true;
+    bool courseMatches = false;
+    if (itemCourse.isEmpty || itemCourse == 'all courses' || itemCourse.contains('all 18') || itemCourse == 'all') {
+      courseMatches = true;
+    } else {
+      for (final mc in enrolledCourseNames) {
+        if (itemCourse.contains(mc) || mc.contains(itemCourse)) {
+          courseMatches = true;
+          break;
+        }
+      }
+      if (!courseMatches && item['target_courses'] is List) {
+        for (var c in item['target_courses'] as List) {
+          final cTitle = (c is Map ? c['title'] : c).toString().toLowerCase();
+          for (final mc in enrolledCourseNames) {
+            if (cTitle.contains(mc) || mc.contains(cTitle)) {
+              courseMatches = true;
+              break;
+            }
+          }
+          if (courseMatches) break;
+        }
+      }
+    }
+
+    if (!courseMatches) return false;
+
+    // Must also match batch (or be for all batches in that course)
+    if (itemBatch.isEmpty || itemBatch == 'all batches' || itemBatch == 'all') {
+      return true;
+    }
+    for (final mb in enrolledBatchNames) {
+      if (itemBatch.contains(mb) || mb.contains(itemBatch)) {
+        return true;
+      }
+    }
+
     return false;
   }
 
@@ -780,10 +834,14 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentCourseName = widget.studentCourse ?? 'Bharathanatyam';
+    final currentCourseName = _isTrainerUser ? 'Academy Library' : _studentCourse;
 
-    final myCourseFolders = _folders.where(_matchesCourse).toList();
-    final basePool = _activeTab == 'my_course' ? myCourseFolders : _folders;
+    final visibleFolders = _folders.where(_isItemVisible).toList();
+    final myCourseFolders = visibleFolders.where((item) {
+      final cat = (item['category'] ?? '').toString().toLowerCase();
+      return cat != 'universal' && (item['target_course_title'] ?? '').toString().toLowerCase().contains(_studentCourse.toLowerCase());
+    }).toList();
+    final basePool = (_activeTab == 'my_course' && !_isTrainerUser) ? myCourseFolders : visibleFolders;
 
     // Apply Upload Date filter
     final dateFilteredPool = basePool.where(_matchesUploadDate).toList();
@@ -827,12 +885,12 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                 ),
               ],
             ),
-            const Text(
-              'Event Video Library',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            Text(
+              _isTrainerUser ? 'Academy Video Library' : 'Event Video Library',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             Text(
-              'Enrolled: $currentCourseName',
+              _isTrainerUser ? 'Official Admin Broadcasts & Media' : 'Enrolled: $currentCourseName',
               style: const TextStyle(fontSize: 10.5, color: LaasyaColors.accentGold),
             ),
           ],
@@ -969,139 +1027,12 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 10),
-
-                    // =========================================================
-                    // 1.1 SIDE-SCROLLING MULTI-YEAR SELECTOR CHIPS (USER REQUIREMENT)
-                    // =========================================================
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        children: [
-                          // "All Years" Pill
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: InkWell(
-                              onTap: () {
-                                setState(() {
-                                  if (_selectedYears.isEmpty || _selectedYears.length == _availableYears.length) {
-                                    _selectedYears = {2026};
-                                  } else {
-                                    _selectedYears = Set.from(_availableYears);
-                                  }
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6.5),
-                                decoration: BoxDecoration(
-                                  color: (_selectedYears.isEmpty || _selectedYears.length == _availableYears.length)
-                                      ? LaasyaColors.primary
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: (_selectedYears.isEmpty || _selectedYears.length == _availableYears.length)
-                                        ? LaasyaColors.primary
-                                        : const Color(0xFFF0D5E4),
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.02),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 1),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.layers_rounded,
-                                      size: 13,
-                                      color: (_selectedYears.isEmpty || _selectedYears.length == _availableYears.length)
-                                          ? Colors.white
-                                          : LaasyaColors.primary,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'All Years',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: (_selectedYears.isEmpty || _selectedYears.length == _availableYears.length)
-                                            ? Colors.white
-                                            : Colors.black87,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          ..._availableYears.map((y) {
-                            final isSelected = _selectedYears.contains(y);
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: InkWell(
-                                onTap: () {
-                                  setState(() {
-                                    if (isSelected) {
-                                      if (_selectedYears.length > 1) {
-                                        _selectedYears.remove(y);
-                                      }
-                                    } else {
-                                      _selectedYears.add(y);
-                                    }
-                                  });
-                                },
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? LaasyaColors.primary : Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: isSelected ? LaasyaColors.primary : const Color(0xFFF0D5E4),
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.02),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 1),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (isSelected) ...[
-                                        const Icon(Icons.check, size: 11, color: Colors.white),
-                                        const SizedBox(width: 3),
-                                      ],
-                                      Text(
-                                        '$y',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: isSelected ? Colors.white : Colors.black87,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-
                     const SizedBox(height: 12),
 
                     // =========================================================
-                    // 2. SEGMENTED TABS: MY ENROLLED COURSE vs ALL ACADEMY
+                    // 2. SEGMENTED TABS: MY ENROLLED COURSE vs ALL ACADEMY (Hidden for Guru Login)
                     // =========================================================
+                    if (!_isTrainerUser)
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
@@ -1130,7 +1061,7 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                           Expanded(
                             child: _tabButton(
                               title: 'All Events',
-                              count: _folders.where(_matchesUploadDate).length,
+                              count: visibleFolders.where(_matchesUploadDate).length,
                               isSelected: _activeTab == 'all',
                               onTap: () => setState(() => _activeTab = 'all'),
                             ),
@@ -1184,35 +1115,15 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          _activeTab == 'my_course'
-                              ? 'Shoot Folders for $currentCourseName (${displayedList.length})'
-                              : 'All Academy Shoot Folders (${displayedList.length})',
+                          _isTrainerUser
+                              ? 'Admin Video Vault (${displayedList.length})'
+                              : (_activeTab == 'my_course'
+                                  ? 'Course Media for $currentCourseName (${displayedList.length})'
+                                  : 'All Academy Media Vault (${displayedList.length})'),
                           style: const TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.bold,
                             color: LaasyaColors.textDark,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDEF7EC),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.cloud_done_rounded, size: 12, color: Color(0xFF03543F)),
-                              SizedBox(width: 4),
-                              Text(
-                                'Drive Links',
-                                style: TextStyle(
-                                  color: Color(0xFF03543F),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
                           ),
                         ),
                       ],
@@ -1282,7 +1193,6 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                           final item = displayedList[index];
                           final title = (item['title'] ?? 'Event Shoot').toString();
                           final course = (item['target_course_title'] ?? 'All Academy Courses').toString();
-                          final batch = (item['target_batch_name'] ?? 'All Batches').toString();
                           final eventDateRaw = item['event_date'];
                           final uploadDateRaw = item['created_at'] ?? item['event_date'];
 
@@ -1312,53 +1222,6 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Top Tags Row
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFDEF7EC),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: const Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.folder_shared_rounded, size: 12, color: Color(0xFF03543F)),
-                                            SizedBox(width: 4),
-                                            Text(
-                                              'EVENT FOLDER',
-                                              style: TextStyle(
-                                                color: Color(0xFF03543F),
-                                                fontSize: 9.5,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFFFF2F8),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: const Color(0xFFF0D5E4)),
-                                        ),
-                                        child: Text(
-                                          '$course • $batch',
-                                          style: const TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: LaasyaColors.primary,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-
-                                  const SizedBox(height: 10),
-
                                   // Event Title
                                   Text(
                                     title,
