@@ -510,6 +510,42 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
     };
   }
 
+  String _formatSlotTime(String raw) {
+    if (raw.isEmpty) return 'TBD';
+    String formatToken(String token) {
+      token = token.trim();
+      if (token.isEmpty) return '';
+      if (RegExp(r'(AM|PM)', caseSensitive: false).hasMatch(token)) {
+        return token.replaceAllMapped(RegExp(r'(\d{1,2}):(\d{2}):\d{2}\s*(AM|PM)', caseSensitive: false), (m) {
+          int h = int.parse(m[1]!);
+          return '$h:${m[2]} ${m[3]?.toUpperCase()}';
+        });
+      }
+      final m = RegExp(r'^(\d{1,2}):(\d{2})(?::(\d{2}))?$').firstMatch(token);
+      if (m != null) {
+        int h = int.parse(m[1]!);
+        final min = m[2]!;
+        final amPm = h >= 12 ? 'PM' : 'AM';
+        int h12 = h % 12;
+        if (h12 == 0) h12 = 12;
+        return '$h12:$min $amPm';
+      }
+      return token;
+    }
+
+    if (raw.contains(' – ')) {
+      final parts = raw.split(' – ');
+      return '${formatToken(parts[0])}\nto ${formatToken(parts[1])}';
+    } else if (raw.contains(' - ')) {
+      final parts = raw.split(' - ');
+      return '${formatToken(parts[0])}\nto ${formatToken(parts[1])}';
+    } else if (raw.contains('-')) {
+      final parts = raw.split('-');
+      return '${formatToken(parts[0])}\nto ${formatToken(parts[1])}';
+    }
+    return formatToken(raw);
+  }
+
   List<Map<String, dynamic>> _getTrainerSchedule(String trainerName, String specialization) {
     final List<Map<String, dynamic>> slots = [];
     final storeCourses = TrainerDataStore().courses;
@@ -960,40 +996,49 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Image.asset(
-                              'assets/images/header_logo.png',
-                              width: 28,
-                              height: 28,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: LaasyaColors.primary, size: 24),
-                            ),
-                            const SizedBox(width: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'LAASYA CULTURAL ACADEMY',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFF590231),
-                                    letterSpacing: 0.5,
-                                  ),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Image.asset(
+                                'assets/images/header_logo.png',
+                                width: 28,
+                                height: 28,
+                                errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: LaasyaColors.primary, size: 24),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'LAASYA CULTURAL ACADEMY',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF590231),
+                                        letterSpacing: 0.5,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      'CURRENT WEEK: $weekRangeFormatted',
+                                      style: const TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.black54,
+                                        letterSpacing: 0.4,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
                                 ),
-                                Text(
-                                  'CURRENT WEEK: $weekRangeFormatted',
-                                  style: const TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.black54,
-                                    letterSpacing: 0.4,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
@@ -1113,12 +1158,12 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
-                                        time,
+                                        _formatSlotTime(time),
                                         style: const TextStyle(
                                           fontSize: 9.5,
                                           fontWeight: FontWeight.w700,
                                           color: Colors.black87,
-                                          height: 1.2,
+                                          height: 1.25,
                                         ),
                                       ),
                                     ],
@@ -1132,8 +1177,11 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      // Badges Row
-                                      Row(
+                                      // Badges Row - using Wrap with ConstrainedBox so it never overflows
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 4,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
                                         children: [
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
@@ -1147,19 +1195,23 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                                               children: [
                                                 Icon(theme['icon'] as IconData, size: 10, color: theme['text'] as Color),
                                                 const SizedBox(width: 4),
-                                                Text(
-                                                  course,
-                                                  style: TextStyle(
-                                                    fontSize: 9.5,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: theme['text'] as Color,
-                                                    letterSpacing: 0.3,
+                                                ConstrainedBox(
+                                                  constraints: const BoxConstraints(maxWidth: 120),
+                                                  child: Text(
+                                                    course,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.w900,
+                                                      color: theme['text'] as Color,
+                                                      letterSpacing: 0.3,
+                                                    ),
                                                   ),
                                                 ),
                                               ],
                                             ),
                                           ),
-                                          const Spacer(),
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
@@ -1172,9 +1224,14 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                                               children: [
                                                 const Icon(Icons.meeting_room_outlined, size: 11, color: Colors.black54),
                                                 const SizedBox(width: 3),
-                                                Text(
-                                                  room,
-                                                  style: const TextStyle(fontSize: 9.5, color: Colors.black87, fontWeight: FontWeight.w600),
+                                                ConstrainedBox(
+                                                  constraints: const BoxConstraints(maxWidth: 120),
+                                                  child: Text(
+                                                    room,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(fontSize: 9.5, color: Colors.black87, fontWeight: FontWeight.w600),
+                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -1197,12 +1254,16 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                                             children: [
                                               const Icon(Icons.star_rounded, size: 12, color: Color(0xFFD97706)),
                                               const SizedBox(width: 3),
-                                              Text(
-                                                '★ EXTRA / RESCHEDULED CLASS ($dateStr)',
-                                                style: const TextStyle(
-                                                  fontSize: 9.5,
-                                                  fontWeight: FontWeight.w900,
-                                                  color: Color(0xFF92400E),
+                                              Flexible(
+                                                child: Text(
+                                                  '★ EXTRA / RESCHEDULED CLASS ($dateStr)',
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: 9.5,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Color(0xFF92400E),
+                                                  ),
                                                 ),
                                               ),
                                             ],
@@ -1236,12 +1297,16 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                                         children: [
                                           const Icon(Icons.person_rounded, size: 13, color: Colors.black54),
                                           const SizedBox(width: 4),
-                                          Text(
-                                            'Guru $trainer',
-                                            style: const TextStyle(
-                                              fontSize: 11.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.black87,
+                                          Expanded(
+                                            child: Text(
+                                              'Guru $trainer',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.black87,
+                                              ),
                                             ),
                                           ),
                                         ],

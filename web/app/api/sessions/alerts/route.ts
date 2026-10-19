@@ -164,7 +164,19 @@ export async function GET(request: NextRequest) {
 
       // Guru/Trainer role: receives admin announcements, notices, and messages
       if (isTrainer) {
-        if (a.alert_type === 'message' || a.alert_type === 'announcement' || a.alert_type === 'admin_alert') {
+        if (
+          a.alert_type === 'message' || 
+          a.alert_type === 'announcement' || 
+          a.alert_type === 'admin_alert' ||
+          a.alert_type === 'holiday_alert' ||
+          a.alert_type === 'tally_class' ||
+          a.alert_type === 'session_cancellation' ||
+          a.alert_type === 'video_shared'
+        ) {
+          if (!bId || bId === 'all') return true;
+          if (allowedBatchIds.length > 0 && !allowedBatchIds.includes(bId)) {
+            return false;
+          }
           return true;
         }
         return false;
@@ -191,7 +203,14 @@ export async function GET(request: NextRequest) {
         return false;
       }
 
-      if (a.alert_type === 'message' || a.alert_type === 'announcement') {
+      if (
+        a.alert_type === 'message' || 
+        a.alert_type === 'announcement' ||
+        a.alert_type === 'holiday_alert' ||
+        a.alert_type === 'tally_class' ||
+        a.alert_type === 'session_cancellation' ||
+        a.alert_type === 'video_shared'
+      ) {
         const isGuruSender = a.trainer_name && !a.trainer_name.toLowerCase().includes('director') && !a.trainer_name.toLowerCase().includes('admin');
         if (isGuruSender) {
           if (!bId || bId === 'all') return true;
@@ -239,9 +258,9 @@ export async function GET(request: NextRequest) {
     for (const a of filtered) {
       const key = a.alert_type === 'attendance_marked'
         ? `att:${a.batch_id}:${a.target_student_id || a.target_roll_number || 'stu'}`
-        : (a.alert_type === 'message' || a.alert_type === 'announcement'
-            ? `msg:${a.id}`
-            : `closed:${a.batch_id}`);
+        : (a.alert_type === 'class_closed'
+            ? `closed:${a.batch_id}`
+            : `alert:${a.alert_type}:${a.id || Math.random()}`);
 
       if (!seen.has(key)) {
         seen.add(key);

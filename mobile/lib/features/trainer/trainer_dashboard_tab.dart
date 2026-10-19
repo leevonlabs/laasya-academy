@@ -6,7 +6,7 @@ import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/widgets/laasya_avatar.dart';
-import '../student/student_messages_screen.dart';
+import 'trainer_announcements_screen.dart';
 import 'trainer_salaries_screen.dart';
 import 'trainer_share_video_screen.dart';
 import 'trainer_timetable_screen.dart';
@@ -768,7 +768,7 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const StudentMessagesScreen(),
+                        builder: (_) => TrainerAnnouncementsScreen(trainerProfile: _profile),
                       ),
                     );
                     setState(() {});

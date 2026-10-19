@@ -1009,6 +1009,9 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(_cachedTrainerBatches);
   }
 
+  List<Map<String, dynamic>> get trainerBatches =>
+      List<Map<String, dynamic>>.from(_cachedTrainerBatches);
+
   Future<List<Map<String, dynamic>>> getBatchStudents(String batchId) async {
     final batches = await getTrainerBatches();
     final batch = batches.firstWhere(
@@ -1647,18 +1650,41 @@ class SupabaseService {
     final guruAssignedBatchNames = <String>{};
     final guruAssignedCourseNames = <String>{};
     if (profCourse.isNotEmpty) guruAssignedCourseNames.add(profCourse);
+
+    void extractGuruBatch(dynamic b) {
+      if (b is Map) {
+        final bId = (b['id'] ?? b['batch_id'] ?? '').toString().toLowerCase().trim();
+        if (bId.isNotEmpty) guruAssignedBatchIds.add(bId);
+        final bName = (b['name'] ?? b['batch_name'] ?? '').toString().toLowerCase().trim();
+        if (bName.isNotEmpty) guruAssignedBatchNames.add(bName);
+        final cName = (b['course_title'] ?? b['course_name'] ?? b['title'] ?? '').toString().toLowerCase().trim();
+        if (cName.isNotEmpty) guruAssignedCourseNames.add(cName);
+      }
+    }
+
     final assignedB = profile['assigned_batches'];
     if (assignedB is List) {
       for (var b in assignedB) {
-        if (b is Map) {
-          final bId = (b['id'] ?? b['batch_id'] ?? '').toString().toLowerCase().trim();
-          if (bId.isNotEmpty) guruAssignedBatchIds.add(bId);
-          final bName = (b['name'] ?? b['batch_name'] ?? '').toString().toLowerCase().trim();
-          if (bName.isNotEmpty) guruAssignedBatchNames.add(bName);
-          final cName = (b['course_title'] ?? b['course_name'] ?? '').toString().toLowerCase().trim();
+        extractGuruBatch(b);
+      }
+    }
+    final assignedC = profile['assigned_courses'];
+    if (assignedC is List) {
+      for (var c in assignedC) {
+        if (c is Map) {
+          final cName = (c['course_title'] ?? c['title'] ?? c['name'] ?? '').toString().toLowerCase().trim();
           if (cName.isNotEmpty) guruAssignedCourseNames.add(cName);
+          final batches = c['batches'];
+          if (batches is List) {
+            for (var b in batches) {
+              extractGuruBatch(b);
+            }
+          }
         }
       }
+    }
+    for (var b in _cachedTrainerBatches) {
+      extractGuruBatch(b);
     }
 
     return items.where((item) {
@@ -1678,16 +1704,14 @@ class SupabaseService {
       if (isTrainer) {
         if (!isGuruMsg) {
           final aud = (item['audience'] ?? '').toString().toLowerCase();
-          if (aud.contains('student') && !aud.contains('all') && !aud.contains('trainer') && !aud.contains('guru')) {
-            return false;
-          }
 
           // If targeted to a specific batch, verify this guru teaches it
+          bool teachesBatch = false;
           if (targetBatchId.isNotEmpty && targetBatchId != 'all') {
-            final teachesBatch = guruAssignedBatchIds.contains(targetBatchId) ||
-                (targetBatchName.isNotEmpty && guruAssignedBatchNames.contains(targetBatchName)) ||
-                itemMsg.contains(myName) ||
-                itemTitle.contains(myName);
+            final targetTokens = targetBatchId.split(RegExp(r'[,| ]+')).where((s) => s.isNotEmpty).toSet();
+            teachesBatch = targetTokens.any((t) => guruAssignedBatchIds.contains(t)) ||
+                (targetBatchName.isNotEmpty && guruAssignedBatchNames.any((b) => b.contains(targetBatchName) || targetBatchName.contains(b))) ||
+                (myName.isNotEmpty && (itemMsg.contains(myName) || itemTitle.contains(myName)));
             if (!teachesBatch && guruAssignedBatchIds.isNotEmpty) {
               return false;
             }
@@ -1695,13 +1719,14 @@ class SupabaseService {
 
           // If targeted to a specific course, verify course match
           if (targetCourseTitle.isNotEmpty && targetCourseTitle != 'all') {
-            bool matchesCourse = guruAssignedCourseNames.any((c) => c.contains(targetCourseTitle) || targetCourseTitle.contains(c));
+            bool matchesCourse = guruAssignedCourseNames.any((c) => c.contains(targetCourseTitle) || targetCourseTitle.contains(c)) ||
+                (myName.isNotEmpty && (itemMsg.contains(myName) || itemTitle.contains(myName)));
             if (!matchesCourse && guruAssignedCourseNames.isNotEmpty && !itemMsg.contains(myName)) {
               return false;
             }
           }
 
-          if (aud.contains('trainer') || aud.contains('all') || aud.contains('gurus') || aud == '' || aud.contains('selected')) {
+          if (aud.contains('trainer') || aud.contains('all') || aud.contains('gurus') || aud == '' || aud.contains('selected') || teachesBatch) {
             return true;
           }
           return false;
@@ -1710,6 +1735,10 @@ class SupabaseService {
         final tName = (item['trainer_name'] ?? item['created_by'] ?? '').toString().toLowerCase();
         if (tId.isNotEmpty && tId == myId) return true;
         if (tName.isNotEmpty && (tName.contains(myName) || myName.contains(tName))) return true;
+        final cBy = (item['created_by'] ?? '').toString().toLowerCase();
+        if (cBy.isNotEmpty && (cBy.contains(myName) || myName.contains(cBy))) return true;
+        if (targetBatchId.isNotEmpty && guruAssignedBatchIds.contains(targetBatchId)) return true;
+        if (targetBatchName.isNotEmpty && guruAssignedBatchNames.any((b) => b.contains(targetBatchName) || targetBatchName.contains(b))) return true;
         return false;
       } else {
         // STUDENT VIEW

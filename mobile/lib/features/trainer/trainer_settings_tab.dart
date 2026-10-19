@@ -4,7 +4,6 @@ import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/widgets/laasya_avatar.dart';
 import '../auth/portal_landing_screen.dart';
-import '../student/student_messages_screen.dart';
 import '../student/student_video_library_screen.dart';
 import 'trainer_announcements_screen.dart';
 import 'trainer_profile_details_screen.dart';
@@ -538,7 +537,7 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const StudentMessagesScreen(),
+                          builder: (_) => TrainerAnnouncementsScreen(trainerProfile: _profile),
                         ),
                       );
                       setState(() {});

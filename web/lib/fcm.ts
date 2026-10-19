@@ -205,8 +205,11 @@ export async function sendFcmToBatch(batchId: string, payload: FcmNotificationPa
     FROM public.device_tokens dt
     LEFT JOIN public.students s ON (s.profile_id = dt.user_id OR s.id = dt.user_id)
     LEFT JOIN public.batch_enrollments be ON (be.student_id = s.id OR be.student_id = dt.user_id)
+    LEFT JOIN public.trainers t ON (t.profile_id = dt.user_id OR t.id = dt.user_id)
+    LEFT JOIN public.batches tb ON (tb.trainer_id = t.id OR tb.trainer_id = dt.user_id)
     WHERE dt.batch_ids ?| $1::text[]
        OR be.batch_id::text = ANY($1::text[])
+       OR tb.id::text = ANY($1::text[])
        OR dt.role = 'admin';
   `, [batchIds]);
 
@@ -232,7 +235,10 @@ export async function sendFcmToCourse(courseId: string, payload: FcmNotification
     LEFT JOIN public.students s ON (s.profile_id = dt.user_id OR s.id = dt.user_id)
     LEFT JOIN public.batch_enrollments be ON (be.student_id = s.id OR be.student_id = dt.user_id)
     LEFT JOIN public.batches b ON b.id = be.batch_id
+    LEFT JOIN public.trainers t ON (t.profile_id = dt.user_id OR t.id = dt.user_id)
+    LEFT JOIN public.batches tb ON (tb.trainer_id = t.id OR tb.trainer_id = dt.user_id)
     WHERE b.course_id::text = $1
+       OR tb.course_id::text = $1
        OR dt.role = 'admin';
   `, [courseId]);
 

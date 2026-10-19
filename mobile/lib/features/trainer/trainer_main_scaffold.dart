@@ -16,6 +16,8 @@ import 'trainer_settings_tab.dart';
 import 'trainer_notifications_screen.dart';
 import 'trainer_announcements_screen.dart';
 import '../../core/services/alarm_service.dart';
+import '../../core/services/notification_service.dart';
+import '../../core/services/fcm_service.dart';
 
 class TrainerMainScaffold extends StatefulWidget {
   const TrainerMainScaffold({super.key});
@@ -40,6 +42,8 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
     _startNetworkAlertPolling();
     _checkInitialNotificationRoute();
     AlarmService.setNotificationOpenedHandler(_handleNotificationOpened);
+    NotificationService.setNotificationOpenedHandler(_handleNotificationOpened);
+    FcmService.onNotificationTapped = _handleNotificationOpened;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         PermissionService.promptRequiredPermissions(context, role: 'trainer');
@@ -61,6 +65,17 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
         name: trainerName,
         phone: phone,
         batchIds: 'all',
+      );
+
+      final trainerBatches = SupabaseService().trainerBatches;
+      final batchIds = trainerBatches
+          .map((b) => (b['id'] ?? '').toString())
+          .where((id) => id.isNotEmpty)
+          .toList();
+      FcmService.registerDeviceToken(
+        userId: trainerId,
+        role: 'trainer',
+        batchIds: batchIds,
       );
     } catch (_) {}
   }
@@ -91,7 +106,13 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
     final alertType = (alert['alert_type'] ?? '').toString();
     // Gurus ONLY receive admin announcements and circular notices
     // NEVER receive student pickup alarm, NEVER receive student class completed alerts, NEVER play any 10-second ring alert!
-    if (alertType == 'message' || alertType == 'announcement' || alertType == 'admin_alert') {
+    if (alertType == 'message' ||
+        alertType == 'announcement' ||
+        alertType == 'admin_alert' ||
+        alertType == 'holiday_alert' ||
+        alertType == 'tally_class' ||
+        alertType == 'session_cancellation' ||
+        alertType == 'video_shared') {
       final id = alert['id']?.toString() ?? '';
       if (id.isNotEmpty && _globalProcessedAlertIds.contains(id)) return;
       if (id.isNotEmpty) {
@@ -251,7 +272,16 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
   void _handleNotificationOpened(Map<String, dynamic> data) {
     if (!mounted) return;
     final route = data['route']?.toString().toLowerCase();
-    if (route == 'messages' || route == '/messages' || route == 'announcements') {
+    final type = data['type']?.toString().toLowerCase();
+    if (route == 'messages' ||
+        route == '/messages' ||
+        route == 'announcements' ||
+        type == 'holiday_alert' ||
+        type == 'tally_class' ||
+        type == 'announcement' ||
+        type == 'session_cancellation' ||
+        type == 'video_shared' ||
+        type == 'message') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen()),

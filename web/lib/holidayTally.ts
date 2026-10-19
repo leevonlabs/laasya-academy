@@ -1,5 +1,5 @@
 import { query, queryOne } from './db';
-import { sendFcmToBatch, sendFcmToCourse, sendFcmToRole } from './fcm';
+import { sendFcmToBatch, sendFcmToCourse, sendFcmToRole, sendFcmToUser } from './fcm';
 
 export interface HolidayAlert {
   id: string;
@@ -397,6 +397,7 @@ ${data.reason.trim()}`;
       body: `Holiday on ${holidayDate} (${holidayDayName}). ${data.reason.trim()}`,
       data: {
         type: 'holiday_alert',
+        route: '/messages',
         holiday_date: holidayDate,
         batch_id: bId
       }
@@ -409,6 +410,7 @@ ${data.reason.trim()}`;
     body: `Holiday declared on ${holidayDate} for batches: ${targetBatchNamesStr || 'Selected Batches'}.`,
     data: {
       type: 'holiday_alert',
+      route: '/messages',
       holiday_date: holidayDate
     }
   }).catch(e => console.error('[FCM] Error notifying gurus of holiday:', e));
@@ -815,10 +817,25 @@ Please attend on time. Attendance will be recorded for this class.`;
       body: `Rescheduled to ${data.rescheduled_date} (${data.start_time.substring(0, 5)} - ${data.end_time.substring(0, 5)}) in ${data.room_or_hall}. Please attend on time.`,
       data: {
         type: 'tally_class',
+        route: '/messages',
         batch_id: data.batch_id,
         rescheduled_date: data.rescheduled_date
       }
     }).catch(e => console.error('[FCM] Error notifying batch of tally class:', e));
+
+    // Also notify assigned Guru directly
+    if (data.trainer_id) {
+      sendFcmToUser(data.trainer_id, {
+        title: extraClassTitle,
+        body: `Extra class rescheduled to ${data.rescheduled_date} (${data.start_time.substring(0, 5)} - ${data.end_time.substring(0, 5)}) in ${data.room_or_hall}.`,
+        data: {
+          type: 'tally_class',
+          route: '/messages',
+          batch_id: data.batch_id,
+          rescheduled_date: data.rescheduled_date
+        }
+      }).catch(e => console.error('[FCM] Error notifying guru of tally class:', e));
+    }
   } catch (err) {
     console.warn('Error broadcasting tally class announcement:', err);
   }
@@ -1068,6 +1085,7 @@ export async function createGuruAbsence(data: {
       body: `Class on ${data.absence_date} cancelled due to Guru absence. ${data.reason}`,
       data: {
         type: 'session_cancellation',
+        route: '/messages',
         batch_id: data.batch_id,
         absence_date: data.absence_date
       }

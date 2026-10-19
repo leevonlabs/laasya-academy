@@ -8,6 +8,8 @@ import '../../core/constants/api_constants.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/alarm_service.dart';
+import '../../core/services/notification_service.dart';
+import '../../core/services/fcm_service.dart';
 import '../../core/services/permission_service.dart';
 import '../trainer/trainer_data_store.dart';
 import 'student_dashboard_tab.dart';
@@ -17,6 +19,7 @@ import 'student_attendance_tab.dart';
 import 'student_settings_tab.dart';
 import 'student_notifications_screen.dart';
 import 'student_messages_screen.dart';
+import 'student_video_library_screen.dart';
 
 class StudentMainScaffold extends StatefulWidget {
   const StudentMainScaffold({super.key});
@@ -43,6 +46,8 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
     _startNetworkAlertPolling();
     _checkInitialNotificationRoute();
     AlarmService.setNotificationOpenedHandler(_handleNotificationOpened);
+    NotificationService.setNotificationOpenedHandler(_handleNotificationOpened);
+    FcmService.onNotificationTapped = _handleNotificationOpened;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         PermissionService.promptRequiredPermissions(context, role: 'student');
@@ -53,10 +58,23 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
   void _handleNotificationOpened(Map<String, dynamic> data) {
     if (!mounted) return;
     final route = data['route']?.toString().toLowerCase();
-    if (route == 'messages' || route == '/messages' || route == 'announcements') {
+    final type = data['type']?.toString().toLowerCase();
+    if (route == 'messages' ||
+        route == '/messages' ||
+        route == 'announcements' ||
+        type == 'holiday_alert' ||
+        type == 'tally_class' ||
+        type == 'announcement' ||
+        type == 'session_cancellation' ||
+        type == 'message') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const StudentMessagesScreen()),
+      );
+    } else if (route == 'video' || route == '/video' || type == 'video_shared' || type == 'video_library') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StudentVideoLibraryScreen()),
       );
     } else if (route == 'attendance' || route == '/attendance' || route == 'alarm') {
       setState(() => _currentIndex = 3);
@@ -99,6 +117,19 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
         name: studentName,
         phone: phone,
         batchIds: batchIdsParam,
+      );
+
+      final tokenBatchIds = enrolled is List
+          ? enrolled
+              .map((e) => e is Map ? e['batch_id']?.toString() : null)
+              .where((id) => id != null && id.isNotEmpty)
+              .cast<String>()
+              .toList()
+          : <String>[];
+      FcmService.registerDeviceToken(
+        userId: studentId,
+        role: 'student',
+        batchIds: tokenBatchIds,
       );
     } catch (_) {}
   }
@@ -191,7 +222,12 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
       SupabaseService().refreshNotifications();
       SupabaseService().notifyAttendanceUpdated();
       _showAttendanceStatusNotification(alert);
-    } else if (alertType == 'message' || alertType == 'announcement') {
+    } else if (alertType == 'message' ||
+        alertType == 'announcement' ||
+        alertType == 'holiday_alert' ||
+        alertType == 'tally_class' ||
+        alertType == 'session_cancellation' ||
+        alertType == 'video_shared') {
       if (id.isNotEmpty) {
         _globalProcessedAlertIds.add(id);
         AlarmService.markAlertProcessed(id);
@@ -289,7 +325,13 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
 
             // Find if there is any message announcement alert
             final messageAlert = freshAlerts.cast<Map<String, dynamic>?>().firstWhere(
-              (a) => a?['alert_type'] == 'message' || a?['alert_type'] == 'announcement',
+              (a) =>
+                  a?['alert_type'] == 'message' ||
+                  a?['alert_type'] == 'announcement' ||
+                  a?['alert_type'] == 'holiday_alert' ||
+                  a?['alert_type'] == 'tally_class' ||
+                  a?['alert_type'] == 'session_cancellation' ||
+                  a?['alert_type'] == 'video_shared',
               orElse: () => null,
             );
 

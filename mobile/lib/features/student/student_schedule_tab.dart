@@ -56,6 +56,42 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
     });
   }
 
+  String _formatStudentSlotTime(String raw) {
+    if (raw.isEmpty) return 'Regular Hours';
+    String formatToken(String token) {
+      token = token.trim();
+      if (token.isEmpty) return '';
+      if (RegExp(r'(AM|PM)', caseSensitive: false).hasMatch(token)) {
+        return token.replaceAllMapped(RegExp(r'(\d{1,2}):(\d{2}):\d{2}\s*(AM|PM)', caseSensitive: false), (m) {
+          int h = int.parse(m[1]!);
+          return '$h:${m[2]} ${m[3]?.toUpperCase()}';
+        });
+      }
+      final m = RegExp(r'^(\d{1,2}):(\d{2})(?::(\d{2}))?$').firstMatch(token);
+      if (m != null) {
+        int h = int.parse(m[1]!);
+        final min = m[2]!;
+        final amPm = h >= 12 ? 'PM' : 'AM';
+        int h12 = h % 12;
+        if (h12 == 0) h12 = 12;
+        return '$h12:$min $amPm';
+      }
+      return token;
+    }
+
+    if (raw.contains(' – ')) {
+      final parts = raw.split(' – ');
+      return '${formatToken(parts[0])} – ${formatToken(parts[1])}';
+    } else if (raw.contains(' - ')) {
+      final parts = raw.split(' - ');
+      return '${formatToken(parts[0])} – ${formatToken(parts[1])}';
+    } else if (raw.contains('-')) {
+      final parts = raw.split('-');
+      return '${formatToken(parts[0])} – ${formatToken(parts[1])}';
+    }
+    return formatToken(raw);
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -224,8 +260,11 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 6,
+                                        alignment: WrapAlignment.spaceBetween,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
                                         children: [
                                           Row(
                                             children: [
@@ -259,7 +298,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                                                     const Icon(Icons.access_time_rounded, size: 13, color: LaasyaColors.primary),
                                                     const SizedBox(width: 4),
                                                     Text(
-                                                      item['time'] ?? 'Regular Hours',
+                                                      _formatStudentSlotTime(item['time'] ?? 'Regular Hours'),
                                                       style: const TextStyle(
                                                         color: LaasyaColors.primary,
                                                         fontWeight: FontWeight.bold,
