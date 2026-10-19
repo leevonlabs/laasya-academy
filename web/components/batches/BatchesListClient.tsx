@@ -26,7 +26,8 @@ import {
   CheckSquare,
   Square,
   RotateCcw,
-  IndianRupee
+  IndianRupee,
+  Tag
 } from 'lucide-react';
 import AiEnhanceButton from '@/components/common/AiEnhanceButton';
 import SearchableCombobox, { ComboboxOption } from '@/components/common/SearchableCombobox';
@@ -252,6 +253,29 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   };
 
   // -------------------------------------------------------------
+  // HELPER: Auto-generate sequential batch code derived from course (e.g. bhar-1)
+  // -------------------------------------------------------------
+  const getNextSequentialBatchCode = (crsId: string, currentBatches: Batch[]) => {
+    const crs = courses.find(c => c.id === crsId);
+    const crsCode = (crs?.code || 'crs').toLowerCase();
+    const crsBatches = currentBatches.filter(b => b.course_id === crsId);
+    
+    let maxNum = 0;
+    crsBatches.forEach(b => {
+      if (b.code) {
+        const match = b.code.match(/-(\d+)$/);
+        if (match) {
+          const n = parseInt(match[1], 10);
+          if (n > maxNum) maxNum = n;
+        }
+      }
+    });
+
+    const nextNum = Math.max(maxNum + 1, crsBatches.length + 1);
+    return `${crsCode}-${nextNum}`;
+  };
+
+  // -------------------------------------------------------------
   // STATUS FILTER (All / Active / Inactive)
   // -------------------------------------------------------------
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
@@ -264,6 +288,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   const [addTrainerSearch, setAddTrainerSearch] = useState('');
   const [addTrainerId, setAddTrainerId] = useState('');
   const [addBatchName, setAddBatchName] = useState('');
+  const [addBatchCode, setAddBatchCode] = useState('');
   const [addMonthlyFee, setAddMonthlyFee] = useState<string>('');
   const [addDescription, setAddDescription] = useState('');
   const [addRoom, setAddRoom] = useState('Natya Mandapam (Room 101)');
@@ -280,6 +305,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     setAddTrainerId('');
     setAddTrainerSearch('');
     setAddBatchName('');
+    setAddBatchCode('');
     setAddMonthlyFee('');
     setAddDescription('');
     setAddRoom(rooms[0]?.name || 'Natya Mandapam (Room 101)');
@@ -298,6 +324,9 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     setAddTrainerId(matchingGurus[0]?.id || trainers[0]?.id || '');
     if (newCrsId) {
       setAddBatchName(getNextSequentialBatchName(newCrsId, batches));
+      setAddBatchCode(getNextSequentialBatchCode(newCrsId, batches));
+    } else {
+      setAddBatchCode('');
     }
   };
 
@@ -309,6 +338,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   const [editTrainerSearch, setEditTrainerSearch] = useState('');
   const [editTrainerId, setEditTrainerId] = useState('');
   const [editBatchName, setEditBatchName] = useState('');
+  const [editBatchCode, setEditBatchCode] = useState('');
   const [editMonthlyFee, setEditMonthlyFee] = useState<string>('0');
   const [editDescription, setEditDescription] = useState('');
   const [editRoom, setEditRoom] = useState('');
@@ -323,6 +353,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     setEditTrainerId(batch.trainer_id);
     setEditTrainerSearch('');
     setEditBatchName(batch.name);
+    setEditBatchCode(batch.code || getNextSequentialBatchCode(batch.course_id, batches));
     setEditMonthlyFee(batch.monthly_fee !== undefined ? String(batch.monthly_fee) : '0');
     setEditDescription(batch.description || '');
     setEditRoom(batch.room_or_hall || 'Natya Mandapam (Room 101)');
@@ -390,11 +421,13 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     if (statusFilter === 'active' && b.is_active === false) return false;
     if (statusFilter === 'inactive' && b.is_active !== false) return false;
     const matchesCourse = selectedCourseIds.length === 0 || selectedCourseIds.includes(b.course_id);
-    const matchesSearch = 
-      b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.course_title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.trainer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (b.room_or_hall || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch = !q ||
+      b.name.toLowerCase().includes(q) ||
+      (b.code && b.code.toLowerCase().includes(q)) ||
+      b.course_title.toLowerCase().includes(q) ||
+      b.trainer_name.toLowerCase().includes(q) ||
+      (b.room_or_hall || '').toLowerCase().includes(q);
     return matchesCourse && matchesSearch;
   });
 
@@ -604,11 +637,13 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
       const primaryEnd = addSchedules[0]?.endTime ? `${addSchedules[0].endTime}:00` : '10:00:00';
       const primaryRoom = addSchedules[0]?.room || addRoom.trim() || 'Natya Mandapam (Room 101)';
 
+      const finalBatchCode = (addBatchCode.trim() || getNextSequentialBatchCode(addCourseId, batches)).toLowerCase();
       const res = await fetch('/api/batches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: addBatchName.trim(),
+          code: finalBatchCode,
           course_id: addCourseId,
           trainer_id: addTrainerId,
           days_of_week: distinctDays,
@@ -634,6 +669,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
 
       const completeBatch: Batch = {
         ...added,
+        code: finalBatchCode,
         course_title: crs?.title || 'Course',
         course_category: crs?.category || 'Category',
         trainer_name: trn?.full_name || 'Guru',
@@ -646,7 +682,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
 
       setBatches(prev => [...prev, completeBatch]);
       setIsAddOpen(false);
-      showFeedback('success', `Batch "${completeBatch.name}" created successfully!`);
+      showFeedback('success', `Batch "${completeBatch.name}" (${finalBatchCode}) created successfully!`);
     } catch (e: any) {
       showFeedback('error', e.message || 'Error creating batch');
     } finally {
@@ -671,6 +707,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
       const primaryStart = editSchedules[0]?.startTime ? `${editSchedules[0].startTime}:00` : '09:00:00';
       const primaryEnd = editSchedules[0]?.endTime ? `${editSchedules[0].endTime}:00` : '10:00:00';
       const primaryRoom = editSchedules[0]?.room || editRoom.trim() || 'Natya Mandapam (Room 101)';
+      const finalEditCode = editBatchCode.trim().toLowerCase();
 
       const res = await fetch('/api/batches', {
         method: 'PUT',
@@ -678,6 +715,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
         body: JSON.stringify({
           id: editingBatch.id,
           name: editBatchName.trim(),
+          code: finalEditCode,
           course_id: editCourseId,
           trainer_id: editTrainerId,
           days_of_week: distinctDays,
@@ -706,6 +744,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
             ? {
                 ...b,
                 name: editBatchName.trim(),
+                code: finalEditCode,
                 course_id: editCourseId,
                 course_title: crs?.title || b.course_title,
                 course_category: crs?.category || b.course_category,
@@ -729,6 +768,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
         setViewingBatch({
           ...viewingBatch,
           name: editBatchName.trim(),
+          code: finalEditCode,
           course_id: editCourseId,
           course_title: crs?.title || viewingBatch.course_title,
           course_category: crs?.category || viewingBatch.course_category,
@@ -1395,10 +1435,17 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                   </span>
                 </div>
 
-                {/* Batch Name & Course */}
-                <h3 className="font-bold text-xl text-[#2D041A] leading-tight group-hover:text-[#8A064D] transition">
-                  {b.name}
-                </h3>
+                {/* Batch Name, Code & Course */}
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-bold text-xl text-[#2D041A] leading-tight group-hover:text-[#8A064D] transition">
+                    {b.name}
+                  </h3>
+                  {b.code && (
+                    <span className="font-mono text-xs font-black text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-lg border border-[#F0D5E4] shrink-0">
+                      {b.code}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 text-sm font-bold text-[#8A064D] mt-1.5">
                   <BookOpen className="w-4 h-4 shrink-0 opacity-80" />
                   <span className="truncate">{b.course_title}</span>
@@ -1511,9 +1558,16 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
               <div>
-                <span className="text-[10px] font-bold text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-md border border-rose-100">
-                  {viewingBatch.course_category}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-md border border-rose-100">
+                    {viewingBatch.course_category}
+                  </span>
+                  {viewingBatch.code && (
+                    <span className="text-xs font-mono font-black text-[#8A064D] bg-[#FFF2F8] px-2.5 py-0.5 rounded-md border border-[#F0D5E4]">
+                      ID: {viewingBatch.code}
+                    </span>
+                  )}
+                </div>
                 <h3 className="font-bold text-lg text-[#2D041A] mt-1">{viewingBatch.name}</h3>
                 <span className="text-xs text-[#8A064D] font-semibold">{viewingBatch.course_title}</span>
               </div>
@@ -1714,19 +1768,39 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 />
               </div>
 
-              {/* 3. Batch Name */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Batch Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Kuchipudi Morning Batch 1"
-                  value={addBatchName}
-                  onChange={(e) => setAddBatchName(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
-                />
+              {/* 3. Batch Name & Batch Code */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Batch Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Bharatanatyam - Batch 1"
+                    value={addBatchName}
+                    onChange={(e) => setAddBatchName(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
+                    <span>Batch Code *</span>
+                    <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                      <span>Auto-Derived</span>
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. bhar-1"
+                    value={addBatchCode}
+                    onChange={(e) => setAddBatchCode(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Depends on course code (e.g. 'bhar-1')</p>
+                </div>
               </div>
 
               {/* 4. Monthly Fee & Capacity */}
@@ -1983,16 +2057,35 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 />
               </div>
 
-              {/* 3. Batch Name */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Batch Name <span className="text-rose-500">*</span></label>
-                <input
-                  type="text"
-                  required
-                  value={editBatchName}
-                  onChange={(e) => setEditBatchName(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
-                />
+              {/* 3. Batch Name & Batch Code */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Batch Name <span className="text-rose-500">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    value={editBatchName}
+                    onChange={(e) => setEditBatchName(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
+                    <span>Batch Code *</span>
+                    <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                      <Tag className="w-3 h-3 text-emerald-600" />
+                      <span>Unique ID</span>
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editBatchCode}
+                    onChange={(e) => setEditBatchCode(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Depends on course code (e.g. 'bhar-1')</p>
+                </div>
               </div>
 
               {/* 4. Monthly Fee & Capacity */}

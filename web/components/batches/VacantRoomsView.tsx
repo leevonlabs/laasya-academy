@@ -75,7 +75,19 @@ export default function VacantRoomsView({ batches, rooms, onBack }: Props) {
   const [selectedDay, setSelectedDay] = useState<number>(todayDay);
 
   const [filterRoom, setFilterRoom] = useState<string>('all');
+  const [tallyClasses, setTallyClasses] = useState<any[]>([]);
   const dayCarouselRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch('/api/tally-classes')
+      .then(res => res.json())
+      .then(data => {
+        if (data && Array.isArray(data.tallyClasses)) {
+          setTallyClasses(data.tallyClasses);
+        }
+      })
+      .catch(e => console.warn('Could not fetch tally classes for room vacancy:', e));
+  }, []);
 
   // Compute number of days in selected month & year
   const daysInMonth = useMemo(() => {
@@ -190,8 +202,36 @@ export default function VacantRoomsView({ batches, rooms, onBack }: Props) {
       }
     });
 
+    // Also include rescheduled tally classes on effectiveDateStr in this room
+    tallyClasses.forEach(tc => {
+      if (tc.rescheduled_date === effectiveDateStr && tc.status === 'Scheduled') {
+        const rawRoom = tc.room_or_hall;
+        const matchedRoom = effectiveRooms.find(r => 
+          r.name.toLowerCase() === rawRoom.toLowerCase() ||
+          r.name.toLowerCase().includes(rawRoom.toLowerCase()) ||
+          rawRoom.toLowerCase().includes(r.name.toLowerCase())
+        );
+        const targetKey = matchedRoom ? matchedRoom.name : rawRoom;
+        if (result[targetKey]) {
+          result[targetKey].push({
+            batch: {
+              id: tc.batch_id,
+              name: tc.batch_name,
+              course_title: tc.course_title,
+              trainer_name: tc.trainer_name,
+              room_or_hall: targetKey,
+            } as any,
+            startTime: tc.start_time?.substring(0, 5) || '09:00',
+            endTime: tc.end_time?.substring(0, 5) || '10:00',
+            room: targetKey,
+            isTally: true
+          } as any);
+        }
+      }
+    });
+
     return result;
-  }, [batches, effectiveRooms, selectedDayInfo.dayName]);
+  }, [batches, effectiveRooms, selectedDayInfo.dayName, tallyClasses, effectiveDateStr]);
 
   // Compute vacancy matrix for each room
   const roomVacancyCards = useMemo(() => {
@@ -533,6 +573,11 @@ export default function VacantRoomsView({ batches, rooms, onBack }: Props) {
                         <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded uppercase">
                           Vacant
                         </span>
+                      ) : (slot.booking as any)?.isTally ? (
+                        <span className="text-[9px] font-black text-amber-950 bg-amber-300 px-1.5 py-0.5 rounded uppercase flex items-center gap-0.5 animate-pulse shadow-2xs">
+                          <span>★</span>
+                          <span>Rescheduled</span>
+                        </span>
                       ) : (
                         <span className="text-[9px] font-bold text-[#8A064D] bg-[#FFE5F0] px-1.5 py-0.5 rounded uppercase">
                           Occupied
@@ -542,8 +587,9 @@ export default function VacantRoomsView({ batches, rooms, onBack }: Props) {
 
                     {!slot.isVacant && slot.booking && (
                       <div className="mt-1 pt-1 border-t border-[#F0D5E4]/60">
-                        <p className="text-[11px] font-bold text-[#2D041A] truncate">
-                          {slot.booking.batch.name} • {slot.booking.batch.course_title}
+                        <p className="text-[11px] font-bold text-[#2D041A] truncate flex items-center gap-1">
+                          {(slot.booking as any)?.isTally && <span className="text-amber-500 font-black">★</span>}
+                          <span>{slot.booking.batch.name} • {slot.booking.batch.course_title}</span>
                         </p>
                         <p className="text-[10px] text-gray-500 font-medium truncate">
                           Guru: {slot.booking.batch.trainer_name}

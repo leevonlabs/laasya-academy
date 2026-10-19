@@ -33,11 +33,15 @@ import {
   BookOpen,
   RotateCcw,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  CalendarX2,
+  CalendarCheck
 } from 'lucide-react';
+import Link from 'next/link';
 import { Announcement } from '@/lib/announcements';
 import AiEnhanceButton from '@/components/common/AiEnhanceButton';
 import MonthPicker from '@/components/common/MonthPicker';
+import AnnouncementsNavTabs from './AnnouncementsNavTabs';
 
 interface Course {
   id: string;
@@ -86,6 +90,8 @@ interface Props {
   batches: Batch[];
   trainers?: Trainer[];
   students?: Student[];
+  defaultTab?: 'admin_sent' | 'guru_sent';
+  defaultViewMode?: 'overview' | 'chat';
 }
 
 // -------------------------------------------------------------
@@ -261,17 +267,19 @@ export default function AnnouncementsClient({
   courses, 
   batches, 
   trainers = [], 
-  students = [] 
+  students = [],
+  defaultTab = 'admin_sent',
+  defaultViewMode = 'overview'
 }: Props) {
   const [announcements, setAnnouncements] = useState<Announcement[]>(
     initialAnnouncements.filter(a => a.announcement_type !== 'banner')
   );
 
   // Active Tab: 'admin_sent' vs 'guru_sent'
-  const [activeTab, setActiveTab] = useState<'admin_sent' | 'guru_sent'>('admin_sent');
+  const [activeTab, setActiveTab] = useState<'admin_sent' | 'guru_sent'>(defaultTab);
 
-  // View Mode: 'overview' (landing 2 cards) vs 'chat' (full dedicated chat page)
-  const [viewMode, setViewMode] = useState<'overview' | 'chat'>('overview');
+  // View Mode: 'overview' (landing 3 cards) vs 'chat' (full dedicated chat page)
+  const [viewMode, setViewMode] = useState<'overview' | 'chat'>(defaultViewMode);
 
   // Default Current Month
   const defaultDates = useMemo(() => {
@@ -905,21 +913,16 @@ export default function AnnouncementsClient({
                   </p>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2 text-xs font-bold text-[#075E54] bg-[#E8F8F0] px-3.5 py-2 rounded-2xl border border-[#BCE8D0] shrink-0 self-start sm:self-auto">
-                <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
-                <span>Live WhatsApp Sync</span>
-              </div>
             </div>
           </div>
 
-          {/* 2 Grid-Based Cards: Admin Sent vs Guru Sent */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Card 1: Admin Sent */}
-            <div className="bg-white rounded-3xl p-6 border-2 border-emerald-100 hover:border-[#075E54] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-6">
+          {/* 3 Grid-Based Action Cards (Admin, Guru, Holiday Alert) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Card 1: Admin Broadcasts */}
+            <div className="bg-white rounded-3xl p-6 border-2 border-emerald-100 hover:border-[#075E54] shadow-xs hover:shadow-lg transition-all flex flex-col justify-between space-y-6 group">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-[#075E54] flex items-center justify-center shadow-2xs">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-[#075E54] flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
                     <ShieldCheck className="w-6 h-6" />
                   </div>
                   <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-[#075E54]">
@@ -927,35 +930,27 @@ export default function AnnouncementsClient({
                   </span>
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-gray-900">Admin Sent Broadcasts</h2>
+                  <h2 className="text-lg font-black text-gray-900 group-hover:text-[#075E54] transition-colors">Admin Broadcasts</h2>
                   <p className="text-xs text-gray-600 font-medium mt-1.5 leading-relaxed">
-                    Official academy-wide notices, holiday alerts, fee reminders, schedule changes, and general administrative broadcasts sent directly to students, parents, and faculty gurus.
+                    Official academy-wide notices, fee reminders, schedule changes, and general broadcasts sent directly to students and gurus.
                   </p>
-                </div>
-                <div className="flex items-center gap-2 pt-2 border-t border-gray-100 text-[11px] font-bold text-gray-500">
-                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-                  <span>Channel: Official Administration</span>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('admin_sent');
-                  setViewMode('chat');
-                }}
-                className="w-full py-3 px-4 rounded-2xl bg-[#075E54] hover:bg-[#064e46] active:scale-98 text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              <Link
+                href="/announcements/admin-broadcasts"
+                className="w-full py-3 px-4 rounded-xl bg-[#075E54] hover:bg-[#064e46] active:scale-98 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-sm text-center"
               >
-                <span>Open Admin Broadcasts</span>
+                <span>Open Admin Chat</span>
                 <ArrowRight className="w-4 h-4" />
-              </button>
+              </Link>
             </div>
 
-            {/* Card 2: Guru Sent */}
-            <div className="bg-white rounded-3xl p-6 border-2 border-emerald-100 hover:border-[#075E54] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-6">
+            {/* Card 2: Guru Announcements */}
+            <div className="bg-white rounded-3xl p-6 border-2 border-emerald-100 hover:border-[#075E54] shadow-xs hover:shadow-lg transition-all flex flex-col justify-between space-y-6 group">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-2xl bg-[#FFF2F8] text-[#8A064D] flex items-center justify-center shadow-2xs">
+                  <div className="w-12 h-12 rounded-2xl bg-[#FFF2F8] text-[#8A064D] flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
                     <GraduationCap className="w-6 h-6" />
                   </div>
                   <span className="px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-[#8A064D]">
@@ -963,28 +958,48 @@ export default function AnnouncementsClient({
                   </span>
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-gray-900">Guru Sent Announcements</h2>
+                  <h2 className="text-lg font-black text-gray-900 group-hover:text-[#8A064D] transition-colors">Guru Announcements</h2>
                   <p className="text-xs text-gray-600 font-medium mt-1.5 leading-relaxed">
-                    Batch practice directives, classroom instructions, curriculum study notes, and direct updates shared by faculty gurus with their assigned batches and students.
+                    Batch practice directives, classroom instructions, curriculum notes, and direct updates shared by faculty gurus.
                   </p>
-                </div>
-                <div className="flex items-center gap-2 pt-2 border-t border-gray-100 text-[11px] font-bold text-gray-500">
-                  <span className="inline-block w-2 h-2 rounded-full bg-[#8A064D]" />
-                  <span>Channel: Faculty Gurus</span>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('guru_sent');
-                  setViewMode('chat');
-                }}
-                className="w-full py-3 px-4 rounded-2xl bg-[#075E54] hover:bg-[#064e46] active:scale-98 text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              <Link
+                href="/announcements/guru-announcements"
+                className="w-full py-3 px-4 rounded-xl bg-[#075E54] hover:bg-[#064e46] active:scale-98 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-sm text-center"
               >
-                <span>Open Guru Announcements</span>
+                <span>Open Guru Feed</span>
                 <ArrowRight className="w-4 h-4" />
-              </button>
+              </Link>
+            </div>
+
+            {/* Card 3: Holiday Alert */}
+            <div className="bg-white rounded-3xl p-6 border-2 border-rose-100 hover:border-[#8A064D] shadow-xs hover:shadow-lg transition-all flex flex-col justify-between space-y-6 group">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-[#FFF2F8] text-[#8A064D] flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                    <CalendarX2 className="w-6 h-6" />
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-[#8A064D]">
+                    Multi-Batch &amp; Realtime
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-gray-900 group-hover:text-[#8A064D] transition-colors">Holiday Alert</h2>
+                  <p className="text-xs text-gray-600 font-medium mt-1.5 leading-relaxed">
+                    Declare academy holidays with multi-course &amp; multi-batch selection. Assigned Gurus and enrolled students get notified instantly and at 12 AM.
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                href="/announcements/holiday-alert"
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#590231] to-[#8A064D] hover:from-[#48082B] hover:to-[#70043E] active:scale-98 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-sm text-center"
+              >
+                <span>Declare Holiday Alert</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
           </div>
         </div>
@@ -999,16 +1014,15 @@ export default function AnnouncementsClient({
           <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-gray-200 shadow-2xs">
             <div className="flex flex-wrap items-center gap-2">
               {/* Back to Overview */}
-              <button
-                type="button"
-                onClick={() => setViewMode('overview')}
+              <Link
+                href="/announcements"
                 className="inline-flex items-center gap-1.5 px-3.5 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition cursor-pointer shrink-0 shadow-2xs"
                 title="Back to Overview"
               >
                 <ArrowLeft className="w-4 h-4 text-gray-700" />
                 <span className="hidden sm:inline">Back to Overview</span>
                 <span className="sm:hidden">Back</span>
-              </button>
+              </Link>
 
               {/* Search: expands to fill remaining space cleanly */}
               <div className="relative min-w-[180px] flex-1">
@@ -1275,16 +1289,15 @@ export default function AnnouncementsClient({
           <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-gray-200 shadow-2xs">
             <div className="flex flex-wrap items-center gap-2">
               {/* Back to Overview */}
-              <button
-                type="button"
-                onClick={() => setViewMode('overview')}
+              <Link
+                href="/announcements"
                 className="inline-flex items-center gap-1.5 px-3.5 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition cursor-pointer shrink-0 shadow-2xs"
                 title="Back to Overview"
               >
                 <ArrowLeft className="w-4 h-4 text-gray-700" />
                 <span className="hidden sm:inline">Back to Overview</span>
                 <span className="sm:hidden">Back</span>
-              </button>
+              </Link>
 
               {/* 1. Guru Filter: flexes to fill space */}
               <div className="flex-1 min-w-[160px]">

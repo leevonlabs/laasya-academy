@@ -419,7 +419,7 @@ export default function SchemesListClient({ initialSchemes, courses, batches }: 
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
           {filteredSchemes.map((scheme) => {
             const schemeCourses = (scheme.course_ids || []).map(id => courseMap.get(id)).filter(Boolean) as Course[];
             const schemeBatches = (scheme.batch_ids || []).map(id => batchMap.get(id)).filter(Boolean) as Batch[];
@@ -431,22 +431,27 @@ export default function SchemesListClient({ initialSchemes, courses, batches }: 
             return (
               <div
                 key={scheme.id}
-                className={`bg-white rounded-3xl p-5 border-2 transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md ${
+                className={`bg-white rounded-3xl p-6 sm:p-7 border-2 transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md ${
                   scheme.is_active
                     ? 'border-emerald-500/80 hover:border-emerald-500'
                     : 'border-rose-400/80 hover:border-rose-400'
                 }`}
               >
-                <div>
+                <div className="space-y-3">
                   {/* Card Header: Scheme Name + Active Status Badge */}
-                  <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FFF2F8] text-[#8A064D] border border-rose-100 mb-1 inline-block">
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#FFF2F8] text-[#8A064D] border border-rose-100 mb-1.5 inline-block">
                         Combo Scheme
                       </span>
-                      <h3 className="text-base font-bold text-[#2D041A] tracking-tight">
+                      <h3 className="text-lg font-black text-[#2D041A] tracking-tight">
                         {scheme.name}
                       </h3>
+                      {scheme.description && (
+                        <p className="text-xs text-gray-500 line-clamp-2 mt-1 leading-relaxed">
+                          {scheme.description}
+                        </p>
+                      )}
                     </div>
 
                     {/* Active / Inactive Status Badge & Quick Toggle */}
@@ -454,7 +459,7 @@ export default function SchemesListClient({ initialSchemes, courses, batches }: 
                       type="button"
                       onClick={(e) => handleToggleStatus(scheme, e)}
                       title={`Click to switch to ${scheme.is_active ? 'Inactive' : 'Active'}`}
-                      className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-extrabold flex items-center gap-1.5 transition cursor-pointer border ${
+                      className={`shrink-0 px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5 transition cursor-pointer border ${
                         scheme.is_active
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
                           : 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
@@ -464,31 +469,74 @@ export default function SchemesListClient({ initialSchemes, courses, batches }: 
                       <span>{scheme.is_active ? 'Active' : 'Inactive'}</span>
                     </button>
                   </div>
+
+                  {/* Bundled Courses & Batches Badges */}
+                  <div className="space-y-2 pt-1 border-t border-gray-100">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                        Bundled Courses ({schemeCourses.length})
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
+                        {schemeCourses.length === 0 ? (
+                          <span className="text-xs text-gray-400 italic">No specific courses</span>
+                        ) : (
+                          schemeCourses.map(c => (
+                            <span
+                              key={c.id}
+                              className="px-2.5 py-0.5 rounded-lg bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] text-[11px] font-bold"
+                            >
+                              {c.title}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                        Bundled Batches ({schemeBatches.length})
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
+                        {schemeBatches.length === 0 ? (
+                          <span className="text-xs text-gray-400 italic">All batches for selected courses</span>
+                        ) : (
+                          schemeBatches.map(b => (
+                            <span
+                              key={b.id}
+                              className="px-2.5 py-0.5 rounded-lg bg-gray-50 text-gray-700 border border-gray-200 text-[11px] font-semibold"
+                            >
+                              {b.name}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Pricing Breakdown Card & Action Buttons */}
-                <div className="pt-2">
-                  <div className="bg-gradient-to-br from-[#FFF9FB] to-white p-3.5 rounded-2xl border border-rose-100/80 mb-3 space-y-1.5">
+                <div className="pt-3 mt-3 border-t border-gray-100">
+                  <div className="bg-gradient-to-br from-[#FFF9FB] to-white p-4 rounded-2xl border border-rose-100/80 mb-3 space-y-2">
                     <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>Standard Total:</span>
+                      <span>Standard Total Fee:</span>
                       <span className="font-semibold line-through text-gray-400">
                         ₹{totalMonthly.toLocaleString('en-IN')}/mo
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs text-emerald-700 font-semibold">
+                    <div className="flex items-center justify-between text-xs text-emerald-700 font-bold">
                       <span className="flex items-center gap-1">
-                        <Tag className="w-3 h-3" />
-                        <span>Fixed Discount:</span>
+                        <Tag className="w-3.5 h-3.5" />
+                        <span>Fixed Monthly Discount:</span>
                       </span>
                       <span>
                         -₹{fixedDiscount.toLocaleString('en-IN')}/mo
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1.5 border-t border-rose-100">
+                    <div className="flex items-center justify-between pt-2 border-t border-rose-100">
                       <div>
-                        <span className="text-xs font-bold text-[#2D041A] block">Net Combo Fee</span>
+                        <span className="text-xs font-black text-[#2D041A] block">Net Package Price</span>
                         {savingsPercent > 0 && (
                           <span className="text-[10px] font-bold text-emerald-600">
                             Save {savingsPercent}% monthly
@@ -496,7 +544,7 @@ export default function SchemesListClient({ initialSchemes, courses, batches }: 
                         )}
                       </div>
                       <div className="text-right">
-                        <span className="text-lg font-black text-[#8A064D] tabular-nums">
+                        <span className="text-xl font-black text-[#8A064D] tabular-nums">
                           ₹{netAmount.toLocaleString('en-IN')}
                         </span>
                         <span className="text-[10px] text-gray-500 block">/ month</span>
@@ -505,11 +553,11 @@ export default function SchemesListClient({ initialSchemes, courses, batches }: 
                   </div>
 
                   {/* Actions: View Details, Edit, Delete */}
-                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
+                  <div className="grid grid-cols-3 gap-2.5">
                     <button
                       type="button"
                       onClick={() => setViewingScheme(scheme)}
-                      className="py-2 px-2 bg-[#2D041A] hover:bg-[#48082B] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs border border-[#48082B]"
+                      className="py-2.5 px-3 bg-[#2D041A] hover:bg-[#48082B] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs border border-[#48082B]"
                       title="View Complete Scheme Details"
                     >
                       <Eye className="w-3.5 h-3.5 text-[#F9E33A]" />
@@ -518,7 +566,7 @@ export default function SchemesListClient({ initialSchemes, courses, batches }: 
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(scheme)}
-                      className="py-2 px-2 bg-[#FFF2F8] hover:bg-[#8A064D] text-[#8A064D] hover:text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border border-[#F0D5E4] cursor-pointer shadow-2xs"
+                      className="py-2.5 px-3 bg-[#FFF2F8] hover:bg-[#8A064D] text-[#8A064D] hover:text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border border-[#F0D5E4] cursor-pointer shadow-2xs"
                       title="Edit Scheme"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
@@ -527,7 +575,7 @@ export default function SchemesListClient({ initialSchemes, courses, batches }: 
                     <button
                       type="button"
                       onClick={() => setDeletingScheme(scheme)}
-                      className="py-2 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border border-rose-200 cursor-pointer shadow-2xs"
+                      className="py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border border-rose-200 cursor-pointer shadow-2xs"
                       title="Delete Scheme"
                     >
                       <Trash2 className="w-3.5 h-3.5 text-rose-600" />

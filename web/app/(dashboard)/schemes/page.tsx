@@ -12,7 +12,7 @@ export default async function SchemesPage() {
   ]);
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="w-full">
       <SchemesListClient
         initialSchemes={schemes}
         courses={courses}

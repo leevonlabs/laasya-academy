@@ -1341,6 +1341,28 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                                           ),
                                         ),
                                       ),
+                                      if (sess['is_rescheduled'] == true || sess['is_tally'] == true) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEF3C7),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFF59E0B)),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.star_rounded, size: 12, color: Color(0xFFD97706)),
+                                              SizedBox(width: 3),
+                                              Text(
+                                                'RESCHEDULED ★',
+                                                style: TextStyle(color: Color(0xFF92400E), fontWeight: FontWeight.bold, fontSize: 9.5),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                       const SizedBox(width: 6),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

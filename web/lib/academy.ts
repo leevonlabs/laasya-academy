@@ -22,8 +22,10 @@ export interface Room {
 export interface TrainerBatchInfo {
   id: string;
   name: string;
+  code?: string;
   course_id: string;
   course_title: string;
+  course_code?: string;
   course_category?: string;
   days_of_week: string[];
   start_time: string;
@@ -37,6 +39,8 @@ export interface TrainerBatchInfo {
 export interface Trainer {
   id: string;
   profile_id: string;
+  guru_id?: string;
+  code?: string;
   full_name: string;
   email: string;
   phone: string;
@@ -58,8 +62,10 @@ export interface Trainer {
 export interface StudentEnrolledBatch {
   batch_id: string;
   batch_name: string;
+  batch_code?: string;
   course_id: string;
   course_title: string;
+  course_code?: string;
   course_category: string;
   monthly_fee: number;
   trainer_id: string;
@@ -125,8 +131,10 @@ export interface BatchScheduleSlot {
 
 export interface Batch {
   id: string;
+  code?: string;
   course_id: string;
   course_title: string;
+  course_code?: string;
   course_category: string;
   trainer_id: string;
   trainer_name: string;
@@ -173,6 +181,7 @@ export interface ClassSession {
   session_topic_notes: string;
   present_count?: number;
   total_enrolled?: number;
+  is_rescheduled?: boolean;
 }
 
 export interface AttendanceRecord {
@@ -339,17 +348,31 @@ export async function getCourses(category?: string): Promise<Course[]> {
 
 export async function createCourse(data: {
   title: string;
-  code: string;
+  code?: string;
   category: string;
   description: string;
   monthly_fee?: number;
   image_url?: string;
 }) {
+  let courseCode = (data.code || '').trim().toLowerCase();
+  if (!courseCode) {
+    const baseSlug = (data.title || '').trim().toLowerCase().split(/\s+/)[0].replace(/[^a-z0-9]/g, '').slice(0, 4) || 'crs';
+    const existing = await query<{ code: string }>(`SELECT code FROM public.courses WHERE code LIKE $1`, [`${baseSlug}%`]);
+    const existingCodes = new Set(existing.map(e => e.code?.toLowerCase()));
+    if (!existingCodes.has(baseSlug)) {
+      courseCode = baseSlug;
+    } else {
+      let counter = 2;
+      while (existingCodes.has(`${baseSlug}${counter}`)) counter++;
+      courseCode = `${baseSlug}${counter}`;
+    }
+  }
+
   return queryOne<Course>(`
     INSERT INTO public.courses (title, code, category, description, monthly_fee, is_active, image_url)
     VALUES ($1, $2, $3, $4, $5, true, $6)
     RETURNING *;
-  `, [data.title, data.code, data.category || '', data.description, data.monthly_fee || 0, data.image_url || null]);
+  `, [data.title, courseCode, data.category || '', data.description, data.monthly_fee || 0, data.image_url || null]);
 }
 
 export async function updateCourse(id: string, data: {
@@ -361,6 +384,7 @@ export async function updateCourse(id: string, data: {
   is_active?: boolean;
   image_url?: string;
 }) {
+  const cleanCode = data.code ? data.code.trim().toLowerCase() : undefined;
   return queryOne<Course>(`
     UPDATE public.courses
     SET title = COALESCE($2, title),
@@ -376,7 +400,7 @@ export async function updateCourse(id: string, data: {
   `, [
     id, 
     data.title, 
-    data.code, 
+    cleanCode, 
     data.category !== undefined ? data.category : null, 
     data.monthly_fee,
     data.description, 
@@ -401,7 +425,7 @@ export async function deleteCourse(id: string) {
 export async function getTrainers(): Promise<Trainer[]> {
   const sql = `
     SELECT 
-      t.id, t.profile_id, p.full_name, p.email, p.phone,
+      t.id, t.profile_id, t.guru_id, COALESCE(t.guru_id, t.code) as code, p.full_name, p.email, p.phone,
       COALESCE(t.alternate_phone, p.alternate_phone) as alternate_phone,
       COALESCE(t.avatar_url, p.avatar_url) as avatar_url,
       COALESCE(t.age, p.age)::int as age,
@@ -418,8 +442,10 @@ export async function getTrainers(): Promise<Trainer[]> {
           json_build_object(
             'id', b.id,
             'name', b.name,
+            'code', b.code,
             'course_id', b.course_id,
             'course_title', c.title,
+            'course_code', c.code,
             'course_category', c.category,
             'days_of_week', b.days_of_week,
             'start_time', b.start_time,
@@ -436,13 +462,46 @@ export async function getTrainers(): Promise<Trainer[]> {
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batches b ON b.trainer_id = t.id
     LEFT JOIN public.courses c ON c.id = b.course_id
-    GROUP BY t.id, t.profile_id, p.full_name, p.email, p.phone, t.alternate_phone, p.alternate_phone, t.avatar_url, p.avatar_url, t.age, p.age, t.gender, p.gender, t.specializations, t.display_title, t.bio, t.is_active, t.joined_date, t.monthly_salary
-    ORDER BY p.full_name;
+    GROUP BY t.id, t.profile_id, t.guru_id, t.code, p.full_name, p.email, p.phone, t.alternate_phone, p.alternate_phone, t.avatar_url, p.avatar_url, t.age, p.age, t.gender, p.gender, t.specializations, t.display_title, t.bio, t.is_active, t.joined_date, t.monthly_salary
+    ORDER BY 
+      CASE WHEN t.guru_id ~ '^GURU-[0-9]+$' THEN CAST(SUBSTRING(t.guru_id FROM 6) AS INT) ELSE 9999 END ASC,
+      p.full_name;
   `;
   return query<Trainer>(sql);
 }
 
+export async function assertUniqueContactNumber(contact?: string | null, excludeProfileId?: string) {
+  const trimmed = contact?.trim();
+  if (!trimmed) return;
+  const digits = trimmed.replace(/\D/g, '');
+  if (!digits || digits.length < 5) return;
+  const suffix = digits.slice(-10);
+
+  const sql = `
+    SELECT id, full_name, role, phone 
+    FROM public.profiles 
+    WHERE (
+      phone = $1 
+      OR alternate_phone = $1
+      OR regexp_replace(COALESCE(phone, ''), '\\D', '', 'g') = $2
+      OR regexp_replace(COALESCE(phone, ''), '\\D', '', 'g') LIKE '%' || $3
+    )
+    ${excludeProfileId ? 'AND id != $4' : ''}
+    LIMIT 1;
+  `;
+  const params = excludeProfileId ? [trimmed, digits, suffix, excludeProfileId] : [trimmed, digits, suffix];
+  const rows = await query<{ id: string; full_name: string; role: string; phone: string }>(sql, params);
+
+  if (rows.length > 0) {
+    const existing = rows[0];
+    const roleLabel = existing.role === 'trainer' ? 'Guru' : existing.role === 'student' ? 'Student' : 'User';
+    throw new Error(`Contact number "${trimmed}" is already registered with ${roleLabel} "${existing.full_name}". Every student and guru must have a unique contact number.`);
+  }
+}
+
 export async function createTrainer(data: {
+  guru_id?: string;
+  code?: string;
   full_name: string;
   email?: string;
   phone?: string;
@@ -456,11 +515,27 @@ export async function createTrainer(data: {
   monthly_salary?: number;
   is_active?: boolean;
 }) {
+  let finalGuruId = (data.guru_id || data.code || '').trim().toUpperCase();
+  if (!finalGuruId) {
+    const maxRow = await queryOne<{ max_num: number }>(`
+      SELECT COALESCE(MAX(CAST(SUBSTRING(guru_id FROM 6) AS INT)), 0) as max_num 
+      FROM public.trainers 
+      WHERE guru_id ~ '^GURU-[0-9]+$'
+    `);
+    const nextNum = Number(maxRow?.max_num || 0) + 1;
+    finalGuruId = `GURU-${String(nextNum).padStart(3, '0')}`;
+  }
+
   const cleanEmail = (data.email && data.email.trim())
     ? data.email.toLowerCase().trim()
     : `${data.full_name.toLowerCase().replace(/[^a-z0-9]/g, '') || 'guru'}@laasyaacademy.com`;
   const cleanPhone = data.phone?.trim() || '+91 8151 998 899';
   const cleanAlternatePhone = data.alternate_phone?.trim() || null;
+
+  // Enforce unique contact numbers for Gurus
+  if (data.phone) await assertUniqueContactNumber(data.phone);
+  if (cleanAlternatePhone) await assertUniqueContactNumber(cleanAlternatePhone);
+
   const displayTitle = data.display_title?.trim() || 'Revered Guru & Mentor';
   const monthlySalary = Number(data.monthly_salary) || 25000;
   const isActive = data.is_active !== undefined ? data.is_active : true;
@@ -498,13 +573,15 @@ export async function createTrainer(data: {
 
   // Insert trainer
   return queryOne<Trainer>(`
-    INSERT INTO public.trainers (profile_id, specializations, display_title, bio, is_active, monthly_salary, avatar_url, age, gender, alternate_phone)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    INSERT INTO public.trainers (profile_id, guru_id, code, specializations, display_title, bio, is_active, monthly_salary, avatar_url, age, gender, alternate_phone)
+    VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     RETURNING *;
-  `, [uid, data.specializations, displayTitle, bio, isActive, monthlySalary, data.avatar_url || null, age, gender, cleanAlternatePhone]);
+  `, [uid, finalGuruId, data.specializations, displayTitle, bio, isActive, monthlySalary, data.avatar_url || null, age, gender, cleanAlternatePhone]);
 }
 
 export async function updateTrainer(id: string, data: {
+  guru_id?: string;
+  code?: string;
   full_name?: string;
   display_title?: string;
   phone?: string;
@@ -526,6 +603,11 @@ export async function updateTrainer(id: string, data: {
   const age = data.age !== undefined ? (data.age ? Number(data.age) : null) : undefined;
   const gender = data.gender !== undefined ? (data.gender ? data.gender.toLowerCase() : null) : undefined;
   const alternatePhone = data.alternate_phone !== undefined ? (data.alternate_phone?.trim() || null) : undefined;
+  const cleanGuruId = (data.guru_id || data.code)?.trim().toUpperCase() || undefined;
+
+  // Enforce unique contact numbers on update
+  if (data.phone) await assertUniqueContactNumber(data.phone, trainer.profile_id);
+  if (alternatePhone) await assertUniqueContactNumber(alternatePhone, trainer.profile_id);
 
   await query(`
     UPDATE public.profiles
@@ -558,6 +640,8 @@ export async function updateTrainer(id: string, data: {
         age = COALESCE($8, age),
         gender = COALESCE($9, gender),
         alternate_phone = COALESCE($10, alternate_phone),
+        guru_id = COALESCE($11, guru_id),
+        code = COALESCE($11, code),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
@@ -571,7 +655,8 @@ export async function updateTrainer(id: string, data: {
     data.avatar_url !== undefined ? data.avatar_url : null,
     age !== undefined ? age : null,
     gender !== undefined ? gender : null,
-    alternatePhone
+    alternatePhone,
+    cleanGuruId
   ]);
 }
 
@@ -681,8 +766,10 @@ export async function getStudents(): Promise<Student[]> {
       student_id: string;
       batch_id: string;
       batch_name: string;
+      batch_code?: string;
       course_id: string;
       course_title: string;
+      course_code?: string;
       course_category: string;
       monthly_fee: number;
       trainer_id: string;
@@ -698,8 +785,10 @@ export async function getStudents(): Promise<Student[]> {
         be.student_id,
         b.id as batch_id,
         b.name as batch_name,
+        b.code as batch_code,
         c.id as course_id,
         c.title as course_title,
+        c.code as course_code,
         c.category as course_category,
         COALESCE(b.monthly_fee, c.monthly_fee, 0)::numeric as monthly_fee,
         t.id as trainer_id,
@@ -741,22 +830,34 @@ export async function getStudents(): Promise<Student[]> {
         COUNT(DISTINCT CASE 
           WHEN cs.session_date >= DATE_TRUNC('month', CURRENT_DATE) 
            AND cs.session_date <= CURRENT_DATE 
+           AND COALESCE(att_held.has_attendance, false) = true
+           AND COALESCE(hol_check.is_holiday, false) = false
+           AND COALESCE(ga_check.is_guru_absent, false) = false
           THEN cs.id 
         END)::int as this_month_held,
         COUNT(DISTINCT CASE 
           WHEN cs.session_date >= DATE_TRUNC('month', CURRENT_DATE) 
            AND cs.session_date <= CURRENT_DATE 
+           AND COALESCE(att_held.has_attendance, false) = true
+           AND COALESCE(hol_check.is_holiday, false) = false
+           AND COALESCE(ga_check.is_guru_absent, false) = false
            AND LOWER(a.status) = 'absent' 
           THEN cs.id 
         END)::int as this_month_absent,
         COUNT(DISTINCT CASE 
           WHEN cs.session_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') 
            AND cs.session_date < DATE_TRUNC('month', CURRENT_DATE) 
+           AND COALESCE(att_held.has_attendance, false) = true
+           AND COALESCE(hol_check.is_holiday, false) = false
+           AND COALESCE(ga_check.is_guru_absent, false) = false
           THEN cs.id 
         END)::int as last_month_held,
         COUNT(DISTINCT CASE 
           WHEN cs.session_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') 
            AND cs.session_date < DATE_TRUNC('month', CURRENT_DATE) 
+           AND COALESCE(att_held.has_attendance, false) = true
+           AND COALESCE(hol_check.is_holiday, false) = false
+           AND COALESCE(ga_check.is_guru_absent, false) = false
            AND LOWER(a.status) = 'absent' 
           THEN cs.id 
         END)::int as last_month_absent
@@ -764,6 +865,27 @@ export async function getStudents(): Promise<Student[]> {
       JOIN public.batches b ON b.id = be.batch_id
       JOIN public.courses c ON c.id = b.course_id
       LEFT JOIN public.class_sessions cs ON cs.batch_id = b.id
+      LEFT JOIN LATERAL (
+        SELECT true as has_attendance 
+        FROM public.attendance att_sub 
+        WHERE att_sub.session_id = cs.id 
+        LIMIT 1
+      ) att_held ON true
+      LEFT JOIN LATERAL (
+        SELECT true as is_holiday 
+        FROM public.holiday_alerts ha 
+        WHERE ha.holiday_date = cs.session_date 
+          AND ha.status != 'Cancelled' 
+          AND (ha.target_batch_ids ? cs.batch_id::text OR ha.target_course_ids ? b.course_id::text)
+        LIMIT 1
+      ) hol_check ON true
+      LEFT JOIN LATERAL (
+        SELECT true as is_guru_absent 
+        FROM public.guru_absences ga 
+        WHERE ga.absence_date = cs.session_date 
+          AND ga.batch_id = cs.batch_id
+        LIMIT 1
+      ) ga_check ON true
       LEFT JOIN public.attendance a ON a.session_id = cs.id AND a.student_id = be.student_id
       WHERE be.status = 'active'
       GROUP BY be.student_id, b.course_id, c.title;
@@ -902,6 +1024,9 @@ export async function createStudent(data: {
   }
   const rollNumber = `LCA-${maxId + 1}`;
 
+  // Enforce unique contact numbers for Students
+  if (data.phone) await assertUniqueContactNumber(data.phone);
+
   const cleanEmail = data.email.toLowerCase().trim();
 
   let authEmail = cleanEmail;
@@ -1034,6 +1159,9 @@ export async function updateStudent(id: string, data: {
   );
   if (!current) throw new Error('Student not found');
 
+  // Enforce unique contact numbers on update
+  if (data.phone) await assertUniqueContactNumber(data.phone, current.profile_id);
+
   const calculatedAge = data.date_of_birth ? Math.max(1, Math.floor((new Date().getTime() - new Date(data.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))) : undefined;
   const age = data.age !== undefined ? (data.age ? Number(data.age) : null) : calculatedAge;
   const gender = data.gender !== undefined ? (data.gender ? data.gender.toLowerCase() : null) : undefined;
@@ -1162,7 +1290,7 @@ export async function enrollStudentInBatch(studentId: string, batchId: string) {
 export async function getBatches(): Promise<Batch[]> {
   const sql = `
     SELECT 
-      b.id, b.course_id, c.title as course_title, c.category as course_category,
+      b.id, b.code, b.course_id, c.title as course_title, c.code as course_code, c.category as course_category,
       b.trainer_id, p.full_name as trainer_name,
       b.name, b.days_of_week, b.start_time, b.end_time, b.room_or_hall,
       COALESCE(b.monthly_fee, 0)::numeric as monthly_fee,
@@ -1175,13 +1303,14 @@ export async function getBatches(): Promise<Batch[]> {
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batch_enrollments be ON be.batch_id = b.id AND be.status = 'active'
     LEFT JOIN public.students st ON st.id = be.student_id
-    GROUP BY b.id, b.course_id, c.title, c.category, b.trainer_id, p.full_name, b.monthly_fee, b.description, b.schedules
+    GROUP BY b.id, b.code, b.course_id, c.title, c.code, c.category, b.trainer_id, p.full_name, b.monthly_fee, b.description, b.schedules
     ORDER BY b.start_time, b.name;
   `;
   return query<Batch>(sql);
 }
 
 export async function createBatch(data: {
+  code?: string;
   course_id: string;
   trainer_id: string;
   name: string;
@@ -1195,16 +1324,34 @@ export async function createBatch(data: {
   is_active?: boolean;
   schedules?: BatchScheduleSlot[];
 }) {
+  let batchCode = data.code?.trim().toLowerCase();
+  if (!batchCode) {
+    const crs = await queryOne<{ code: string }>(`SELECT code FROM public.courses WHERE id = $1`, [data.course_id]);
+    const crsCode = (crs?.code || 'crs').toLowerCase();
+    const existing = await query<{ code: string }>(`SELECT code FROM public.batches WHERE course_id = $1`, [data.course_id]);
+    let maxNum = 0;
+    for (const row of existing) {
+      if (row.code) {
+        const m = row.code.match(/-(\d+)$/);
+        if (m) {
+          const num = parseInt(m[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+    }
+    batchCode = `${crsCode}-${maxNum + 1}`;
+  }
+
   return queryOne<Batch>(`
     INSERT INTO public.batches (
-      course_id, trainer_id, name, days_of_week, 
+      course_id, trainer_id, name, code, days_of_week, 
       start_time, end_time, room_or_hall, max_capacity, 
       monthly_fee, description, is_active, schedules
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     RETURNING *;
   `, [
-    data.course_id, data.trainer_id, data.name, data.days_of_week,
+    data.course_id, data.trainer_id, data.name, batchCode, data.days_of_week,
     data.start_time, data.end_time, data.room_or_hall, data.max_capacity,
     Number(data.monthly_fee || 0),
     data.description || '',
@@ -1214,6 +1361,7 @@ export async function createBatch(data: {
 }
 
 export async function updateBatch(id: string, data: {
+  code?: string;
   name?: string;
   course_id?: string;
   trainer_id?: string;
@@ -1227,6 +1375,7 @@ export async function updateBatch(id: string, data: {
   is_active?: boolean;
   schedules?: BatchScheduleSlot[];
 }) {
+  const cleanCode = data.code ? data.code.trim().toLowerCase() : undefined;
   return queryOne<Batch>(`
     UPDATE public.batches
     SET name = COALESCE($2, name),
@@ -1241,6 +1390,7 @@ export async function updateBatch(id: string, data: {
         description = COALESCE($11, description),
         is_active = COALESCE($12, is_active),
         schedules = COALESCE($13::jsonb, schedules),
+        code = COALESCE($14, code),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
@@ -1250,7 +1400,8 @@ export async function updateBatch(id: string, data: {
     data.monthly_fee !== undefined ? data.monthly_fee : null,
     data.description !== undefined ? data.description : null,
     data.is_active !== undefined ? data.is_active : null,
-    data.schedules ? JSON.stringify(data.schedules) : null
+    data.schedules ? JSON.stringify(data.schedules) : null,
+    cleanCode
   ]);
 }
 
@@ -1267,6 +1418,11 @@ export async function deleteBatch(id: string) {
 // SESSIONS & ATTENDANCE
 // -------------------------------------------------------------
 export async function getSessions(dateFilter?: string, startDate?: string, endDate?: string, roomFilter?: string): Promise<ClassSession[]> {
+  let targetDate = dateFilter;
+  if (!targetDate && !startDate && !endDate) {
+    targetDate = new Date().toISOString().split('T')[0];
+  }
+
   let sql = `
     SELECT 
       s.id, s.batch_id, b.name as batch_name, c.title as course_title,
@@ -1275,7 +1431,8 @@ export async function getSessions(dateFilter?: string, startDate?: string, endDa
       s.start_time, s.end_time,
       s.status, s.check_in_code, s.session_topic_notes,
       COUNT(DISTINCT CASE WHEN a.status = 'present' THEN a.id END)::int as present_count,
-      COUNT(DISTINCT be.id)::int as total_enrolled
+      COUNT(DISTINCT be.id)::int as total_enrolled,
+      COALESCE(tc_check.is_rescheduled, false) as is_rescheduled
     FROM public.class_sessions s
     JOIN public.batches b ON b.id = s.batch_id
     JOIN public.courses c ON c.id = b.course_id
@@ -1283,19 +1440,21 @@ export async function getSessions(dateFilter?: string, startDate?: string, endDa
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batch_enrollments be ON be.batch_id = b.id AND be.status = 'active'
     LEFT JOIN public.attendance a ON a.session_id = s.id
+    LEFT JOIN LATERAL (
+      SELECT true as is_rescheduled
+      FROM public.tally_classes tc
+      WHERE tc.batch_id = s.batch_id AND tc.rescheduled_date = s.session_date AND tc.status = 'Scheduled'
+      LIMIT 1
+    ) tc_check ON true
     WHERE 1=1 AND b.is_active = true
   `;
   const params: any[] = [];
   if (startDate && endDate) {
     sql += ` AND s.session_date >= $1 AND s.session_date <= $2`;
     params.push(startDate, endDate);
-  } else if (dateFilter) {
+  } else if (targetDate) {
     sql += ` AND s.session_date = $1`;
-    params.push(dateFilter);
-  } else {
-    const today = new Date().toISOString().split('T')[0];
-    sql += ` AND s.session_date = $1`;
-    params.push(today);
+    params.push(targetDate);
   }
 
   if (roomFilter && roomFilter !== 'All' && roomFilter !== 'all' && roomFilter.trim() !== '') {
@@ -1304,10 +1463,58 @@ export async function getSessions(dateFilter?: string, startDate?: string, endDa
   }
 
   sql += `
-    GROUP BY s.id, s.batch_id, b.name, c.title, b.room_or_hall, p.full_name
+    GROUP BY s.id, s.batch_id, b.name, c.title, b.room_or_hall, p.full_name, tc_check.is_rescheduled
     ORDER BY s.session_date ASC, s.start_time ASC;
   `;
-  return query<ClassSession>(sql, params);
+  const sessions = await query<ClassSession>(sql, params);
+
+  // Also include any active scheduled tally classes for this date
+  try {
+    let tallySql = `
+      SELECT 
+        tc.id as id,
+        tc.batch_id,
+        tc.batch_name,
+        tc.course_title,
+        tc.room_or_hall,
+        tc.trainer_name,
+        TO_CHAR(tc.rescheduled_date, 'YYYY-MM-DD') as session_date,
+        tc.start_time::text as start_time,
+        tc.end_time::text as end_time,
+        'scheduled' as status,
+        '' as check_in_code,
+        COALESCE(tc.reason, 'Rescheduled / Tally Class') as session_topic_notes,
+        0 as present_count,
+        tc.students_count as total_enrolled,
+        true as is_rescheduled
+      FROM public.tally_classes tc
+      WHERE tc.status = 'Scheduled'
+    `;
+    const tallyParams: any[] = [];
+    if (startDate && endDate) {
+      tallySql += ` AND tc.rescheduled_date >= $1 AND tc.rescheduled_date <= $2`;
+      tallyParams.push(startDate, endDate);
+    } else if (targetDate) {
+      tallySql += ` AND tc.rescheduled_date = $1`;
+      tallyParams.push(targetDate);
+    }
+    if (roomFilter && roomFilter !== 'All' && roomFilter !== 'all' && roomFilter.trim() !== '') {
+      tallyParams.push(roomFilter);
+      tallySql += ` AND tc.room_or_hall = $${tallyParams.length}`;
+    }
+
+    const tallyRows = await query<ClassSession>(tallySql, tallyParams);
+    for (const tr of tallyRows) {
+      const existsInSessions = sessions.some(s => s.batch_id === tr.batch_id && s.session_date === tr.session_date);
+      if (!existsInSessions) {
+        sessions.push(tr);
+      }
+    }
+  } catch (tallyErr) {
+    console.warn('Error fetching tally classes in getSessions:', tallyErr);
+  }
+
+  return sessions.sort((a, b) => (a.start_time > b.start_time ? 1 : -1));
 }
 
 export async function updateSessionStatus(sessionId: string, status: string, checkInCode?: string) {
@@ -1434,7 +1641,7 @@ export interface GuruAttendanceAuditRecord {
   present_students_count: number;
   absent_students_count: number;
   total_enrolled: number;
-  guru_status: 'present' | 'absent' | 'upcoming';
+  guru_status: 'present' | 'absent' | 'upcoming' | 'holiday';
 }
 
 export async function getGuruAttendanceAuditRecords(options?: {
@@ -1466,7 +1673,8 @@ export async function getGuruAttendanceAuditRecords(options?: {
       COALESCE(att_stats.absent_count, 0) as absent_students_count,
       COALESCE(enr_stats.enrolled_count, 0) as total_enrolled,
       CASE 
-        WHEN (cs.status = 'completed' OR COALESCE(alert_check.has_alert, false) = true) AND COALESCE(att_stats.marked_count, 0) > 0 THEN 'present'
+        WHEN COALESCE(att_stats.marked_count, 0) > 0 THEN 'present'
+        WHEN COALESCE(hol_check.is_holiday, false) = true THEN 'holiday'
         ELSE 'absent'
       END as guru_status
     FROM public.class_sessions cs
@@ -1487,6 +1695,14 @@ export async function getGuruAttendanceAuditRecords(options?: {
       FROM public.batch_enrollments be
       WHERE be.batch_id = cs.batch_id AND be.status = 'active'
     ) enr_stats ON true
+    LEFT JOIN LATERAL (
+      SELECT true as is_holiday
+      FROM public.holiday_alerts ha
+      WHERE ha.holiday_date = cs.session_date
+        AND ha.status != 'Cancelled'
+        AND (ha.target_batch_ids ? cs.batch_id::text OR ha.target_course_ids ? b.course_id::text)
+      LIMIT 1
+    ) hol_check ON true
     LEFT JOIN LATERAL (
       SELECT true as has_alert
       FROM public.session_alerts sa

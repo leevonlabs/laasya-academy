@@ -243,24 +243,20 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
     );
   }, [categories, categorySearchQuery]);
 
-  // Helper to generate next unique code
-  const generateNextCourseCode = (courseList: Course[]) => {
-    const codes = courseList.map(c => c.code).filter(Boolean);
-    let maxNum = 0;
-    for (const c of codes) {
-      const match = c.match(/(\d+)/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (num > maxNum) maxNum = num;
-      }
-    }
-    const nextNum = Math.max(maxNum + 1, courseList.length + 1);
-    return `LCA-CRS-${String(nextNum).padStart(3, '0')}`;
+  // Helper to auto-generate lowercase course code from title (e.g. Bharatanatyam -> bhar)
+  const generateCourseCodeFromName = (title: string, currentCourses: Course[]) => {
+    const slug = title.trim().toLowerCase().split(/\s+/)[0].replace(/[^a-z0-9]/g, '').slice(0, 4);
+    if (!slug) return '';
+    const existingCodes = new Set(currentCourses.map(c => c.code?.toLowerCase()).filter(Boolean));
+    if (!existingCodes.has(slug)) return slug;
+    let counter = 2;
+    while (existingCodes.has(`${slug}${counter}`)) counter++;
+    return `${slug}${counter}`;
   };
 
   const openAddModal = () => {
     setNewTitle('');
-    setNewCode(generateNextCourseCode(courses));
+    setNewCode('');
     setNewCategory(categories[0] || 'Classical Dance');
     setIsCreatingNewCategory(false);
     setCustomNewCategory('');
@@ -423,12 +419,13 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
         }
       }
 
+      const codeToUse = (newCode.trim() || generateCourseCodeFromName(newTitle, courses)).toLowerCase();
       const res = await fetch('/api/courses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newTitle.trim(),
-          code: newCode.trim().toUpperCase(),
+          code: codeToUse,
           category: finalCategory,
           monthly_fee: Number(newFee),
           description: newDesc.trim(),
@@ -475,13 +472,14 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
         }
       }
 
+      const finalEditCode = editCode.trim().toLowerCase();
       const res = await fetch('/api/courses', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: editingCourse.id,
           title: editTitle.trim(),
-          code: editCode.trim().toUpperCase(),
+          code: finalEditCode,
           category: finalCategory,
           monthly_fee: Number(editFee),
           description: editDesc.trim(),
@@ -502,7 +500,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
             ? {
                 ...c,
                 title: editTitle.trim(),
-                code: editCode.trim().toUpperCase(),
+                code: finalEditCode,
                 category: finalCategory,
                 monthly_fee: Number(editFee),
                 description: editDesc.trim(),
@@ -517,7 +515,7 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
         setViewingCourse({
           ...viewingCourse,
           title: editTitle.trim(),
-          code: editCode.trim().toUpperCase(),
+          code: finalEditCode,
           category: finalCategory,
           monthly_fee: Number(editFee),
           description: editDesc.trim(),
@@ -1057,17 +1055,22 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
             </div>
 
             <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
-              <div>
-                <span className="text-xs font-semibold text-gray-500">Category:</span>
-                {isCourseUncategorized(viewingCourse) ? (
-                  <span className="ml-2 text-[11px] font-black text-red-700 bg-red-50 border-2 border-red-500 px-2.5 py-0.5 rounded-full">
-                    ⚠️ No Category
-                  </span>
-                ) : (
-                  <span className="ml-2 text-xs font-bold text-[#8A064D] bg-[#FFF2F8] px-3 py-1 rounded-full border border-rose-100">
-                    {viewingCourse.category}
-                  </span>
-                )}
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono font-black text-[#8A064D] bg-[#FFF2F8] px-3 py-1 rounded-xl border border-[#F0D5E4]">
+                  ID: {viewingCourse.code}
+                </span>
+                <div>
+                  <span className="text-xs font-semibold text-gray-500">Category:</span>
+                  {isCourseUncategorized(viewingCourse) ? (
+                    <span className="ml-2 text-[11px] font-black text-red-700 bg-red-50 border-2 border-red-500 px-2.5 py-0.5 rounded-full">
+                      ⚠️ No Category
+                    </span>
+                  ) : (
+                    <span className="ml-2 text-xs font-bold text-[#8A064D] bg-[#FFF2F8] px-3 py-1 rounded-full border border-rose-100">
+                      {viewingCourse.category}
+                    </span>
+                  )}
+                </div>
               </div>
               <span className={`font-black px-2.5 py-0.5 rounded-full text-[11px] ${
                 viewingCourse.is_active !== false 
@@ -1206,19 +1209,20 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                 </div>
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5 flex items-center justify-between">
-                    <span>Course Code</span>
-                    <span className="text-[10px] text-gray-500 font-bold flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-gray-400" />
-                      <span>Locked</span>
+                    <span>Course Code *</span>
+                    <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                      <Tag className="w-3 h-3 text-emerald-600" />
+                      <span>Unique ID</span>
                     </span>
                   </label>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-100/90 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-600 select-none">
-                    <Lock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                    <span className="tracking-wide">{editCode}</span>
-                    <span className="ml-auto text-[9px] uppercase tracking-wider font-extrabold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-md">
-                      Read-Only
-                    </span>
-                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={editCode}
+                    onChange={(e) => setEditCode(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Unique course identifier (e.g. 'bhar')</p>
                 </div>
               </div>
 
@@ -1397,27 +1401,33 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Kathak Classical"
+                    placeholder="e.g. Bharatanatyam"
                     value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewTitle(val);
+                      setNewCode(generateCourseCodeFromName(val, courses));
+                    }}
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5 flex items-center justify-between">
-                    <span>Course Code</span>
+                    <span>Course Code *</span>
                     <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-emerald-600" />
-                      <span>Auto-Assigned</span>
+                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                      <span>Auto-Generated</span>
                     </span>
                   </label>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-100/90 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-600 select-none">
-                    <Lock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                    <span className="tracking-wide">{newCode}</span>
-                    <span className="ml-auto text-[9px] uppercase tracking-wider font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
-                      System ID
-                    </span>
-                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. bhar"
+                    value={newCode}
+                    onChange={(e) => setNewCode(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D]"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Auto-derived 4 letters from title (e.g. 'bhar')</p>
                 </div>
               </div>
 

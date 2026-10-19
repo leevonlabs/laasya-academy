@@ -1,8 +1,9 @@
-import 'dart:ui' as ui;
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
 import 'trainer_data_store.dart';
 
 class TrainerTimetableScreen extends StatefulWidget {
@@ -15,12 +16,10 @@ class TrainerTimetableScreen extends StatefulWidget {
 }
 
 class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
-  final GlobalKey _timetableKey = GlobalKey();
-
   String _selectedDay = 'All'; // 'All', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
-  bool _isDownloading = false;
-
   final List<String> _days = ['All', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  List<Map<String, dynamic>> _rescheduledClasses = [];
 
   // Master Academy Timetable Dataset (Matching Admin /batches/timetable)
   final List<Map<String, dynamic>> _masterTimetable = [
@@ -105,260 +104,244 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
       'room': 'Hall 1',
     },
     {
-      'time': '8:30 AM – 9:30 AM',
-      'day': 'Tue',
-      'course': 'BHARATANATYAM',
-      'batch': 'Semi-Classical',
-      'trainer': 'Nandana',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '8:30 AM – 9:30 AM',
-      'day': 'Thu',
-      'course': 'BHARATANATYAM',
-      'batch': 'Semi-Classical',
-      'trainer': 'Nandana',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '8:30 AM – 9:30 AM',
-      'day': 'Fri',
-      'course': 'BHARATANATYAM',
-      'batch': 'Semi-Classical',
-      'trainer': 'Nandana',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '9:30 AM – 10:30 AM',
-      'day': 'Sat',
-      'course': 'BHARATANATYAM',
-      'batch': 'Nrityam (Morning)',
-      'trainer': 'Nandana',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '9:30 AM – 10:30 AM',
-      'day': 'Sun',
-      'course': 'BHARATANATYAM',
-      'batch': 'Nrityam (Morning)',
-      'trainer': 'Nandana',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '10:30 AM – 11:30 AM',
-      'day': 'Sat',
-      'course': 'BHARATANATYAM',
-      'batch': 'Kartari Mukham',
-      'trainer': 'Nandana',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '10:30 AM – 11:30 AM',
-      'day': 'Sat',
-      'course': 'BHARATANATYAM',
-      'batch': 'Spanda',
-      'trainer': 'Vismaya',
-      'room': 'Room 102',
-    },
-    {
-      'time': '10:30 AM – 11:30 AM',
-      'day': 'Sun',
-      'course': 'BHARATANATYAM',
-      'batch': 'Kartari Mukham',
-      'trainer': 'Nandana',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '10:30 AM – 11:30 AM',
-      'day': 'Sun',
-      'course': 'BHARATANATYAM',
-      'batch': 'Spanda',
-      'trainer': 'Vismaya',
-      'room': 'Room 102',
-    },
-    {
-      'time': '11:30 AM – 12:30 PM',
-      'day': 'Sat',
-      'course': 'BHARATANATYAM',
-      'batch': 'Shikharam',
-      'trainer': 'Kavya',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '11:30 AM – 12:30 PM',
-      'day': 'Sat',
-      'course': 'BHARATANATYAM',
-      'batch': 'Blossom',
-      'trainer': 'Amrutha',
-      'room': 'Room 101',
-    },
-    {
-      'time': '11:30 AM – 12:30 PM',
-      'day': 'Sun',
-      'course': 'BHARATANATYAM',
-      'batch': 'Shikharam',
-      'trainer': 'Kavya',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '11:30 AM – 12:30 PM',
-      'day': 'Sun',
-      'course': 'BHARATANATYAM',
-      'batch': 'Blossom',
-      'trainer': 'Amrutha',
-      'room': 'Room 101',
-    },
-    {
-      'time': '2:00 PM – 3:00 PM',
-      'day': 'Sat',
-      'course': 'BHARATANATYAM',
-      'batch': 'Ladies Bharatanatyam',
-      'trainer': 'Kavya',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '2:00 PM – 3:00 PM',
-      'day': 'Sun',
-      'course': 'BHARATANATYAM',
-      'batch': 'Ladies Bharatanatyam',
-      'trainer': 'Kavya',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '3:30 PM – 4:30 PM',
-      'day': 'Sat',
-      'course': 'WESTERN DANCE',
-      'batch': 'Weekend Batch',
-      'trainer': 'Manjunath',
-      'room': 'Studio 2',
-    },
-    {
-      'time': '3:30 PM – 4:30 PM',
-      'day': 'Sun',
-      'course': 'WESTERN DANCE',
-      'batch': 'Weekend Batch',
-      'trainer': 'Manjunath',
-      'room': 'Studio 2',
-    },
-    {
-      'time': '4:00 PM – 5:00 PM',
-      'day': 'Tue',
-      'course': 'BHARATANATYAM',
-      'batch': 'Ragam',
-      'trainer': 'Nandana',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '4:00 PM – 5:00 PM',
-      'day': 'Wed',
-      'course': 'INSTRUMENT CLASSES',
-      'batch': 'Weekday Batch (Violin)',
-      'trainer': 'Amos',
-      'room': 'Room 103',
-    },
-    {
-      'time': '4:00 PM – 5:00 PM',
-      'day': 'Thu',
-      'course': 'BHARATANATYAM',
-      'batch': 'Ragam',
-      'trainer': 'Nandana',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '4:00 PM – 5:00 PM',
-      'day': 'Fri',
-      'course': 'INSTRUMENT CLASSES',
-      'batch': 'Weekday Batch (Violin)',
-      'trainer': 'Amos',
-      'room': 'Room 103',
-    },
-    {
-      'time': '4:30 PM – 5:30 PM',
+      'time': '7:00 AM – 8:00 AM',
       'day': 'Mon',
-      'course': 'BHARATANATYAM',
-      'batch': 'Anjali',
-      'trainer': 'Kavya',
-      'room': 'Natya Mandapam',
+      'course': 'YOGA',
+      'batch': 'Batch 3 (Advanced)',
+      'trainer': 'Satish Kale',
+      'room': 'Hall 1',
     },
     {
-      'time': '4:30 PM – 5:30 PM',
-      'day': 'Tue',
-      'course': 'KARATE',
-      'batch': 'Dojo Beginners',
-      'trainer': 'Balraj',
-      'room': 'Ground Hall',
+      'time': '7:00 AM – 8:00 AM',
+      'day': 'Wed',
+      'course': 'YOGA',
+      'batch': 'Batch 3 (Advanced)',
+      'trainer': 'Satish Kale',
+      'room': 'Hall 1',
     },
     {
-      'time': '4:30 PM – 5:30 PM',
-      'day': 'Thu',
-      'course': 'KARATE',
-      'batch': 'Dojo Beginners',
-      'trainer': 'Balraj',
-      'room': 'Ground Hall',
-    },
-    {
-      'time': '4:30 PM – 5:30 PM',
+      'time': '7:00 AM – 8:00 AM',
       'day': 'Fri',
-      'course': 'BHARATANATYAM',
-      'batch': 'Anjali',
-      'trainer': 'Kavya',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '4:30 PM – 5:30 PM',
-      'day': 'Sat',
-      'course': 'BHARATANATYAM',
-      'batch': 'Alapadma',
-      'trainer': 'Vismaya',
-      'room': 'Natya Mandapam',
-    },
-    {
-      'time': '4:30 PM – 5:30 PM',
-      'day': 'Sun',
-      'course': 'BHARATANATYAM',
-      'batch': 'Thalam',
-      'trainer': 'Amrutha',
-      'room': 'Natya Mandapam',
+      'course': 'YOGA',
+      'batch': 'Batch 3 (Advanced)',
+      'trainer': 'Satish Kale',
+      'room': 'Hall 1',
     },
     {
       'time': '5:00 PM – 6:00 PM',
       'day': 'Mon',
       'course': 'BHARATANATYAM',
-      'batch': 'Mudra',
-      'trainer': 'Amrutha',
+      'batch': 'Batch 1 (Beginners)',
+      'trainer': 'Anusha',
+      'room': 'Natya Mandapam',
+    },
+    {
+      'time': '5:00 PM – 6:00 PM',
+      'day': 'Wed',
+      'course': 'BHARATANATYAM',
+      'batch': 'Batch 1 (Beginners)',
+      'trainer': 'Anusha',
+      'room': 'Natya Mandapam',
+    },
+    {
+      'time': '5:00 PM – 6:00 PM',
+      'day': 'Fri',
+      'course': 'BHARATANATYAM',
+      'batch': 'Batch 1 (Beginners)',
+      'trainer': 'Anusha',
+      'room': 'Natya Mandapam',
+    },
+    {
+      'time': '6:00 PM – 7:00 PM',
+      'day': 'Mon',
+      'course': 'BHARATANATYAM',
+      'batch': 'Batch 2 (Intermediate)',
+      'trainer': 'Anusha',
+      'room': 'Natya Mandapam',
+    },
+    {
+      'time': '6:00 PM – 7:00 PM',
+      'day': 'Wed',
+      'course': 'BHARATANATYAM',
+      'batch': 'Batch 2 (Intermediate)',
+      'trainer': 'Anusha',
+      'room': 'Natya Mandapam',
+    },
+    {
+      'time': '6:00 PM – 7:00 PM',
+      'day': 'Fri',
+      'course': 'BHARATANATYAM',
+      'batch': 'Batch 2 (Intermediate)',
+      'trainer': 'Anusha',
+      'room': 'Natya Mandapam',
+    },
+    {
+      'time': '7:00 PM – 8:00 PM',
+      'day': 'Tue',
+      'course': 'BHARATANATYAM',
+      'batch': 'Batch 3 (Arangetram)',
+      'trainer': 'Anusha',
+      'room': 'Natya Mandapam',
+    },
+    {
+      'time': '7:00 PM – 8:00 PM',
+      'day': 'Thu',
+      'course': 'BHARATANATYAM',
+      'batch': 'Batch 3 (Arangetram)',
+      'trainer': 'Anusha',
+      'room': 'Natya Mandapam',
+    },
+    {
+      'time': '7:00 PM – 8:00 PM',
+      'day': 'Sat',
+      'course': 'BHARATANATYAM',
+      'batch': 'Batch 3 (Arangetram)',
+      'trainer': 'Anusha',
+      'room': 'Natya Mandapam',
+    },
+    {
+      'time': '4:30 PM – 5:30 PM',
+      'day': 'Mon',
+      'course': 'KARATE',
+      'batch': 'Batch 1 (White & Yellow)',
+      'trainer': 'Vijay',
+      'room': 'Veera Kalari Koodam',
+    },
+    {
+      'time': '4:30 PM – 5:30 PM',
+      'day': 'Wed',
+      'course': 'KARATE',
+      'batch': 'Batch 1 (White & Yellow)',
+      'trainer': 'Vijay',
+      'room': 'Veera Kalari Koodam',
+    },
+    {
+      'time': '4:30 PM – 5:30 PM',
+      'day': 'Fri',
+      'course': 'KARATE',
+      'batch': 'Batch 1 (White & Yellow)',
+      'trainer': 'Vijay',
+      'room': 'Veera Kalari Koodam',
+    },
+    {
+      'time': '5:30 PM – 6:30 PM',
+      'day': 'Mon',
+      'course': 'KARATE',
+      'batch': 'Batch 2 (Green & Blue)',
+      'trainer': 'Vijay',
+      'room': 'Veera Kalari Koodam',
+    },
+    {
+      'time': '5:30 PM – 6:30 PM',
+      'day': 'Wed',
+      'course': 'KARATE',
+      'batch': 'Batch 2 (Green & Blue)',
+      'trainer': 'Vijay',
+      'room': 'Veera Kalari Koodam',
+    },
+    {
+      'time': '5:30 PM – 6:30 PM',
+      'day': 'Fri',
+      'course': 'KARATE',
+      'batch': 'Batch 2 (Green & Blue)',
+      'trainer': 'Vijay',
+      'room': 'Veera Kalari Koodam',
+    },
+    {
+      'time': '6:30 PM – 7:30 PM',
+      'day': 'Tue',
+      'course': 'KARATE',
+      'batch': 'Batch 3 (Brown & Black)',
+      'trainer': 'Vijay',
+      'room': 'Veera Kalari Koodam',
+    },
+    {
+      'time': '6:30 PM – 7:30 PM',
+      'day': 'Thu',
+      'course': 'KARATE',
+      'batch': 'Batch 3 (Brown & Black)',
+      'trainer': 'Vijay',
+      'room': 'Veera Kalari Koodam',
+    },
+    {
+      'time': '6:30 PM – 7:30 PM',
+      'day': 'Sat',
+      'course': 'KARATE',
+      'batch': 'Batch 3 (Brown & Black)',
+      'trainer': 'Vijay',
+      'room': 'Veera Kalari Koodam',
+    },
+    {
+      'time': '4:00 PM – 5:00 PM',
+      'day': 'Mon',
+      'course': 'KUCHIPUDI',
+      'batch': 'Batch 1 (Tarangam)',
+      'trainer': 'Radhika',
+      'room': 'Natya Mandapam',
+    },
+    {
+      'time': '4:00 PM – 5:00 PM',
+      'day': 'Wed',
+      'course': 'KUCHIPUDI',
+      'batch': 'Batch 1 (Tarangam)',
+      'trainer': 'Radhika',
+      'room': 'Natya Mandapam',
+    },
+    {
+      'time': '4:00 PM – 5:00 PM',
+      'day': 'Fri',
+      'course': 'KUCHIPUDI',
+      'batch': 'Batch 1 (Tarangam)',
+      'trainer': 'Radhika',
       'room': 'Natya Mandapam',
     },
     {
       'time': '5:00 PM – 6:00 PM',
       'day': 'Tue',
-      'course': 'BHARATANATYAM',
-      'batch': 'Pataka',
-      'trainer': 'Vismaya',
+      'course': 'MOHINIYATTAM',
+      'batch': 'Batch 1 (Lasya Foundation)',
+      'trainer': 'Deepa',
       'room': 'Natya Mandapam',
     },
     {
       'time': '5:00 PM – 6:00 PM',
-      'day': 'Wed',
-      'course': 'BHARATANATYAM',
-      'batch': 'Mudra',
-      'trainer': 'Amrutha',
+      'day': 'Thu',
+      'course': 'MOHINIYATTAM',
+      'batch': 'Batch 1 (Lasya Foundation)',
+      'trainer': 'Deepa',
       'room': 'Natya Mandapam',
     },
     {
       'time': '5:00 PM – 6:00 PM',
-      'day': 'Wed',
-      'course': 'INSTRUMENT CLASSES',
-      'batch': 'Weekday Batch',
-      'trainer': 'Amos',
-      'room': 'Room 103',
+      'day': 'Sat',
+      'course': 'MOHINIYATTAM',
+      'batch': 'Batch 1 (Lasya Foundation)',
+      'trainer': 'Deepa',
+      'room': 'Natya Mandapam',
     },
     {
-      'time': '5:00 PM – 6:00 PM',
-      'day': 'Fri',
-      'course': 'INSTRUMENT CLASSES',
-      'batch': 'Weekday Batch',
-      'trainer': 'Amos',
-      'room': 'Room 103',
+      'time': '6:00 PM – 7:00 PM',
+      'day': 'Tue',
+      'course': 'WESTERN DANCE',
+      'batch': 'Batch 1 (Hip-Hop & Contemporary)',
+      'trainer': 'Kiran',
+      'room': 'Studio 2',
+    },
+    {
+      'time': '6:00 PM – 7:00 PM',
+      'day': 'Thu',
+      'course': 'WESTERN DANCE',
+      'batch': 'Batch 1 (Hip-Hop & Contemporary)',
+      'trainer': 'Kiran',
+      'room': 'Studio 2',
+    },
+    {
+      'time': '6:00 PM – 7:00 PM',
+      'day': 'Sat',
+      'course': 'WESTERN DANCE',
+      'batch': 'Batch 1 (Hip-Hop & Contemporary)',
+      'trainer': 'Kiran',
+      'room': 'Studio 2',
     },
     {
       'time': '5:30 PM – 6:30 PM',
@@ -426,6 +409,33 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
     },
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _fetchTallyClasses();
+  }
+
+  Future<void> _fetchTallyClasses() async {
+    try {
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/tally-classes');
+      final res = await http.get(uri).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['tallyClasses'] is List) {
+          final list = List<Map<String, dynamic>>.from(decoded['tallyClasses']);
+          if (mounted) {
+            setState(() {
+              _rescheduledClasses = list;
+            });
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching tally classes for trainer timetable: $e');
+    }
+  }
+
   Map<String, dynamic> _getCourseTheme(String courseName) {
     final lower = courseName.toUpperCase();
     if (lower.contains('BHARAT')) {
@@ -455,48 +465,39 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
         'icon': Icons.audiotrack_rounded,
       };
     }
-    if (lower.contains('DRAWING') || lower.contains('ART')) {
+    if (lower.contains('KARATE') || lower.contains('MARTIAL') || lower.contains('KALARI')) {
+      return {
+        'bg': const Color(0xFFFEE2E2),
+        'border': const Color(0xFFFECACA),
+        'text': const Color(0xFFB91C1C),
+        'badgeBg': const Color(0xFFFEF2F2),
+        'icon': Icons.sports_kabaddi_rounded,
+      };
+    }
+    if (lower.contains('KUCHIPUDI') || lower.contains('MOHINIYATTAM')) {
+      return {
+        'bg': const Color(0xFFF3E8FF),
+        'border': const Color(0xFFE9D5FF),
+        'text': const Color(0xFF7E22CE),
+        'badgeBg': const Color(0xFFFAF5FF),
+        'icon': Icons.auto_awesome_rounded,
+      };
+    }
+    if (lower.contains('DRAWING') || lower.contains('PAINT') || lower.contains('ART')) {
+      return {
+        'bg': const Color(0xFFE0E7FF),
+        'border': const Color(0xFFC7D2FE),
+        'text': const Color(0xFF4338CA),
+        'badgeBg': const Color(0xFFEEF2FF),
+        'icon': Icons.palette_rounded,
+      };
+    }
+    if (lower.contains('YOGA') || lower.contains('MEDITATION')) {
       return {
         'bg': const Color(0xFFDCFCE7),
         'border': const Color(0xFFBBF7D0),
         'text': const Color(0xFF15803D),
         'badgeBg': const Color(0xFFF0FDF4),
-        'icon': Icons.brush_rounded,
-      };
-    }
-    if (lower.contains('WESTERN')) {
-      return {
-        'bg': const Color(0xFFEDE9FE),
-        'border': const Color(0xFFDDD6FE),
-        'text': const Color(0xFF6D28D9),
-        'badgeBg': const Color(0xFFF5F3FF),
-        'icon': Icons.nightlife_rounded,
-      };
-    }
-    if (lower.contains('KALARI')) {
-      return {
-        'bg': const Color(0xFFFFEDD5),
-        'border': const Color(0xFFFED7AA),
-        'text': const Color(0xFFC2410C),
-        'badgeBg': const Color(0xFFFFF7ED),
-        'icon': Icons.sports_martial_arts_rounded,
-      };
-    }
-    if (lower.contains('KARATE')) {
-      return {
-        'bg': const Color(0xFFCCFBF1),
-        'border': const Color(0xFF99F6E4),
-        'text': const Color(0xFF0F766E),
-        'badgeBg': const Color(0xFFF0FDFA),
-        'icon': Icons.sports_kabaddi_rounded,
-      };
-    }
-    if (lower.contains('YOGA')) {
-      return {
-        'bg': const Color(0xFFFEF9C3),
-        'border': const Color(0xFFFEF08A),
-        'text': const Color(0xFFA16207),
-        'badgeBg': const Color(0xFFFEFCE8),
         'icon': Icons.self_improvement_rounded,
       };
     }
@@ -507,73 +508,6 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
       'badgeBg': const Color(0xFFFFF2F8),
       'icon': Icons.school_rounded,
     };
-  }
-
-  Future<void> _downloadTimetableAsPng() async {
-    if (_isDownloading) return;
-    setState(() => _isDownloading = true);
-
-    try {
-      await Future.delayed(const Duration(milliseconds: 150));
-      final boundary = _timetableKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) {
-        throw Exception('Timetable preview could not be captured.');
-      }
-
-      final ui.Image image = await boundary.toImage(pixelRatio: 2.5);
-      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) {
-        throw Exception('PNG serialization failed.');
-      }
-
-      final Uint8List pngBytes = byteData.buffer.asUint8List();
-      final fileName = 'laasya_timetable_${DateTime.now().millisecondsSinceEpoch}.png';
-
-      // Save via native Android MediaStore / Pictures directory
-      const channel = MethodChannel('com.laasyaacademy.app/notifications');
-      final bool? success = await channel.invokeMethod<bool>('saveImage', {
-        'bytes': pngBytes,
-        'fileName': fileName,
-      });
-
-      if (!mounted) return;
-
-      if (success == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFF03543F),
-            duration: const Duration(seconds: 4),
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Timetable PNG saved successfully to Gallery & Downloads!\n($fileName)',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      } else {
-        throw Exception('File write failed.');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: LaasyaColors.error,
-            content: Text('Failed to save timetable PNG: $e'),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isDownloading = false);
-      }
-    }
   }
 
   List<Map<String, dynamic>> _getTrainerSchedule(String trainerName, String specialization) {
@@ -620,13 +554,13 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
               'batch': batchName,
               'trainer': trainerName,
               'room': room,
+              'is_rescheduled': false,
             });
           }
         }
       }
     }
 
-    // If dynamic store produced slots, return them!
     if (slots.isNotEmpty) {
       return slots;
     }
@@ -645,7 +579,7 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
         return true;
       }
       return false;
-    }).toList();
+    }).map((s) => {...s, 'is_rescheduled': false}).toList();
   }
 
   @override
@@ -653,8 +587,70 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
     final trainerName = (widget.trainerProfile?['full_name'] ?? 'Guru').toString();
     final specialization = (widget.trainerProfile?['specialization'] ?? widget.trainerProfile?['course_name'] ?? 'Faculty').toString();
 
-    // Strictly get only this Guru's enrolled courses and batches
-    final allMySlots = _getTrainerSchedule(trainerName, specialization);
+    // -------------------------------------------------------------
+    // CALCULATE CURRENT WEEK DATES STRICTLY (Monday to Sunday)
+    // -------------------------------------------------------------
+    final now = DateTime.now();
+    final currentMonday = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final currentSunday = currentMonday.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+    final weekRangeFormatted = '${DateFormat('dd MMM').format(currentMonday)} – ${DateFormat('dd MMM yyyy').format(currentSunday)}';
+
+    // Strictly get this Guru's regular batch classes
+    final regularSlots = _getTrainerSchedule(trainerName, specialization);
+
+    // Rescheduled / Tally classes for this Guru strictly in the CURRENT WEEK
+    final List<Map<String, dynamic>> currentWeekRescheduled = [];
+    final tNameLower = trainerName.toLowerCase().trim();
+    final myId = (widget.trainerProfile?['id'] ?? widget.trainerProfile?['trainer_id'] ?? '').toString();
+
+    for (final tc in _rescheduledClasses) {
+      if (tc['status'] != 'Scheduled') continue;
+      final tcTrainer = (tc['trainer_name'] ?? '').toString().toLowerCase().trim();
+      final tcTrainerId = (tc['trainer_id'] ?? '').toString();
+
+      final matchesTrainer = (myId.isNotEmpty && tcTrainerId == myId) ||
+          (tNameLower.isNotEmpty && (tcTrainer.contains(tNameLower) || tNameLower.contains(tcTrainer)));
+
+      if (!matchesTrainer) {
+        final bName = (tc['batch_name'] ?? '').toString().toLowerCase();
+        final teachesBatch = regularSlots.any((s) => (s['batch'] ?? '').toString().toLowerCase() == bName);
+        if (!teachesBatch) continue;
+      }
+
+      final rDateStr = tc['rescheduled_date']?.toString() ?? '';
+      DateTime? rDate;
+      try {
+        rDate = DateTime.parse(rDateStr);
+      } catch (_) {}
+
+      // Filter strictly for current week (Monday to Sunday)
+      if (rDate != null) {
+        final startOfDay = DateTime(rDate.year, rDate.month, rDate.day);
+        if (startOfDay.isBefore(currentMonday) || startOfDay.isAfter(currentSunday)) {
+          continue;
+        }
+      }
+
+      const dayAbbrevs = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      final dayAbbrev = rDate != null ? dayAbbrevs[rDate.weekday - 1] : 'Mon';
+      final startTime = tc['start_time']?.toString() ?? '10:00';
+      final endTime = tc['end_time']?.toString() ?? '11:00';
+
+      currentWeekRescheduled.add({
+        'time': '$startTime – $endTime',
+        'day': dayAbbrev,
+        'date': rDate != null ? DateFormat('dd MMM yyyy').format(rDate) : rDateStr,
+        'course': tc['course_title'] ?? 'Classical Arts',
+        'batch': tc['batch_name'] ?? 'Batch',
+        'trainer': tc['trainer_name'] ?? trainerName,
+        'room': tc['room_or_hall'] ?? 'Natya Mandapam',
+        'is_rescheduled': true,
+        'cause': tc['cause'] ?? 'Holiday / Absence Replacement',
+        'status': 'Rescheduled ★',
+      });
+    }
+
+    final allMySlots = [...regularSlots, ...currentWeekRescheduled];
 
     // Filter by selected day
     final filtered = allMySlots.where((slot) {
@@ -665,203 +661,289 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF8FA),
+      backgroundColor: const Color(0xFFF7F3EE), // Soft Warm Ivory
       appBar: AppBar(
         backgroundColor: const Color(0xFF590231),
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Weekly Timetable',
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             Text(
-              'Academy Master Schedule & Batch Timings',
-              style: TextStyle(fontSize: 11, color: LaasyaColors.accentGold),
+              'Current Week: $weekRangeFormatted',
+              style: const TextStyle(fontSize: 11, color: LaasyaColors.accentGold),
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            onPressed: _isDownloading ? null : _downloadTimetableAsPng,
-            tooltip: 'Download PNG',
-            icon: _isDownloading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: LaasyaColors.accentGold),
-                  )
-                : const Icon(Icons.download_rounded, color: LaasyaColors.accentGold, size: 24),
-          ),
-        ],
+        // No download buttons in AppBar
+        actions: const [],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Overview Banner
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF590231), Color(0xFF8A064D)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
+      body: RefreshIndicator(
+        onRefresh: _fetchTallyClasses,
+        color: LaasyaColors.primary,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // =============================================================
+              // 1. ADMIN PROFILE & ACADEMY CONTROL CARD
+              // =============================================================
+              Container(
+                padding: const EdgeInsets.all(14),
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFEADBDB), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
-                    child: const Icon(Icons.calendar_month_rounded, color: LaasyaColors.accentGold, size: 28),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$trainerName\'s Schedule',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF2F8),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFF0D5E4), width: 1.5),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.account_balance_rounded, color: Color(0xFF8A064D), size: 22),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Academy Central Office',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF590231),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE8F8F0),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                                ),
+                                child: const Text(
+                                  'Admin Verified',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF047857),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Smt. Shanta Rao • Academy Director & Academic Operations',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Master Timetable Verified • Term 2026-27 • +91 80 2345 6789',
+                            style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // =============================================================
+              // 2. GURU HERO BANNER (NO DOWNLOAD BUTTON)
+              // =============================================================
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF590231), Color(0xFF8A064D)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF590231).withOpacity(0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.calendar_month_rounded, color: LaasyaColors.accentGold, size: 28),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$trainerName\'s Weekly Timetable',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '$specialization • Current Week Only ($weekRangeFormatted)',
+                            style: const TextStyle(color: Colors.white70, fontSize: 11),
+                          ),
+                          if (currentWeekRescheduled.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF9E33A),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '★ ${currentWeekRescheduled.length} Rescheduled Class${currentWeekRescheduled.length > 1 ? 'es' : ''} This Week',
+                                style: const TextStyle(
+                                  color: Color(0xFF2D041A),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // =============================================================
+              // 3. CONTROLS STRIP: ASSIGNED BATCHES & CURRENT WEEK DAY FILTER
+              // =============================================================
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Current Week Schedule',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: LaasyaColors.textDark,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFCE7F3),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: LaasyaColors.primary.withOpacity(0.35),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.verified_rounded,
+                          size: 14,
+                          color: LaasyaColors.primary,
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(width: 5),
                         Text(
-                          '$specialization • Full Weekly Grid View',
-                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                          'Total Slots: ${allMySlots.length}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: LaasyaColors.primary,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  ElevatedButton.icon(
-                    onPressed: _isDownloading ? null : _downloadTimetableAsPng,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF9E33A),
-                      foregroundColor: const Color(0xFF2D041A),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                    ),
-                    icon: const Icon(Icons.photo_library_rounded, size: 14),
-                    label: const Text(
-                      'Download PNG',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                    ),
-                  ),
                 ],
               ),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
-            // Controls Strip: Filter by Assigned vs All + Day Selector
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Weekly Schedule',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: LaasyaColors.textDark,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFCE7F3),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: LaasyaColors.primary.withOpacity(0.35),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.verified_rounded,
-                        size: 14,
-                        color: LaasyaColors.primary,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Assigned Batches (${allMySlots.length})',
-                        style: const TextStyle(
-                          fontSize: 11,
+              // Day Selector Pills
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _days.map((day) {
+                    final isSel = _selectedDay == day;
+                    final dayCount = day == 'All'
+                        ? allMySlots.length
+                        : allMySlots.where((s) => s['day'] == day).length;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        label: Text(day == 'All' ? 'All ($dayCount)' : '$day ($dayCount)'),
+                        selected: isSel,
+                        onSelected: (val) {
+                          if (val) setState(() => _selectedDay = day);
+                        },
+                        labelStyle: TextStyle(
+                          fontSize: 11.5,
                           fontWeight: FontWeight.bold,
-                          color: LaasyaColors.primary,
+                          color: isSel ? Colors.white : Colors.black87,
+                        ),
+                        selectedColor: LaasyaColors.primary,
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(
+                            color: isSel ? LaasyaColors.primary : const Color(0xFFF0D5E4),
+                          ),
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  }).toList(),
                 ),
-              ],
-            ),
-
-            const SizedBox(height: 10),
-
-            // Day Selector Pills
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _days.map((day) {
-                  final isSel = _selectedDay == day;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      label: Text(day),
-                      selected: isSel,
-                      onSelected: (val) {
-                        if (val) setState(() => _selectedDay = day);
-                      },
-                      labelStyle: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.bold,
-                        color: isSel ? Colors.white : Colors.black87,
-                      ),
-                      selectedColor: LaasyaColors.primary,
-                      backgroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        side: BorderSide(
-                          color: isSel ? LaasyaColors.primary : const Color(0xFFF0D5E4),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
               ),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Timetable RepaintBoundary Container (Exportable as High-Res PNG)
-            RepaintBoundary(
-              key: _timetableKey,
-              child: Container(
+              // =============================================================
+              // 4. TIMETABLE CLASS SLOTS (CURRENT WEEK ONLY)
+              // =============================================================
+              Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFF0D5E4)),
+                  border: Border.all(color: const Color(0xFFEADBDB)),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.03),
@@ -874,7 +956,7 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Exportable Header Strip
+                    // Header Strip
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -887,10 +969,10 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                               errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: LaasyaColors.primary, size: 24),
                             ),
                             const SizedBox(width: 8),
-                            const Column(
+                            Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
+                                const Text(
                                   'LAASYA CULTURAL ACADEMY',
                                   style: TextStyle(
                                     fontSize: 11.5,
@@ -900,8 +982,8 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                                   ),
                                 ),
                                 Text(
-                                  'OFFICIAL WEEKLY BATCH TIMETABLE',
-                                  style: TextStyle(
+                                  'CURRENT WEEK: $weekRangeFormatted',
+                                  style: const TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.black54,
@@ -942,7 +1024,7 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                             const Icon(Icons.event_busy_rounded, color: Colors.grey, size: 36),
                             const SizedBox(height: 8),
                             Text(
-                              'No scheduled batches for ${_selectedDay == 'All' ? 'the selected filter' : _selectedDay}.',
+                              'No scheduled batches for ${_selectedDay == 'All' ? 'the selected filter' : _selectedDay} in the current week.',
                               style: const TextStyle(color: Colors.grey, fontSize: 13),
                             ),
                           ],
@@ -962,13 +1044,33 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                           final batch = slot['batch'] ?? '';
                           final trainer = slot['trainer'] ?? '';
                           final room = slot['room'] ?? '';
+                          final isRescheduled = slot['is_rescheduled'] == true;
+                          final cause = slot['cause'] ?? '';
+                          final dateStr = slot['date'] ?? '';
                           final theme = _getCourseTheme(course);
+
+                          // Rescheduled classes stand out with amber styling & star icon
+                          final cardBg = isRescheduled
+                              ? const Color(0xFFFFFBEB)
+                              : (theme['bg'] as Color).withOpacity(0.35);
+                          final cardBorder = isRescheduled
+                              ? const Color(0xFFF59E0B)
+                              : (theme['border'] as Color);
 
                           return Container(
                             decoration: BoxDecoration(
-                              color: (theme['bg'] as Color).withOpacity(0.35),
+                              color: cardBg,
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: theme['border'] as Color, width: 1.2),
+                              border: Border.all(color: cardBorder, width: isRescheduled ? 1.6 : 1.2),
+                              boxShadow: isRescheduled
+                                  ? [
+                                      BoxShadow(
+                                        color: const Color(0xFFF59E0B).withOpacity(0.12),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : null,
                             ),
                             padding: const EdgeInsets.all(12),
                             child: Row(
@@ -976,12 +1078,16 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                               children: [
                                 // Time & Day Column
                                 Container(
-                                  width: 82,
+                                  width: 86,
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: (theme['border'] as Color).withOpacity(0.5)),
+                                    border: Border.all(
+                                      color: isRescheduled
+                                          ? const Color(0xFFF59E0B).withOpacity(0.6)
+                                          : (theme['border'] as Color).withOpacity(0.5),
+                                    ),
                                   ),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -989,7 +1095,9 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: theme['badgeBg'] as Color,
+                                          color: isRescheduled
+                                              ? const Color(0xFFFEF3C7)
+                                              : (theme['badgeBg'] as Color),
                                           borderRadius: BorderRadius.circular(4),
                                         ),
                                         child: Text(
@@ -997,7 +1105,9 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                                           style: TextStyle(
                                             fontSize: 9,
                                             fontWeight: FontWeight.w900,
-                                            color: theme['text'] as Color,
+                                            color: isRescheduled
+                                                ? const Color(0xFFB45309)
+                                                : (theme['text'] as Color),
                                           ),
                                         ),
                                       ),
@@ -1022,7 +1132,7 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      // Course Badge
+                                      // Badges Row
                                       Row(
                                         children: [
                                           Container(
@@ -1072,6 +1182,41 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                                         ],
                                       ),
 
+                                      // Rescheduled Star Badge
+                                      if (isRescheduled) ...[
+                                        const SizedBox(height: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEF3C7),
+                                            borderRadius: BorderRadius.circular(5),
+                                            border: Border.all(color: const Color(0xFFF59E0B)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.star_rounded, size: 12, color: Color(0xFFD97706)),
+                                              const SizedBox(width: 3),
+                                              Text(
+                                                '★ EXTRA / RESCHEDULED CLASS ($dateStr)',
+                                                style: const TextStyle(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: Color(0xFF92400E),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (cause.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Reason: $cause',
+                                            style: const TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Color(0xFFB45309)),
+                                          ),
+                                        ],
+                                      ],
+
                                       const SizedBox(height: 6),
 
                                       // Batch Name
@@ -1112,10 +1257,10 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
                   ],
                 ),
               ),
-            ),
 
-            const SizedBox(height: 24),
-          ],
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );

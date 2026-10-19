@@ -471,7 +471,7 @@ export default function LandingPageClient() {
   });
 
   return (
-    <div className="min-h-screen bg-[#FFF9FB] text-[#220314] font-sans selection:bg-[#8A064D] selection:text-white">
+    <div className="min-h-screen bg-[#F7F3EE] text-[#220314] font-sans selection:bg-[#8A064D] selection:text-white">
 
       {/* =================================================================== */}
       {/* 1. STICKY HEADER & NAVIGATION */}

@@ -29,7 +29,8 @@ import {
   CheckCircle2,
   ZoomIn,
   Maximize2,
-  ArrowLeft
+  ArrowLeft,
+  Tag
 } from 'lucide-react';
 import AiEnhanceButton from '@/components/common/AiEnhanceButton';
 
@@ -55,8 +56,24 @@ export default function TrainersListClient({
   // Dedicated Full Page View Mode ('list' | 'add' | 'edit')
   const [pageMode, setPageMode] = useState<'list' | 'add' | 'edit'>('list');
 
+  // Helper to auto-generate next sequential Guru ID (e.g. GURU-015)
+  const getNextGuruId = (trainerList: Trainer[]) => {
+    let maxNum = 0;
+    for (const t of trainerList) {
+      const idToTest = t.guru_id || t.code || '';
+      const match = idToTest.match(/GURU-(\d+)/i);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n > maxNum) maxNum = n;
+      }
+    }
+    const nextNum = Math.max(maxNum + 1, trainerList.length + 1);
+    return `GURU-${String(nextNum).padStart(3, '0')}`;
+  };
+
   // Add Guru Modal State
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [addGuruId, setAddGuruId] = useState('');
   const [addFullName, setAddFullName] = useState('');
   const [addAge, setAddAge] = useState<string>('');
   const [addGender, setAddGender] = useState<'male' | 'female' | 'trans'>('female');
@@ -74,6 +91,7 @@ export default function TrainersListClient({
 
   // Edit Guru Modal State
   const [editingGuru, setEditingGuru] = useState<Trainer | null>(null);
+  const [editGuruId, setEditGuruId] = useState('');
   const [editFullName, setEditFullName] = useState('');
   const [editAge, setEditAge] = useState<string>('');
   const [editGender, setEditGender] = useState<'male' | 'female' | 'trans'>('female');
@@ -179,9 +197,11 @@ export default function TrainersListClient({
 
     // Search Query match
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase().trim();
       const matchesSearch = 
         t.full_name.toLowerCase().includes(q) ||
+        (t.guru_id && t.guru_id.toLowerCase().includes(q)) ||
+        (t.code && t.code.toLowerCase().includes(q)) ||
         (t.display_title && t.display_title.toLowerCase().includes(q)) ||
         (t.phone && t.phone.toLowerCase().includes(q)) ||
         (t.email && t.email.toLowerCase().includes(q)) ||
@@ -232,6 +252,7 @@ export default function TrainersListClient({
 
   // Open Add Modal with Clean Blank State
   const openAddModal = () => {
+    setAddGuruId(getNextGuruId(trainers));
     setAddFullName('');
     setAddAge('');
     setAddGender('female');
@@ -253,6 +274,7 @@ export default function TrainersListClient({
   // Open Edit Modal
   const openEditModal = (guru: Trainer) => {
     setEditingGuru(guru);
+    setEditGuruId(guru.guru_id || guru.code || getNextGuruId(trainers));
     setEditFullName(guru.full_name);
     setEditAge(guru.age ? String(guru.age) : '');
     setEditGender((guru.gender as any) || 'female');
@@ -290,10 +312,13 @@ export default function TrainersListClient({
 
     setSaving(true);
     try {
+      const finalGuruId = (addGuruId.trim() || getNextGuruId(trainers)).toUpperCase();
       const res = await fetch('/api/trainers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          guru_id: finalGuruId,
+          code: finalGuruId,
           full_name: addFullName.trim(),
           age: Number(addAge),
           gender: addGender,
@@ -313,6 +338,8 @@ export default function TrainersListClient({
         const added = await res.json();
         const newGuru: Trainer = {
           ...added,
+          guru_id: finalGuruId,
+          code: finalGuruId,
           full_name: addFullName.trim(),
           age: Number(addAge),
           gender: addGender,
@@ -332,7 +359,7 @@ export default function TrainersListClient({
         setTrainers(prev => [...prev, newGuru]);
         setIsAddOpen(false);
         setPageMode('list');
-        showNotification(`Guru ${addFullName.trim()} successfully registered to academy faculty!`);
+        showNotification(`Guru ${addFullName.trim()} (${finalGuruId}) successfully registered to academy faculty!`);
       } else {
         const err = await res.json();
         alert(`Failed to add Guru: ${err.error || 'Server error'}`);
@@ -364,11 +391,14 @@ export default function TrainersListClient({
 
     setSaving(true);
     try {
+      const finalEditGuruId = (editGuruId.trim() || editingGuru.guru_id || editingGuru.code || 'GURU').toUpperCase();
       const res = await fetch('/api/trainers', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: editingGuru.id,
+          guru_id: finalEditGuruId,
+          code: finalEditGuruId,
           full_name: editFullName.trim(),
           age: Number(editAge),
           gender: editGender,
@@ -388,6 +418,8 @@ export default function TrainersListClient({
           if (t.id === editingGuru.id) {
             return {
               ...t,
+              guru_id: finalEditGuruId,
+              code: finalEditGuruId,
               full_name: editFullName.trim(),
               age: Number(editAge),
               gender: editGender,
@@ -407,6 +439,8 @@ export default function TrainersListClient({
         if (viewingGuru && viewingGuru.id === editingGuru.id) {
           setViewingGuru(prev => prev ? ({
             ...prev,
+            guru_id: finalEditGuruId,
+            code: finalEditGuruId,
             full_name: editFullName.trim(),
             age: Number(editAge),
             gender: editGender,
@@ -421,7 +455,7 @@ export default function TrainersListClient({
           }) : null);
         }
 
-        showNotification(`Guru details for ${editFullName.trim()} updated successfully!`);
+        showNotification(`Guru details for ${editFullName.trim()} (${finalEditGuruId}) updated successfully!`);
         setEditingGuru(null);
         setPageMode('list');
       } else {
@@ -548,19 +582,38 @@ export default function TrainersListClient({
                 maxSizeMB={4}
               />
 
-              {/* Guru Full Name */}
-              <div>
-                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                  Guru Full Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Enter Guru's full name"
-                  value={addFullName}
-                  onChange={(e) => setAddFullName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
-                />
+              {/* Guru ID & Full Name */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5 flex items-center justify-between">
+                    <span>Guru ID *</span>
+                    <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                      <span>Auto</span>
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. GURU-015"
+                    value={addGuruId}
+                    onChange={(e) => setAddGuruId(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Guru Full Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter Guru's full name"
+                    value={addFullName}
+                    onChange={(e) => setAddFullName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
               </div>
 
               {/* Display Title */}
@@ -931,18 +984,36 @@ export default function TrainersListClient({
                 maxSizeMB={4}
               />
 
-              {/* Full Name */}
-              <div>
-                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                  Guru Full Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editFullName}
-                  onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
-                />
+              {/* Guru ID & Full Name */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5 flex items-center justify-between">
+                    <span>Guru ID *</span>
+                    <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                      <Tag className="w-3 h-3 text-emerald-600" />
+                      <span>ID</span>
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editGuruId}
+                    onChange={(e) => setEditGuruId(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Guru Full Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFullName}
+                    onChange={(e) => setEditFullName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
               </div>
 
               {/* Display Title */}
@@ -1415,14 +1486,19 @@ export default function TrainersListClient({
                   )}
 
                   {/* FLOATING STATUS PILLS AT TOP CORNERS */}
-                  <div className="absolute top-3.5 left-3.5 z-20">
+                  <div className="absolute top-3.5 left-3.5 z-20 flex items-center gap-1.5">
+                    {(t.guru_id || t.code) && (
+                      <span className="font-mono text-xs font-black text-white bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-xl shadow-md border border-white/20">
+                        {t.guru_id || t.code}
+                      </span>
+                    )}
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-extrabold backdrop-blur-md shadow-md border ${
                       t.is_active !== false 
                         ? 'bg-emerald-950/75 text-emerald-300 border-emerald-500/40' 
                         : 'bg-zinc-900/75 text-zinc-300 border-zinc-600/40'
                     }`}>
                       <span className={`w-2 h-2 rounded-full ${t.is_active !== false ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-400'}`}></span>
-                      <span>{t.is_active !== false ? 'Active Guru' : 'Inactive'}</span>
+                      <span>{t.is_active !== false ? 'Active' : 'Inactive'}</span>
                     </span>
                   </div>
 
@@ -1650,7 +1726,12 @@ export default function TrainersListClient({
                   <h3 className="font-serif font-black text-2xl sm:text-3xl text-[#2D041A] leading-tight">
                     {viewingGuru.full_name}
                   </h3>
-                  <div className="mt-1.5 flex items-center gap-2">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    {(viewingGuru.guru_id || viewingGuru.code) && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full font-mono font-black text-xs text-[#8A064D] bg-[#FFF2F8] border border-[#F0D5E4]">
+                        ID: {viewingGuru.guru_id || viewingGuru.code}
+                      </span>
+                    )}
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F9E33A] text-[#2D041A] font-black text-xs uppercase tracking-wider shadow-xs border border-[#F9E33A]">
                       <Sparkles className="w-3 h-3 text-[#2D041A] fill-[#2D041A]" />
                       <span>{viewingGuru.display_title || 'Revered Guru & Mentor'}</span>

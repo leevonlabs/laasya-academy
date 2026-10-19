@@ -403,10 +403,45 @@ export async function createEventFolder(data: {
     try {
       const isGuru = data.shared_by_type === 'guru' || Boolean(data.trainer_id);
       const senderRole = isGuru ? 'Guru' : 'Admin';
-      const senderName = isGuru ? (data.trainer_name || 'Guru') : (data.created_by || 'Admin / Director');
+      const senderName = isGuru ? (data.trainer_name || 'Guru') : (data.created_by || 'Academy Administration');
       const urlText = data.drive_url || data.youtube_url || '';
-      const alertTitle = `New Learning Video Shared by ${senderName} (${senderRole})`;
-      const alertMsg = `"${data.title}" was shared by ${senderName} (${senderRole}).${urlText ? ` Link: ${urlText}` : ''}`;
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
+      const annTitle = `Video: ${data.title.trim()}`;
+      const annMessage = `New video shared by ${senderName} (${senderRole}):\n\nTitle: ${data.title.trim()}\nCourse: ${data.target_course_title || 'Classical Arts'}\nBatch: ${data.target_batch_name || 'All Batches'}${urlText ? `\nLink: ${urlText}` : ''}${data.description ? `\n\nNotes:\n${data.description.trim()}` : ''}`;
+
+      await query(`
+        INSERT INTO public.announcements (
+          title,
+          message,
+          audience,
+          target_course_id,
+          target_course_title,
+          target_batch_id,
+          target_batch_name,
+          type_tag,
+          publish_date,
+          publish_time,
+          status,
+          delivery_status,
+          announcement_type,
+          created_by,
+          sender_role
+        ) VALUES ($1, $2, 'Selected course or batch', $3, $4, $5, $6, 'Video', $7, $8, 'Published', 'System verified (Delivered)', 'message', $9, $10);
+      `, [
+        annTitle,
+        annMessage,
+        validCourseId,
+        data.target_course_title || null,
+        validBatchId,
+        data.target_batch_name || 'All Batches',
+        todayStr,
+        currentTimeStr,
+        senderName,
+        isGuru ? 'trainer' : 'admin'
+      ]);
 
       await query(`
         INSERT INTO public.session_alerts (
@@ -415,12 +450,12 @@ export async function createEventFolder(data: {
       `, [
         validBatchId || 'all',
         data.target_batch_name || 'All Batches',
-        alertTitle,
+        `New Video: ${data.title.trim()}`,
         senderName,
-        alertMsg
+        `"${data.title}" was shared by ${senderName} (${senderRole}).${urlText ? ` Link: ${urlText}` : ''}`
       ]);
     } catch (alertErr) {
-      console.warn('Could not insert session_alert for video link:', alertErr);
+      console.warn('Could not insert announcement or session_alert for video link:', alertErr);
     }
 
     return item;
@@ -496,22 +531,49 @@ export async function createUniversalEventFolders(data: {
     try {
       const isGuru = data.shared_by_type === 'guru' || Boolean(data.trainer_id);
       const senderRole = isGuru ? 'Guru' : 'Admin';
-      const senderName = isGuru ? (data.trainer_name || 'Guru') : (data.created_by || 'Admin / Director');
+      const senderName = isGuru ? (data.trainer_name || 'Guru') : (data.created_by || 'Academy Administration');
       const urlText = data.drive_url || data.youtube_url || '';
-      const alertTitle = `New Learning Video Shared by ${senderName} (${senderRole})`;
-      const alertMsg = `"${data.title}" was shared across all courses by ${senderName} (${senderRole}).${urlText ? ` Link: ${urlText}` : ''}`;
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
+      const annTitle = `Video: ${data.title.trim()}`;
+      const annMessage = `New video shared across courses by ${senderName} (${senderRole}):\n\nTitle: ${data.title.trim()}${urlText ? `\nLink: ${urlText}` : ''}${data.description ? `\n\nNotes:\n${data.description.trim()}` : ''}`;
+
+      await query(`
+        INSERT INTO public.announcements (
+          title,
+          message,
+          audience,
+          type_tag,
+          publish_date,
+          publish_time,
+          status,
+          delivery_status,
+          announcement_type,
+          created_by,
+          sender_role
+        ) VALUES ($1, $2, 'All students and gurus', 'Video', $3, $4, 'Published', 'System verified (Delivered)', 'message', $5, $6);
+      `, [
+        annTitle,
+        annMessage,
+        todayStr,
+        currentTimeStr,
+        senderName,
+        isGuru ? 'trainer' : 'admin'
+      ]);
 
       await query(`
         INSERT INTO public.session_alerts (
           batch_id, batch_name, course_title, trainer_name, message, alert_type, created_at
         ) VALUES ('all', 'All Batches', $1, $2, $3, 'video_shared', NOW());
       `, [
-        alertTitle,
+        `New Video: ${data.title.trim()}`,
         senderName,
-        alertMsg
+        `"${data.title}" was shared across all courses by ${senderName} (${senderRole}).${urlText ? ` Link: ${urlText}` : ''}`
       ]);
     } catch (alertErr) {
-      console.warn('Could not insert session_alert for universal video link:', alertErr);
+      console.warn('Could not insert announcement or session_alert for universal video link:', alertErr);
     }
 
     return inserted;

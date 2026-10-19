@@ -110,7 +110,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                       Expanded(
                         child: _scheduleTabButton(
                           title: "Week Schedule",
-                          subtitle: 'Complete Timetable',
+                          subtitle: 'Current Week Only',
                           count: _schedule.length,
                           isSelected: _selectedDay == 'week',
                           onTap: () => setState(() => _selectedDay = 'week'),
@@ -271,21 +271,46 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                                               ),
                                             ],
                                           ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: isHoliday ? const Color(0xFFFEF3C7) : const Color(0xFFDEF7EC),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              status.toString().toUpperCase(),
-                                              style: TextStyle(
-                                                color: isHoliday ? const Color(0xFF92400E) : const Color(0xFF03543F),
-                                                fontSize: 10.5,
-                                                fontWeight: FontWeight.bold,
+                                          if (item['is_rescheduled'] == true || item['is_tally'] == true || status.toString().contains('★'))
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFEF3C7),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: const Color(0xFFF59E0B)),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.star_rounded, size: 13, color: Color(0xFFD97706)),
+                                                  SizedBox(width: 3),
+                                                  Text(
+                                                    'RESCHEDULED ★',
+                                                    style: TextStyle(
+                                                      color: Color(0xFF92400E),
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          else
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: isHoliday ? const Color(0xFFFEF3C7) : const Color(0xFFDEF7EC),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                status.toString().toUpperCase(),
+                                                style: TextStyle(
+                                                  color: isHoliday ? const Color(0xFF92400E) : const Color(0xFF03543F),
+                                                  fontSize: 10.5,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
                                             ),
-                                          ),
                                         ],
                                       ),
                                       const SizedBox(height: 12),

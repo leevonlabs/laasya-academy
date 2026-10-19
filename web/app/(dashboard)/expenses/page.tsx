@@ -19,7 +19,7 @@ export default async function ExpensesPage() {
   ]);
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="w-full">
       <ExpensesClient 
         initialExpenses={expenses}
         initialSummary={summary}

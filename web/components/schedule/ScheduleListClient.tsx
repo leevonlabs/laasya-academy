@@ -654,6 +654,12 @@ export default function ScheduleListClient({ initialSessions, initialRooms }: Pr
                     <span className="inline-flex items-center text-xs font-black bg-[#8A064D] text-[#F9E33A] px-3 py-1 rounded-xl shadow-xs border border-[#8A064D]">
                       {s.batch_name}
                     </span>
+                    {s.is_rescheduled && (
+                      <span className="inline-flex items-center gap-1 text-xs font-black bg-amber-400 text-amber-950 px-2.5 py-1 rounded-xl border border-amber-500 shadow-xs animate-pulse">
+                        <span className="text-sm">★</span>
+                        <span>Rescheduled Class</span>
+                      </span>
+                    )}
                   </div>
 
                   {/* CLEARLY VISIBLE DETAILS BELOW: Guru Name, Room Name, Timings */}

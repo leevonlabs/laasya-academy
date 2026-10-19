@@ -378,7 +378,13 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
         const matchesRoll = s.roll_number.toLowerCase().includes(q);
         const matchesPhone = (s.phone || '').includes(q);
         const matchesParent = (s.parent_name || '').toLowerCase().includes(q);
-        const matchesCourse = (s.enrolled_batches || []).some(b => b.course_title.toLowerCase().includes(q));
+        const matchesCourse = (s.enrolled_batches || []).some(
+          b =>
+            b.course_title.toLowerCase().includes(q) ||
+            (b.course_code && b.course_code.toLowerCase().includes(q)) ||
+            (b.batch_code && b.batch_code.toLowerCase().includes(q)) ||
+            (b.batch_name && b.batch_name.toLowerCase().includes(q))
+        );
         if (!matchesName && !matchesRoll && !matchesPhone && !matchesParent && !matchesCourse) {
           return false;
         }
@@ -735,13 +741,16 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
       // Build enrolled_batches objects
       const enrolledBatchObjects: StudentEnrolledBatch[] = selectedBatchIds.map(bId => {
         const b = batches.find(x => x.id === bId);
+        const crs = courses.find(c => c.id === b?.course_id);
         return {
           batch_id: bId,
           batch_name: b?.name || 'Class Batch',
+          batch_code: b?.code,
           course_id: b?.course_id || '',
-          course_title: b?.course_title || 'Course',
-          course_category: b?.course_category || 'Academy Arts',
-          monthly_fee: Number(b?.monthly_fee || (courses.find(c => c.id === b?.course_id)?.monthly_fee || 2000)),
+          course_title: b?.course_title || crs?.title || 'Course',
+          course_code: crs?.code || b?.course_code,
+          course_category: b?.course_category || crs?.category || 'Academy Arts',
+          monthly_fee: Number(b?.monthly_fee || (crs?.monthly_fee || 2000)),
           trainer_id: b?.trainer_id || '',
           trainer_name: b?.trainer_name || 'Academy Guru',
           days_of_week: b?.days_of_week || [],
@@ -835,13 +844,16 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
       // Reconstruct updated enrolled batches
       const updatedBatchObjects: StudentEnrolledBatch[] = editSelectedBatchIds.map(bId => {
         const b = batches.find(x => x.id === bId);
+        const crs = courses.find(c => c.id === b?.course_id);
         return {
           batch_id: bId,
           batch_name: b?.name || 'Class Batch',
+          batch_code: b?.code,
           course_id: b?.course_id || '',
-          course_title: b?.course_title || 'Course',
-          course_category: b?.course_category || 'Academy Arts',
-          monthly_fee: Number(b?.monthly_fee || (courses.find(c => c.id === b?.course_id)?.monthly_fee || 2000)),
+          course_title: b?.course_title || crs?.title || 'Course',
+          course_code: crs?.code || b?.course_code,
+          course_category: b?.course_category || crs?.category || 'Academy Arts',
+          monthly_fee: Number(b?.monthly_fee || (crs?.monthly_fee || 2000)),
           trainer_id: b?.trainer_id || '',
           trainer_name: b?.trainer_name || 'Academy Guru',
           days_of_week: b?.days_of_week || [],
@@ -1319,9 +1331,16 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
                                 className="p-2.5 bg-white rounded-xl border border-rose-200 hover:border-[#8A064D] hover:shadow-xs transition cursor-pointer flex items-center justify-between gap-2 group"
                               >
                                 <div className="min-w-0">
-                                  <span className="font-bold text-xs text-[#2D041A] group-hover:text-[#8A064D] block truncate">
-                                    {b.name}
-                                  </span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-xs text-[#2D041A] group-hover:text-[#8A064D] truncate">
+                                      {b.name}
+                                    </span>
+                                    {b.code && (
+                                      <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4] font-semibold shrink-0">
+                                        {b.code}
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="text-[10px] text-gray-500 block truncate">
                                     {b.days_of_week?.join(', ')} • {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)} • {b.trainer_name || 'Guru'}
                                   </span>
@@ -1378,10 +1397,20 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
                               <span className="text-xs font-black text-[#8A064D] uppercase tracking-wide">
                                 {crs?.title || 'Course'}
                               </span>
+                              {crs?.code && (
+                                <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4] font-semibold">
+                                  {crs.code}
+                                </span>
+                              )}
                               <span className="text-gray-300 font-bold">•</span>
                               <span className="text-xs font-bold text-[#2D041A]">
                                 {b?.name || 'Batch'}
                               </span>
+                              {b?.code && (
+                                <span className="font-mono text-[10px] text-[#590231] bg-white px-1.5 py-0.5 rounded border border-rose-200 font-semibold">
+                                  {b.code}
+                                </span>
+                              )}
                             </div>
                             <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
                               <span>Guru: <strong className="text-gray-700">{b?.trainer_name || 'Assigned'}</strong></span>
@@ -1923,9 +1952,16 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
                                 className="p-2.5 bg-white rounded-xl border border-rose-200 hover:border-[#8A064D] hover:shadow-xs transition cursor-pointer flex items-center justify-between gap-2 group"
                               >
                                 <div className="min-w-0">
-                                  <span className="font-bold text-xs text-[#2D041A] group-hover:text-[#8A064D] block truncate">
-                                    {b.name}
-                                  </span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-xs text-[#2D041A] group-hover:text-[#8A064D] truncate">
+                                      {b.name}
+                                    </span>
+                                    {b.code && (
+                                      <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4] font-semibold shrink-0">
+                                        {b.code}
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="text-[10px] text-gray-500 block truncate">
                                     {b.days_of_week?.join(', ')} • {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)} • {b.trainer_name || 'Guru'}
                                   </span>
@@ -1982,10 +2018,20 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
                               <span className="text-xs font-black text-[#8A064D] uppercase tracking-wide">
                                 {crs?.title || 'Course'}
                               </span>
+                              {crs?.code && (
+                                <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4] font-semibold">
+                                  {crs.code}
+                                </span>
+                              )}
                               <span className="text-gray-300 font-bold">•</span>
                               <span className="text-xs font-bold text-[#2D041A]">
                                 {b?.name || 'Batch'}
                               </span>
+                              {b?.code && (
+                                <span className="font-mono text-[10px] text-[#590231] bg-white px-1.5 py-0.5 rounded border border-rose-200 font-semibold">
+                                  {b.code}
+                                </span>
+                              )}
                             </div>
                             <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
                               <span>Guru: <strong className="text-gray-700">{b?.trainer_name || 'Assigned'}</strong></span>
@@ -2984,9 +3030,22 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
                     detailStudent.enrolled_batches.map((eb, idx) => (
                       <div key={idx} className="bg-white p-3 rounded-xl border border-gray-200 flex items-center justify-between text-xs shadow-2xs">
                         <div>
-                          <div className="font-bold text-gray-900">{eb.course_title}</div>
-                          <div className="text-[11px] text-gray-500 mt-0.5">
-                            Batch: <strong className="text-gray-800">{eb.batch_name}</strong> • Guru: {eb.trainer_name}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-gray-900">{eb.course_title}</span>
+                            {eb.course_code && (
+                              <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4] font-semibold">
+                                {eb.course_code}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            <span>Batch: <strong className="text-gray-800">{eb.batch_name}</strong></span>
+                            {eb.batch_code && (
+                              <span className="font-mono text-[10px] text-[#590231] bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 font-semibold">
+                                {eb.batch_code}
+                              </span>
+                            )}
+                            <span>• Guru: {eb.trainer_name}</span>
                           </div>
                           {/* Day Time Room Row by Row */}
                           <div className="mt-2 space-y-1">
@@ -3336,7 +3395,14 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
                             }`}
                           >
                             <div>
-                              <span>{b.course_title} — {b.name}</span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span>{b.course_title} — {b.name}</span>
+                                {b.code && (
+                                  <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4] font-semibold">
+                                    {b.code}
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[10px] text-gray-400 block font-normal">
                                 Guru: {b.trainer_name} ({b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)})
                               </span>
@@ -3634,7 +3700,14 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
                             }`}
                           >
                             <div>
-                              <span>{b.course_title} — {b.name}</span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span>{b.course_title} — {b.name}</span>
+                                {b.code && (
+                                  <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4] font-semibold">
+                                    {b.code}
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[10px] text-gray-400 block font-normal">
                                 Guru: {b.trainer_name} ({b.start_time?.substring(0, 5)} - {b.end_time?.substring(0, 5)})
                               </span>

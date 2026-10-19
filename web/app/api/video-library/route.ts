@@ -169,7 +169,20 @@ export async function POST(request: NextRequest) {
           access_level: batch.id === 'all' ? 'Course' : 'Batch',
           created_by: created_by || (shared_by_type === 'guru' ? (trainer_name || 'Guru Faculty') : 'Academy Owner'),
         });
-        if (singleItem) createdItems.push(singleItem);
+        if (singleItem) {
+          createdItems.push(singleItem);
+          if (batch.id && batch.id !== 'all') {
+            sendFcmToBatch(batch.id, {
+              title: 'New Class Video Available',
+              body: `New video "${title.trim()}" shared for ${batch.course_title || target_course_title || ''} (${batch.name || ''}).`,
+              data: {
+                type: 'video_shared',
+                batch_id: String(batch.id),
+                video_id: String(singleItem.id || '')
+              }
+            }).catch(err => console.error('[FCM] Error notifying batch video:', err));
+          }
+        }
       }
       return NextResponse.json(
         { success: true, items: createdItems, item: createdItems[0] || null },

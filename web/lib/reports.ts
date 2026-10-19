@@ -792,9 +792,26 @@ export async function getAbsenceReport(filters: {
         COALESCE(s.roll_number, 'N/A') as roll_number,
         COALESCE(p.phone, 'N/A') as student_contact,
         COALESCE(s.parent_contact, s.emergency_contact, p.alternate_phone, 'N/A') as parent_contact,
-        COUNT(DISTINCT cs.id)::int as total_classes_held,
-        COUNT(DISTINCT CASE WHEN LOWER(a.status) = 'absent' THEN cs.id END)::int as total_absent_days,
-        COUNT(DISTINCT CASE WHEN LOWER(a.status) = 'present' THEN cs.id END)::int as total_present_days
+        COUNT(DISTINCT CASE 
+          WHEN COALESCE(att_held.has_attendance, false) = true
+           AND COALESCE(hol_check.is_holiday, false) = false
+           AND COALESCE(ga_check.is_guru_absent, false) = false
+          THEN cs.id 
+        END)::int as total_classes_held,
+        COUNT(DISTINCT CASE 
+          WHEN COALESCE(att_held.has_attendance, false) = true
+           AND COALESCE(hol_check.is_holiday, false) = false
+           AND COALESCE(ga_check.is_guru_absent, false) = false
+           AND LOWER(a.status) = 'absent' 
+          THEN cs.id 
+        END)::int as total_absent_days,
+        COUNT(DISTINCT CASE 
+          WHEN COALESCE(att_held.has_attendance, false) = true
+           AND COALESCE(hol_check.is_holiday, false) = false
+           AND COALESCE(ga_check.is_guru_absent, false) = false
+           AND LOWER(a.status) = 'present' 
+          THEN cs.id 
+        END)::int as total_present_days
       FROM public.students s
       JOIN public.profiles p ON p.id = s.profile_id
       JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
@@ -802,6 +819,27 @@ export async function getAbsenceReport(filters: {
       JOIN public.courses c ON c.id = b.course_id
       LEFT JOIN public.class_sessions cs ON cs.batch_id = be.batch_id
         AND cs.session_date <= CURRENT_DATE
+      LEFT JOIN LATERAL (
+        SELECT true as has_attendance 
+        FROM public.attendance att_sub 
+        WHERE att_sub.session_id = cs.id 
+        LIMIT 1
+      ) att_held ON true
+      LEFT JOIN LATERAL (
+        SELECT true as is_holiday 
+        FROM public.holiday_alerts ha 
+        WHERE ha.holiday_date = cs.session_date 
+          AND ha.status != 'Cancelled' 
+          AND (ha.target_batch_ids ? be.batch_id::text OR ha.target_course_ids ? b.course_id::text)
+        LIMIT 1
+      ) hol_check ON true
+      LEFT JOIN LATERAL (
+        SELECT true as is_guru_absent 
+        FROM public.guru_absences ga 
+        WHERE ga.absence_date = cs.session_date 
+          AND ga.batch_id = be.batch_id
+        LIMIT 1
+      ) ga_check ON true
     `;
 
     if (filters.startDate) {
@@ -894,14 +932,52 @@ export async function getStudentCourseAbsenceReport(filters: {
         c.title as course_name,
         b.id as batch_id,
         b.name as batch_name,
-        COUNT(DISTINCT cs.id)::int as total_classes_held,
-        COUNT(DISTINCT CASE WHEN LOWER(a.status) = 'present' THEN cs.id END)::int as total_present_days,
-        COUNT(DISTINCT CASE WHEN LOWER(a.status) = 'absent' THEN cs.id END)::int as total_absent_days
+        COUNT(DISTINCT CASE 
+          WHEN COALESCE(att_held.has_attendance, false) = true
+           AND COALESCE(hol_check.is_holiday, false) = false
+           AND COALESCE(ga_check.is_guru_absent, false) = false
+          THEN cs.id 
+        END)::int as total_classes_held,
+        COUNT(DISTINCT CASE 
+          WHEN COALESCE(att_held.has_attendance, false) = true
+           AND COALESCE(hol_check.is_holiday, false) = false
+           AND COALESCE(ga_check.is_guru_absent, false) = false
+           AND LOWER(a.status) = 'present' 
+          THEN cs.id 
+        END)::int as total_present_days,
+        COUNT(DISTINCT CASE 
+          WHEN COALESCE(att_held.has_attendance, false) = true
+           AND COALESCE(hol_check.is_holiday, false) = false
+           AND COALESCE(ga_check.is_guru_absent, false) = false
+           AND LOWER(a.status) = 'absent' 
+          THEN cs.id 
+        END)::int as total_absent_days
       FROM public.batch_enrollments be
       JOIN public.batches b ON b.id = be.batch_id
       JOIN public.courses c ON c.id = b.course_id
       LEFT JOIN public.class_sessions cs ON cs.batch_id = b.id
         AND cs.session_date <= CURRENT_DATE
+      LEFT JOIN LATERAL (
+        SELECT true as has_attendance 
+        FROM public.attendance att_sub 
+        WHERE att_sub.session_id = cs.id 
+        LIMIT 1
+      ) att_held ON true
+      LEFT JOIN LATERAL (
+        SELECT true as is_holiday 
+        FROM public.holiday_alerts ha 
+        WHERE ha.holiday_date = cs.session_date 
+          AND ha.status != 'Cancelled' 
+          AND (ha.target_batch_ids ? be.batch_id::text OR ha.target_course_ids ? b.course_id::text)
+        LIMIT 1
+      ) hol_check ON true
+      LEFT JOIN LATERAL (
+        SELECT true as is_guru_absent 
+        FROM public.guru_absences ga 
+        WHERE ga.absence_date = cs.session_date 
+          AND ga.batch_id = be.batch_id
+        LIMIT 1
+      ) ga_check ON true
     `;
 
     if (filters.startDate) {

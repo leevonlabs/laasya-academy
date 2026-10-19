@@ -902,6 +902,52 @@ class SupabaseService {
       }
     }
 
+    // Fetch today's rescheduled tally classes from backend API
+    final todayStr = DateFormat('yyyy-MM-dd').format(now);
+    try {
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/tally-classes');
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['tallyClasses'] is List) {
+          final tcs = List<Map<String, dynamic>>.from(decoded['tallyClasses']);
+          for (var tc in tcs) {
+            if (tc['rescheduled_date'] == todayStr && tc['status'] == 'Scheduled') {
+              final bId = tc['batch_id']?.toString();
+              final matchesBatch = batches.any((b) => b['id']?.toString() == bId);
+              if (matchesBatch || batches.isEmpty) {
+                todaySessions.add({
+                  'id': 'tally-${tc['id']}',
+                  'session_date': todayStr,
+                  'start_time': tc['start_time']?.toString().substring(0, 5) ?? '10:00',
+                  'end_time': tc['end_time']?.toString().substring(0, 5) ?? '11:00',
+                  'status': 'scheduled',
+                  'check_in_code': '482910',
+                  'batch_id': bId,
+                  'is_rescheduled': true,
+                  'is_tally': true,
+                  'batches': {
+                    'id': bId,
+                    'name': tc['batch_name'] ?? 'Batch',
+                    'room_or_hall': tc['room_or_hall'] ?? 'Natya Mandapam (Room 101)',
+                    'max_capacity': 20,
+                    'enrolled_count': tc['students_count'] ?? 15,
+                    'courses': {
+                      'id': tc['course_id'],
+                      'title': tc['course_title'] ?? 'Classical Dance',
+                      'category': 'Classical Arts',
+                    }
+                  }
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching today tally classes for trainer: $e');
+    }
+
     if (todaySessions.isNotEmpty) {
       return todaySessions;
     }
@@ -1103,11 +1149,15 @@ class SupabaseService {
           classTime = timings.trim();
         }
 
+        // Calculate current week Monday strictly
+        final currentMonday = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+
         for (var day in days) {
           final isToday = day.toLowerCase() == currentDayName.toLowerCase();
-          final diff = (dayNames.indexOf(day) - now.weekday + 7) % 7;
-          final targetDate = now.add(Duration(days: diff));
+          final dayIdx = dayNames.indexOf(day);
+          final targetDate = currentMonday.add(Duration(days: dayIdx >= 1 ? dayIdx - 1 : 0));
           final dateStr = DateFormat('dd-MMMM-yyyy').format(targetDate);
+          final diffFromToday = targetDate.difference(DateTime(now.year, now.month, now.day)).inDays;
 
           realSchedule.add({
             'id': 'sch-${c['id']}-$day',
@@ -1122,10 +1172,70 @@ class SupabaseService {
             'date': dateStr,
             'status': 'Scheduled',
             'is_today': isToday,
-            'is_tomorrow': (diff == 1),
+            'is_tomorrow': (diffFromToday == 1),
           });
         }
         idx++;
+      }
+
+      // Also fetch rescheduled tally classes for student's batches (Current Week Only)
+      try {
+        final uri = Uri.parse('${ApiConstants.baseUrl}/api/tally-classes');
+        final res = await http.get(uri).timeout(const Duration(seconds: 4));
+        if (res.statusCode == 200) {
+          final decoded = jsonDecode(res.body);
+          if (decoded is Map && decoded['tallyClasses'] is List) {
+            final tcs = List<Map<String, dynamic>>.from(decoded['tallyClasses']);
+            final enrolledBatchIds = enrolled.map((e) => e is Map ? e['batch_id']?.toString() : null).whereType<String>().toSet();
+            final todayStr = DateFormat('yyyy-MM-dd').format(now);
+
+            final currentMonday = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+            final currentSunday = currentMonday.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+
+            for (var tc in tcs) {
+              final tcBatchId = tc['batch_id']?.toString();
+              if (tc['status'] == 'Scheduled' && (enrolledBatchIds.isEmpty || enrolledBatchIds.contains(tcBatchId))) {
+                final rDate = tc['rescheduled_date']?.toString() ?? todayStr;
+                DateTime? dt;
+                try {
+                  dt = DateTime.parse(rDate);
+                } catch (_) {}
+
+                // Filter strictly to current week only
+                if (dt != null) {
+                  final dtStartOfDay = DateTime(dt.year, dt.month, dt.day);
+                  if (dtStartOfDay.isBefore(currentMonday) || dtStartOfDay.isAfter(currentSunday)) {
+                    continue;
+                  }
+                }
+
+                final dayName = dt != null ? dayNames[dt.weekday] : currentDayName;
+                final isToday = rDate == todayStr;
+                final dateFormatted = dt != null ? DateFormat('dd-MMMM-yyyy').format(dt) : rDate;
+
+                realSchedule.add({
+                  'id': 'tally-${tc['id']}',
+                  'course': tc['course_title'] ?? 'Classical Arts',
+                  'category': 'Rescheduled / Tally Class',
+                  'batch': tc['batch_name'] ?? 'Batch',
+                  'batch_id': tcBatchId,
+                  'trainer': tc['trainer_name'] ?? 'Assigned Guru',
+                  'time': '${tc['start_time']?.toString().substring(0, 5)} - ${tc['end_time']?.toString().substring(0, 5)}',
+                  'room': tc['room_or_hall'] ?? 'Natya Mandapam',
+                  'day': dayName,
+                  'date': dateFormatted,
+                  'status': 'Rescheduled ★',
+                  'is_today': isToday,
+                  'is_tomorrow': false,
+                  'is_rescheduled': true,
+                  'is_tally': true,
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching student tally classes: $e');
       }
 
       if (realSchedule.isNotEmpty) {
@@ -1525,12 +1635,31 @@ class SupabaseService {
       }
     }
 
-    final profCourse = (profile['course'] ?? '').toString().toLowerCase().trim();
+    final profCourse = (profile['course'] ?? profile['course_name'] ?? profile['primary_course'] ?? '').toString().toLowerCase().trim();
     if (profCourse.isNotEmpty) enrolledCourseNames.add(profCourse);
     final profBatch = (profile['batch'] ?? '').toString().toLowerCase().trim();
     if (profBatch.isNotEmpty) enrolledBatchNames.add(profBatch);
     final profTrainer = (profile['trainer_name'] ?? '').toString().toLowerCase().trim();
     if (profTrainer.isNotEmpty) enrolledTrainerNames.add(profTrainer);
+
+    // Guru's assigned batches and courses
+    final guruAssignedBatchIds = <String>{};
+    final guruAssignedBatchNames = <String>{};
+    final guruAssignedCourseNames = <String>{};
+    if (profCourse.isNotEmpty) guruAssignedCourseNames.add(profCourse);
+    final assignedB = profile['assigned_batches'];
+    if (assignedB is List) {
+      for (var b in assignedB) {
+        if (b is Map) {
+          final bId = (b['id'] ?? b['batch_id'] ?? '').toString().toLowerCase().trim();
+          if (bId.isNotEmpty) guruAssignedBatchIds.add(bId);
+          final bName = (b['name'] ?? b['batch_name'] ?? '').toString().toLowerCase().trim();
+          if (bName.isNotEmpty) guruAssignedBatchNames.add(bName);
+          final cName = (b['course_title'] ?? b['course_name'] ?? '').toString().toLowerCase().trim();
+          if (cName.isNotEmpty) guruAssignedCourseNames.add(cName);
+        }
+      }
+    }
 
     return items.where((item) {
       final senderRole = (item['sender_role'] ?? '').toString().toLowerCase();
@@ -1539,10 +1668,40 @@ class SupabaseService {
           item['trainer_id'] != null ||
           (item['trainer_name'] != null && item['trainer_name'].toString().trim().isNotEmpty);
 
+      final targetBatchId = (item['target_batch_id'] ?? '').toString().toLowerCase().trim();
+      final targetBatchName = (item['target_batch_name'] ?? '').toString().toLowerCase().trim();
+      final targetCourseId = (item['target_course_id'] ?? '').toString().toLowerCase().trim();
+      final targetCourseTitle = (item['target_course_title'] ?? '').toString().toLowerCase().trim();
+      final itemMsg = (item['message'] ?? '').toString().toLowerCase();
+      final itemTitle = (item['title'] ?? '').toString().toLowerCase();
+
       if (isTrainer) {
         if (!isGuruMsg) {
           final aud = (item['audience'] ?? '').toString().toLowerCase();
-          if (aud.contains('trainer') || aud.contains('all') || aud.contains('gurus') || aud == '') {
+          if (aud.contains('student') && !aud.contains('all') && !aud.contains('trainer') && !aud.contains('guru')) {
+            return false;
+          }
+
+          // If targeted to a specific batch, verify this guru teaches it
+          if (targetBatchId.isNotEmpty && targetBatchId != 'all') {
+            final teachesBatch = guruAssignedBatchIds.contains(targetBatchId) ||
+                (targetBatchName.isNotEmpty && guruAssignedBatchNames.contains(targetBatchName)) ||
+                itemMsg.contains(myName) ||
+                itemTitle.contains(myName);
+            if (!teachesBatch && guruAssignedBatchIds.isNotEmpty) {
+              return false;
+            }
+          }
+
+          // If targeted to a specific course, verify course match
+          if (targetCourseTitle.isNotEmpty && targetCourseTitle != 'all') {
+            bool matchesCourse = guruAssignedCourseNames.any((c) => c.contains(targetCourseTitle) || targetCourseTitle.contains(c));
+            if (!matchesCourse && guruAssignedCourseNames.isNotEmpty && !itemMsg.contains(myName)) {
+              return false;
+            }
+          }
+
+          if (aud.contains('trainer') || aud.contains('all') || aud.contains('gurus') || aud == '' || aud.contains('selected')) {
             return true;
           }
           return false;
@@ -1559,6 +1718,29 @@ class SupabaseService {
           if (aud.contains('trainer') && !aud.contains('student') && !aud.contains('all')) {
             return false;
           }
+
+          // If targeted to a specific batch, ONLY show to students enrolled in that batch
+          if (targetBatchId.isNotEmpty && targetBatchId != 'all') {
+            final inBatch = enrolledBatchIds.contains(targetBatchId) ||
+                (targetBatchName.isNotEmpty && enrolledBatchNames.any((b) => b.contains(targetBatchName) || targetBatchName.contains(b)));
+            if (!inBatch) {
+              return false;
+            }
+          }
+
+          // If targeted to a specific course, ONLY show to students enrolled in that course
+          if (targetCourseId.isNotEmpty && targetCourseId != 'all') {
+            if (!enrolledCourseIds.contains(targetCourseId)) {
+              return false;
+            }
+          }
+          if (targetCourseTitle.isNotEmpty && targetCourseTitle != 'all') {
+            final inCourse = enrolledCourseNames.any((c) => c.contains(targetCourseTitle) || targetCourseTitle.contains(c));
+            if (!inCourse && enrolledCourseNames.isNotEmpty) {
+              return false;
+            }
+          }
+
           return true;
         }
 
@@ -1578,15 +1760,12 @@ class SupabaseService {
         }
 
         // 2. Check target batch
-        final targetBatchId = (item['target_batch_id'] ?? '').toString().toLowerCase().trim();
         if (targetBatchId.isNotEmpty && targetBatchId != 'all') {
           if (enrolledBatchIds.contains(targetBatchId)) return true;
           return false; // Specifically targeted a batch student is not in
         }
 
         // 3. Check target course
-        final targetCourseId = (item['target_course_id'] ?? '').toString().toLowerCase().trim();
-        final targetCourseTitle = (item['target_course_title'] ?? '').toString().toLowerCase().trim();
         if (targetCourseId.isNotEmpty && targetCourseId != 'all') {
           if (enrolledCourseIds.contains(targetCourseId)) return true;
           return false; // Specifically targeted a course student is not in

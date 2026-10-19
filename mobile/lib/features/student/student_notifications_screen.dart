@@ -15,7 +15,6 @@ class StudentNotificationsScreen extends StatefulWidget {
 class _StudentNotificationsScreenState extends State<StudentNotificationsScreen> {
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
-  String _selectedFilter = 'All';
 
   @override
   void initState() {
@@ -401,20 +400,7 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final unreadCount = _notifications.where((n) => n['is_read'] == false).length;
-    final attendanceCount = _notifications.where((n) => n['type'] == 'attendance').length;
-    final alertsCount = _notifications.where((n) => n['type'] == 'class_alert').length;
-    final paymentsCount = _notifications.where((n) => n['type'] == 'payment').length;
-
-    final filtered = _notifications.where((n) {
-      if (_selectedFilter == 'Unread') return n['is_read'] == false;
-      if (_selectedFilter == 'Attendance') return n['type'] == 'attendance';
-      if (_selectedFilter == 'Class Alerts') return n['type'] == 'class_alert';
-      if (_selectedFilter == 'Fee Receipts') return n['type'] == 'payment';
-      if (_selectedFilter == 'Announcements') return n['type'] == 'announcement';
-      if (_selectedFilter == 'Reminders') return n['type'] == 'reminder' || n['type'] == 'schedule_change';
-      return true;
-    }).toList();
+    final filtered = _notifications;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8FA),
@@ -491,64 +477,8 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
               ),
             ),
 
-            // Live Metrics Strip
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
-                children: [
-                  _buildMetricPill('Total', '${_notifications.length}', const Color(0xFF475569)),
-                  const SizedBox(width: 6),
-                  _buildMetricPill('Attendance', '$attendanceCount', const Color(0xFF059669)),
-                  const SizedBox(width: 6),
-                  _buildMetricPill('Alerts', '$alertsCount', const Color(0xFFEA580C)),
-                  const SizedBox(width: 6),
-                  _buildMetricPill('Fees', '$paymentsCount', const Color(0xFF0D9488)),
-                  const SizedBox(width: 6),
-                  _buildMetricPill('Unread', '$unreadCount', LaasyaColors.primary),
-                ],
-              ),
-            ),
-
-            // Filter Chips Carousel
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    'All',
-                    'Attendance',
-                    'Class Alerts',
-                    'Fee Receipts',
-                    'Announcements',
-                    'Reminders',
-                    'Unread',
-                  ].map((f) {
-                    final isSel = _selectedFilter == f;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: ChoiceChip(
-                        label: Text(f),
-                        selected: isSel,
-                        selectedColor: LaasyaColors.primary,
-                        backgroundColor: Colors.white,
-                        side: BorderSide(
-                          color: isSel ? LaasyaColors.primary : Colors.grey.shade300,
-                        ),
-                        labelStyle: TextStyle(
-                          color: isSel ? Colors.white : LaasyaColors.textDark,
-                          fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-                          fontSize: 12,
-                        ),
-                        onSelected: (val) {
-                          if (val) setState(() => _selectedFilter = f);
-                        },
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
+            // Notifications List
+            const SizedBox(height: 8),
 
             // Notifications List
             Expanded(
@@ -735,38 +665,6 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
                             );
                           },
                         ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMetricPill(String label, String value, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey.shade600,
-              ),
             ),
           ],
         ),

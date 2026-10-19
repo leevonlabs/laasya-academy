@@ -783,6 +783,12 @@ export default function GuruAttendanceTab({
                               <span>Absent</span>
                             </span>
                           )}
+                          {r.guru_status === 'holiday' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-purple-100 text-purple-900 border border-purple-300">
+                              <span>🎉</span>
+                              <span>Admin Holiday (Excused)</span>
+                            </span>
+                          )}
                         </td>
 
                         {/* 8. Action Checkpoint */}

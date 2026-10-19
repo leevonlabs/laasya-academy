@@ -24,10 +24,12 @@ import {
   X,
   Calendar as CalendarIcon,
   Sparkles,
+  BadgePercent,
   Video,
   Image as ImageIcon,
   ShieldCheck,
-  KeyRound
+  KeyRound,
+  CalendarCheck
 } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 
@@ -63,22 +65,23 @@ export default function DashboardShell({ user, children }: Props) {
 
   const academyNavItems = [
     { label: 'Overview', href: '/overview', icon: LayoutDashboard },
+    { label: 'Today Schedules', href: '/schedule', icon: Clock },
+    { label: 'Attendance Audit', href: '/attendance', icon: ClipboardCheck },
+    { label: 'Reports and Audit', href: '/reports', icon: BarChart3 },
     { label: 'Student Fees', href: '/fees', icon: Receipt },
     { label: 'Guru Salaries', href: '/salaries', icon: Banknote },
-    { label: 'Expenses', href: '/expenses', icon: TrendingDown },
-    { label: 'Announcements', href: '/announcements', icon: Megaphone },
-    { label: 'Advertisements', href: '/advertisements', icon: ImageIcon },
-    { label: 'Reports & Audits', href: '/reports', icon: BarChart3 },
-    { label: 'Courses (18)', href: '/courses', icon: BookOpen },
-    { label: 'Gurus (14)', href: '/trainers', icon: Users },
     { label: 'Students', href: '/students', icon: GraduationCap },
+    { label: 'Gurus', href: '/trainers', icon: Users },
+    { label: 'Courses', href: '/courses', icon: BookOpen },
     { label: 'Batches', href: '/batches', icon: Calendar },
-    { label: 'Schemes', href: '/schemes', icon: Sparkles },
+    { label: 'Announcements', href: '/announcements', icon: Megaphone },
+    { label: 'Tally Classes', href: '/tally-classes', icon: CalendarCheck },
     { label: 'Video Library', href: '/video-library', icon: Video },
-    { label: 'Today Schedule', href: '/schedule', icon: Clock },
-    { label: 'Attendance Audit', href: '/attendance', icon: ClipboardCheck },
-    { label: 'Admin Profile', href: '/admin-profile', icon: ShieldCheck },
+    { label: 'Advertisements', href: '/advertisements', icon: ImageIcon },
+    { label: 'Schemes', href: '/schemes', icon: BadgePercent },
+    { label: 'Expenses', href: '/expenses', icon: TrendingDown },
     { label: 'Password Management', href: '/password-management', icon: KeyRound },
+    { label: 'Admin Profile', href: '/admin-profile', icon: ShieldCheck },
   ];
 
   const currentNavItem = academyNavItems.find(item => 
@@ -86,7 +89,7 @@ export default function DashboardShell({ user, children }: Props) {
   ) || academyNavItems[0];
 
   return (
-    <div className="min-h-screen flex bg-[#FFF9FB]" suppressHydrationWarning>
+    <div className="min-h-screen flex bg-[#F7F3EE]" suppressHydrationWarning>
       
       {/* Mobile Backdrop */}
       {isMobileOpen && (

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
-import '../student/student_messages_screen.dart';
 import '../student/student_video_library_screen.dart';
 import 'trainer_salaries_screen.dart';
+import 'trainer_announcements_screen.dart';
 
 class TrainerNotificationsScreen extends StatefulWidget {
   const TrainerNotificationsScreen({super.key});
@@ -15,7 +15,6 @@ class TrainerNotificationsScreen extends StatefulWidget {
 class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen> {
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
-  String _selectedFilter = 'All';
 
   @override
   void initState() {
@@ -62,10 +61,10 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
     }
 
     // 4. Announcements / Messages Redirection
-    if (type == 'announcement' || type == 'message' || title.contains('announcement') || title.contains('message') || title.contains('notice')) {
+    if (type == 'announcement' || type == 'message' || title.contains('announcement') || title.contains('message') || title.contains('notice') || title.contains('holiday') || title.contains('extra class')) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const StudentMessagesScreen()),
+        MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen()),
       );
       return;
     }
@@ -245,7 +244,7 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
                           label: const Text('Open Noticeboard Messages', style: TextStyle(fontWeight: FontWeight.bold)),
                           onPressed: () {
                             Navigator.pop(ctx);
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentMessagesScreen()));
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen()));
                           },
                         ),
                       ),
@@ -317,11 +316,7 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _notifications.where((n) {
-      if (_selectedFilter == 'Announcements') return n['type'] == 'announcement';
-      if (_selectedFilter == 'Updates') return n['type'] != 'announcement';
-      return true;
-    }).toList();
+    final filtered = _notifications;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8FA),
@@ -383,32 +378,7 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
               ),
             ),
 
-            // Filter Chips
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: Row(
-                children: ['All', 'Announcements', 'Updates'].map((f) {
-                  final isSel = _selectedFilter == f;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: ChoiceChip(
-                      label: Text(f),
-                      selected: isSel,
-                      selectedColor: LaasyaColors.primary,
-                      backgroundColor: Colors.white,
-                      labelStyle: TextStyle(
-                        color: isSel ? Colors.white : LaasyaColors.textDark,
-                        fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 12,
-                      ),
-                      onSelected: (val) {
-                        if (val) setState(() => _selectedFilter = f);
-                      },
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
+            const SizedBox(height: 8),
 
             Expanded(
               child: _isLoading
