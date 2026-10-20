@@ -393,6 +393,8 @@ class SupabaseService {
     String? role,
   }) async {
     final identifier = email.trim();
+    _cachedProfile = null;
+    await _clearProfileFromPrefs();
 
     // 1. Authenticate against central Academy API (authenticates all 300 students and 14 Gurus)
     try {
@@ -681,8 +683,8 @@ class SupabaseService {
         'next_due_date': '10th Nov 2026',
       };
       return _cachedProfile;
-    } else {
-      // Default Student (Ananya Rao)
+    } else if (identifier.contains('ananya') || identifier.contains('10021') || identifier.toLowerCase() == 'lca-1') {
+      // Mock Student (Ananya Rao)
       _cachedProfile = {
         'id': 'st-mock-1',
         'full_name': 'Ananya Rao',
@@ -708,14 +710,16 @@ class SupabaseService {
         'due_date': '10th Oct 2026',
         'next_due_date': '10th Nov 2026',
       };
-      if (_cachedProfile != null) {
-        if (role != null && _cachedProfile!['role'] != role) {
-          _cachedProfile = null;
-          throw Exception('Access Denied: This account belongs to a Student. Please log in via the Student Login screen.');
-        }
-        await _saveProfileToPrefs(_cachedProfile!);
+      if (role != null && _cachedProfile!['role'] != role) {
+        _cachedProfile = null;
+        throw Exception('Access Denied: This account belongs to a Student. Please log in via the Student Login screen.');
       }
+      await _saveProfileToPrefs(_cachedProfile!);
       return _cachedProfile;
+    } else {
+      _cachedProfile = null;
+      await _clearProfileFromPrefs();
+      throw Exception('Invalid credentials. No ${role ?? 'user'} account found matching this identifier. Please verify your mobile number or roll number.');
     }
   }
 
@@ -1827,6 +1831,22 @@ class SupabaseService {
     }).toList();
   }
 
+  List<Map<String, dynamic>> _deduplicateAnnouncements(List<Map<String, dynamic>> items) {
+    final seen = <String>{};
+    final result = <Map<String, dynamic>>[];
+    for (final item in items) {
+      final title = (item['title'] ?? '').toString().trim().toLowerCase();
+      final message = (item['message'] ?? '').toString().trim().toLowerCase();
+      final date = (item['publish_date'] ?? item['date'] ?? '').toString().trim();
+      final key = '$title|$message|$date';
+      if (!seen.contains(key)) {
+        seen.add(key);
+        result.add(item);
+      }
+    }
+    return result;
+  }
+
   Future<List<Map<String, dynamic>>> getMessageAnnouncements({bool forceRefresh = false}) async {
     if (!forceRefresh && _cachedMessageAnnouncements.isNotEmpty) {
       return List<Map<String, dynamic>>.from(_cachedMessageAnnouncements);
@@ -1858,6 +1878,23 @@ class SupabaseService {
                 }
               } catch (_) {}
             }
+
+            // Skip future scheduled messages whose publish time has not arrived yet
+            final itemStatus = (item['status'] ?? '').toString().toLowerCase();
+            final pubDate = (item['publish_date'] ?? '').toString().trim();
+            final pubTime = (item['publish_time'] ?? '00:00:00').toString().trim();
+            if (pubDate.isNotEmpty) {
+              try {
+                final scheduledDt = DateTime.parse('${pubDate}T$pubTime');
+                if (scheduledDt.isAfter(now)) {
+                  continue;
+                }
+              } catch (_) {}
+            }
+            if (itemStatus == 'scheduled' || itemStatus == 'draft') {
+              continue;
+            }
+
             final mapItem = Map<String, dynamic>.from(item);
             mapItem['image_url'] = _normalizeImageUrl(mapItem['image_url']);
             mapItem['date'] = mapItem['publish_date'] ?? 'Today';
@@ -1877,10 +1914,11 @@ class SupabaseService {
             valid.add(mapItem);
           }
           final filtered = _filterAnnouncementsForCurrentUser(valid);
-          if (filtered.isNotEmpty) {
-            _cachedMessageAnnouncements = filtered;
-            _saveMessageAnnouncementsToPrefs(filtered);
-            return filtered;
+          final deduped = _deduplicateAnnouncements(filtered);
+          if (deduped.isNotEmpty) {
+            _cachedMessageAnnouncements = deduped;
+            _saveMessageAnnouncementsToPrefs(deduped);
+            return deduped;
           }
         }
       } catch (e) {
@@ -1890,7 +1928,7 @@ class SupabaseService {
 
     // 2. HTTP API fallback
     try {
-      final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements?announcementType=message&_t=${DateTime.now().millisecondsSinceEpoch}');
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/announcements?announcementType=message&status=Published&_t=${DateTime.now().millisecondsSinceEpoch}');
       final res = await http.get(uri).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -1910,6 +1948,23 @@ class SupabaseService {
                   }
                 } catch (_) {}
               }
+
+              // Skip future scheduled messages
+              final itemStatus = (item['status'] ?? '').toString().toLowerCase();
+              final pubDate = (item['publish_date'] ?? '').toString().trim();
+              final pubTime = (item['publish_time'] ?? '00:00:00').toString().trim();
+              if (pubDate.isNotEmpty) {
+                try {
+                  final scheduledDt = DateTime.parse('${pubDate}T$pubTime');
+                  if (scheduledDt.isAfter(now)) {
+                    continue;
+                  }
+                } catch (_) {}
+              }
+              if (itemStatus == 'scheduled' || itemStatus == 'draft') {
+                continue;
+              }
+
               item['image_url'] = _normalizeImageUrl(item['image_url']);
 
               // Enrich with trainer & admin avatars if missing
@@ -1926,10 +1981,11 @@ class SupabaseService {
               valid.add(item);
             }
             final filtered = _filterAnnouncementsForCurrentUser(valid);
-            if (filtered.isNotEmpty) {
-              _cachedMessageAnnouncements = filtered;
-              _saveMessageAnnouncementsToPrefs(filtered);
-              return filtered;
+            final deduped = _deduplicateAnnouncements(filtered);
+            if (deduped.isNotEmpty) {
+              _cachedMessageAnnouncements = deduped;
+              _saveMessageAnnouncementsToPrefs(deduped);
+              return deduped;
             }
           }
         }
@@ -2282,8 +2338,22 @@ class SupabaseService {
         });
       }
 
-      _cachedNotifications = notifs;
-      _saveNotificationsToPrefs(notifs);
+      // Deduplicate notifications by content fingerprint so identical notifications never repeat
+      final seenNotifFingerprints = <String>{};
+      final dedupedNotifs = <Map<String, dynamic>>[];
+      for (var n in notifs) {
+        final title = (n['title'] ?? '').toString().trim().toLowerCase();
+        final message = (n['message'] ?? '').toString().trim().toLowerCase();
+        final date = (n['date'] ?? '').toString().trim();
+        final key = '$title|$message|$date';
+        if (!seenNotifFingerprints.contains(key)) {
+          seenNotifFingerprints.add(key);
+          dedupedNotifs.add(n);
+        }
+      }
+
+      _cachedNotifications = dedupedNotifs;
+      _saveNotificationsToPrefs(dedupedNotifs);
     } catch (e) {
       debugPrint('Notification parallel fetch notice: $e');
       if (_cachedNotifications.isEmpty) {

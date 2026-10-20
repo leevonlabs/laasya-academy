@@ -113,15 +113,29 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
         return true;
       }).toList();
 
+      // Deduplicate messages by content fingerprint
+      final seenKeys = <String>{};
+      final dedupedValid = <Map<String, dynamic>>[];
+      for (final m in validMsgs) {
+        final t = (m['title'] ?? '').toString().trim().toLowerCase();
+        final msg = (m['message'] ?? '').toString().trim().toLowerCase();
+        final d = (m['publish_date'] ?? m['date'] ?? '').toString().trim();
+        final key = '$t|$msg|$d';
+        if (!seenKeys.contains(key)) {
+          seenKeys.add(key);
+          dedupedValid.add(m);
+        }
+      }
+
       // Sort chronologically: oldest at top (8am), newest at bottom (9pm)
-      validMsgs.sort((a, b) {
+      dedupedValid.sort((a, b) {
         final da = _getExactMessageDateTime(a);
         final db = _getExactMessageDateTime(b);
         return da.compareTo(db);
       });
 
       setState(() {
-        _messages = validMsgs;
+        _messages = dedupedValid;
         _isLoading = false;
         _unreadCount = 0;
       });
@@ -317,6 +331,94 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
       fullUrl,
       fit: BoxFit.cover,
       errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildMessageBody(String rawContent, bool isHoliday) {
+    if (!isHoliday) {
+      return Text(
+        rawContent,
+        style: const TextStyle(
+          fontSize: 12.5,
+          color: Color(0xFF202C33),
+          height: 1.4,
+        ),
+      );
+    }
+
+    // 1. Remove redundant "Holiday Alert: <title>" line if present
+    String cleaned = rawContent
+        .replaceFirst(RegExp(r'^Holiday Alert:[^\n]*\n*', caseSensitive: false), '')
+        .trim();
+
+    // 2. Parse "Holiday Date:" and "Reason:"
+    final dateMatch = RegExp(r'Holiday Date:\s*([^\n]+)', caseSensitive: false).firstMatch(cleaned);
+    final reasonMatch = RegExp(r'Reason:\s*\n*([\s\S]*)', caseSensitive: false).firstMatch(cleaned);
+
+    if (dateMatch != null) {
+      final dateStr = dateMatch.group(1)?.trim() ?? '';
+      final reasonText = reasonMatch?.group(1)?.trim() ??
+          cleaned.replaceFirst(RegExp(r'Holiday Date:[^\n]*', caseSensitive: false), '').trim();
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Highlighted Date with distinct amber color & badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.event_available_rounded, size: 14, color: Color(0xFFB45309)),
+                const SizedBox(width: 6),
+                Text(
+                  'Holiday Date: $dateStr',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF92400E),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Bold Reason heading only; regular description text
+          const Text(
+            'Reason:',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF111B21),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            reasonText,
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.normal,
+              color: Color(0xFF202C33),
+              height: 1.4,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Text(
+      cleaned,
+      style: const TextStyle(
+        fontSize: 12.5,
+        color: Color(0xFF202C33),
+        height: 1.4,
+      ),
     );
   }
 
@@ -544,8 +646,18 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                             itemCount: _messages.length,
                             itemBuilder: (context, index) {
                               final msg = _messages[index];
-                              final title = msg['title'] ?? 'Notice';
-                              final content = msg['message'] ?? '';
+                              final rawTitle = (msg['title'] ?? 'Notice').toString();
+                              final isHoliday = (msg['type_tag'] == 'Holiday' ||
+                                  rawTitle.toLowerCase().contains('holiday') ||
+                                  (msg['message'] ?? '').toString().toLowerCase().contains('holiday'));
+                              String cleanTitle = rawTitle;
+                              if (isHoliday) {
+                                cleanTitle = rawTitle
+                                    .replaceFirst(RegExp(r'^(Holiday Notice:\s*|Holiday Alert:\s*)', caseSensitive: false), '')
+                                    .trim();
+                              }
+                              final title = isHoliday ? cleanTitle : rawTitle;
+                              final content = (msg['message'] ?? '').toString();
                               final tag = msg['type_tag'];
                               final tagColor = _getTagColor(tag);
 
@@ -733,10 +845,10 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                                             // Headline
                                             Text(
                                               title,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.bold,
-                                                color: Color(0xFF111B21), // Notice text dark
+                                                color: isHoliday ? const Color(0xFF590231) : const Color(0xFF111B21), // Notice title (burgundy for holiday)
                                                 height: 1.25,
                                               ),
                                             ),
@@ -744,14 +856,7 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                                             const SizedBox(height: 6),
 
                                             // Body Text
-                                            Text(
-                                              content,
-                                              style: const TextStyle(
-                                                fontSize: 12.5,
-                                                color: Color(0xFF202C33),
-                                                height: 1.4,
-                                              ),
-                                            ),
+                                            _buildMessageBody(content, isHoliday),
 
                                             if (actionLinks.isNotEmpty) ...[
                                               const SizedBox(height: 10),

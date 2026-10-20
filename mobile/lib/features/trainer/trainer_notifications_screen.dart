@@ -64,7 +64,7 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
     if (type == 'announcement' || type == 'message' || title.contains('announcement') || title.contains('message') || title.contains('notice') || title.contains('holiday') || title.contains('extra class')) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen()),
+        MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: true)),
       );
       return;
     }
@@ -244,7 +244,7 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
                           label: const Text('Open Noticeboard Messages', style: TextStyle(fontWeight: FontWeight.bold)),
                           onPressed: () {
                             Navigator.pop(ctx);
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen()));
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: true)));
                           },
                         ),
                       ),

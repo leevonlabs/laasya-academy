@@ -452,7 +452,10 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => TrainerAnnouncementsScreen(trainerProfile: _profile),
+                          builder: (_) => TrainerAnnouncementsScreen(
+                            trainerProfile: _profile,
+                            isMessagesMode: false,
+                          ),
                         ),
                       );
                     },
@@ -537,7 +540,10 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => TrainerAnnouncementsScreen(trainerProfile: _profile),
+                          builder: (_) => TrainerAnnouncementsScreen(
+                            trainerProfile: _profile,
+                            isMessagesMode: true,
+                          ),
                         ),
                       );
                       setState(() {});

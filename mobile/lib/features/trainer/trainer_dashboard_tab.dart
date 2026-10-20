@@ -768,7 +768,10 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => TrainerAnnouncementsScreen(trainerProfile: _profile),
+                        builder: (_) => TrainerAnnouncementsScreen(
+                          trainerProfile: _profile,
+                          isMessagesMode: true,
+                        ),
                       ),
                     );
                     setState(() {});

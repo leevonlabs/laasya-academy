@@ -38,6 +38,7 @@ import {
   CalendarCheck
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Announcement } from '@/lib/announcements';
 import AiEnhanceButton from '@/components/common/AiEnhanceButton';
 import MonthPicker from '@/components/common/MonthPicker';
@@ -271,6 +272,7 @@ export default function AnnouncementsClient({
   defaultTab = 'admin_sent',
   defaultViewMode = 'overview'
 }: Props) {
+  const router = useRouter();
   const [announcements, setAnnouncements] = useState<Announcement[]>(
     initialAnnouncements.filter(a => a.announcement_type !== 'banner')
   );
@@ -521,7 +523,22 @@ export default function AnnouncementsClient({
       const timeB = new Date(b.created_at || b.publish_date).getTime();
       return timeA - timeB;
     });
-    return list;
+
+    // Deduplicate broadcasts (especially holiday alerts dispatched across multiple courses/batches)
+    const seen = new Set<string>();
+    const deduped: Announcement[] = [];
+    for (const ann of list) {
+      const isHol = ann.type_tag === 'Holiday' || (ann.title || '').toLowerCase().includes('holiday');
+      const d = ann.publish_date?.split('T')[0] || ann.created_at?.split('T')[0] || '';
+      const t = (ann.title || '').trim().toLowerCase();
+      const m = (ann.message || '').trim().toLowerCase();
+      const key = isHol ? `holiday|${t}|${d}` : `${t}|${m}|${d}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(ann);
+      }
+    }
+    return deduped;
   }, [announcements, appliedAdminFilters]);
 
   // Guru Sent Messages (Sorted Oldest on Top, Latest Below like WhatsApp)
@@ -1087,18 +1104,19 @@ export default function AnnouncementsClient({
                 <button
                   type="button"
                   onClick={handleApplyAdminFilters}
-                  className="h-9 px-3 rounded-xl bg-[#075E54] hover:bg-[#128C7E] text-white text-xs font-black shadow-xs transition flex items-center justify-center gap-1 cursor-pointer"
+                  className="h-9 px-4 rounded-xl bg-[#075E54] hover:bg-[#128C7E] text-white text-xs font-black shadow-md ring-2 ring-[#075E54]/25 transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Filter className="w-3 h-3" />
-                  <span>Apply</span>
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>Apply Filter</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleResetAdminFilters}
-                  className="h-9 px-2.5 rounded-xl border border-gray-200 text-gray-600 text-xs font-bold hover:bg-gray-50 cursor-pointer"
+                  className="h-9 px-3 rounded-xl border border-gray-300 text-gray-700 text-xs font-bold hover:bg-gray-100 shadow-2xs cursor-pointer transition flex items-center justify-center gap-1"
                   title="Reset Filters"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset</span>
                 </button>
               </div>
             </div>
@@ -1177,16 +1195,6 @@ export default function AnnouncementsClient({
                               <span className="px-1.5 py-0.2 rounded bg-white/80 text-[#075E54] border border-[#C2EDB9]">
                                 🎯 {ann.audience}
                               </span>
-                              {ann.target_course_title && (
-                                <span className="px-1.5 py-0.2 rounded bg-white/80 text-gray-700">
-                                  📚 {ann.target_course_title}
-                                </span>
-                              )}
-                              {ann.target_batch_name && (
-                                <span className="px-1.5 py-0.2 rounded bg-white/80 text-gray-700">
-                                  👥 {ann.target_batch_name}
-                                </span>
-                              )}
                             </div>
                           </div>
 
@@ -1225,34 +1233,61 @@ export default function AnnouncementsClient({
                           )}
 
                           {/* Bottom Row: Actions & Time */}
-                          <div className="pt-1.5 border-t border-[#C2EDB9] flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1">
+                          <div className="pt-2 border-t border-[#C2EDB9] flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                              {/* Details text button */}
                               <button
-                                onClick={() => setDetailModalAnnouncement(ann)}
-                                className="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 text-[#075E54] text-[10px] font-black shadow-2xs flex items-center gap-1 transition cursor-pointer"
+                                onClick={() => {
+                                  const isHoliday = ann.type_tag === 'Holiday' || (ann.title || '').toLowerCase().includes('holiday') || (ann.message || '').toLowerCase().includes('holiday');
+                                  if (isHoliday) {
+                                    router.push(`/announcements/holiday-alert?viewTitle=${encodeURIComponent(ann.title)}&action=details`);
+                                  } else {
+                                    setDetailModalAnnouncement(ann);
+                                  }
+                                }}
+                                className="h-7 px-3 rounded-lg bg-white hover:bg-emerald-50 text-[#075E54] border border-[#C2EDB9] text-[10px] font-black shadow-2xs flex items-center justify-center gap-1 transition cursor-pointer"
+                                title="View Details"
                               >
                                 <Eye className="w-3 h-3 text-[#075E54]" />
-                                <span>Details & Students</span>
+                                <span>Details</span>
                               </button>
 
+                              {/* Edit text button */}
                               <button
-                                onClick={() => openEditModal(ann)}
-                                className="p-1 rounded-lg bg-white hover:bg-emerald-50 text-gray-700 cursor-pointer shadow-2xs"
-                                title="Edit"
+                                onClick={() => {
+                                  const isHoliday = ann.type_tag === 'Holiday' || (ann.title || '').toLowerCase().includes('holiday') || (ann.message || '').toLowerCase().includes('holiday');
+                                  if (isHoliday) {
+                                    router.push(`/announcements/holiday-alert?viewTitle=${encodeURIComponent(ann.title)}&action=edit`);
+                                  } else {
+                                    openEditModal(ann);
+                                  }
+                                }}
+                                className="h-7 px-3 rounded-lg bg-white hover:bg-emerald-50 text-gray-700 border border-[#C2EDB9] text-[10px] font-black shadow-2xs flex items-center justify-center gap-1 transition cursor-pointer"
+                                title="Edit Broadcast"
                               >
-                                <Edit3 className="w-3 h-3" />
+                                <Edit3 className="w-3 h-3 text-gray-600" />
+                                <span>Edit</span>
                               </button>
 
+                              {/* Delete text button */}
                               <button
-                                onClick={() => setDeletingAnnouncement(ann)}
-                                className="p-1 rounded-lg bg-white hover:bg-rose-50 text-rose-600 cursor-pointer shadow-2xs"
-                                title="Delete"
+                                onClick={() => {
+                                  const isHoliday = ann.type_tag === 'Holiday' || (ann.title || '').toLowerCase().includes('holiday') || (ann.message || '').toLowerCase().includes('holiday');
+                                  if (isHoliday) {
+                                    router.push(`/announcements/holiday-alert?viewTitle=${encodeURIComponent(ann.title)}&action=delete`);
+                                  } else {
+                                    setDeletingAnnouncement(ann);
+                                  }
+                                }}
+                                className="h-7 px-3 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-black shadow-2xs flex items-center justify-center gap-1 transition cursor-pointer"
+                                title="Delete Broadcast"
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Trash2 className="w-3 h-3 text-rose-500" />
+                                <span>Delete</span>
                               </button>
                             </div>
 
-                            <div className="flex items-center gap-1 text-[10px] text-gray-500 font-bold shrink-0">
+                            <div className="flex items-center gap-1 text-[10px] text-gray-500 font-bold shrink-0 ml-auto">
                               <span>{time}</span>
                               <CheckCheck className="w-3.5 h-3.5 text-[#34B7F1]" />
                             </div>

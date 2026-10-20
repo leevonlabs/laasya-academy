@@ -46,6 +46,7 @@ import { Batch, Course, Trainer, Student, Room, GuruAttendanceAuditRecord } from
 import VacantRoomsView from '@/components/batches/VacantRoomsView';
 import TimetableView from '@/components/batches/TimetableView';
 import AiEnhanceButton from '@/components/common/AiEnhanceButton';
+import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
 
 interface Props {
   initialTallyClasses: TallyClass[];
@@ -190,10 +191,10 @@ function MultiSearchDropdown({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`h-9 px-3 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+        className={`h-9 px-3.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
           selectedIds.length > 0
-            ? 'bg-[#FFF2F8] border-[#F0D5E4] text-[#8A064D]'
-            : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+            ? 'bg-[#FFF2F8] border-[#8A064D] text-[#8A064D] ring-1 ring-[#8A064D]/20'
+            : 'bg-white border-gray-300 text-gray-800 hover:border-[#075E54] hover:bg-gray-50'
         }`}
       >
         {Icon && <Icon className="w-3.5 h-3.5 opacity-70 text-[#8A064D]" />}
@@ -1775,41 +1776,41 @@ export default function TallyClassesClient({
         </div>
       )}
 
-      {/* TOP HEADER BANNER WITH ACTION BUTTONS */}
-      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-emerald-100 shadow-2xs">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="flex items-start gap-4">
-            <div className="w-13 h-13 rounded-2xl bg-[#E8F8F0] text-[#075E54] border border-emerald-200 flex items-center justify-center shrink-0 shadow-2xs">
-              <CalendarCheck className="w-7 h-7" />
+      {/* TOP HEADER BANNER WITH ACTION BUTTONS (COMPACT) */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-100 shadow-2xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-[#E8F8F0] text-[#075E54] border border-emerald-200 flex items-center justify-center shrink-0 shadow-2xs">
+              <CalendarCheck className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">
                   Reschedule Engine
                 </h1>
-                <span className="px-3 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[#075E54] text-xs font-black">
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[#075E54] text-[11px] font-black">
                   Zero Clash Guarantee
                 </span>
-                <span className="px-3 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-xs font-black flex items-center gap-1">
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-black flex items-center gap-1">
                   <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
                   <span>Starred Tally Classes</span>
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-gray-600 font-medium mt-1 max-w-2xl leading-relaxed">
-                Primary engine to manage and tally classes cancelled due to <strong>Admin Declared Holidays</strong> or <strong>Guru Leave</strong>. View room vacancy &amp; master timetable at a glance, assign replacement classes, and notify all batch disciples.
+              <p className="text-xs text-gray-500 font-medium mt-0.5 max-w-xl line-clamp-1 sm:line-clamp-none">
+                Primary engine to manage and tally classes cancelled due to <strong>Admin Declared Holidays</strong> or <strong>Guru Leave</strong>.
               </p>
             </div>
           </div>
 
-          {/* Quick Action Buttons (Room Vacancy, Master Timetable, Report Absence) */}
-          <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-center">
-            {/* Room Vacancy Grid Button (Now triggers Full Page Mode) */}
+          {/* Quick Action Buttons (Compact) */}
+          <div className="flex items-center gap-2 flex-wrap self-start lg:self-center shrink-0">
+            {/* Room Vacancy Grid Button */}
             <button
               type="button"
               onClick={() => setFullPageView('vacancy')}
-              className="px-4 py-2.5 rounded-2xl bg-white border border-gray-300 hover:border-[#075E54] text-gray-800 hover:text-[#075E54] font-bold text-xs transition flex items-center gap-2 shadow-2xs cursor-pointer active:scale-95"
+              className="px-3.5 py-2 rounded-xl bg-white border border-gray-300 hover:border-[#075E54] text-gray-800 hover:text-[#075E54] font-bold text-xs transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
             >
-              <DoorOpen className="w-4 h-4 text-[#075E54]" />
+              <DoorOpen className="w-3.5 h-3.5 text-[#075E54]" />
               <span>Room Vacancy Grid</span>
             </button>
 
@@ -1817,9 +1818,9 @@ export default function TallyClassesClient({
             <button
               type="button"
               onClick={() => setIsTimetableModalOpen(true)}
-              className="px-4 py-2.5 rounded-2xl bg-white border border-gray-300 hover:border-[#8A064D] text-gray-800 hover:text-[#8A064D] font-bold text-xs transition flex items-center gap-2 shadow-2xs cursor-pointer active:scale-95"
+              className="px-3.5 py-2 rounded-xl bg-white border border-gray-300 hover:border-[#8A064D] text-gray-800 hover:text-[#8A064D] font-bold text-xs transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
             >
-              <Clock className="w-4 h-4 text-[#8A064D]" />
+              <Clock className="w-3.5 h-3.5 text-[#8A064D]" />
               <span>Master Timetable</span>
             </button>
           </div>
@@ -1830,22 +1831,22 @@ export default function TallyClassesClient({
       <div className="bg-white rounded-3xl border border-gray-200 shadow-2xs relative">
         
         {/* Table Toolbar: Search, Date Range Filter, Multi-selects, Status and Cause */}
-        <div className="p-5 sm:p-6 border-b border-gray-100 flex flex-col gap-4 bg-gray-50/50 rounded-t-3xl relative z-20">
+        <div className="p-3.5 sm:p-4 border-b border-gray-100 flex flex-col gap-3 bg-gray-50/50 rounded-t-3xl relative z-20">
           
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-[#FFF2F8] text-[#8A064D] flex items-center justify-center shrink-0">
-                <CalendarX2 className="w-5 h-5" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-[#FFF2F8] text-[#8A064D] flex items-center justify-center shrink-0">
+                <CalendarX2 className="w-4 h-4" />
               </div>
               <div>
-                <h2 className="font-serif font-black text-lg text-gray-900 flex items-center gap-2">
+                <h2 className="font-serif font-black text-base text-gray-900 flex items-center gap-2">
                   <span>Cancelled Classes Overview</span>
-                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
                     {filteredCancelledClasses.length} Total
                   </span>
                 </h2>
-                <p className="text-xs text-gray-500 font-medium">
-                  All classes cancelled via Holiday Alerts or Guru Leave awaiting or completed for tally rescheduling
+                <p className="text-[11px] text-gray-500 font-medium">
+                  Classes cancelled via Holiday Alerts or Guru Leave awaiting or completed for tally rescheduling
                 </p>
               </div>
             </div>
@@ -1884,47 +1885,33 @@ export default function TallyClassesClient({
             </div>
           </div>
 
-          {/* Filter Controls Row */}
-          <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-gray-200/60">
+          {/* Filter Controls Row: Extended across row without empty space, highlighted filter buttons */}
+          <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-gray-200/60 w-full">
             
-            {/* Search Box */}
-            <div className="relative min-w-[200px] flex-1 sm:flex-none">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            {/* Search Box - Extended to fill available space */}
+            <div className="relative flex-1 min-w-[200px] sm:min-w-[260px]">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search date, batch, guru, room..."
-                className="w-full h-9 pl-8 pr-3 rounded-xl border border-gray-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#075E54] bg-white shadow-2xs"
+                placeholder="Search date, course, batch, guru, room, cause..."
+                className="w-full h-9 pl-9 pr-3 rounded-xl border border-gray-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#075E54]/30 focus:border-[#075E54] bg-white shadow-xs"
               />
             </div>
 
-            {/* Date Range Filter (From - To) */}
-            <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-2.5 py-1 text-xs shadow-2xs">
-              <span className="text-[10px] font-bold text-gray-400 uppercase">From</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="text-xs font-bold text-gray-800 focus:outline-none bg-transparent cursor-pointer"
+            {/* Standard Date Range Filter: Highlighted Single Button Popover */}
+            <div className="shrink-0">
+              <DateRangeQuickFilter
+                startDate={startDate}
+                endDate={endDate}
+                align="left"
+                onApply={({ startDate: s, endDate: e }) => {
+                  setStartDate(s);
+                  setEndDate(e);
+                }}
+                placeholder="Select Date Range"
               />
-              <span className="text-[10px] font-bold text-gray-400 uppercase ml-1">To</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="text-xs font-bold text-gray-800 focus:outline-none bg-transparent cursor-pointer"
-              />
-              {(startDate || endDate) && (
-                <button
-                  type="button"
-                  onClick={() => { setStartDate(''); setEndDate(''); }}
-                  className="p-1 text-gray-400 hover:text-gray-700 ml-1 cursor-pointer"
-                  title="Clear Date Filter"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
             </div>
 
             {/* Multi-Select Searchable Filter: Course */}
@@ -1958,11 +1945,11 @@ export default function TallyClassesClient({
               align="right"
             />
 
-            {/* Cause Filter Dropdown */}
+            {/* Cause Filter Dropdown - Highlighted */}
             <select
               value={causeFilter}
               onChange={(e) => setCauseFilter(e.target.value as any)}
-              className="h-9 px-3 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#075E54] shadow-2xs cursor-pointer"
+              className="h-9 px-3.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-800 bg-white hover:border-[#075E54] focus:outline-none focus:ring-2 focus:ring-[#075E54]/20 shadow-xs cursor-pointer"
             >
               <option value="all">All Causes</option>
               <option value="holiday">Holiday Only</option>
@@ -1983,9 +1970,9 @@ export default function TallyClassesClient({
                   setCauseFilter('all');
                   setStatusFilter('all');
                 }}
-                className="h-9 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                className="h-9 px-3.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-gray-200 shadow-xs"
               >
-                <RotateCcw className="w-3 h-3" />
+                <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
                 <span>Reset</span>
               </button>
             )}
@@ -2217,45 +2204,129 @@ export default function TallyClassesClient({
               </button>
             </div>
 
-            <div className="p-6 space-y-4 overflow-y-auto text-xs">
-              <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-200">
-                <div>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Course &amp; Batch</span>
-                  <div className="font-bold text-gray-900 text-sm">{detailsModalItem.courseTitle}</div>
-                  <div className="font-extrabold text-[#590231]">{detailsModalItem.batchName}</div>
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto text-xs max-h-[75vh]">
+              
+              {/* SECTION 1: CANCELLED SESSION SUMMARY */}
+              <div className="rounded-2xl border border-rose-200 bg-[#FFF9FB] p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-rose-100 pb-2.5">
+                  <span className="font-serif font-black text-xs sm:text-sm text-[#590231] flex items-center gap-2">
+                    <CalendarX2 className="w-4 h-4 text-[#8A064D]" />
+                    <span>Cancelled Session Summary</span>
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    detailsModalItem.cause === 'Holiday'
+                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                      : 'bg-amber-100 text-amber-900 border border-amber-200'
+                  }`}>
+                    Cause: {detailsModalItem.cause}
+                  </span>
                 </div>
-                <div>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Assigned Guru</span>
-                  <div className="font-bold text-gray-900 text-sm">{detailsModalItem.trainerName}</div>
-                  <div className="text-gray-500">{detailsModalItem.trainerPhone || 'Faculty'}</div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase block">Original Date &amp; Day</span>
+                    <div className="font-extrabold text-gray-900 mt-0.5 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-rose-500" />
+                      <span>{detailsModalItem.date} ({detailsModalItem.dayName || getDayNameFromDate(detailsModalItem.date)})</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase block">Original Slot &amp; Studio</span>
+                    <div className="font-bold text-gray-900 mt-0.5 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{detailsModalItem.classTimings}</span>
+                      <span className="text-gray-300">•</span>
+                      <DoorOpen className="w-3.5 h-3.5 text-[#075E54]" />
+                      <span>{detailsModalItem.roomOrHall}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase block">Course &amp; Batch</span>
+                    <div className="font-black text-gray-900 mt-0.5">{detailsModalItem.courseTitle}</div>
+                    <div className="text-[11px] font-bold text-[#8A064D]">{detailsModalItem.batchName}</div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase block">Assigned Guru &amp; Contact</span>
+                    <div className="font-bold text-gray-900 mt-0.5">{detailsModalItem.trainerName}</div>
+                    <div className="text-[11px] font-mono text-gray-500">{detailsModalItem.trainerPhone || 'Faculty Contact'}</div>
+                  </div>
+                </div>
+
+                {/* Holiday Title / Detailed Cancellation Reason */}
+                <div className="pt-2 border-t border-rose-100 text-xs">
+                  <div className="text-[10px] text-gray-400 font-bold uppercase block mb-0.5">
+                    {detailsModalItem.cause === 'Holiday' ? 'Holiday Title & Remarks' : 'Absence Reason & Remarks'}
+                  </div>
+                  {detailsModalItem.holidayTitle && (
+                    <div className="font-black text-[#590231] text-xs mb-0.5">
+                      {detailsModalItem.holidayTitle}
+                    </div>
+                  )}
+                  <p className="text-gray-700 font-medium leading-relaxed bg-white/70 p-2.5 rounded-xl border border-rose-100/80">
+                    {detailsModalItem.reason || 'No cancellation remarks recorded.'}
+                  </p>
                 </div>
               </div>
 
+              {/* SECTION 2: RESCHEDULE SUMMARY */}
               {detailsModalItem.tallyClass && !isEditingDetails && (
-                <div className="p-4 rounded-2xl bg-[#E8F8F0] border border-emerald-200 space-y-2">
-                  <span className="text-xs font-black text-[#075E54] flex items-center gap-1.5">
-                    <CalendarCheck className="w-4 h-4 text-[#075E54]" />
-                    <span>Active Rescheduled Slot</span>
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs pt-1">
+                <div className="rounded-2xl border border-emerald-200 bg-[#E8F8F0]/80 p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
+                    <span className="font-serif font-black text-xs sm:text-sm text-[#075E54] flex items-center gap-2">
+                      <CalendarCheck className="w-4 h-4 text-[#075E54]" />
+                      <span>Reschedule Summary</span>
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-900 border border-emerald-300">
+                      Status: Rescheduled (Success)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                     <div>
-                      <span className="text-[10px] text-gray-500 block">Rescheduled Date:</span>
-                      <strong className="text-gray-900 font-mono text-sm">{detailsModalItem.tallyClass.rescheduled_date}</strong>
+                      <span className="text-[10px] text-gray-500 font-bold uppercase block">Rescheduled Date &amp; Day</span>
+                      <div className="font-mono font-extrabold text-[#075E54] text-sm mt-0.5 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-[#075E54]" />
+                        <span>{detailsModalItem.tallyClass.rescheduled_date}</span>
+                      </div>
+                      <span className="text-[11px] text-gray-600 font-medium">
+                        {getDayNameFromDate(detailsModalItem.tallyClass.rescheduled_date)}
+                      </span>
                     </div>
+
                     <div>
-                      <span className="text-[10px] text-gray-500 block">Timing:</span>
-                      <strong className="text-gray-900 font-mono text-sm">
-                        {formatTime12(detailsModalItem.tallyClass.start_time)} - {formatTime12(detailsModalItem.tallyClass.end_time)}
-                      </strong>
+                      <span className="text-[10px] text-gray-500 font-bold uppercase block">Rescheduled Timings</span>
+                      <div className="font-mono font-black text-gray-900 text-sm mt-0.5 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[#075E54]" />
+                        <span>
+                          {formatTime12(detailsModalItem.tallyClass.start_time)} – {formatTime12(detailsModalItem.tallyClass.end_time)}
+                        </span>
+                      </div>
                     </div>
+
                     <div>
-                      <span className="text-[10px] text-gray-500 block">Studio Room:</span>
-                      <strong className="text-gray-900">{detailsModalItem.tallyClass.room_or_hall}</strong>
+                      <span className="text-[10px] text-gray-500 font-bold uppercase block">Allocated Studio</span>
+                      <div className="font-bold text-gray-900 text-sm mt-0.5 flex items-center gap-1.5">
+                        <DoorOpen className="w-3.5 h-3.5 text-[#075E54]" />
+                        <span>{detailsModalItem.tallyClass.room_or_hall}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="pt-2 border-t border-emerald-200/60 text-xs text-gray-700">
-                    <span className="font-bold text-emerald-950">Notice: </span>
-                    <span>&quot;{detailsModalItem.tallyClass.reason}&quot;</span>
+
+                  {/* Compensation Notice Remarks */}
+                  <div className="pt-2 border-t border-emerald-200/60 text-xs">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase block mb-1">
+                      Compensation Notice Remarks (Broadcast Message)
+                    </span>
+                    <p className="text-gray-800 font-medium leading-relaxed bg-white/90 p-2.5 rounded-xl border border-emerald-200/80">
+                      &quot;{detailsModalItem.tallyClass.reason}&quot;
+                    </p>
+                    <div className="text-[11px] text-[#075E54] font-bold mt-1.5 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Notice verified &amp; broadcast to enrolled batch disciples and assigned Guru.</span>
+                    </div>
                   </div>
                 </div>
               )}

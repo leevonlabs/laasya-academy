@@ -10,8 +10,8 @@ export default async function DashboardLayout({
 }) {
   const user = await getCurrentUser();
 
-  // Route protection: If not logged in as owner, redirect to login
-  if (!user || user.role !== 'owner') {
+  // Route protection: If not logged in as owner or receptionist, redirect to login
+  if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
     redirect('/login');
   }
 

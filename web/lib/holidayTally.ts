@@ -224,11 +224,9 @@ export async function createHolidayAlert(data: {
     const cTitle = data.target_course_titles[i] || data.target_course_titles[0] || 'Academy Course';
     const guruName = data.affected_guru_names[i] || 'Faculty Guru';
 
-    // Instant holiday notice: Title, Holiday Date & Day, Reason (and Image)
+    // Instant holiday notice: Clean Title, Holiday Date & Day, Reason (and Image)
     if (data.send_instant !== false) {
-      const instantMessage = `Holiday Alert: ${data.title.trim()}
-
-Holiday Date: ${holidayDate} (${holidayDayName})
+      const instantMessage = `Holiday Date: ${holidayDate} (${holidayDayName})
 
 Reason:
 ${data.reason.trim()}`;
@@ -254,7 +252,7 @@ ${data.reason.trim()}`;
             sender_role
           ) VALUES ($1, $2, 'Selected course or batch', $3, $4, $5, $6, 'Holiday', $7, $8, 'Published', 'System verified (Delivered)', 'message', $9, $10, 'admin');
         `, [
-          `Holiday Notice: ${data.title.trim()}`,
+          data.title.trim(),
           instantMessage,
           cId,
           cTitle,
@@ -270,7 +268,7 @@ ${data.reason.trim()}`;
       }
     }
 
-    // Day before holiday at 6:00 PM Reminder announcement
+    // Day before holiday at 6:00 PM Reminder announcement (Scheduled for the eve at 6 PM)
     if (dayBeforeHolidayStr >= todayStr && holidayDate > todayStr) {
       const reminderMessage = `★ REMINDER: HOLIDAY TOMORROW ★
 
@@ -319,76 +317,6 @@ ${data.reason.trim()}`;
       } catch (remErr) {
         console.warn('Could not insert 6 PM reminder announcement for batch:', bId, remErr);
       }
-    }
-
-    // 12:00 AM on holiday date announcement
-    if (data.send_scheduled_12am !== false && holidayDate > todayStr) {
-      const dayOfHolidayMessage = `★ HOLIDAY TODAY ★
-
-Holiday Alert: ${data.title.trim()}
-
-Holiday Date: ${holidayDate} (${holidayDayName})
-
-Reason:
-${data.reason.trim()}`;
-
-      try {
-        await query(`
-          INSERT INTO public.announcements (
-            title,
-            message,
-            audience,
-            target_course_id,
-            target_course_title,
-            target_batch_id,
-            target_batch_name,
-            type_tag,
-            publish_date,
-            publish_time,
-            status,
-            delivery_status,
-            announcement_type,
-            image_url,
-            created_by,
-            sender_role
-          ) VALUES ($1, $2, 'Selected course or batch', $3, $4, $5, $6, 'Holiday', $7, '00:00:00', 'Scheduled', 'Queued for Scheduled Dispatch', 'message', $8, $9, 'admin');
-        `, [
-          `Holiday Today: ${data.title.trim()}`,
-          dayOfHolidayMessage,
-          cId,
-          cTitle,
-          bId,
-          bName,
-          holidayDate,
-          data.image_url || null,
-          data.created_by || 'Admin'
-        ]);
-      } catch (schedErr) {
-        console.warn('Could not insert scheduled 12 AM announcement for batch:', bId, schedErr);
-      }
-    }
-
-    // Realtime session_alert for each affected batch
-    try {
-      await query(`
-        INSERT INTO public.session_alerts (
-          batch_id,
-          batch_name,
-          course_title,
-          trainer_name,
-          message,
-          alert_type,
-          created_at
-        ) VALUES ($1, $2, $3, $4, $5, 'announcement', NOW());
-      `, [
-        bId,
-        bName,
-        cTitle,
-        guruName,
-        `HOLIDAY ALERT: ${data.title.trim()} on ${holidayDate} (${holidayDayName}). Reason: ${data.reason.trim()}`
-      ]);
-    } catch (alertErr) {
-      console.warn('Could not insert session_alert for batch', bId, alertErr);
     }
 
     // Push notification to batch

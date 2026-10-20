@@ -186,7 +186,9 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
 
     const finalResult = (filters?.status && filters.status !== 'all')
       ? processed.filter(r => r.status.toLowerCase() === filters.status?.toLowerCase())
-      : processed;
+      : (filters?.announcementType === 'message'
+          ? processed.filter(r => r.status === 'Published')
+          : processed);
     announcementsCache.set(cacheKey, { data: finalResult, expiry: Date.now() + 15000 });
     return finalResult;
   } catch (err) {

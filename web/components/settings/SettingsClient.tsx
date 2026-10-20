@@ -900,44 +900,6 @@ export default function SettingsClient({
         /* PAGE 2: PASSWORD MANAGEMENT DESK                               */
         /* ============================================================= */
         <div className="space-y-6">
-          {/* Quick Action & Default Password Card */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-3xl bg-[#FFF9FB] border border-[#F0D5E4]">
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-2xl bg-white border border-[#F0D5E4] text-[#8A064D] shadow-2xs">
-                <Lock className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-[#2D041A]">Universal Default App Key</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="font-mono text-sm font-black text-[#8A064D]">123456</span>
-                  <button
-                    type="button"
-                    onClick={copyDefaultPassword}
-                    title="Copy Default Password"
-                    className="p-1 hover:bg-[#FFF2F8] rounded text-gray-400 hover:text-[#8A064D] transition cursor-pointer"
-                  >
-                    {copiedDefault ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                  <span className="text-[11px] text-gray-400">Default for all new accounts</span>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleResetAll}
-              disabled={isResettingAll}
-              className="bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50 self-start sm:self-center"
-              title="Reset every student and guru password to 123456"
-            >
-              {isResettingAll ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="w-3.5 h-3.5" />
-              )}
-              <span>Reset All Accounts to 123456</span>
-            </button>
-          </div>
 
           <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
             {/* Navigation Tabs & Search Bar */}

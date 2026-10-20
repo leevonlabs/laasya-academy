@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -29,7 +29,8 @@ import {
   Image as ImageIcon,
   ShieldCheck,
   KeyRound,
-  CalendarCheck
+  CalendarCheck,
+  UserCheck
 } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 
@@ -38,6 +39,7 @@ interface Props {
     fullName?: string;
     email?: string;
     role?: string;
+    allowedPages?: string[];
   };
   children: React.ReactNode;
 }
@@ -81,12 +83,30 @@ export default function DashboardShell({ user, children }: Props) {
     { label: 'Schemes', href: '/schemes', icon: BadgePercent },
     { label: 'Expenses', href: '/expenses', icon: TrendingDown },
     { label: 'Password Management', href: '/password-management', icon: KeyRound },
+    { label: 'Reception', href: '/reception', icon: UserCheck },
     { label: 'Admin Profile', href: '/admin-profile', icon: ShieldCheck },
   ];
 
-  const currentNavItem = academyNavItems.find(item => 
+  const visibleNavItems = useMemo(() => {
+    if (user?.role === 'receptionist') {
+      const allowed = new Set(user.allowedPages || []);
+      const filtered = academyNavItems.filter(item => {
+        if (item.href === '/reception' || item.href === '/password-management' || item.href === '/admin-profile') {
+          return false;
+        }
+        return allowed.has(item.href) || allowed.has(item.label);
+      });
+      return [
+        ...filtered,
+        { label: 'My Profile', href: '/reception-profile', icon: UserCheck }
+      ];
+    }
+    return academyNavItems;
+  }, [user]);
+
+  const currentNavItem = visibleNavItems.find(item => 
     pathname === item.href || (item.href !== '/overview' && pathname.startsWith(`${item.href}/`))
-  ) || academyNavItems[0];
+  ) || visibleNavItems[0] || academyNavItems[0];
 
   return (
     <div className="min-h-screen flex bg-[#F7F3EE]" suppressHydrationWarning>
@@ -174,7 +194,7 @@ export default function DashboardShell({ user, children }: Props) {
             </div>
           )}
 
-          {academyNavItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || (item.href !== '/overview' && pathname.startsWith(`${item.href}/`));
             return (
@@ -208,24 +228,27 @@ export default function DashboardShell({ user, children }: Props) {
 
         </nav>
 
-        {/* Director Profile & Logout Footer */}
+        {/* Director / Receptionist Profile & Logout Footer */}
         <div className="p-3 border-t border-[#8A064D]/60 bg-[#3F0123]/90 shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#8A064D] to-[#73023E] border border-[#F9E33A] flex items-center justify-center font-black text-xs text-[#F9E33A] shadow-xs shrink-0">
-                AD
+            <Link 
+              href={user.role === 'receptionist' ? '/reception-profile' : '/admin-profile'}
+              className="flex items-center gap-2.5 overflow-hidden group hover:opacity-90 transition cursor-pointer"
+            >
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#8A064D] to-[#73023E] border border-[#F9E33A] flex items-center justify-center font-black text-xs text-[#F9E33A] shadow-xs shrink-0 group-hover:scale-105 transition">
+                {user.role === 'receptionist' ? 'RC' : 'AD'}
               </div>
               {!isCollapsed && (
                 <div className="overflow-hidden min-w-0">
-                  <p className="text-sm font-bold text-white truncate">
-                    {user.fullName || 'Academy Director'}
+                  <p className="text-sm font-bold text-white truncate group-hover:text-[#F9E33A] transition">
+                    {user.fullName || (user.role === 'receptionist' ? 'Receptionist' : 'Academy Director')}
                   </p>
                   <p className="text-[11px] text-[#F9E33A] truncate font-semibold">
-                    Owner & Director
+                    {user.role === 'receptionist' ? 'Front Desk Reception' : 'Owner & Director'}
                   </p>
                 </div>
               )}
-            </div>
+            </Link>
 
             {!isCollapsed && <LogoutButton />}
           </div>
@@ -269,10 +292,10 @@ export default function DashboardShell({ user, children }: Props) {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Active Date Chip */}
+            {/* Active Date Chip (No Term displayed) */}
             <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF2F8] border border-[#F0D5E4] text-[#6E3955] text-xs font-bold tabular-nums">
               <CalendarIcon className="w-3.5 h-3.5 text-[#8A064D]" />
-              <span>Oct 2026 • Term II</span>
+              <span>{new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
             </div>
 
             {/* Online Status Pill */}

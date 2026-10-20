@@ -65,11 +65,20 @@ export async function POST(request: NextRequest) {
         JOIN public.profiles p ON t.profile_id = p.id
         LEFT JOIN auth.users u ON u.id = p.id
         WHERE (
-          (LENGTH($1) >= 8 AND regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
-          OR LOWER(p.email) = LOWER($2)
-          OR LOWER(p.full_name) = LOWER($2)
-          OR LOWER(p.full_name) LIKE '%' || LOWER($2) || '%'
+          (LENGTH($1) >= 8 AND (
+            RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)
+            OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $1
+          ))
+          OR LOWER(TRIM(p.email)) = LOWER(TRIM($2))
+          OR LOWER(TRIM(p.full_name)) = LOWER(TRIM($2))
         )
+        ORDER BY
+          CASE 
+            WHEN (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)) THEN 1
+            WHEN LOWER(TRIM(p.email)) = LOWER(TRIM($2)) THEN 2
+            WHEN LOWER(TRIM(p.full_name)) = LOWER(TRIM($2)) THEN 3
+            ELSE 4
+          END ASC
         LIMIT 1
       `;
       const trainer = await queryOne<any>(guruSql, [cleanDigits, rawInput]);
@@ -168,8 +177,6 @@ export async function POST(request: NextRequest) {
           s.status as student_status,
           s.advance_paid,
           s.fixed_discount,
-          s.total_monthly_fee,
-          s.scheme_id,
           s.parent_name,
           s.parent_contact,
           s.address,
@@ -184,12 +191,26 @@ export async function POST(request: NextRequest) {
         JOIN public.profiles p ON s.profile_id = p.id
         LEFT JOIN auth.users u ON u.id = p.id
         WHERE (
-          (LENGTH($1) >= 8 AND regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
-          OR (LENGTH($1) >= 8 AND regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
-          OR LOWER(s.roll_number) = LOWER($2)
-          OR LOWER(p.email) = LOWER($2)
-          OR LOWER(p.full_name) = LOWER($2)
+          (LENGTH($1) >= 8 AND (
+            RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)
+            OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $1
+          ))
+          OR (LENGTH($1) >= 8 AND (
+            RIGHT(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)
+            OR regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g') = $1
+          ))
+          OR LOWER(TRIM(s.roll_number)) = LOWER(TRIM($2))
+          OR LOWER(TRIM(p.email)) = LOWER(TRIM($2))
+          OR LOWER(TRIM(p.full_name)) = LOWER(TRIM($2))
         )
+        ORDER BY
+          CASE 
+            WHEN LOWER(TRIM(s.roll_number)) = LOWER(TRIM($2)) THEN 1
+            WHEN (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)) THEN 2
+            WHEN (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)) THEN 3
+            WHEN LOWER(TRIM(p.email)) = LOWER(TRIM($2)) THEN 4
+            ELSE 5
+          END ASC
         LIMIT 1
       `;
       const student = await queryOne<any>(studentSql, [cleanDigits, rawInput]);
@@ -230,7 +251,7 @@ export async function POST(request: NextRequest) {
           `, [student.student_id]);
 
           const enrollment = enrollments[0];
-          const standardFee = student.total_monthly_fee != null ? Number(student.total_monthly_fee) : (Number(enrollment?.monthly_fee) || 2000);
+          const standardFee = Number(enrollment?.monthly_fee) || 2000;
           const discount = Number(student.fixed_discount) || 0;
           const advance = Number(student.advance_paid) || 0;
           const netMonthly = Math.max(0, standardFee - discount);
@@ -303,7 +324,7 @@ export async function POST(request: NextRequest) {
             timings: formattedEnrollments[0]?.timings || 'Mon, Wed, Fri • 17:00 - 18:30',
             total_monthly_fee: standardFee,
             fixed_discount: discount,
-            scheme_id: student.scheme_id || null,
+            scheme_id: null,
             net_monthly_fee: netMonthly,
             advance_paid: advance,
             due_amount: due,

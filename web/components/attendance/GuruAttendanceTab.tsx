@@ -56,6 +56,20 @@ export default function GuruAttendanceTab({
     setRecords(initialRecords);
   }, [initialRecords]);
 
+  // Fetch tally classes for rescheduled / extra classes count
+  const [tallyClasses, setTallyClasses] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    fetch('/api/tally-classes')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.classes)) {
+          setTallyClasses(data.classes);
+        }
+      })
+      .catch(err => console.warn('Could not fetch tally classes for guru attendance stats:', err));
+  }, []);
+
   // LEVEL 1 vs LEVEL 2 Navigation State
   // selectedGuruId: null = Guru Grid View (Level 1)
   // selectedGuruId: string = Dedicated Guru Attendance Detail View (Level 2)
@@ -393,9 +407,13 @@ export default function GuruAttendanceTab({
 
   // KPIs for the selected Guru
   const currentGuruStats = useMemo(() => {
-    const total = currentGuruFilteredRecords.length;
     const present = currentGuruFilteredRecords.filter(r => r.guru_status === 'present').length;
     const absent = currentGuruFilteredRecords.filter(r => r.guru_status === 'absent').length;
+    const extra = tallyClasses.filter(tc => 
+      (currentGuru?.id && tc.trainer_id === currentGuru.id) ||
+      (currentGuru?.full_name && tc.trainer_name && tc.trainer_name.toLowerCase().trim() === currentGuru.full_name.toLowerCase().trim())
+    ).length;
+    const total = present + absent + extra;
     const past = present + absent;
     const complianceRate = past > 0 ? Math.round((present / past) * 100) : 100;
     const totalStudentsRollCall = currentGuruFilteredRecords.reduce((acc, r) => acc + (r.marked_students_count || 0), 0);
@@ -404,10 +422,11 @@ export default function GuruAttendanceTab({
       total,
       present,
       absent,
+      extra,
       complianceRate,
       totalStudentsRollCall
     };
-  }, [currentGuruFilteredRecords]);
+  }, [currentGuruFilteredRecords, currentGuru, tallyClasses]);
 
   // CSV Export for Single Guru
   const downloadSingleGuruCsv = () => {
@@ -549,13 +568,8 @@ export default function GuruAttendanceTab({
 
         {/* 2. Guru Individual KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-xs">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Conducted</p>
-            <p className="text-xl font-black text-gray-900 mt-0.5">{currentGuruStats.total}</p>
-          </div>
-
           <div className="bg-white p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-xs">
-            <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Present (Held)</p>
+            <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Conducted (Held)</p>
             <p className="text-xl font-black text-emerald-700 mt-0.5">{currentGuruStats.present}</p>
           </div>
 
@@ -564,9 +578,14 @@ export default function GuruAttendanceTab({
             <p className="text-xl font-black text-rose-700 mt-0.5">{currentGuruStats.absent}</p>
           </div>
 
-          <div className="bg-white p-3.5 rounded-xl border border-[#D4AF37]/40 bg-[#FFFDF5] shadow-xs">
-            <p className="text-[10px] font-bold text-[#8A064D] uppercase tracking-wider">Compliance Rate</p>
-            <p className="text-xl font-black text-[#590231] mt-0.5">{currentGuruStats.complianceRate}%</p>
+          <div className="bg-white p-3.5 rounded-xl border border-amber-200 bg-amber-50/20 shadow-xs">
+            <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Extra (Rescheduled)</p>
+            <p className="text-xl font-black text-amber-700 mt-0.5">{currentGuruStats.extra}</p>
+          </div>
+
+          <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-xs">
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Classes</p>
+            <p className="text-xl font-black text-gray-900 mt-0.5">{currentGuruStats.total}</p>
           </div>
         </div>
 
@@ -1092,7 +1111,11 @@ export default function GuruAttendanceTab({
             const coursesTaught = getTrainerCourses(guru, trainerRecs);
             const present = trainerRecs.filter(r => r.guru_status === 'present').length;
             const absent = trainerRecs.filter(r => r.guru_status === 'absent').length;
-            const total = trainerRecs.length;
+            const extra = tallyClasses.filter(tc => 
+              (tc.trainer_id && tc.trainer_id === guru.id) ||
+              (tc.trainer_name && guru.full_name && tc.trainer_name.toLowerCase().trim() === guru.full_name.toLowerCase().trim())
+            ).length;
+            const total = present + absent + extra;
             const avatar = guru.avatar_url;
 
             return (
@@ -1154,18 +1177,22 @@ export default function GuruAttendanceTab({
                     )}
                   </div>
 
-                  {/* Quick Attendance Stats: Conducted, Missed, Total (No Compliance %) */}
-                  <div className="mt-3.5 pt-3 border-t border-gray-100 grid grid-cols-3 gap-1.5 text-center">
-                    <div className="p-1.5 rounded-lg bg-emerald-50/60 border border-emerald-100">
-                      <p className="text-[10px] font-bold text-emerald-700 uppercase">Conducted</p>
+                  {/* Quick Attendance Stats: Conducted, Missed, Extra [Rescheduled Class], Total */}
+                  <div className="mt-3.5 pt-3 border-t border-gray-100 grid grid-cols-4 gap-1 text-center">
+                    <div className="p-1 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                      <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-tight">Conducted</p>
                       <p className="text-xs font-black text-emerald-800 mt-0.5">{present}</p>
                     </div>
-                    <div className="p-1.5 rounded-lg bg-rose-50/60 border border-rose-100">
-                      <p className="text-[10px] font-bold text-rose-700 uppercase">Missed</p>
+                    <div className="p-1 rounded-lg bg-rose-50/70 border border-rose-100">
+                      <p className="text-[9px] font-bold text-rose-700 uppercase tracking-tight">Missed</p>
                       <p className="text-xs font-black text-rose-800 mt-0.5">{absent}</p>
                     </div>
-                    <div className="p-1.5 rounded-lg bg-gray-50 border border-gray-200">
-                      <p className="text-[10px] font-bold text-gray-600 uppercase">Total</p>
+                    <div className="p-1 rounded-lg bg-amber-50/70 border border-amber-200" title="Rescheduled Extra Classes">
+                      <p className="text-[9px] font-bold text-amber-700 uppercase tracking-tight">Extra</p>
+                      <p className="text-xs font-black text-amber-800 mt-0.5">{extra}</p>
+                    </div>
+                    <div className="p-1 rounded-lg bg-gray-50 border border-gray-200">
+                      <p className="text-[9px] font-bold text-gray-600 uppercase tracking-tight">Total</p>
                       <p className="text-xs font-black text-gray-800 mt-0.5">{total}</p>
                     </div>
                   </div>

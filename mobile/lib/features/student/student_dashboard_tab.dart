@@ -760,7 +760,7 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                 const SizedBox(width: 8),
                 _quickActionButton(
                   icon: Icons.video_library_rounded,
-                  label: 'Drive Vault',
+                  label: 'Videos',
                   bgColor: const Color(0xFFFEF3C7),
                   iconColor: const Color(0xFF92400E),
                   unreadCount: SupabaseService().getUnreadVideosCount(),

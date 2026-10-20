@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   CalendarX2, 
   Plus, 
@@ -63,10 +63,34 @@ export default function HolidayAlertClient({
   const [showCourseBatchTableInDetails, setShowCourseBatchTableInDetails] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedMonth, setSelectedMonth] = useState<string>('all');
-  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const currentMonthNum = String(new Date().getMonth() + 1).padStart(2, '0');
+  const currentYearNum = String(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthNum);
+  const [selectedYear, setSelectedYear] = useState<string>(currentYearNum);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const action = searchParams?.get('action');
+    const viewTitle = searchParams?.get('viewTitle');
+    const viewId = searchParams?.get('viewId');
+    if (action && (viewTitle || viewId)) {
+      const match = alerts.find(a => 
+        (viewId && a.id === viewId) || 
+        (viewTitle && a.title.toLowerCase().includes(viewTitle.toLowerCase()))
+      );
+      if (match) {
+        if (action === 'details') {
+          setViewingAlert(match);
+        } else if (action === 'edit') {
+          handleOpenEdit(match);
+        } else if (action === 'delete') {
+          handleDeleteAlert(match.id, match.title);
+        }
+      }
+    }
+  }, [searchParams, alerts]);
 
   // Helper to format created ISO string into DD MMM YYYY, hh:mm AM/PM
   const formatCreatedDateTime = (iso?: string) => {
@@ -1178,8 +1202,10 @@ export default function HolidayAlertClient({
                   <h3 className="font-serif font-black text-xl text-gray-900">
                     {viewingAlert.title}
                   </h3>
-                  <div className="text-[11px] text-gray-400 font-medium mt-0.5">
-                    Created on {viewingAlert.created_at ? viewingAlert.created_at.split('T')[0] : '—'} • Status: <span className="font-bold text-[#8A064D]">{viewingAlert.status}</span>
+                  <div className="text-[11px] text-gray-500 font-medium mt-1 flex flex-wrap items-center gap-2">
+                    <span>Created: <strong className="text-gray-700">{formatCreatedDateTime(viewingAlert.created_at)}</strong></span>
+                    <span>•</span>
+                    <span>Status: <span className="font-bold text-[#8A064D]">{viewingAlert.status}</span></span>
                   </div>
                 </div>
               </div>
@@ -1198,10 +1224,14 @@ export default function HolidayAlertClient({
                 <span className="font-mono font-bold text-gray-900 text-sm">{viewingAlert.holiday_date}</span>
               </div>
 
-              {/* Optional Circular Image */}
+              {/* Banner Image - Fully Visible (object-contain with no cropping) */}
               {viewingAlert.image_url && (
-                <div className="w-full h-44 rounded-2xl overflow-hidden border border-rose-100 bg-gray-50">
-                  <img src={viewingAlert.image_url} alt={viewingAlert.title} className="w-full h-full object-cover" />
+                <div className="w-full rounded-2xl overflow-hidden border border-rose-100 bg-[#FFF9FB] flex items-center justify-center p-2">
+                  <img
+                    src={viewingAlert.image_url}
+                    alt={viewingAlert.title}
+                    className="w-full max-h-[380px] object-contain rounded-xl"
+                  />
                 </div>
               )}
 
@@ -1446,6 +1476,260 @@ export default function HolidayAlertClient({
                 />
               </div>
 
+              {/* 2-COLUMN GRID FOR COURSES & BATCHES SELECTION */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                <div className="space-y-1.5" ref={courseDropdownRef}>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
+                      Select Courses <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCourseSelectionChange(courses.map(c => c.id))}
+                        className="text-[11px] font-bold text-[#8A064D] hover:underline cursor-pointer"
+                      >
+                        Select All ({courses.length})
+                      </button>
+                      <span className="text-gray-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCourseSelectionChange([])}
+                        className="text-[11px] font-medium text-gray-400 hover:text-gray-600 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setCourseDropdownOpen(prev => !prev)}
+                      className="w-full min-h-[42px] px-3.5 py-2 rounded-xl border border-gray-200 bg-gray-50 hover:bg-white text-left flex items-center justify-between gap-2 text-xs transition"
+                    >
+                      <div className="flex flex-wrap gap-1 items-center flex-1">
+                        {selectedCourseIds.length === 0 ? (
+                          <span className="text-gray-400">Click to search and select courses...</span>
+                        ) : (
+                          <span className="font-bold text-[#8A064D]">
+                            {selectedCourseIds.length} Course{selectedCourseIds.length > 1 ? 's' : ''} Selected
+                          </span>
+                        )}
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                    </button>
+
+                    {courseDropdownOpen && (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-2xl border border-gray-200 shadow-xl z-30 p-2 space-y-2 max-h-60 overflow-y-auto">
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="text"
+                            value={courseSearch}
+                            onChange={(e) => setCourseSearch(e.target.value)}
+                            placeholder="Search courses..."
+                            className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-gray-200 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
+                          />
+                        </div>
+
+                        <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+                          {courses
+                            .filter(c =>
+                              c.title.toLowerCase().includes(courseSearch.toLowerCase()) ||
+                              (c.code && c.code.toLowerCase().includes(courseSearch.toLowerCase()))
+                            )
+                            .map(c => {
+                              const isSelected = selectedCourseIds.includes(c.id);
+                              return (
+                                <div
+                                  key={c.id}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      handleCourseSelectionChange(selectedCourseIds.filter(id => id !== c.id));
+                                    } else {
+                                      handleCourseSelectionChange([...selectedCourseIds, c.id]);
+                                    }
+                                  }}
+                                  className={`p-2 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition ${
+                                    isSelected
+                                      ? 'bg-[#FFF2F8] border-[#8A064D] text-[#8A064D] font-bold'
+                                      : 'bg-white border-gray-100 text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="truncate">{c.title}</span>
+                                    {c.code && (
+                                      <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4]">
+                                        {c.code}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    readOnly
+                                    className="accent-[#8A064D]"
+                                  />
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedCourseIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pt-1">
+                      {courses
+                        .filter(c => selectedCourseIds.includes(c.id))
+                        .map(c => (
+                          <span
+                            key={c.id}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#FFF2F8] border border-[#F0D5E4] text-[#8A064D] text-[10px] font-bold"
+                          >
+                            <span>{c.title}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCourseSelectionChange(selectedCourseIds.filter(id => id !== c.id))}
+                              className="hover:text-rose-700 ml-0.5"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* BATCH SELECTION DROPDOWN */}
+                <div className="space-y-1.5" ref={batchDropdownRef}>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
+                      Select Batches <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBatchIds(availableBatches.map(b => b.id))}
+                        className="text-[11px] font-bold text-[#8A064D] hover:underline cursor-pointer"
+                      >
+                        Select All ({availableBatches.length})
+                      </button>
+                      <span className="text-gray-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBatchIds([])}
+                        className="text-[11px] font-medium text-gray-400 hover:text-gray-600 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setBatchDropdownOpen(prev => !prev)}
+                      className="w-full min-h-[42px] px-3.5 py-2 rounded-xl border border-gray-200 bg-gray-50 hover:bg-white text-left flex items-center justify-between gap-2 text-xs transition"
+                    >
+                      <div className="flex flex-wrap gap-1 items-center flex-1">
+                        {selectedBatchIds.length === 0 ? (
+                          <span className="text-gray-400">Click to search and select batches...</span>
+                        ) : (
+                          <span className="font-bold text-[#8A064D]">
+                            {selectedBatchIds.length} Batch{selectedBatchIds.length > 1 ? 'es' : ''} Selected
+                          </span>
+                        )}
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                    </button>
+
+                    {batchDropdownOpen && (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-2xl border border-gray-200 shadow-xl z-30 p-2 space-y-2 max-h-64 overflow-y-auto">
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="text"
+                            value={batchSearch}
+                            onChange={(e) => setBatchSearch(e.target.value)}
+                            placeholder="Search batches..."
+                            className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-gray-200 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {availableBatches
+                            .filter(b =>
+                              b.name.toLowerCase().includes(batchSearch.toLowerCase()) ||
+                              (b.code && b.code.toLowerCase().includes(batchSearch.toLowerCase())) ||
+                              (b.course_title && b.course_title.toLowerCase().includes(batchSearch.toLowerCase()))
+                            )
+                            .map(b => {
+                              const isSelected = selectedBatchIds.includes(b.id);
+                              return (
+                                <div
+                                  key={b.id}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSelectedBatchIds(prev => prev.filter(id => id !== b.id));
+                                    } else {
+                                      setSelectedBatchIds(prev => [...prev, b.id]);
+                                    }
+                                  }}
+                                  className={`p-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition ${
+                                    isSelected
+                                      ? 'bg-[#FFF2F8] border-[#8A064D] text-[#8A064D]'
+                                      : 'bg-white border-gray-100 text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  <div className="min-w-0 pr-2">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-bold">{b.name}</span>
+                                      {b.code && (
+                                        <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4]">
+                                          {b.code}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[10px] text-gray-500 block truncate">
+                                      {b.course_title} • Guru: {b.trainer_name || 'Assigned'}
+                                    </span>
+                                  </div>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    readOnly
+                                    className="accent-[#8A064D] shrink-0"
+                                  />
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* AUDIENCE IMPACT SUMMARY */}
+              <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4] space-y-2.5">
+                <span className="text-xs font-black text-[#590231] uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#8A064D]" />
+                  <span>Notification Audience Impact</span>
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-gray-500 text-[11px] block">Affected Faculty Gurus:</span>
+                    <strong className="text-gray-900 font-extrabold text-sm">{affectedGurus.length} Gurus</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-[11px] block">Estimated Batch Disciples:</span>
+                    <strong className="text-[#8A064D] font-extrabold text-sm">{affectedStudentsCount} Disciples</strong>
+                  </div>
+                </div>
+              </div>
+
               {/* Submit Buttons */}
               <div className="pt-2 flex items-center justify-end gap-2.5">
                 <button
@@ -1465,9 +1749,12 @@ export default function HolidayAlertClient({
                   className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#590231] to-[#8A064D] hover:from-[#470126] hover:to-[#70043E] text-white text-xs font-bold transition flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
                 >
                   {isSubmitting ? (
-                    <span>Saving...</span>
+                    <span>Saving Edits...</span>
                   ) : (
-                    <span>Save Changes</span>
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-[#F9E33A]" />
+                      <span>Save Edits</span>
+                    </>
                   )}
                 </button>
               </div>

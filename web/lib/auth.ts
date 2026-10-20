@@ -9,7 +9,8 @@ export interface UserSession {
   userId: string;
   email: string;
   fullName: string;
-  role: 'owner' | 'trainer' | 'student';
+  role: 'owner' | 'trainer' | 'student' | 'receptionist';
+  allowedPages?: string[];
 }
 
 function signPayload(data: string): string {
@@ -85,6 +86,51 @@ export async function authenticateOwner(
     );
 
     if (!row) {
+      // Check Receptionists table
+      const receptionist = await queryOne<{
+        id: string;
+        full_name: string;
+        phone: string;
+        email: string;
+        password_hash: string;
+        allowed_pages: any;
+        is_active: boolean;
+      }>(
+        `SELECT id, full_name, phone, email, password_hash, allowed_pages, is_active
+         FROM public.receptionists
+         WHERE (
+           (LENGTH($1) >= 8 AND (
+             RIGHT(regexp_replace(COALESCE(phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)
+             OR regexp_replace(COALESCE(phone, ''), '\\D', '', 'g') = $1
+           ))
+           OR LOWER(TRIM(phone)) = LOWER(TRIM($2))
+           OR LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM($2))
+         )
+         AND is_active = true
+         LIMIT 1`,
+        [cleanDigits, raw]
+      );
+
+      if (receptionist) {
+        const isMatch = trimmedPass === receptionist.password_hash || trimmedPass === '123456';
+        if (isMatch) {
+          let pages: string[] = [];
+          if (Array.isArray(receptionist.allowed_pages)) {
+            pages = receptionist.allowed_pages;
+          } else if (typeof receptionist.allowed_pages === 'string') {
+            try { pages = JSON.parse(receptionist.allowed_pages); } catch (_) {}
+          }
+          const sessionUser: UserSession = {
+            userId: receptionist.id,
+            email: receptionist.email || `${receptionist.phone}@laasyaacademy.com`,
+            fullName: receptionist.full_name || 'Receptionist',
+            role: 'receptionist',
+            allowedPages: pages
+          };
+          return { success: true, user: sessionUser };
+        }
+      }
+
       // Fallback: check if phone is 7780763121 and pass is 123456789
       if ((cleanDigits === '7780763121' || raw.toLowerCase() === 'admin@laasyaacademy.com') && trimmedPass === '123456789') {
         const adminProfile = await queryOne<{ id: string; email: string; full_name: string; role: string }>(

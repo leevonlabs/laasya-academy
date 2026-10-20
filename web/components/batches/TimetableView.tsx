@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { 
   ArrowLeft, 
   Calendar, 
   Clock, 
-  Printer, 
+  Download, 
   Sparkles, 
   DoorOpen, 
   User, 
@@ -357,8 +357,46 @@ export default function TimetableView({ onBack, batches }: Props) {
     );
   }, [batches]);
 
-  const handlePrint = () => {
-    window.print();
+  const [isExporting, setIsExporting] = useState(false);
+  const timetableRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadPng = async () => {
+    if (!timetableRef.current) return;
+    setIsExporting(true);
+    try {
+      const { toPng } = await import('html-to-image');
+      const dataUrl = await toPng(timetableRef.current, {
+        pixelRatio: 2,
+        backgroundColor: '#FFFFFF',
+        cacheBust: true,
+      });
+      const link = document.createElement('a');
+      link.download = `laasya-weekly-master-timetable-${new Date().toISOString().split('T')[0]}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Error exporting timetable to PNG with html-to-image:', err);
+      try {
+        // Fallback to html2canvas if available
+        const html2canvas = (await import('html2canvas')).default;
+        const canvas = await html2canvas(timetableRef.current, {
+          scale: 2,
+          backgroundColor: '#FFFFFF',
+          useCORS: true,
+          logging: false,
+        });
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `laasya-weekly-master-timetable-${new Date().toISOString().split('T')[0]}.png`;
+        link.href = dataUrl;
+        link.click();
+      } catch (fallbackErr) {
+        console.error('Fallback export also failed:', fallbackErr);
+        alert('Failed to download PNG. Please try again or use browser print.');
+      }
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -395,14 +433,27 @@ export default function TimetableView({ onBack, batches }: Props) {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={handlePrint}
-            className="bg-white hover:bg-gray-50 text-gray-700 border border-[#F0D5E4] px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xs transition flex items-center gap-2 cursor-pointer active:scale-95"
+            disabled={isExporting}
+            onClick={handleDownloadPng}
+            className="bg-[#8A064D] hover:bg-[#70043E] text-white border border-[#F9E33A]/40 px-4 py-2.5 rounded-2xl text-xs font-bold shadow-sm transition flex items-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
           >
-            <Printer className="w-4 h-4 text-[#8A064D]" />
-            <span>Print / Save PDF</span>
+            {isExporting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Exporting PNG...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4 text-[#F9E33A]" />
+                <span>Download PNG</span>
+              </>
+            )}
           </button>
         </div>
       </div>
+
+      {/* Exportable Timetable Wrapper */}
+      <div ref={timetableRef} className="space-y-6 bg-white p-4 sm:p-6 rounded-3xl border border-[#F0D5E4] shadow-xs">
 
       {/* Course Badges Legend */}
       <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-wrap items-center gap-2">
@@ -523,6 +574,7 @@ export default function TimetableView({ onBack, batches }: Props) {
             <strong>Rooms:</strong> the academy has 4 rooms. At most 3 classes run at the same time (around 6:30 PM on Monday, Tuesday, Wednesday, Friday and Saturday), so there is no room clash anywhere in the week.
           </span>
         </p>
+      </div>
       </div>
     </div>
   );

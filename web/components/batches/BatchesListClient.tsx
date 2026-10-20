@@ -294,6 +294,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   const [addRoom, setAddRoom] = useState('Natya Mandapam (Room 101)');
   const [addCapacity, setAddCapacity] = useState(25);
   const [addIsActive, setAddIsActive] = useState(true);
+  const [addSaveConflictError, setAddSaveConflictError] = useState<string | null>(null);
   const [addSchedules, setAddSchedules] = useState<ScheduleEntry[]>([
     { day: 'Monday', startTime: '09:00', endTime: '10:00', room: 'Natya Mandapam (Room 101)' }
   ]);
@@ -311,6 +312,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     setAddRoom(rooms[0]?.name || 'Natya Mandapam (Room 101)');
     setAddCapacity(25);
     setAddIsActive(true);
+    setAddSaveConflictError(null);
     setAddSchedules([
       { day: 'Monday', startTime: '09:00', endTime: '10:00', room: rooms[0]?.name || 'Natya Mandapam (Room 101)' }
     ]);
@@ -625,9 +627,11 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
 
     const conflict = checkScheduleConflict(addSchedules);
     if (conflict.hasConflict) {
+      setAddSaveConflictError(conflict.message || 'Room and time conflict: The room is already occupied for these timings.');
       showFeedback('error', conflict.message || 'Room and time conflict detected!');
       return;
     }
+    setAddSaveConflictError(null);
 
     setSaving(true);
 
@@ -1096,13 +1100,14 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
             )}
           </div>
 
-          {/* Create Batch Trigger */}
+          {/* Create Batch Trigger - Prominently Highlighted */}
           <button
             onClick={openAddModal}
-            className="bg-[#8A064D] hover:bg-[#70043E] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-2 cursor-pointer active:scale-95"
+            className="bg-gradient-to-r from-[#8A064D] to-[#590231] hover:from-[#9D0657] hover:to-[#6E033C] text-white px-5 py-2.5 rounded-2xl text-xs font-black shadow-lg shadow-[#8A064D]/25 hover:shadow-xl hover:shadow-[#8A064D]/35 border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95 hover:scale-[1.02]"
+            title="Create New Batch"
           >
-            <Plus className="w-4 h-4 text-[#F9E33A]" />
-            <span>Create Batch</span>
+            <Plus className="w-4 h-4 text-[#F9E33A] stroke-[3]" />
+            <span className="tracking-wide">Create Batch</span>
           </button>
         </div>
       </div>
@@ -1555,7 +1560,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
       {/* ================================================================= */}
       {viewingBatch && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
               <div>
                 <div className="flex items-center gap-2">
@@ -1573,7 +1578,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
               </div>
               <button
                 onClick={() => setViewingBatch(null)}
-                className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1607,17 +1612,17 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 </div>
               </div>
 
-              {/* Batch Description if present */}
-              {viewingBatch.description && (
-                <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-rose-100/80">
-                  <span className="text-[10px] font-bold text-[#8A064D] uppercase tracking-wider block mb-1">
-                    Batch Description &amp; Syllabus
-                  </span>
-                  <p className="text-xs text-gray-700 leading-relaxed font-medium">
-                    {viewingBatch.description}
-                  </p>
-                </div>
-              )}
+              {/* Batch Description always clearly displayed */}
+              <div className="bg-[#FFF9FB] p-3.5 rounded-2xl border border-rose-100/80">
+                <span className="text-[10px] font-bold text-[#8A064D] uppercase tracking-wider block mb-1">
+                  Batch Description &amp; Syllabus Focus
+                </span>
+                <p className="text-xs text-gray-700 leading-relaxed font-medium whitespace-pre-wrap">
+                  {viewingBatch.description && viewingBatch.description.trim()
+                    ? viewingBatch.description
+                    : 'No specific curriculum description provided for this batch.'}
+                </p>
+              </div>
 
               {/* Schedule Details */}
               <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2">
@@ -1724,52 +1729,53 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
       {/* ================================================================= */}
       {isAddOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-[#F0D5E4] max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-7 shadow-2xl border border-[#F0D5E4] max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-5">
               <div>
-                <h3 className="font-bold text-base text-[#2D041A]">Create New Recurring Batch</h3>
-                <p className="text-xs text-gray-500">Configure course, Guru, multi-day schedule, room, and capacity.</p>
+                <h3 className="font-bold text-lg text-[#2D041A]">Create New Recurring Batch</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Configure course, Guru, weekly schedule slots, room allocation, and student capacity.</p>
               </div>
               <button
                 onClick={() => setIsAddOpen(false)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateBatch} className="space-y-4">
               
-              {/* 1. Searchable Course Dropdown (Type directly to filter) */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Select Course <span className="text-rose-500">*</span> <span className="text-[10px] text-gray-400 font-normal">(Type directly to search)</span>
-                </label>
-                <SearchableCombobox
-                  options={courseComboboxOptions}
-                  value={addCourseId}
-                  onChange={(id) => handleAddCourseChange(id)}
-                  placeholder="Type course name (e.g. Bharatanatyam, Kuchipudi, Carnatic)..."
-                  required
-                />
+              {/* Row 1: Course & Assigned Guru */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Select Course <span className="text-rose-500">*</span>
+                  </label>
+                  <SearchableCombobox
+                    options={courseComboboxOptions}
+                    value={addCourseId}
+                    onChange={(id) => handleAddCourseChange(id)}
+                    placeholder="Type to search and select course..."
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Assign Guru / Faculty <span className="text-rose-500">*</span>
+                  </label>
+                  <SearchableCombobox
+                    options={getGuruComboboxOptions(addCourseId)}
+                    value={addTrainerId}
+                    onChange={(id) => setAddTrainerId(id)}
+                    placeholder="Type to search and select Guru..."
+                    required
+                  />
+                </div>
               </div>
 
-              {/* 2. Assign Guru / Faculty (Searchable Combobox) */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Assign Guru / Faculty <span className="text-rose-500">*</span> <span className="text-[10px] text-gray-400 font-normal">(Type directly to search)</span>
-                </label>
-                <SearchableCombobox
-                  options={getGuruComboboxOptions(addCourseId)}
-                  value={addTrainerId}
-                  onChange={(id) => setAddTrainerId(id)}
-                  placeholder="Type Guru name (e.g. Sri Guru, Smt...)..."
-                  required
-                />
-              </div>
-
-              {/* 3. Batch Name & Batch Code */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Row 2: Batch Name & Batch Code */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Batch Name <span className="text-rose-500">*</span>
@@ -1777,10 +1783,10 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Bharatanatyam - Batch 1"
+                    placeholder="Enter batch name"
                     value={addBatchName}
                     onChange={(e) => setAddBatchName(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
                 <div>
@@ -1794,32 +1800,31 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                   <input
                     type="text"
                     required
-                    placeholder="e.g. bhar-1"
+                    placeholder="Enter batch code"
                     value={addBatchCode}
                     onChange={(e) => setAddBatchCode(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
                   />
-                  <p className="text-[10px] text-gray-400 mt-1">Depends on course code (e.g. 'bhar-1')</p>
                 </div>
               </div>
 
-              {/* 4. Monthly Fee & Capacity */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Row 3: Monthly Fee & Capacity */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Monthly Fee (₹) <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
-                    <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                    <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-3.5 top-3" />
                     <input
                       type="number"
                       required
                       min={0}
                       step={50}
-                      placeholder="e.g. 2500"
+                      placeholder="Enter monthly fee"
                       value={addMonthlyFee}
                       onChange={(e) => setAddMonthlyFee(e.target.value)}
-                      className="w-full pl-8 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                      className="w-full pl-8 pr-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
                     />
                   </div>
                 </div>
@@ -1829,17 +1834,18 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                     type="number"
                     required
                     min={1}
+                    placeholder="Enter maximum class capacity"
                     value={addCapacity}
                     onChange={(e) => setAddCapacity(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
               </div>
 
-              {/* 5. Batch Description with AI Enhance */}
+              {/* 5. Batch Description with AI Enhance - Enlarged */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-gray-700">Batch Description / Notes</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-700">Batch Description &amp; Curriculum Notes</label>
                   <AiEnhanceButton
                     value={addDescription}
                     context={`Batch Name: ${addBatchName || 'Batch'}, Course: ${courses.find(c => c.id === addCourseId)?.title || 'Course'}`}
@@ -1847,19 +1853,24 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                   />
                 </div>
                 <textarea
-                  rows={2}
+                  rows={5}
                   value={addDescription}
                   onChange={(e) => setAddDescription(e.target.value)}
-                  placeholder="Enter batch focus, curriculum details, or notes..."
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] resize-none"
+                  placeholder="Enter batch curriculum, syllabus focus, prerequisites, or special instructions..."
+                  className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs focus:ring-2 focus:ring-[#8A064D] resize-y min-h-[110px]"
                 />
               </div>
 
-              {/* Conflict Alert Banner if occupied */}
-              {addConflict.hasConflict && (
-                <div className="p-3 bg-rose-50 border border-rose-300 rounded-2xl flex items-start gap-2.5 text-xs text-rose-800 animate-in fade-in shadow-xs">
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                  <span className="font-semibold">{addConflict.message}</span>
+              {/* Prominent Red Conflict Alert Banner if occupied or on save conflict */}
+              {(addConflict.hasConflict || addSaveConflictError) && (
+                <div className="p-4 bg-rose-50 border-2 border-rose-500 rounded-2xl flex items-start gap-3 text-xs text-rose-900 shadow-sm animate-in fade-in">
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-extrabold text-rose-800 text-sm">Room Schedule Conflict</p>
+                    <p className="font-medium mt-1 leading-relaxed">
+                      {addConflict.message || addSaveConflictError || 'The selected room is already occupied during these timings by another batch. Please select a vacant room or adjust the time slot.'}
+                    </p>
+                  </div>
                 </div>
               )}
 

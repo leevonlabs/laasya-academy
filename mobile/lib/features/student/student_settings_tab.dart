@@ -588,25 +588,14 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
                   ),
                   const Divider(height: 1, indent: 64),
 
-                  // 3. Privacy Policy Option
+                  // 3. Privacy Policy & Terms of Service Option
                   _settingsTile(
-                    icon: Icons.privacy_tip_rounded,
+                    icon: Icons.shield_rounded,
                     iconBg: const Color(0xFFF3E8FF),
                     iconColor: const Color(0xFF6B21A8),
-                    title: 'Privacy Policy',
-                    subtitle: 'Child safety, data protection & pickup chimes disclosure',
-                    onTap: () => LaasyaPolicyDialog.showPrivacy(context),
-                  ),
-                  const Divider(height: 1, indent: 64),
-
-                  // 4. Terms & Conditions Option
-                  _settingsTile(
-                    icon: Icons.gavel_rounded,
-                    iconBg: const Color(0xFFFEF3C7),
-                    iconColor: const Color(0xFF92400E),
-                    title: 'Terms & Conditions',
-                    subtitle: 'Academy rules, attendance policies & student guidelines',
-                    onTap: () => LaasyaPolicyDialog.showTerms(context),
+                    title: 'Privacy Policy & Terms of Service',
+                    subtitle: 'Child safety, data protection, academy rules & student guidelines',
+                    onTap: () => LaasyaPolicyDialog.showPolicy(context),
                   ),
                 ],
               ),

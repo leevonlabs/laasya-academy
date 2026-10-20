@@ -261,7 +261,7 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen()),
+              MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: true)),
             );
           },
         ),
@@ -284,7 +284,7 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
         type == 'message') {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen()),
+        MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: true)),
       );
     } else if (route == 'attendance' || route == '/attendance') {
       setState(() => _currentIndex = 3);

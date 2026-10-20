@@ -4,6 +4,10 @@ import '../constants/colors.dart';
 /// Modal dialog and bottom sheet displaying official Privacy Policy
 /// and Terms & Conditions compliant with Google Play & Apple App Store guidelines.
 class LaasyaPolicyDialog {
+  static void showPolicy(BuildContext context) {
+    _showPolicySheet(context, initialTab: 0);
+  }
+
   static void showPrivacy(BuildContext context) {
     _showPolicySheet(context, initialTab: 0);
   }
@@ -76,9 +80,9 @@ class _PolicySheetWidgetState extends State<_PolicySheetWidget> {
                       size: 22,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      _selectedTab == 0 ? 'Privacy Policy' : 'Terms & Conditions',
-                      style: const TextStyle(
+                    const Text(
+                      'Privacy Policy & Terms',
+                      style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
                         color: LaasyaColors.textDark,
