@@ -30,7 +30,8 @@ import {
   ShieldCheck,
   KeyRound,
   CalendarCheck,
-  UserCheck
+  UserCheck,
+  Bell
 } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 
@@ -40,6 +41,7 @@ interface Props {
     email?: string;
     role?: string;
     allowedPages?: string[];
+    canDelete?: boolean;
   };
   children: React.ReactNode;
 }
@@ -48,13 +50,49 @@ export default function DashboardShell({ user, children }: Props) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [adminAvatar, setAdminAvatar] = useState<string>('');
+  const [adminName, setAdminName] = useState<string>(user?.fullName || 'Director');
+  const [notifications, setNotifications] = useState([
+    {
+      id: 'n1',
+      title: 'Fee Collection Due',
+      description: 'Monthly tuition fees are due for 3 enrolled disciples.',
+      time: 'Just now',
+      unread: true,
+      href: '/finance/student-fees',
+    },
+    {
+      id: 'n2',
+      title: 'Active Holiday Alert',
+      description: 'Scheduled holiday circular dispatched to parents and gurus.',
+      time: 'Today',
+      unread: true,
+      href: '/holiday-alerts',
+    },
+    {
+      id: 'n3',
+      title: 'Attendance Audit Complete',
+      description: 'Weekly sessions verified across all classical art batches.',
+      time: 'Yesterday',
+      unread: false,
+      href: '/attendance/audit',
+    }
+  ]);
 
-  // Load sidebar preference from localStorage
+  // Load sidebar preference from localStorage & fetch admin profile
   useEffect(() => {
     const saved = localStorage.getItem('laasya_sidebar_collapsed');
     if (saved === 'true') {
       setIsCollapsed(true);
     }
+
+    fetch('/api/settings/admin-profile')
+      .then(r => r.json())
+      .then(d => {
+        if (d?.profile?.avatar_url) setAdminAvatar(d.profile.avatar_url);
+        if (d?.profile?.full_name) setAdminName(d.profile.full_name);
+      })
+      .catch(() => {});
   }, []);
 
   const toggleCollapse = () => {
@@ -80,7 +118,6 @@ export default function DashboardShell({ user, children }: Props) {
     { label: 'Tally Classes', href: '/tally-classes', icon: CalendarCheck },
     { label: 'Video Library', href: '/video-library', icon: Video },
     { label: 'Advertisements', href: '/advertisements', icon: ImageIcon },
-    { label: 'Schemes', href: '/schemes', icon: BadgePercent },
     { label: 'Expenses', href: '/expenses', icon: TrendingDown },
     { label: 'Password Management', href: '/password-management', icon: KeyRound },
     { label: 'Reception', href: '/reception', icon: UserCheck },
@@ -291,18 +328,57 @@ export default function DashboardShell({ user, children }: Props) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 relative">
             {/* Active Date Chip (No Term displayed) */}
             <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF2F8] border border-[#F0D5E4] text-[#6E3955] text-xs font-bold tabular-nums">
               <CalendarIcon className="w-3.5 h-3.5 text-[#8A064D]" />
               <span>{new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
             </div>
 
-            {/* Online Status Pill */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="hidden sm:inline">Director Active</span>
-            </div>
+            {/* Notification Bell Icon - Navigates to dedicated Notifications page */}
+            <Link
+              href="/notifications"
+              className="relative p-2 rounded-xl bg-[#FFF2F8] hover:bg-rose-100 border border-[#F0D5E4] text-[#8A064D] transition cursor-pointer flex items-center justify-center shadow-2xs"
+              title="Academy Notifications & Alerts"
+            >
+              <Bell className="w-4 h-4" />
+              {notifications.some(n => n.unread) && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-600 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
+                  {notifications.filter(n => n.unread).length}
+                </span>
+              )}
+            </Link>
+
+            {/* Profile Page Icon with Profile Image */}
+            <Link
+              href="/admin-profile"
+              className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-2xl bg-white hover:bg-[#FFF2F8] border border-[#F0D5E4] hover:border-[#8A064D] shadow-2xs transition group cursor-pointer"
+              title="Director Profile &amp; Academy Settings"
+            >
+              <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-[#590231] text-[#F9E33A] flex items-center justify-center font-bold text-xs shrink-0 shadow-xs ring-2 ring-emerald-500/40">
+                {adminAvatar ? (
+                  <img
+                    src={adminAvatar}
+                    alt={adminName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <span>{adminName.charAt(0).toUpperCase()}</span>
+                )}
+                <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white" />
+              </div>
+              <div className="hidden sm:block text-left">
+                <span className="text-xs font-extrabold text-[#2D041A] group-hover:text-[#8A064D] block leading-tight truncate max-w-[100px]">
+                  {adminName}
+                </span>
+                <span className="text-[10px] text-emerald-700 font-bold block leading-tight">
+                  Director
+                </span>
+              </div>
+            </Link>
           </div>
         </header>
 

@@ -1707,11 +1707,14 @@ For queries, contact: +91 8151 998 899`;
                     LC
                   </div>
                   <div>
-                    <h3 className="font-black text-base text-[#2D041A] uppercase tracking-wide">
-                      Laasya Cultural Academy
-                    </h3>
-                    <p className="text-[10px] text-gray-500 font-semibold tracking-widest uppercase">
-                      Official Student Fee Receipt
+                    <div className="inline-block bg-[#590231] text-white text-[10px] font-bold px-2 py-0.5 rounded-md tracking-wider">
+                      LAASYA CULTURAL ACADEMY
+                    </div>
+                    <p className="text-[9.5px] text-gray-500 font-medium mt-0.5">
+                      Society Reg. No: REG/HYD/2018/84920 • Center for Classical Arts, Dance & Music
+                    </p>
+                    <p className="text-[10.5px] text-[#8A064D] font-bold uppercase tracking-wider mt-0.5">
+                      Official Student Fee Receipt & Tax Invoice
                     </p>
                   </div>
                 </div>
@@ -1822,6 +1825,22 @@ For queries, contact: +91 8151 998 899`;
                     </div>
                   </div>
                 )}
+
+                {/* Digital Verification & Authorized Signatory */}
+                <div className="pt-4 mt-2 border-t border-gray-100 flex items-end justify-between">
+                  <div className="p-2.5 rounded-xl border border-emerald-600 bg-emerald-50/50 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <div>
+                      <span className="text-[9px] font-black uppercase text-emerald-800 tracking-wider block">Digitally Verified</span>
+                      <span className="text-[9px] text-gray-500">Official Computer-Generated Tax Invoice</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-gray-400">For Laasya Cultural Academy</p>
+                    <p className="text-xs font-black text-[#8A064D] mt-0.5">Sri Ramesh Rao</p>
+                    <p className="text-[10px] text-gray-500">Academy Director</p>
+                  </div>
+                </div>
 
               </div>
             </div>

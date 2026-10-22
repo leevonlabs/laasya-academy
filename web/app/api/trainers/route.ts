@@ -9,7 +9,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'owner') {
+  if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'owner') {
+  if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 
@@ -43,8 +43,8 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'owner') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  if (!user || (user.role !== 'owner' && !(user.role === 'receptionist' && user.canDelete))) {
+    return NextResponse.json({ error: 'Unauthorized: Delete permission denied' }, { status: 403 });
   }
 
   try {

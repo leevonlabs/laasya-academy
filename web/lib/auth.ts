@@ -11,6 +11,7 @@ export interface UserSession {
   fullName: string;
   role: 'owner' | 'trainer' | 'student' | 'receptionist';
   allowedPages?: string[];
+  canDelete?: boolean;
 }
 
 function signPayload(data: string): string {
@@ -94,9 +95,10 @@ export async function authenticateOwner(
         email: string;
         password_hash: string;
         allowed_pages: any;
+        can_delete: boolean;
         is_active: boolean;
       }>(
-        `SELECT id, full_name, phone, email, password_hash, allowed_pages, is_active
+        `SELECT id, full_name, phone, email, password_hash, allowed_pages, COALESCE(can_delete, false) as can_delete, is_active
          FROM public.receptionists
          WHERE (
            (LENGTH($1) >= 8 AND (
@@ -125,7 +127,8 @@ export async function authenticateOwner(
             email: receptionist.email || `${receptionist.phone}@laasyaacademy.com`,
             fullName: receptionist.full_name || 'Receptionist',
             role: 'receptionist',
-            allowedPages: pages
+            allowedPages: pages,
+            canDelete: Boolean(receptionist.can_delete)
           };
           return { success: true, user: sessionUser };
         }
@@ -147,7 +150,8 @@ export async function authenticateOwner(
               userId: adminProfile.id,
               email: adminProfile.email,
               fullName: adminProfile.full_name || 'Satya',
-              role: 'owner'
+              role: 'owner',
+              canDelete: true
             }
           };
         }
@@ -159,7 +163,8 @@ export async function authenticateOwner(
       userId: row.id,
       email: row.email,
       fullName: row.full_name || 'Satya',
-      role: 'owner'
+      role: 'owner',
+      canDelete: true
     };
 
     return { success: true, user: sessionUser };

@@ -7,6 +7,8 @@ import {
   getBatches 
 } from '@/lib/academy';
 import { getFinancialSummary } from '@/lib/finance';
+import { getTallyClasses } from '@/lib/holidayTally';
+import TimetableView from '@/components/batches/TimetableView';
 import { 
   BookOpen, 
   Users, 
@@ -26,12 +28,13 @@ import {
 export const revalidate = 15; // Fast client router cache with dynamic background revalidation
 
 export default async function OverviewPage() {
-  const [metrics, finance, todaySessions, allCourses, allBatches] = await Promise.all([
+  const [metrics, finance, todaySessions, allCourses, allBatches, tallyClasses] = await Promise.all([
     getDashboardMetrics(),
     getFinancialSummary(),
     getSessions(),
     getCourses(),
-    getBatches()
+    getBatches(),
+    getTallyClasses().catch(() => [])
   ]);
 
   // Categories count
@@ -445,6 +448,37 @@ export default async function OverviewPage() {
 
         </div>
 
+      </div>
+
+      {/* Weekly Master Timetable Section (Includes Rescheduled Classes) */}
+      <div className="bg-white rounded-3xl p-6 border border-[#F0D5E4] shadow-xs">
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#F0D5E4]/60">
+          <div>
+            <div className="inline-flex items-center gap-1.5 bg-[#FFF2F8] text-[#8A064D] px-3 py-0.5 rounded-full text-xs font-bold border border-rose-200 mb-1">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Current Week Live Schedule</span>
+            </div>
+            <h2 className="text-xl font-black text-[#2D041A]">
+              Academy Weekly Master Timetable
+            </h2>
+            <p className="text-xs text-gray-500 font-medium mt-0.5">
+              Live timetable showing regular batch hours and dynamic rescheduled classes (marked with ★) for the current week.
+            </p>
+          </div>
+          <Link
+            href="/batches"
+            className="text-xs font-bold text-[#8A064D] hover:underline flex items-center gap-1"
+          >
+            <span>Manage All Batches</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <TimetableView 
+          batches={allBatches} 
+          tallyClasses={tallyClasses} 
+          showBackLink={false} 
+        />
       </div>
 
     </div>

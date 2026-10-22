@@ -101,9 +101,10 @@ function getCourseImage(course: Course): string {
 interface Props {
   initialCourses: Course[];
   initialCategories?: string[];
+  canDelete?: boolean;
 }
 
-export default function CourseListClient({ initialCourses, initialCategories }: Props) {
+export default function CourseListClient({ initialCourses, initialCategories, canDelete = true }: Props) {
   const [courses, setCourses] = useState<Course[]>(initialCourses);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -754,18 +755,20 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                                 <Edit3 className="w-3.5 h-3.5" />
                               </button>
 
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setIsCategoryDropdownOpen(false);
-                                  setDeletingCategoryName(cat);
-                                }}
-                                className="p-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                                title={`Delete Category "${cat}"`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {canDelete && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsCategoryDropdownOpen(false);
+                                    setDeletingCategoryName(cat);
+                                  }}
+                                  className="p-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                  title={`Delete Category "${cat}"`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -1005,13 +1008,15 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
                     </button>
 
                     {/* Delete Button */}
-                    <button
-                      onClick={() => setDeletingCourse(c)}
-                      title="Delete Course"
-                      className="p-2 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition cursor-pointer shadow-2xs"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {canDelete && (
+                      <button
+                        onClick={() => setDeletingCourse(c)}
+                        title="Delete Course"
+                        className="p-2 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition cursor-pointer shadow-2xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1134,18 +1139,20 @@ export default function CourseListClient({ initialCourses, initialCategories }: 
 
               {/* Action Buttons */}
               <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const c = viewingCourse;
-                    setViewingCourse(null);
-                    setDeletingCourse(c);
-                  }}
-                  className="px-3.5 py-2 rounded-xl text-xs font-black text-rose-600 hover:bg-rose-50 transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Delete Course</span>
-                </button>
+                {canDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const c = viewingCourse;
+                      setViewingCourse(null);
+                      setDeletingCourse(c);
+                    }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-black text-rose-600 hover:bg-rose-50 transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Course</span>
+                  </button>
+                ) : <div />}
 
                 <div className="flex items-center gap-2">
                   <button

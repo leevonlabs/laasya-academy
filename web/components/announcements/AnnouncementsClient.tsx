@@ -93,6 +93,7 @@ interface Props {
   students?: Student[];
   defaultTab?: 'admin_sent' | 'guru_sent';
   defaultViewMode?: 'overview' | 'chat';
+  canDelete?: boolean;
 }
 
 // -------------------------------------------------------------
@@ -270,7 +271,8 @@ export default function AnnouncementsClient({
   trainers = [], 
   students = [],
   defaultTab = 'admin_sent',
-  defaultViewMode = 'overview'
+  defaultViewMode = 'overview',
+  canDelete = true
 }: Props) {
   const router = useRouter();
   const [announcements, setAnnouncements] = useState<Announcement[]>(
@@ -1270,21 +1272,23 @@ export default function AnnouncementsClient({
                               </button>
 
                               {/* Delete text button */}
-                              <button
-                                onClick={() => {
-                                  const isHoliday = ann.type_tag === 'Holiday' || (ann.title || '').toLowerCase().includes('holiday') || (ann.message || '').toLowerCase().includes('holiday');
-                                  if (isHoliday) {
-                                    router.push(`/announcements/holiday-alert?viewTitle=${encodeURIComponent(ann.title)}&action=delete`);
-                                  } else {
-                                    setDeletingAnnouncement(ann);
-                                  }
-                                }}
-                                className="h-7 px-3 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-black shadow-2xs flex items-center justify-center gap-1 transition cursor-pointer"
-                                title="Delete Broadcast"
-                              >
-                                <Trash2 className="w-3 h-3 text-rose-500" />
-                                <span>Delete</span>
-                              </button>
+                              {canDelete && (
+                                <button
+                                  onClick={() => {
+                                    const isHoliday = ann.type_tag === 'Holiday' || (ann.title || '').toLowerCase().includes('holiday') || (ann.message || '').toLowerCase().includes('holiday');
+                                    if (isHoliday) {
+                                      router.push(`/announcements/holiday-alert?viewTitle=${encodeURIComponent(ann.title)}&action=delete`);
+                                    } else {
+                                      setDeletingAnnouncement(ann);
+                                    }
+                                  }}
+                                  className="h-7 px-3 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-black shadow-2xs flex items-center justify-center gap-1 transition cursor-pointer"
+                                  title="Delete Broadcast"
+                                >
+                                  <Trash2 className="w-3 h-3 text-rose-500" />
+                                  <span>Delete</span>
+                                </button>
+                              )}
                             </div>
 
                             <div className="flex items-center gap-1 text-[10px] text-gray-500 font-bold shrink-0 ml-auto">

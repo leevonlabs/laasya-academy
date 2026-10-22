@@ -256,6 +256,12 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
   }
 
   void _showAnnouncementDetail(Map<String, dynamic> ann) {
+    // Record view for advertisement when opened by student
+    final adId = ann['id']?.toString() ?? '';
+    if (adId.isNotEmpty) {
+      SupabaseService().recordAdvertisementView(adId);
+    }
+
     final actionLinks = _parseActionLinks(ann['action_links']);
 
     showModalBottomSheet(
@@ -616,29 +622,47 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
     final course = _profile?['course'] ?? 'Bharathanatyam';
     final batch = _profile?['batch'] ?? 'Batch A (Beginners)';
 
-    // Tuition Fee Attributes (Relocated from Profile Page)
+    // Tuition Fee Attributes
     final totalFee = _profile?['total_monthly_fee'] ?? 2000;
     final fixedDiscount = _profile?['fixed_discount'] ?? 0;
     final advancePaid = _profile?['advance_paid'] ?? 2000;
-    final dueAmount = _profile?['due_amount'] ?? 0;
-    final dueStatus = _profile?['due_status'] ?? 'green';
+
+    final double totalMonthlyFeeNum = (totalFee is num) ? totalFee.toDouble() : (double.tryParse(totalFee.toString()) ?? 2000.0);
+    final double fixedDiscountNum = (fixedDiscount is num) ? fixedDiscount.toDouble() : (double.tryParse(fixedDiscount.toString()) ?? 0.0);
+    final double advancePaidNum = (advancePaid is num) ? advancePaid.toDouble() : (double.tryParse(advancePaid.toString()) ?? 0.0);
+
+    // Base fee (excl. 18% GST) & GST amount itemized
+    final double baseFeeNum = totalMonthlyFeeNum / 1.18;
+    final double gstAmountNum = totalMonthlyFeeNum - baseFeeNum;
+
+    // Net fee payable after discount
+    final double netMonthlyFee = (totalMonthlyFeeNum - fixedDiscountNum).clamp(0.0, double.infinity);
+
+    // Balance Due calculation:
+    // If advance paid is greater than net monthly fee, display negative balance due (advance credit)
+    final double balanceDueNum = (advancePaidNum > netMonthlyFee)
+        ? -(advancePaidNum - netMonthlyFee)
+        : (netMonthlyFee - advancePaidNum);
+
+    final bool hasAdvanceCredit = balanceDueNum < 0;
+    final bool isFeeCleared = balanceDueNum <= 0;
 
     Color dueBadgeBg;
     Color dueBadgeText;
     String dueLabel;
 
-    if (dueStatus == 'green' || (dueAmount is num && dueAmount <= 0)) {
+    if (hasAdvanceCredit) {
+      dueBadgeBg = const Color(0xFFDEF7EC);
+      dueBadgeText = const Color(0xFF03543F);
+      dueLabel = 'Advance Credit: ₹${(-balanceDueNum).toStringAsFixed(0)}';
+    } else if (isFeeCleared) {
       dueBadgeBg = const Color(0xFFDEF7EC);
       dueBadgeText = const Color(0xFF03543F);
       dueLabel = 'Fee Cleared • No Dues';
-    } else if (dueStatus == 'yellow' || (dueAmount is num && dueAmount < totalFee)) {
-      dueBadgeBg = const Color(0xFFFEF3C7);
-      dueBadgeText = const Color(0xFF92400E);
-      dueLabel = 'Partial Paid: ₹$dueAmount Due';
     } else {
       dueBadgeBg = const Color(0xFFFDE8E8);
       dueBadgeText = const Color(0xFF9B1C1C);
-      dueLabel = 'Tuition Due: ₹$dueAmount';
+      dueLabel = 'Balance Due: ₹${balanceDueNum.toStringAsFixed(0)}';
     }
 
     return RefreshIndicator(
@@ -859,11 +883,15 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                     ],
                   ),
                   const SizedBox(height: 14),
+                  // ---------------------------------------------------------
+                  // ROW 1: 3 GRIDS IN A ROW (Base Fee, GST (18%), Total Fee)
+                  // ---------------------------------------------------------
                   Row(
                     children: [
+                      // Grid 1: Base Fee (excl. GST)
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFF9FB),
                             borderRadius: BorderRadius.circular(14),
@@ -872,17 +900,21 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Monthly Fee', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const Text('Base Fee', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 3),
-                              Text('₹$totalFee', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
+                              Text('₹${baseFeeNum.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: LaasyaColors.textDark)),
+                              const SizedBox(height: 2),
+                              const Text('excl. GST', style: TextStyle(fontSize: 9, color: Colors.black45, fontWeight: FontWeight.w500)),
                             ],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
+
+                      // Grid 2: GST Percent & Amount
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF3FAF7),
                             borderRadius: BorderRadius.circular(14),
@@ -891,28 +923,34 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Paid / Advance', style: TextStyle(fontSize: 10, color: Color(0xFF03543F), fontWeight: FontWeight.bold)),
+                              const Text('GST (18%)', style: TextStyle(fontSize: 10, color: Color(0xFF03543F), fontWeight: FontWeight.bold)),
                               const SizedBox(height: 3),
-                              Text('₹$advancePaid', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
+                              Text('₹${gstAmountNum.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
+                              const SizedBox(height: 2),
+                              const Text('18% Itemized', style: TextStyle(fontSize: 9, color: Color(0xFF047857), fontWeight: FontWeight.w500)),
                             ],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
+
+                      // Grid 3: Total Fee
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                           decoration: BoxDecoration(
-                            color: (dueAmount > 0) ? const Color(0xFFFDF2F2) : const Color(0xFFFFF9FB),
+                            color: const Color(0xFFFFF2F8),
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: (dueAmount > 0) ? const Color(0xFFF8B4B4) : const Color(0xFFF0D5E4)),
+                            border: Border.all(color: const Color(0xFFF0D5E4)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Balance Due', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                              const Text('Total Fee', style: TextStyle(fontSize: 10, color: Color(0xFF8A064D), fontWeight: FontWeight.bold)),
                               const SizedBox(height: 3),
-                              Text('₹$dueAmount', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: dueBadgeText)),
+                              Text('₹${totalMonthlyFeeNum.toStringAsFixed(0)}', style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900, color: Color(0xFF8A064D))),
+                              const SizedBox(height: 2),
+                              const Text('monthly gross', style: TextStyle(fontSize: 9, color: Colors.black45, fontWeight: FontWeight.w500)),
                             ],
                           ),
                         ),
@@ -920,94 +958,121 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                     ],
                   ),
 
-                  // =========================================================
-                  // TOTAL FIXED MONTHLY DISCOUNT (HIGHLIGHTED IN RED IN REF IMAGE)
-                  // =========================================================
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF2F8),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFF0D5E4), width: 1.2),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(7),
+                  const SizedBox(height: 10),
+
+                  // ---------------------------------------------------------
+                  // ROW 2: 2 GRIDS IN A ROW (Balance Due, Total Discount)
+                  // ---------------------------------------------------------
+                  Row(
+                    children: [
+                      // Grid 1: Balance Due (negative if advance paid > current monthly fee)
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF8A064D),
-                            borderRadius: BorderRadius.circular(9),
+                            color: hasAdvanceCredit
+                                ? const Color(0xFFF3FAF7)
+                                : (balanceDueNum > 0 ? const Color(0xFFFDF2F2) : const Color(0xFFFFF9FB)),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: hasAdvanceCredit
+                                  ? const Color(0xFFC7EBD9)
+                                  : (balanceDueNum > 0 ? const Color(0xFFF8B4B4) : const Color(0xFFF0D5E4)),
+                            ),
                           ),
-                          child: const Icon(Icons.local_offer_rounded, size: 16, color: Color(0xFFF9E33A)),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'TOTAL FIXED MONTHLY DISCOUNT',
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Balance Due', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                  if (hasAdvanceCredit)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDEF7EC),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text('Credit', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                hasAdvanceCredit
+                                    ? '-₹${(-balanceDueNum).toStringAsFixed(0)}'
+                                    : '₹${balanceDueNum.toStringAsFixed(0)}',
                                 style: TextStyle(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.6,
-                                  color: Color(0xFF8A064D),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: hasAdvanceCredit
+                                      ? const Color(0xFF03543F)
+                                      : (balanceDueNum > 0 ? const Color(0xFF9B1C1C) : const Color(0xFF03543F)),
                                 ),
                               ),
                               const SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  Text(
-                                    '₹$fixedDiscount',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFF2D041A),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    (fixedDiscount is num && fixedDiscount > 0)
-                                        ? 'discount saved every month'
-                                        : 'Standard academy fee (No discount)',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: (fixedDiscount is num && fixedDiscount > 0)
-                                          ? const Color(0xFF047857)
-                                          : Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                hasAdvanceCredit
+                                    ? 'Reduced for upcoming month'
+                                    : (balanceDueNum > 0 ? 'Pending payment due' : 'All dues settled'),
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: hasAdvanceCredit
+                                      ? const Color(0xFF047857)
+                                      : (balanceDueNum > 0 ? const Color(0xFF9B1C1C) : const Color(0xFF03543F)),
+                                ),
                               ),
                             ],
                           ),
                         ),
-                        if (fixedDiscount is num && fixedDiscount > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFDEF7EC),
-                              borderRadius: BorderRadius.circular(7),
-                              border: Border.all(color: const Color(0xFF31C48D).withOpacity(0.4)),
-                            ),
-                            child: const Text(
-                              'Scheme Applied',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF03543F),
-                              ),
-                            ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Grid 2: Total Discount
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF2F8),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFF0D5E4)),
                           ),
-                      ],
-                    ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Total Discount', style: TextStyle(fontSize: 10, color: Color(0xFF8A064D), fontWeight: FontWeight.bold)),
+                                  Icon(Icons.local_offer_rounded, size: 12, color: Color(0xFF8A064D)),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '₹${fixedDiscountNum.toStringAsFixed(0)}',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF2D041A)),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                fixedDiscountNum > 0 ? 'Fixed concession / mo' : 'Standard academy fee',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: fixedDiscountNum > 0 ? const Color(0xFF047857) : Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
 
                   // Due cycle / pending dues indicator below discount
                   const SizedBox(height: 8),
-                  if (dueAmount > 0)
+                  if (balanceDueNum > 0)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
@@ -1020,8 +1085,28 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              'Due Date: ${_profile?['due_date'] ?? '10th Oct 2026'} • Pending Amount ₹$dueAmount',
+                              'Due Date: ${_profile?['due_date'] ?? '10th Oct 2026'} • Pending Amount ₹${balanceDueNum.toStringAsFixed(0)}',
                               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF9B1C1C)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (hasAdvanceCredit)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDEF7EC),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF03543F)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Advance Credit: ₹${(-balanceDueNum).toStringAsFixed(0)} will be auto-deducted from upcoming month tuition fees.',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF03543F)),
                             ),
                           ),
                         ],

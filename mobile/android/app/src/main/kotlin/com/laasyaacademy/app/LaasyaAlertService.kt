@@ -232,7 +232,8 @@ class LaasyaAlertService : Service() {
             if (alertType == "message" || alertType == "announcement" || alertType == "admin_alert") {
                 val title = alert.optString("course_title", alert.optString("title", "Academy Notice"))
                 val msg = alert.optString("message", "New administrative circular posted.")
-                showSystemNotification(NOTIF_ID_ANNOUNCEMENT, title, msg, NOTIF_CHANNEL_ANNOUNCEMENTS, "/messages")
+                val notifRoute = if (alertType == "announcement") "/announcements" else "/messages"
+                showSystemNotification(NOTIF_ID_ANNOUNCEMENT, title, msg, NOTIF_CHANNEL_ANNOUNCEMENTS, notifRoute)
             }
             return
         }
@@ -255,9 +256,14 @@ class LaasyaAlertService : Service() {
                 val msg = "$courseTitle • $batchName (Recorded by Guru $trainerName)"
                 showSystemNotification(NOTIF_ID_ATTENDANCE, title, msg, NOTIF_CHANNEL_CLASSES, "/attendance")
             }
-            "message", "announcement" -> {
+            "announcement" -> {
                 val title = alert.optString("course_title", alert.optString("title", "Academy Notice"))
                 val msg = alert.optString("message", "New announcement received.")
+                showSystemNotification(NOTIF_ID_ANNOUNCEMENT, title, msg, NOTIF_CHANNEL_ANNOUNCEMENTS, "/announcements")
+            }
+            "message" -> {
+                val title = alert.optString("course_title", alert.optString("title", "Academy Notice"))
+                val msg = alert.optString("message", "New message received.")
                 showSystemNotification(NOTIF_ID_ANNOUNCEMENT, title, msg, NOTIF_CHANNEL_ANNOUNCEMENTS, "/messages")
             }
         }

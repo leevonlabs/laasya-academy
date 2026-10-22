@@ -28,6 +28,7 @@ export interface Announcement {
   admin_avatar_url?: string | null;
   target_students?: string[] | string | null;
   target_student_names?: string[] | string | null;
+  views_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -103,6 +104,9 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
         a.sender_role,
         a.trainer_id,
         a.trainer_name,
+        a.target_students,
+        a.target_student_names,
+        COALESCE(a.views_count, 0) as views_count,
         COALESCE(pt.avatar_url, tt.avatar_url, pt2.avatar_url) as trainer_avatar_url,
         COALESCE(NULLIF((SELECT config_value->>'avatar_url' FROM public.app_config WHERE config_key = 'admin_support_profile'), ''), NULLIF(pa.avatar_url, '')) as admin_avatar_url,
         a.created_at::text as created_at, 
@@ -345,17 +349,39 @@ export async function createAnnouncement(data: {
       : effectiveMessage;
     const alertMessage = `${previewMessage} (Shared by ${senderFullName} [${senderRoleName}])`;
 
-    await query(`
-      INSERT INTO public.session_alerts (
-        batch_id, batch_name, course_title, trainer_name, message, alert_type, created_at
-      ) VALUES ($1, $2, $3, $4, $5, 'announcement', NOW());
-    `, [
-      validBatchId || 'all',
-      data.target_batch_name || 'All Batches',
-      alertCourseTitle,
-      senderFullName,
-      alertMessage
-    ]);
+    if (Array.isArray(data.target_students) && data.target_students.length > 0) {
+      for (const st of data.target_students) {
+        const sId = String(st.id || st.student_id || '');
+        const sRoll = String(st.roll_number || '');
+        const sName = String(st.name || '');
+        await query(`
+          INSERT INTO public.session_alerts (
+            batch_id, batch_name, course_title, trainer_name, message, alert_type, target_student_id, target_roll_number, target_student_name, created_at
+          ) VALUES ($1, $2, $3, $4, $5, 'announcement', $6, $7, $8, NOW());
+        `, [
+          validBatchId || 'all',
+          data.target_batch_name || 'All Batches',
+          alertCourseTitle,
+          senderFullName,
+          alertMessage,
+          sId || null,
+          sRoll || null,
+          sName || null
+        ]);
+      }
+    } else {
+      await query(`
+        INSERT INTO public.session_alerts (
+          batch_id, batch_name, course_title, trainer_name, message, alert_type, created_at
+        ) VALUES ($1, $2, $3, $4, $5, 'announcement', NOW());
+      `, [
+        validBatchId || 'all',
+        data.target_batch_name || 'All Batches',
+        alertCourseTitle,
+        senderFullName,
+        alertMessage
+      ]);
+    }
   } catch (alertErr) {
     console.warn('Could not insert session_alert copy for announcement:', alertErr);
   }

@@ -8,7 +8,7 @@ export async function PUT(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'owner') {
+    if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -22,7 +22,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Amount must be greater than 0', field: 'amount' }, { status: 400 });
     }
 
-    const updated = await updateExpense(id, body, user.fullName || 'Academy Director');
+    const updated = await updateExpense(id, body, user.fullName || 'Academy Staff');
 
     return NextResponse.json({
       success: true,
@@ -41,12 +41,12 @@ export async function DELETE(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'owner') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user || (user.role !== 'owner' && !(user.role === 'receptionist' && user.canDelete))) {
+      return NextResponse.json({ error: 'Unauthorized: Delete permission denied' }, { status: 403 });
     }
 
     const { id } = await params;
-    const removed = await deleteExpense(id, user.fullName || 'Academy Director');
+    const removed = await deleteExpense(id, user.fullName || 'Academy Staff');
 
     return NextResponse.json({
       success: true,

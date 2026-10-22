@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deleteVideoLibraryItem, updateVideoLibraryItem } from '@/lib/videoLibrary';
+import { getCurrentUser } from '@/lib/auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,6 +17,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getCurrentUser();
+    if (!user || (user.role !== 'owner' && !(user.role === 'receptionist' && user.canDelete))) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Delete permission denied' },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
     const { id } = await params;
     if (!id) {
       return NextResponse.json({ success: false, error: 'Item ID is required' }, { status: 400, headers: corsHeaders });

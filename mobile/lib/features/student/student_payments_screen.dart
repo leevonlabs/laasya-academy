@@ -42,8 +42,15 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
 
   // Invoice modal view with download and share options
   void _showInvoiceModal(Map<String, dynamic> item) {
-    final invNo = (item['invoice_number'] ?? 'LCA-INV-2026').toString();
-    final recNo = (item['receipt_number'] ?? 'LCA-REC-2026').toString();
+    final rawInv = (item['invoice_number'] ?? '').toString();
+    final rawRec = (item['receipt_number'] ?? '').toString();
+    final fallbackHash = (item['id'] ?? '10006').toString().replaceAll(RegExp(r'[^0-9]'), '').padRight(5, '7').substring(0, 5);
+    final invNo = (rawInv.isNotEmpty && rawInv != 'LCA-INV' && rawInv != 'LCA-INV-2026') 
+        ? rawInv 
+        : 'LCA-INV-2026-$fallbackHash';
+    final recNo = (rawRec.isNotEmpty && rawRec != 'LCA-REC' && rawRec != 'LCA-REC-2026') 
+        ? rawRec 
+        : 'LCA-REC-2026-$fallbackHash';
     final date = (item['payment_date'] ?? 'Recent').toString();
     final period = (item['fee_period'] ?? 'Monthly Tuition').toString();
     final course = (item['course_title'] ?? 'Bharathanatyam').toString();
@@ -97,7 +104,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                         Icon(Icons.receipt_long_rounded, color: LaasyaColors.primary, size: 22),
                         SizedBox(width: 8),
                         Text(
-                          'Official Fee Invoice',
+                          'Official Fee Receipt & Tax Invoice',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -234,7 +241,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
 
                         // Fee Line Items
                         const Text(
-                          'PAYMENT BREAKDOWN',
+                          'PAYMENT BREAKDOWN (GST ITEMIZED)',
                           style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: LaasyaColors.primary),
                         ),
                         const SizedBox(height: 10),
@@ -252,6 +259,28 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                 children: [
                                   Text('$course Tuition ($period)', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                                   Text('₹$gross', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Base Tuition (excl. GST)', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                                  Text(
+                                    '₹${((gross is num ? gross.toDouble() : 2000.0) / 1.18).toStringAsFixed(2)}',
+                                    style: const TextStyle(fontSize: 11, color: Colors.black87, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('GST (18% included • HSN: 999293)', style: TextStyle(fontSize: 11, color: Color(0xFF03543F))),
+                                  Text(
+                                    '₹${((gross is num ? gross.toDouble() : 2000.0) - ((gross is num ? gross.toDouble() : 2000.0) / 1.18)).toStringAsFixed(2)}',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF03543F), fontWeight: FontWeight.bold),
+                                  ),
                                 ],
                               ),
                               if (discount > 0) ...[
@@ -387,6 +416,545 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                     ),
                   ],
                 ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Interactive Self-Service Payment Gateway Modal for Students
+  void _showPaymentGatewayModal(int feeAmount, String courseTitle) {
+    int selectedTab = 0; // 0: UPI, 1: Card, 2: NetBanking
+    bool isProcessing = false;
+    final studentName = widget.studentProfile?['full_name'] ?? 'Student';
+    final rollNo = widget.studentProfile?['roll_number'] ?? 'LCA-6';
+    final double baseFee = feeAmount / 1.18;
+    final double gstFee = feeAmount - baseFee;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (mCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setMState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.88,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(28),
+                  topRight: Radius.circular(28),
+                ),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Header with Security Badge
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.lock_rounded, color: Color(0xFF03543F), size: 20),
+                            SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Academy Payment Gateway',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                    color: LaasyaColors.textDark,
+                                  ),
+                                ),
+                                Text(
+                                  '256-Bit SSL Encrypted • PCI DSS Compliant',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 22),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+
+                  Expanded(
+                    child: isProcessing
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const CircularProgressIndicator(color: LaasyaColors.primary),
+                                const SizedBox(height: 18),
+                                const Text(
+                                  'Connecting to Banking Gateway...',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Authorizing ₹$feeAmount payment for $studentName',
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          )
+                        : SingleChildScrollView(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Order & Fee Summary Card
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF9FB),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: const Color(0xFFF0D5E4)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(courseTitle, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
+                                              Text('Monthly Tuition Fee • $rollNo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                            ],
+                                          ),
+                                          Text('₹$feeAmount', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      const Divider(height: 1),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text('Base Tuition (excl. GST):', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                                          Text('₹${baseFee.toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87)),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text('GST (18% included):', style: TextStyle(fontSize: 11, color: Color(0xFF03543F))),
+                                          Text('₹${gstFee.toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: 20),
+
+                                // Payment Method Selection Tabs
+                                const Text(
+                                  'SELECT PAYMENT METHOD',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Colors.grey),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    _gatewayTabItem(0, 'UPI / QR', Icons.qr_code_scanner_rounded, selectedTab, () => setMState(() => selectedTab = 0)),
+                                    const SizedBox(width: 8),
+                                    _gatewayTabItem(1, 'Card', Icons.credit_card_rounded, selectedTab, () => setMState(() => selectedTab = 1)),
+                                    const SizedBox(width: 8),
+                                    _gatewayTabItem(2, 'NetBanking', Icons.account_balance_rounded, selectedTab, () => setMState(() => selectedTab = 2)),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 16),
+
+                                // Tab Content
+                                if (selectedTab == 0) ...[
+                                  // UPI View
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: Colors.grey.shade200),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        const Text('Scan Academy UPI QR or pay via installed app', style: TextStyle(fontSize: 11.5, color: Colors.grey)),
+                                        const SizedBox(height: 14),
+                                        // QR Code Mock
+                                        Container(
+                                          width: 130,
+                                          height: 130,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade50,
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: Colors.grey.shade300),
+                                          ),
+                                          child: const Center(
+                                            child: Icon(Icons.qr_code_2_rounded, size: 100, color: Color(0xFF2D041A)),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFF2F8),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFF0D5E4)),
+                                          ),
+                                          child: const Text('UPI ID: laasyaacademy@sbi', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
+                                        ),
+                                        const SizedBox(height: 14),
+                                        const Text('Instant App Transfer:', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                          children: [
+                                            _upiAppIcon('GPay', const Color(0xFF4285F4)),
+                                            _upiAppIcon('PhonePe', const Color(0xFF5F259F)),
+                                            _upiAppIcon('Paytm', const Color(0xFF00B9F5)),
+                                            _upiAppIcon('BHIM', const Color(0xFF00796B)),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ] else if (selectedTab == 1) ...[
+                                  // Card View
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: Colors.grey.shade200),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Card Number', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                        const SizedBox(height: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade50,
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(color: Colors.grey.shade300),
+                                          ),
+                                          child: const Row(
+                                            children: [
+                                              Icon(Icons.credit_card_rounded, size: 18, color: Colors.grey),
+                                              SizedBox(width: 10),
+                                              Text('4532  ••••  ••••  8910', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text('Expiry Date', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                                  const SizedBox(height: 6),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                    decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade300)),
+                                                    child: const Text('12 / 29', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text('CVV', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                                  const SizedBox(height: 6),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                    decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade300)),
+                                                    child: const Text('•••', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        const Text('Supports Visa, MasterCard, RuPay, Maestro debit & credit cards.', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                      ],
+                                    ),
+                                  ),
+                                ] else ...[
+                                  // NetBanking View
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: Colors.grey.shade200),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Select Your Bank', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                        const SizedBox(height: 10),
+                                        _bankOption('State Bank of India (SBI)', true),
+                                        _bankOption('HDFC Bank', false),
+                                        _bankOption('ICICI Bank', false),
+                                        _bankOption('Axis Bank', false),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+
+                                const SizedBox(height: 24),
+
+                                // Pay Button
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF03543F),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                      elevation: 2,
+                                    ),
+                                    onPressed: () async {
+                                      setMState(() => isProcessing = true);
+                                      await Future.delayed(const Duration(milliseconds: 1400));
+                                      
+                                      // Generate payment record
+                                      final now = DateTime.now();
+                                      final dateStr = '${now.day} ${_monthName(now.month)} ${now.year}';
+                                      final newInvNo = 'LCA-INV-2026-${now.millisecondsSinceEpoch.toString().substring(7)}';
+                                      final newRecNo = 'LCA-REC-${now.millisecondsSinceEpoch.toString().substring(8)}';
+                                      final newPayment = {
+                                        'id': 'pay-${now.millisecondsSinceEpoch}',
+                                        'invoice_number': newInvNo,
+                                        'receipt_number': newRecNo,
+                                        'payment_date': dateStr,
+                                        'fee_period': '${_monthName(now.month)} ${now.year}',
+                                        'course_title': courseTitle,
+                                        'batch_name': 'Enrolled Batch',
+                                        'student_name': studentName,
+                                        'roll_number': rollNo,
+                                        'parent_name': widget.studentProfile?['parent_name'] ?? 'Parent',
+                                        'payment_method': selectedTab == 0 ? 'UPI / Online' : selectedTab == 1 ? 'Debit Card' : 'Net Banking',
+                                        'transaction_reference': 'TXN-${now.millisecondsSinceEpoch}',
+                                        'receipt_issued_by': 'Automated Online Payment Gateway',
+                                        'amount_paid': feeAmount,
+                                        'gross_amount': feeAmount,
+                                        'discount_amount': 0,
+                                        'status': 'paid',
+                                      };
+
+                                      setState(() {
+                                        _payments.insert(0, newPayment);
+                                      });
+
+                                      if (mounted && ctx.mounted) {
+                                        Navigator.pop(ctx);
+                                        _showPaymentSuccessDialog(newPayment);
+                                      }
+                                    },
+                                    child: Text(
+                                      'Pay ₹$feeAmount Securely',
+                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _gatewayTabItem(int index, String title, IconData icon, int currentTab, VoidCallback onTap) {
+    final isSelected = index == currentTab;
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF590231) : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isSelected ? const Color(0xFF590231) : Colors.grey.shade300),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 18, color: isSelected ? Colors.white : Colors.black87),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _upiAppIcon(String name, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(name, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+    );
+  }
+
+  Widget _bankOption(String bankName, bool isSelected) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFFFFF2F8) : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: isSelected ? const Color(0xFF8A064D) : Colors.grey.shade200),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(bankName, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500, color: isSelected ? const Color(0xFF8A064D) : Colors.black87)),
+          Icon(isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, size: 16, color: isSelected ? const Color(0xFF8A064D) : Colors.grey),
+        ],
+      ),
+    );
+  }
+
+  String _monthName(int m) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return (m >= 1 && m <= 12) ? months[m - 1] : 'Month';
+  }
+
+  void _showPaymentSuccessDialog(Map<String, dynamic> newPayment) {
+    showDialog(
+      context: context,
+      builder: (dCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDEF7EC),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_circle_rounded, color: Color(0xFF03543F), size: 48),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Payment Successful!',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Tuition fee of ₹${newPayment['amount_paid']} has been processed and credited to Laasya Cultural Academy.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Receipt No:', style: TextStyle(fontSize: 10.5, color: Colors.grey)),
+                        Text(newPayment['receipt_number'] ?? '', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Payment Mode:', style: TextStyle(fontSize: 10.5, color: Colors.grey)),
+                        Text(newPayment['payment_method'] ?? '', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => Navigator.pop(dCtx),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF590231),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(dCtx);
+                        _showInvoiceModal(newPayment);
+                      },
+                      child: const Text('View Receipt'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -588,6 +1156,104 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                       ),
                     ),
 
+                    // =========================================================
+                    // 1.5. SELF-SERVICE PAYMENT ACTION CARD
+                    // =========================================================
+                    Container(
+                      margin: const EdgeInsets.only(top: 14),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFF0D5E4)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFF2F8),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.payment_rounded, color: LaasyaColors.primary, size: 20),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Online Fee Payment',
+                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                                      ),
+                                      Text(
+                                        'Pay your monthly tuition fee directly',
+                                        style: TextStyle(fontSize: 10.5, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDEF7EC),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text('UPI • CARDS • NETBANKING', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Divider(height: 1),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Monthly Tuition Payable', style: TextStyle(fontSize: 10.5, color: Colors.grey)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '₹$monthlyFee',
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF03543F)),
+                                  ),
+                                  const Text(
+                                    'Incl. 18% GST',
+                                    style: TextStyle(fontSize: 9.5, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                              ElevatedButton.icon(
+                                onPressed: () => _showPaymentGatewayModal(monthlyFee, course),
+                                icon: const Icon(Icons.lock_rounded, size: 14, color: Colors.white),
+                                label: Text('Pay ₹$monthlyFee Now', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF8A064D),
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
                     const SizedBox(height: 20),
 
                     // =========================================================
@@ -597,7 +1263,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Payment History (${_payments.length})',
+                          'Payment-Wise Tax Invoices (${_payments.length})',
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,

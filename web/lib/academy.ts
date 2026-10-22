@@ -145,6 +145,7 @@ export interface Batch {
   room_or_hall: string;
   room?: string;
   monthly_fee?: number;
+  gst_percent?: number;
   description?: string;
   max_capacity: number;
   is_active: boolean;
@@ -1294,6 +1295,7 @@ export async function getBatches(): Promise<Batch[]> {
       b.trainer_id, p.full_name as trainer_name,
       b.name, b.days_of_week, b.start_time, b.end_time, b.room_or_hall,
       COALESCE(b.monthly_fee, 0)::numeric as monthly_fee,
+      COALESCE(b.gst_percent, 18)::numeric as gst_percent,
       COALESCE(b.description, '') as description,
       b.max_capacity, b.is_active, b.schedules,
       COUNT(DISTINCT CASE WHEN st.status = 'active' THEN be.id END)::int as enrolled_count
@@ -1303,7 +1305,7 @@ export async function getBatches(): Promise<Batch[]> {
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batch_enrollments be ON be.batch_id = b.id AND be.status = 'active'
     LEFT JOIN public.students st ON st.id = be.student_id
-    GROUP BY b.id, b.code, b.course_id, c.title, c.code, c.category, b.trainer_id, p.full_name, b.monthly_fee, b.description, b.schedules
+    GROUP BY b.id, b.code, b.course_id, c.title, c.code, c.category, b.trainer_id, p.full_name, b.monthly_fee, b.gst_percent, b.description, b.schedules
     ORDER BY b.start_time, b.name;
   `;
   return query<Batch>(sql);
@@ -1320,6 +1322,7 @@ export async function createBatch(data: {
   room_or_hall: string;
   max_capacity: number;
   monthly_fee?: number;
+  gst_percent?: number;
   description?: string;
   is_active?: boolean;
   schedules?: BatchScheduleSlot[];
@@ -1354,6 +1357,7 @@ export async function createBatch(data: {
     data.course_id, data.trainer_id, data.name, batchCode, data.days_of_week,
     data.start_time, data.end_time, data.room_or_hall, data.max_capacity,
     Number(data.monthly_fee || 0),
+    Number(data.gst_percent !== undefined ? data.gst_percent : 18),
     data.description || '',
     data.is_active !== undefined ? data.is_active : true,
     JSON.stringify(data.schedules || [])
@@ -1371,6 +1375,7 @@ export async function updateBatch(id: string, data: {
   room_or_hall?: string;
   max_capacity?: number;
   monthly_fee?: number;
+  gst_percent?: number;
   description?: string;
   is_active?: boolean;
   schedules?: BatchScheduleSlot[];
@@ -1398,6 +1403,7 @@ export async function updateBatch(id: string, data: {
     id, data.name, data.course_id, data.trainer_id, data.days_of_week,
     data.start_time, data.end_time, data.room_or_hall, data.max_capacity,
     data.monthly_fee !== undefined ? data.monthly_fee : null,
+    data.gst_percent !== undefined ? data.gst_percent : null,
     data.description !== undefined ? data.description : null,
     data.is_active !== undefined ? data.is_active : null,
     data.schedules ? JSON.stringify(data.schedules) : null,

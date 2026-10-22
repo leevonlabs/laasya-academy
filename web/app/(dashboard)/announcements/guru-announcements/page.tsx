@@ -10,9 +10,11 @@ export const dynamic = 'force-dynamic';
 
 export default async function GuruAnnouncementsPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'owner') {
+  if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
     redirect('/login');
   }
+
+  const canDelete = user.role === 'owner' || Boolean(user.canDelete);
 
   const [announcements, courses, batches, trainers, students] = await Promise.all([
     getAnnouncements({ announcementType: 'message' }),
@@ -32,6 +34,7 @@ export default async function GuruAnnouncementsPage() {
         students={students}
         defaultTab="guru_sent"
         defaultViewMode="chat"
+        canDelete={canDelete}
       />
     </div>
   );

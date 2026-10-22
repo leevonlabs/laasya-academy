@@ -185,6 +185,15 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
 
             _globalProcessedAlertIds.add(id);
             AlarmService.markAlertProcessed(id);
+
+            // User requirement: If alert was sent by the Guru themselves, do not pop up self-notification
+            final senderRole = (a['sender_role'] ?? '').toString().toLowerCase();
+            final aTrainerId = (a['trainer_id'] ?? '').toString().trim();
+            final aTrainerName = (a['trainer_name'] ?? a['created_by'] ?? '').toString().toLowerCase().trim();
+            final isSelfSent = (aTrainerId.isNotEmpty && aTrainerId == trainerId) ||
+                (senderRole.contains('trainer') && aTrainerName.isNotEmpty && trainerName.toLowerCase().contains(aTrainerName));
+            if (isSelfSent) continue;
+
             freshAlerts.add(a);
           }
 
@@ -205,10 +214,23 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
     SystemSound.play(SystemSoundType.alert);
     HapticFeedback.mediumImpact();
 
-    final title = alert['course_title'] ?? alert['title'] ?? 'Academy Notice';
-    final msg = alert['message'] ?? 'New administrative circular posted.';
+    final title = (alert['course_title'] ?? alert['title'] ?? 'Academy Notice').toString();
+    final msg = (alert['message'] ?? 'New administrative circular posted.').toString();
+    final alertType = (alert['alert_type'] ?? alert['type'] ?? alert['type_tag'] ?? '').toString().toLowerCase();
+    final senderRole = (alert['sender_role'] ?? '').toString().toLowerCase();
+    final titleLower = title.toLowerCase();
+    final isAnnouncement = alertType == 'announcement' ||
+        alertType == 'broadcast' ||
+        titleLower.contains('announcement') ||
+        titleLower.contains('broadcast') ||
+        senderRole.contains('trainer') ||
+        senderRole.contains('guru');
 
-    AlarmService.showNoticeNotification(title: title, message: msg);
+    AlarmService.showNoticeNotification(
+      title: title,
+      message: msg,
+      route: isAnnouncement ? '/announcements' : '/messages',
+    );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).clearSnackBars();
@@ -256,12 +278,14 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
           ],
         ),
         action: SnackBarAction(
-          label: 'VIEW',
+          label: isAnnouncement ? 'VIEW ANNOUNCEMENT' : 'VIEW MESSAGE',
           textColor: LaasyaColors.accentGold,
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: true)),
+              MaterialPageRoute(
+                builder: (_) => TrainerAnnouncementsScreen(isMessagesMode: !isAnnouncement),
+              ),
             );
           },
         ),
@@ -272,13 +296,17 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
   void _handleNotificationOpened(Map<String, dynamic> data) {
     if (!mounted) return;
     final route = data['route']?.toString().toLowerCase();
-    final type = data['type']?.toString().toLowerCase();
-    if (route == 'messages' ||
+    final type = (data['alert_type'] ?? data['type'] ?? '').toString().toLowerCase();
+    final title = (data['title'] ?? data['course_title'] ?? '').toString().toLowerCase();
+    if (route == 'announcements' || route == '/announcements' || type == 'announcement' || title.contains('announcement') || type == 'broadcast') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: false)),
+      );
+    } else if (route == 'messages' ||
         route == '/messages' ||
-        route == 'announcements' ||
         type == 'holiday_alert' ||
         type == 'tally_class' ||
-        type == 'announcement' ||
         type == 'session_cancellation' ||
         type == 'video_shared' ||
         type == 'message') {

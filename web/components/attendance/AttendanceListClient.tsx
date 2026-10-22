@@ -613,14 +613,14 @@ export default function AttendanceListClient({
               {/* Grid Header & Filters */}
               <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-bold text-[#2D041A] flex items-center gap-2.5">
+                  <h2 className="text-xl font-black text-[#1A010F] flex items-center gap-2.5">
                     <span>Academy Courses</span>
-                    <span className="text-xs bg-[#FFF2F8] text-[#8A064D] border border-rose-100 px-3 py-1 rounded-full font-bold">
+                    <span className="text-xs bg-[#590231] text-[#F9E33A] border border-[#F9E33A]/40 px-3 py-1 rounded-full font-black">
                       {courses.length} Disciplines
                     </span>
                   </h2>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Click any course card below to view its available batches, timings, and live student attendance sheets.
+                  <p className="text-xs font-semibold text-gray-600 mt-1">
+                    Select a course to view batch attendance and student roll-calls.
                   </p>
                 </div>
 
@@ -644,10 +644,10 @@ export default function AttendanceListClient({
                   <button
                     key={cat}
                     onClick={() => setGridSelectedCategory(cat)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                    className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition cursor-pointer ${
                       gridSelectedCategory === cat
-                        ? 'bg-[#8A064D] text-white shadow-xs'
-                        : 'bg-white text-gray-600 border border-[#F0D5E4] hover:bg-gray-50'
+                        ? 'bg-[#8A064D] text-white shadow-sm ring-2 ring-[#8A064D]/20'
+                        : 'bg-white text-gray-800 border border-gray-300 hover:bg-gray-100'
                     }`}
                   >
                     {cat}
@@ -661,51 +661,62 @@ export default function AttendanceListClient({
                   const courseBatchesCount = batches.filter(b => b.course_id === crs.id).length;
                   const guruName = COURSE_GURUS_MAP[crs.title] || 'Senior Faculty Guru';
 
+                  const isDance = crs.category?.toLowerCase().includes('dance') || crs.category?.toLowerCase().includes('bharat') || crs.category?.toLowerCase().includes('kuchipudi');
+                  const isMusic = crs.category?.toLowerCase().includes('music') || crs.category?.toLowerCase().includes('instrument');
+                  const categoryBadgeColor = isDance
+                    ? 'bg-rose-100/90 text-[#8A064D] border-rose-200'
+                    : isMusic
+                      ? 'bg-amber-100/90 text-amber-900 border-amber-300'
+                      : 'bg-teal-100/90 text-teal-900 border-teal-300';
+
                   return (
                     <div
                       key={crs.id}
                       onClick={() => handleSelectCourse(crs.id)}
-                      className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-xs hover:shadow-md hover:border-[#8A064D] hover:-translate-y-0.5 transition-all cursor-pointer flex flex-col justify-between group"
+                      className="bg-white rounded-2xl p-5 border-2 border-gray-200 shadow-sm hover:shadow-md hover:border-[#8A064D] transition-all cursor-pointer flex flex-col justify-between group"
                     >
                       <div>
                         {/* Top Badges */}
-                        <div className="flex items-center justify-between mb-3.5">
-                          <span className="text-xs font-mono font-black text-[#8A064D] bg-[#FFF2F8] border border-rose-100 px-3 py-1 rounded-xl shadow-2xs">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-xs font-mono font-black text-[#590231] bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg">
                             {crs.code}
                           </span>
-                          <span className="text-xs font-bold text-gray-600 bg-gray-50 border border-gray-200 px-2.5 py-0.5 rounded-full">
+                          <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-md border ${categoryBadgeColor}`}>
                             {crs.category}
                           </span>
                         </div>
 
                         {/* Title */}
-                        <h3 className="text-lg font-bold text-[#2D041A] group-hover:text-[#8A064D] transition">
+                        <h3 className="text-lg font-black text-gray-900 group-hover:text-[#8A064D] transition-colors leading-snug">
                           {crs.title}
                         </h3>
 
-                        {/* Guru Name */}
-                        <div className="mt-2.5 py-2 px-3.5 rounded-xl bg-[#FFF9FB] border border-rose-100 flex items-center justify-between">
-                          <span className="text-xs font-bold uppercase text-[#8A064D]">Assigned Guru</span>
-                          <span className="text-sm font-bold text-gray-800 truncate ml-2">
+                        {/* Guru Info */}
+                        <div className="mt-3 py-2 px-3 rounded-xl bg-gray-50 border border-gray-200 flex items-center gap-2">
+                          <User className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
+                          <span className="text-xs font-bold text-gray-800 truncate">
                             {guruName}
                           </span>
                         </div>
 
-                        {/* Monthly Fee */}
-                        <div className="mt-3.5 flex items-center justify-between text-xs text-gray-600">
-                          <span>Monthly Tuition: <strong className="text-[#8A064D] text-sm tabular-nums font-black">₹{Number(crs.monthly_fee).toLocaleString('en-IN')}</strong></span>
+                        {/* Tuition Fee */}
+                        <div className="mt-3 flex items-center justify-between text-xs font-semibold text-gray-700">
+                          <span className="text-gray-500 font-bold">Tuition Fee</span>
+                          <span className="text-[#8A064D] text-sm tabular-nums font-black">
+                            ₹{Number(crs.monthly_fee).toLocaleString('en-IN')}<span className="text-[10px] text-gray-500 font-medium"> / mo</span>
+                          </span>
                         </div>
                       </div>
 
                       {/* Bottom Action Footer */}
-                      <div className="mt-4 pt-3.5 border-t border-gray-100 flex items-center justify-between">
-                        <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-lg">
-                          {courseBatchesCount} Batch{courseBatchesCount !== 1 ? 'es' : ''} Available
+                      <div className="mt-4 pt-3 border-t border-gray-200 flex items-center justify-between">
+                        <span className="text-xs font-black text-gray-800 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-lg">
+                          {courseBatchesCount} Batch{courseBatchesCount !== 1 ? 'es' : ''}
                         </span>
 
-                        <span className="text-sm font-bold text-[#8A064D] group-hover:text-[#590231] flex items-center gap-1.5">
-                          <span>View Batches & Attendance</span>
-                          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                        <span className="text-xs font-black text-[#8A064D] group-hover:text-[#590231] flex items-center gap-1 group-hover:underline">
+                          <span>View Attendance</span>
+                          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                         </span>
                       </div>
                     </div>

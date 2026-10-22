@@ -61,9 +61,10 @@ interface Props {
     summary: GuruComplianceSummary;
     gurus: GuruComplianceItem[];
   };
+  canDelete?: boolean;
 }
 
-export default function VideoLibraryClient({ initialCourses, initialItems, initialCompliance }: Props) {
+export default function VideoLibraryClient({ initialCourses, initialItems, initialCompliance, canDelete = true }: Props) {
 
   const [courses, setCourses] = useState<CourseWithDetails[]>(initialCourses);
   const [items, setItems] = useState<VideoLibraryItem[]>(initialItems);
@@ -894,6 +895,11 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
 
   // Delete Item
   const handleDeleteItem = async (id: string) => {
+    if (!canDelete) {
+      alert('Delete permission is disabled for your account.');
+      return;
+    }
+
     if (!confirm('Are you sure you want to remove this event folder link? Students will no longer see it in their mobile app.')) {
       return;
     }
@@ -1427,14 +1433,16 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                               </span>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteItem(item.id)}
-                              title="Delete shared link"
-                              className="text-gray-400 hover:text-rose-600 p-1 cursor-pointer transition"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteItem(item.id)}
+                                title="Delete shared link"
+                                className="text-gray-400 hover:text-rose-600 p-1 cursor-pointer transition"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
 
                           <h4 className="font-bold text-sm text-gray-900 mt-1.5 leading-snug">
@@ -1819,15 +1827,17 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                           <Edit3 className="w-3.5 h-3.5" />
                           <span>Edit</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="py-2 px-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 text-xs font-bold transition flex items-center justify-center gap-1 border border-rose-200 shadow-2xs cursor-pointer"
-                          title="Delete Link"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                          <span>Delete</span>
-                        </button>
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="py-2 px-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 text-xs font-bold transition flex items-center justify-center gap-1 border border-rose-200 shadow-2xs cursor-pointer"
+                            title="Delete Link"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Delete</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -3529,13 +3539,15 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
-                            <button
-                              onClick={() => handleDeleteItem(item.id)}
-                              title="Delete link"
-                              className="text-gray-400 hover:text-rose-600 p-1"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {canDelete && (
+                              <button
+                                onClick={() => handleDeleteItem(item.id)}
+                                title="Delete link"
+                                className="text-gray-400 hover:text-rose-600 p-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -4204,18 +4216,20 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                   <Edit3 className="w-3.5 h-3.5" />
                   <span>Edit</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const id = viewingAllVideoItem.id;
-                    setViewingAllVideoItem(null);
-                    handleDeleteItem(id);
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition flex items-center gap-1.5 border border-rose-200 cursor-pointer shadow-2xs"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                  <span>Delete</span>
-                </button>
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const id = viewingAllVideoItem.id;
+                      setViewingAllVideoItem(null);
+                      handleDeleteItem(id);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition flex items-center gap-1.5 border border-rose-200 cursor-pointer shadow-2xs"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Delete</span>
+                  </button>
+                )}
               </div>
 
               <button

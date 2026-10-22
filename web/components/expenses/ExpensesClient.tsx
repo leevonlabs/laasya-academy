@@ -41,9 +41,10 @@ interface Props {
   initialExpenses: Expense[];
   initialSummary: ExpenseSummary;
   categories: CategoryItem[];
+  canDelete?: boolean;
 }
 
-export default function ExpensesClient({ initialExpenses, initialSummary, categories: initialCategories }: Props) {
+export default function ExpensesClient({ initialExpenses, initialSummary, categories: initialCategories, canDelete = true }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [categories, setCategories] = useState<CategoryItem[]>(initialCategories);
 
@@ -759,13 +760,15 @@ export default function ExpensesClient({ initialExpenses, initialSummary, catego
                             </button>
 
                             {/* Delete Button */}
-                            <button
-                              onClick={() => setDeletingExpense(exp)}
-                              className="p-1.5 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition cursor-pointer shadow-2xs"
-                              title="Remove Expense"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {canDelete && (
+                              <button
+                                onClick={() => setDeletingExpense(exp)}
+                                className="p-1.5 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition cursor-pointer shadow-2xs"
+                                title="Remove Expense"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
 
                           </div>
                         </td>

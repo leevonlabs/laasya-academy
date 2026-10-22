@@ -40,9 +40,10 @@ interface Props {
   batches: Batch[];
   courses: Course[];
   schemes?: Scheme[];
+  canDelete?: boolean;
 }
 
-export default function StudentsListClient({ initialStudents, batches, courses, schemes = [] }: Props) {
+export default function StudentsListClient({ initialStudents, batches, courses, schemes = [], canDelete = true }: Props) {
   const [students, setStudents] = useState<Student[]>(initialStudents);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -135,6 +136,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
   const [editJoiningDate, setEditJoiningDate] = useState('');
   const [editAdvancePaid, setEditAdvancePaid] = useState<number>(0);
   const [editFixedDiscount, setEditFixedDiscount] = useState<number>(0);
+  const [editDiscountPercent, setEditDiscountPercent] = useState<number>(0);
   const [editStatus, setEditStatus] = useState<'active' | 'inactive' | 'suspended'>('active');
   const [editCourseSelections, setEditCourseSelections] = useState<{ courseId: string; batchIds: string[] }[]>([]);
   const [activeEditCourseId, setActiveEditCourseId] = useState<string>('');
@@ -162,6 +164,44 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
   const [joiningDate, setJoiningDate] = useState('2026-09-30');
   const [advancePaid, setAdvancePaid] = useState<number>(0);
   const [fixedDiscount, setFixedDiscount] = useState<number>(0);
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
+
+  const handleDiscountAmountChange = (amount: number, gross: number) => {
+    setFixedDiscount(amount);
+    if (gross > 0) {
+      setDiscountPercent(Number(((amount / gross) * 100).toFixed(2)));
+    } else {
+      setDiscountPercent(0);
+    }
+  };
+
+  const handleDiscountPercentChange = (pct: number, gross: number) => {
+    setDiscountPercent(pct);
+    if (gross > 0) {
+      setFixedDiscount(Math.round((pct / 100) * gross));
+    } else {
+      setFixedDiscount(0);
+    setDiscountPercent(0);
+    }
+  };
+
+  const handleEditDiscountAmountChange = (amount: number, gross: number) => {
+    setEditFixedDiscount(amount);
+    if (gross > 0) {
+      setEditDiscountPercent(Number(((amount / gross) * 100).toFixed(2)));
+    } else {
+      setEditDiscountPercent(0);
+    }
+  };
+
+  const handleEditDiscountPercentChange = (pct: number, gross: number) => {
+    setEditDiscountPercent(pct);
+    if (gross > 0) {
+      setEditFixedDiscount(Math.round((pct / 100) * gross));
+    } else {
+      setEditFixedDiscount(0);
+    }
+  };
   const [newStatus, setNewStatus] = useState<'active' | 'inactive'>('active');
   const [courseSelections, setCourseSelections] = useState<{ courseId: string; batchIds: string[] }[]>([]);
   const [activeCourseId, setActiveCourseId] = useState<string>('');
@@ -184,14 +224,52 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
   }, [batches, selectedCourseIds]);
 
   // Course options for student enrollment (Searchable Combobox)
+  // "show the course name and total batch count only in the course drop down, clearly with count in different colour."
   const studentCourseOptions = useMemo<ComboboxOption[]>(() => {
-    return courses.map(c => ({
-      id: c.id,
-      label: c.title,
-      subtitle: `${c.code} • ${c.category || 'General'}`,
-      badge: c.category
-    }));
-  }, [courses]);
+    return courses.map(c => {
+      const count = batches.filter(b => b.course_id === c.id).length;
+      return {
+        id: c.id,
+        label: c.title,
+        subtitle: undefined,
+        badge: `${count} ${count === 1 ? 'Batch' : 'Batches'}`
+      };
+    });
+  }, [courses, batches]);
+
+  // Available batches for registration (Searchable Combobox)
+  // "in batch drop down display batch name and code, base and gst, guru name only in every grid."
+  const availableBatchOptions = useMemo<ComboboxOption[]>(() => {
+    const list = activeCourseId ? batches.filter(b => b.course_id === activeCourseId) : batches;
+    return list.map(b => {
+      const gross = Number(b.monthly_fee || 0);
+      const gstRate = Number(b.gst_percent !== undefined ? b.gst_percent : 18);
+      const base = gross / (1 + (gstRate / 100));
+      const gst = gross - base;
+      return {
+        id: b.id,
+        label: `${b.name} (${b.code || 'BATCH'})`,
+        subtitle: `Base: ₹${base.toFixed(2)} + GST (${gstRate}%): ₹${gst.toFixed(2)} • Guru: ${b.trainer_name || 'Guru'}`,
+        badge: `₹${gross.toLocaleString('en-IN')}/mo`
+      };
+    });
+  }, [batches, activeCourseId]);
+
+  const availableEditBatchOptions = useMemo<ComboboxOption[]>(() => {
+    const list = activeEditCourseId ? batches.filter(b => b.course_id === activeEditCourseId) : batches;
+    return list.map(b => {
+      const gross = Number(b.monthly_fee || 0);
+      const gstRate = Number(b.gst_percent !== undefined ? b.gst_percent : 18);
+      const base = gross / (1 + (gstRate / 100));
+      const gst = gross - base;
+      return {
+        id: b.id,
+        label: `${b.name} (${b.code || 'BATCH'})`,
+        subtitle: `Base: ₹${base.toFixed(2)} + GST (${gstRate}%): ₹${gst.toFixed(2)} • Guru: ${b.trainer_name || 'Guru'}`,
+        badge: `₹${gross.toLocaleString('en-IN')}/mo`
+      };
+    });
+  }, [batches, activeEditCourseId]);
 
   // Active Scheme options for combo selection
   const schemeComboboxOptions = useMemo<ComboboxOption[]>(() => {
@@ -470,7 +548,15 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
     setEditAddress(s.address || '');
     setEditJoiningDate(s.enrollment_date ? s.enrollment_date.substring(0, 10) : '2026-09-30');
     setEditAdvancePaid(Number(s.advance_paid || 0));
-    setEditFixedDiscount(Number(s.fixed_discount || 0));
+    const disc = Number(s.fixed_discount || 0);
+    setEditFixedDiscount(disc);
+    const initialBatchIds = (s.enrolled_batches || []).map(b => b.batch_id);
+    const initialGross = batches.filter(b => initialBatchIds.includes(b.id)).reduce((acc, b) => acc + (Number(b.monthly_fee) || 0), 0);
+    if (initialGross > 0 && disc > 0) {
+      setEditDiscountPercent(Number(((disc / initialGross) * 100).toFixed(2)));
+    } else {
+      setEditDiscountPercent(0);
+    }
     setEditStatus(s.status || 'active');
 
     // Group enrolled batches by course
@@ -1008,10 +1094,19 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
 
   // DEDICATED FULL PAGE FOR REGISTERING NEW DISCIPLE
   if (pageMode === 'register') {
-    const totalMonthlyCalculated = batches
+    const totalGrossCalculated = batches
       .filter(b => selectedBatchIds.includes(b.id))
       .reduce((acc, b) => acc + (Number(b.monthly_fee) || 0), 0);
-    const netMonthlyCalculated = Math.max(0, totalMonthlyCalculated - Number(fixedDiscount || 0));
+    const totalBaseCalculated = batches
+      .filter(b => selectedBatchIds.includes(b.id))
+      .reduce((acc, b) => {
+        const fee = Number(b.monthly_fee) || 0;
+        const gstRate = Number(b.gst_percent !== undefined ? b.gst_percent : 18);
+        return acc + (fee / (1 + (gstRate / 100)));
+      }, 0);
+    const totalGstCalculated = totalGrossCalculated - totalBaseCalculated;
+    const totalMonthlyCalculated = totalGrossCalculated;
+    const netMonthlyCalculated = Math.max(0, totalGrossCalculated - Number(fixedDiscount || 0));
     const calculatedDue = netMonthlyCalculated - Number(advancePaid || 0);
 
     return (
@@ -1062,451 +1157,221 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
               {savingNew ? (
                 <>
                   <Sparkles className="w-4 h-4 animate-spin text-[#F9E33A]" />
-                  <span>Registering Disciple...</span>
+                  <span>Registering Student...</span>
                 </>
               ) : (
                 <>
                   <Plus className="w-4 h-4 text-[#F9E33A]" />
-                  <span>Register Disciple</span>
+                  <span>Register Student</span>
                 </>
               )}
             </button>
           </div>
         </div>
 
-        {/* 2-Column Responsive Form Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column (7 cols): Personal & Contact & Guardian Details */}
-          <div className="lg:col-span-7 space-y-6">
-            {/* Personal Details Card */}
-            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
-              <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
-                <User className="w-4 h-4 text-[#8A064D]" />
-                <span>Personal Information</span>
-              </h2>
+        {/* Top Section (Row 1): 2-Column Responsive Layout (Personal Information & Guardian Details side-by-side) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column: Personal Information Card */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+            <h2 className="text-base font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+              <User className="w-5 h-5 text-[#8A064D]" />
+              <span>Personal Information</span>
+            </h2>
 
-              <PhotoUploadInput
-                value={avatarUrl}
-                onChange={setAvatarUrl}
-                label="Student Profile Photo"
-                initials={fullName ? fullName.slice(0, 2).toUpperCase() : 'ST'}
-                studentName={fullName}
-                rollNumber={nextAutoId}
-                maxSizeMB={1}
-              />
+            <PhotoUploadInput
+              value={avatarUrl}
+              onChange={setAvatarUrl}
+              label="Student Profile Photo"
+              initials={fullName ? fullName.slice(0, 2).toUpperCase() : 'ST'}
+              studentName={fullName}
+              rollNumber={nextAutoId}
+              maxSizeMB={1}
+            />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Student Full Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Enter full name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Student ID <span className="text-[10px] text-gray-400 font-normal">(System Generated)</span>
-                  </label>
-                  <input
-                    type="text"
-                    disabled
-                    readOnly
-                    value={nextAutoId}
-                    className="w-full px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-mono font-black text-[#8A064D] cursor-not-allowed"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Date of Birth
-                  </label>
-                  <input
-                    type="date"
-                    value={dateOfBirth}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setDateOfBirth(val);
-                      const autoAge = calculateAge(val);
-                      if (autoAge) setAge(autoAge);
-                    }}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                      Age (Years)
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      placeholder="14"
-                      value={age}
-                      onChange={(e) => setAge(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                      Gender
-                    </label>
-                    <select
-                      value={gender}
-                      onChange={(e) => setGender(e.target.value as any)}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
-                    >
-                      <option value="female">Female</option>
-                      <option value="male">Male</option>
-                      <option value="trans">Trans</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Student Email
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="student@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Primary Phone Number <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="10-digit mobile"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Residential Address
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="Complete residential address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Separate Dedicated Scheme Selection Card */}
-            {schemes && schemes.length > 0 && (
-              <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-3">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
-                  <div>
-                    <h3 className="text-xs font-black text-[#590231] uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-[#8A064D]" />
-                      <span>Academy Combo Scheme (Optional)</span>
-                    </h3>
-                    <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                      Select a predefined combo scheme to automatically bundle courses, batches, and apply a fixed monthly discount.
-                    </p>
-                  </div>
-                  {selectedSchemeId && (
-                    <button
-                      type="button"
-                      onClick={() => handleApplyScheme('', 'register')}
-                      className="px-2.5 py-1 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition cursor-pointer"
-                    >
-                      Clear Scheme
-                    </button>
-                  )}
-                </div>
-                <SearchableCombobox
-                  options={schemeComboboxOptions}
-                  value={selectedSchemeId}
-                  placeholder="Search & choose a scheme to auto-fill courses, batches & discount..."
-                  onChange={(id) => handleApplyScheme(id, 'register')}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Student Full Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter full name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                 />
-                {selectedSchemeId && (
-                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold flex items-center justify-between">
-                    <span>✓ Active Scheme applied: Courses, batches, and monthly discount auto-configured.</span>
-                    <button
-                      type="button"
-                      onClick={() => handleApplyScheme('', 'register')}
-                      className="text-rose-600 font-bold hover:underline ml-2 cursor-pointer"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Course & Batch Enrollment Card - Side-by-Side Selection Layout */}
-            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-5">
-              <div className="border-b border-gray-100 pb-3">
-                <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-[#8A064D]" />
-                  <span>Course &amp; Batch Enrollment</span>
-                </h2>
-                <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                  Select a course on the left, then pick its batch on the right. You can repeat this iteratively to enroll in multiple courses and batches.
-                </p>
               </div>
 
-              {/* Side-by-Side Selection: Left Course, Right Batches */}
-              <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                  {/* Left Column: Course Selection */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
-                      Select Course <span className="text-rose-500">*</span>
-                    </label>
-                    <SearchableCombobox
-                      options={studentCourseOptions}
-                      value={activeCourseId}
-                      placeholder="Type or click to search course (e.g. Bharatanatyam, Vocal)..."
-                      onChange={(id) => setActiveCourseId(id)}
-                    />
-                  </div>
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Student ID <span className="text-xs text-gray-400 font-normal">(System Generated)</span>
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  readOnly
+                  value={nextAutoId}
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-sm font-mono font-black text-[#8A064D] cursor-not-allowed"
+                />
+              </div>
 
-                  {/* Right Column: Available Batches for Selected Course */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-xs font-black text-[#590231] uppercase tracking-wide truncate">
-                        {activeCourseId
-                          ? `Batches: ${courses.find(c => c.id === activeCourseId)?.title || 'Course'}`
-                          : 'Available Batches'} <span className="text-rose-500">*</span>
-                      </label>
-                      {activeCourseId && (
-                        <button
-                          type="button"
-                          onClick={() => setActiveCourseId('')}
-                          className="text-[11px] font-semibold text-gray-400 hover:text-gray-600 cursor-pointer"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Date of Birth
+                </label>
+                <input
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDateOfBirth(val);
+                    const autoAge = calculateAge(val);
+                    if (autoAge) setAge(autoAge);
+                  }}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
 
-                    {!activeCourseId ? (
-                      <div className="p-3.5 text-center rounded-xl bg-white border border-dashed border-gray-200 text-xs text-gray-400 min-h-[46px] flex items-center justify-center">
-                        Select a course on the left to see available batches and fees.
-                      </div>
-                    ) : (
-                      (() => {
-                        const availableBatches = batches.filter(
-                          b => b.course_id === activeCourseId && !selectedBatchIds.includes(b.id)
-                        );
-
-                        if (availableBatches.length === 0) {
-                          return (
-                            <div className="p-3 text-center rounded-xl bg-white border border-dashed border-gray-200 text-xs text-gray-500">
-                              All batches for this course are already selected.
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div className="space-y-2 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
-                            {availableBatches.map(b => (
-                              <div
-                                key={b.id}
-                                onClick={() => handleSelectBatch(b.id)}
-                                className="p-2.5 bg-white rounded-xl border border-rose-200 hover:border-[#8A064D] hover:shadow-xs transition cursor-pointer flex items-center justify-between gap-2 group"
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-bold text-xs text-[#2D041A] group-hover:text-[#8A064D] truncate">
-                                      {b.name}
-                                    </span>
-                                    {b.code && (
-                                      <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4] font-semibold shrink-0">
-                                        {b.code}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-[10px] text-gray-500 block truncate">
-                                    {b.days_of_week?.join(', ')} • {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)} • {b.trainer_name || 'Guru'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <span className="px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-black tabular-nums">
-                                    ₹{Number(b.monthly_fee || 0).toLocaleString('en-IN')}/mo
-                                  </span>
-                                  <button
-                                    type="button"
-                                    className="px-2 py-1 rounded-lg bg-[#8A064D] text-white text-[10px] font-bold"
-                                  >
-                                    + Add
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()
-                    )}
-                  </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Age (Years)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    placeholder="14"
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Gender
+                  </label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value as any)}
+                    className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
+                  >
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                    <option value="trans">Trans</option>
+                  </select>
                 </div>
               </div>
 
-              {/* Selected / Enrolled Batches Cards with Course & Batch Name Side-by-Side */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-[#590231] uppercase tracking-wider">
-                    Enrolled Batches ({selectedBatchIds.length})
-                  </span>
-                  <span className="text-xs font-black text-[#8A064D]">
-                    Total Monthly Fee: ₹{selectedBatchIds.reduce((sum, bId) => {
-                      const b = batches.find(x => x.id === bId);
-                      return sum + (Number(b?.monthly_fee) || 0);
-                    }, 0).toLocaleString('en-IN')}
-                  </span>
-                </div>
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Student Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="student@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
 
-                {selectedBatchIds.length === 0 ? (
-                  <div className="p-4 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
-                    No batches selected yet. Select a course and batch above to enroll.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {selectedBatchIds.map(bId => {
-                      const b = batches.find(x => x.id === bId);
-                      const crs = courses.find(c => c.id === b?.course_id);
-                      return (
-                        <div key={bId} className="p-3.5 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] flex items-start justify-between gap-3 shadow-2xs">
-                          <div className="min-w-0 flex-1">
-                            {/* Course and Batch Name Side by Side */}
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-black text-[#8A064D] uppercase tracking-wide">
-                                {crs?.title || 'Course'}
-                              </span>
-                              {crs?.code && (
-                                <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4] font-semibold">
-                                  {crs.code}
-                                </span>
-                              )}
-                              <span className="text-gray-300 font-bold">•</span>
-                              <span className="text-xs font-bold text-[#2D041A]">
-                                {b?.name || 'Batch'}
-                              </span>
-                              {b?.code && (
-                                <span className="font-mono text-[10px] text-[#590231] bg-white px-1.5 py-0.5 rounded border border-rose-200 font-semibold">
-                                  {b.code}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
-                              <span>Guru: <strong className="text-gray-700">{b?.trainer_name || 'Assigned'}</strong></span>
-                              <span>•</span>
-                              <span>{b?.start_time?.slice(0, 5)} - {b?.end_time?.slice(0, 5)}</span>
-                              <span>•</span>
-                              <span>Room: {b?.room_or_hall || 'Hall'}</span>
-                            </div>
-                            <span className="text-[11px] font-extrabold text-emerald-700 block mt-1 tabular-nums">
-                              ₹{Number(b?.monthly_fee || 0).toLocaleString('en-IN')}/mo
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveBatch(bId)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0"
-                            title="Remove Batch"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Primary Phone Number <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="10-digit mobile"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Residential Address
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Complete residential address"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
               </div>
             </div>
           </div>
 
-          {/* Right Column (5 cols): Guardian & Fee Allocation */}
-          <div className="lg:col-span-5 space-y-6">
-            {/* Guardian & Admission Card */}
-            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
-              <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
-                <ShieldCheck className="w-4 h-4 text-[#8A064D]" />
-                <span>Parent / Guardian & Admission Details</span>
-              </h2>
+          {/* Right Column: Guardian & Admission Details Card */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+            <h2 className="text-base font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+              <ShieldCheck className="w-5 h-5 text-[#8A064D]" />
+              <span>Parent / Guardian &amp; Admission Details</span>
+            </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Guardian Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Parent / Guardian"
-                    value={parentName}
-                    onChange={(e) => setParentName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Guardian Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Parent / Guardian"
+                  value={parentName}
+                  onChange={(e) => setParentName(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
 
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Relation
-                  </label>
-                  <select
-                    value={parentRelation}
-                    onChange={(e) => setParentRelation(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
-                  >
-                    <option value="Mother">Mother</option>
-                    <option value="Father">Father</option>
-                    <option value="Guardian">Guardian</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Relation
+                </label>
+                <select
+                  value={parentRelation}
+                  onChange={(e) => setParentRelation(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
+                >
+                  <option value="Mother">Mother</option>
+                  <option value="Father">Father</option>
+                  <option value="Guardian">Guardian</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Guardian Phone <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="10-digit number"
-                    value={parentContact}
-                    onChange={(e) => setParentContact(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Guardian Phone <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="10-digit number"
+                  value={parentContact}
+                  onChange={(e) => setParentContact(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
 
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Joining Date
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={joiningDate}
-                    onChange={(e) => setJoiningDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Joining Date
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={joiningDate}
+                  onChange={(e) => setJoiningDate(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
 
+              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                     Fixed Monthly Discount (₹)
@@ -1515,107 +1380,283 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
                     type="number"
                     min={0}
                     value={fixedDiscount}
-                    onChange={(e) => setFixedDiscount(Number(e.target.value))}
+                    onChange={(e) => handleDiscountAmountChange(Number(e.target.value), totalGrossCalculated)}
                     placeholder="e.g. 500"
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D] transition"
                   />
-                  <span className="text-[10px] text-gray-500 font-medium">Deducted every month from total fee</span>
+                  <span className="text-xs text-gray-500 font-medium">Number wise discount (auto-calculates %)</span>
                 </div>
-
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Advance Paid (₹)
+                    Total Discount Percent (%)
                   </label>
                   <input
                     type="number"
                     min={0}
-                    value={advancePaid}
-                    onChange={(e) => setAdvancePaid(Number(e.target.value))}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-emerald-800 focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                    max={100}
+                    step="0.1"
+                    value={discountPercent}
+                    onChange={(e) => handleDiscountPercentChange(Number(e.target.value), totalGrossCalculated)}
+                    placeholder="e.g. 10%"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D] transition"
                   />
+                  <span className="text-xs text-gray-500 font-medium">Percent wise discount (auto-calculates ₹)</span>
                 </div>
+              </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Student Status
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setNewStatus('active')}
-                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                        newStatus === 'active'
-                          ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
-                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                      }`}
-                    >
-                      Active
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewStatus('inactive')}
-                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                        newStatus === 'inactive'
-                          ? 'bg-rose-500 text-white border-rose-600 shadow-xs'
-                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                      }`}
-                    >
-                      Inactive
-                    </button>
-                  </div>
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Advance Paid (₹)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={advancePaid}
+                  onChange={(e) => setAdvancePaid(Number(e.target.value))}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-emerald-800 focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Student Status
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewStatus('active')}
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold border transition cursor-pointer ${
+                      newStatus === 'active'
+                        ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
+                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    Active
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewStatus('inactive')}
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold border transition cursor-pointer ${
+                      newStatus === 'inactive'
+                        ? 'bg-rose-500 text-white border-rose-600 shadow-xs'
+                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    Inactive
+                  </button>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Dynamic Fee Calculation Card */}
-            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
-              <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
-                <Receipt className="w-4 h-4 text-[#8A064D]" />
-                <span>Tuition &amp; Fee Summary</span>
+        {/* Middle Section (Row 2): Course & Batch Enrollment - OCCUPIES BOTH LEFT TO RIGHT ENDS OF THE PAGE */}
+        <div className="w-full bg-white p-6 sm:p-7 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-6">
+          <div className="border-b border-gray-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
+                <Layers className="w-5 h-5 text-[#8A064D]" />
+                <span>Course &amp; Batch Enrollment</span>
               </h2>
+              <p className="text-xs text-gray-500 font-medium mt-0.5">
+                Search and select course on the left, then pick its batch on the right. You can select multiple courses and multiple batches without restriction.
+              </p>
+            </div>
+            <span className="text-xs font-black text-[#8A064D] bg-[#FFF2F8] px-3 py-1 rounded-full border border-rose-200 shrink-0">
+              {selectedBatchIds.length} Batches Selected
+            </span>
+          </div>
 
-              <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] space-y-2 text-xs">
-                <div className="flex justify-between items-center text-gray-700">
-                  <span className="font-semibold">Total Monthly Tuition:</span>
-                  <span className="font-black text-sm text-[#2D041A]">₹{totalMonthlyCalculated.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between items-center text-gray-700">
-                  <span className="font-semibold">Fixed Monthly Discount:</span>
-                  <span className="font-black text-emerald-700">-₹{Number(fixedDiscount || 0).toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between items-center text-gray-700 pt-1 border-t border-[#F0D5E4]/50">
-                  <span className="font-bold">Net Monthly Tuition:</span>
-                  <span className="font-black text-sm text-[#2D041A]">₹{netMonthlyCalculated.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between items-center text-gray-700">
-                  <span className="font-semibold">Advance Payment Applied:</span>
-                  <span className="font-black text-emerald-700">₹{Number(advancePaid || 0).toLocaleString('en-IN')}</span>
-                </div>
-                <div className="pt-2 border-t border-[#F0D5E4] flex justify-between items-center">
-                  <span className="font-black text-[#590231]">Initial Balance Due:</span>
-                  <span className="font-black text-base text-[#8A064D]">₹{Math.max(0, calculatedDue).toLocaleString('en-IN')}</span>
-                </div>
+          {/* Searchable Course & Batch Dropdowns Row - Dropdown floats out so page scrolls freely */}
+          <div className="p-5 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+              {/* Left: Searchable Course Combobox */}
+              <div className="space-y-1.5">
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide">
+                  Select Course <span className="text-rose-500">*</span>
+                </label>
+                <SearchableCombobox
+                  options={studentCourseOptions}
+                  value={activeCourseId}
+                  placeholder="Search course (e.g. Bharatanatyam, Carnatic Music)..."
+                  onChange={(id) => setActiveCourseId(id)}
+                />
               </div>
 
-              <button
-                type="button"
-                disabled={savingNew || !fullName.trim() || selectedBatchIds.length === 0}
-                onClick={handleRegisterStudent}
-                className="w-full py-3 rounded-2xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-black shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {savingNew ? (
-                  <>
-                    <Sparkles className="w-4 h-4 animate-spin text-[#F9E33A]" />
-                    <span>Registering Disciple...</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4 text-[#F9E33A]" />
-                    <span>Complete Disciple Registration</span>
-                  </>
-                )}
-              </button>
+              {/* Right: Searchable Batch Combobox */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-black text-[#590231] uppercase tracking-wide truncate">
+                    {activeCourseId
+                      ? `Select Batch: ${courses.find(c => c.id === activeCourseId)?.title || 'Course'}`
+                      : 'Select Batch'} <span className="text-rose-500">*</span>
+                  </label>
+                  {activeCourseId && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveCourseId('')}
+                      className="text-xs font-semibold text-gray-400 hover:text-gray-600 cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <SearchableCombobox
+                  options={availableBatchOptions}
+                  value=""
+                  placeholder={activeCourseId ? "Select batch to enroll..." : "Choose course first or search all batches..."}
+                  onChange={(id) => {
+                    if (id) {
+                      handleSelectBatch(id);
+                    }
+                  }}
+                />
+              </div>
             </div>
+          </div>
+
+          {/* Enrolled Courses & Batches Grid - Occupies Both Left to Right Ends */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-black text-[#590231] uppercase tracking-wider">
+                Enrolled Courses &amp; Batches ({selectedBatchIds.length})
+              </span>
+              <span className="text-sm font-black text-[#8A064D]">
+                Monthly Gross: ₹{selectedBatchIds.reduce((sum, bId) => {
+                  const b = batches.find(x => x.id === bId);
+                  return sum + (Number(b?.monthly_fee) || 0);
+                }, 0).toLocaleString('en-IN')}
+              </span>
+            </div>
+
+            {selectedBatchIds.length === 0 ? (
+              <div className="p-8 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-sm text-gray-500">
+                No courses or batches enrolled yet. Use the searchable course and batch dropdowns above to add batches.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {selectedBatchIds.map(bId => {
+                  const b = batches.find(x => x.id === bId);
+                  const crs = courses.find(c => c.id === b?.course_id);
+                  const fee = Number(b?.monthly_fee || 0);
+                  const gstPercent = Number(b?.gst_percent !== undefined ? b?.gst_percent : 18);
+                  const base = fee / (1 + (gstPercent / 100));
+                  const gst = fee - base;
+
+                  return (
+                    <div key={bId} className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] flex flex-col justify-between gap-3 shadow-2xs hover:shadow-xs transition">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-black text-[#8A064D] uppercase tracking-wide">
+                            {crs?.title || 'Course'}
+                          </span>
+                          {b?.code && (
+                            <span className="font-mono text-xs text-[#590231] bg-white px-2 py-0.5 rounded-lg border border-rose-200 font-bold shrink-0">
+                              {b.code}
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-sm font-extrabold text-[#2D041A]">
+                          {b?.name || 'Batch'}
+                        </h4>
+                        <div className="text-xs text-gray-600 space-y-0.5">
+                          <p>Guru: <strong className="text-gray-900">{b?.trainer_name || 'Assigned'}</strong></p>
+                          <p>{b?.days_of_week?.join(', ')} • {b?.start_time?.slice(0, 5)} - {b?.end_time?.slice(0, 5)}</p>
+                          <p className="font-mono text-[11px] text-gray-500">Base: ₹{base.toFixed(2)} + GST ({gstPercent}%): ₹{gst.toFixed(2)}</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-[#F0D5E4]/60 flex items-center justify-between">
+                        <span className="text-sm font-black text-emerald-800 tabular-nums">
+                          ₹{fee.toLocaleString('en-IN')}/mo
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBatch(bId)}
+                          className="px-3 py-1 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition flex items-center gap-1 cursor-pointer"
+                          title="Remove Batch"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Section (Row 3): Tuition & Fee Summary at the End */}
+        <div className="w-full bg-white p-6 sm:p-7 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-5">
+          <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+            <h2 className="text-base font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-[#8A064D]" />
+              <span>Tuition &amp; Fee Summary</span>
+            </h2>
+            <span className="text-xs text-gray-400 font-medium">All amounts itemized with 18% GST</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 text-center">
+            <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-200">
+              <span className="text-[11px] font-bold text-gray-500 uppercase block">Base Tuition</span>
+              <span className="text-base font-black text-gray-900 mt-1 block">₹{totalBaseCalculated.toFixed(2)}</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200">
+              <span className="text-[11px] font-bold text-emerald-800 uppercase block">GST (18%)</span>
+              <span className="text-base font-black text-emerald-800 mt-1 block">₹{totalGstCalculated.toFixed(2)}</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-[#FFF2F8] border border-rose-200">
+              <span className="text-[11px] font-bold text-[#8A064D] uppercase block">Gross Total</span>
+              <span className="text-base font-black text-[#8A064D] mt-1 block">₹{totalGrossCalculated.toLocaleString('en-IN')}</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-200">
+              <span className="text-[11px] font-bold text-gray-500 uppercase block">Discount</span>
+              <span className="text-base font-black text-emerald-700 mt-1 block">-₹{Number(fixedDiscount || 0).toLocaleString('en-IN')}</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-rose-50/50 border border-rose-200">
+              <span className="text-[11px] font-bold text-[#590231] uppercase block">Net Tuition</span>
+              <span className="text-base font-black text-[#2D041A] mt-1 block">₹{netMonthlyCalculated.toLocaleString('en-IN')}</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-200">
+              <span className="text-[11px] font-bold text-gray-500 uppercase block">Advance Paid</span>
+              <span className="text-base font-black text-emerald-700 mt-1 block">₹{Number(advancePaid || 0).toLocaleString('en-IN')}</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-[#590231] text-white col-span-2 sm:col-span-1 border border-[#F9E33A]/40">
+              <span className="text-[11px] font-bold text-[#F9E33A] uppercase block">Balance Due</span>
+              <span className="text-base font-black text-white mt-1 block">
+                {calculatedDue < 0 ? `-₹${Math.abs(calculatedDue).toLocaleString('en-IN')}` : `₹${calculatedDue.toLocaleString('en-IN')}`}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => setPageMode('list')}
+              className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-bold transition cursor-pointer text-center"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={savingNew || !fullName.trim() || selectedBatchIds.length === 0}
+              onClick={handleRegisterStudent}
+              className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-[#8A064D] hover:bg-[#590231] text-white text-sm font-black shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer border border-[#F9E33A]/40"
+            >
+              {savingNew ? (
+                <>
+                  <Sparkles className="w-5 h-5 animate-spin text-[#F9E33A]" />
+                  <span>Registering Student...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-5 h-5 text-[#F9E33A]" />
+                  <span>Complete Registration</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -1624,10 +1665,19 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
 
   // DEDICATED FULL PAGE FOR EDITING DISCIPLE
   if (pageMode === 'edit' && editingStudent) {
-    const totalMonthlyCalculated = batches
+    const totalGrossCalculated = batches
       .filter(b => editSelectedBatchIds.includes(b.id))
       .reduce((acc, b) => acc + (Number(b.monthly_fee) || 0), 0);
-    const netMonthlyCalculated = Math.max(0, totalMonthlyCalculated - Number(editFixedDiscount || 0));
+    const totalBaseCalculated = batches
+      .filter(b => editSelectedBatchIds.includes(b.id))
+      .reduce((acc, b) => {
+        const fee = Number(b.monthly_fee) || 0;
+        const gstRate = Number(b.gst_percent !== undefined ? b.gst_percent : 18);
+        return acc + (fee / (1 + (gstRate / 100)));
+      }, 0);
+    const totalGstCalculated = totalGrossCalculated - totalBaseCalculated;
+    const totalMonthlyCalculated = totalGrossCalculated;
+    const netMonthlyCalculated = Math.max(0, totalGrossCalculated - Number(editFixedDiscount || 0));
     const calculatedDue = netMonthlyCalculated - Number(editAdvancePaid || 0);
 
     return (
@@ -1700,432 +1750,209 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
           </div>
         </div>
 
-        {/* 2-Column Responsive Form Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column (7 cols): Personal & Contact Details */}
-          <div className="lg:col-span-7 space-y-6">
-            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
-              <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
-                <User className="w-4 h-4 text-[#8A064D]" />
-                <span>Personal & Profile Information</span>
-              </h2>
+        {/* Top Section (Row 1): 2-Column Responsive Layout (Personal Information & Guardian Details side-by-side) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column: Personal Information Card */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+            <h2 className="text-base font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+              <User className="w-5 h-5 text-[#8A064D]" />
+              <span>Personal Information</span>
+            </h2>
 
-              <PhotoUploadInput
-                value={editAvatarUrl}
-                onChange={setEditAvatarUrl}
-                label="Student Profile Photo"
-                initials={editFullName ? editFullName.slice(0, 2).toUpperCase() : 'ST'}
-                studentName={editFullName}
-                rollNumber={editingStudent.roll_number}
-                maxSizeMB={1}
-              />
+            <PhotoUploadInput
+              value={editAvatarUrl}
+              onChange={setEditAvatarUrl}
+              label="Student Profile Photo"
+              initials={editFullName ? editFullName.slice(0, 2).toUpperCase() : 'ST'}
+              studentName={editFullName}
+              rollNumber={editingStudent.roll_number}
+              maxSizeMB={1}
+            />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Student Full Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter full name"
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Student ID <span className="text-xs text-gray-400 font-normal">(Immutable Roll No)</span>
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  readOnly
+                  value={editingStudent.roll_number}
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-sm font-mono font-black text-[#8A064D] cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Date of Birth
+                </label>
+                <input
+                  type="date"
+                  value={editDateOfBirth}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditDateOfBirth(val);
+                    const autoAge = calculateAge(val);
+                    if (autoAge) setEditAge(autoAge);
+                  }}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Student Full Name <span className="text-rose-500">*</span>
+                  <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Age (Years)
                   </label>
                   <input
-                    type="text"
-                    required
-                    value={editFullName}
-                    onChange={(e) => setEditFullName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                    type="number"
+                    min={1}
+                    max={100}
+                    placeholder="14"
+                    value={editAge}
+                    onChange={(e) => setEditAge(e.target.value)}
+                    className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Student Status <span className="text-[10px] text-[#8A064D] font-normal">(Active / Inactive)</span>
+                  <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Gender
                   </label>
                   <select
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
+                    value={editGender}
+                    onChange={(e) => setEditGender(e.target.value as any)}
+                    className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
                   >
-                    <option value="active">Active (Enrolled - Counts in batch capacity)</option>
-                    <option value="inactive">Inactive (Paused / Left - Frees up batch seat)</option>
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                    <option value="trans">Trans</option>
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Date of Birth
-                  </label>
-                  <input
-                    type="date"
-                    value={editDateOfBirth}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setEditDateOfBirth(val);
-                      const autoAge = calculateAge(val);
-                      if (autoAge) setEditAge(autoAge);
-                    }}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                      Age (Years)
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={editAge}
-                      onChange={(e) => setEditAge(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                      Gender
-                    </label>
-                    <select
-                      value={editGender}
-                      onChange={(e) => setEditGender(e.target.value as any)}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
-                    >
-                      <option value="female">Female</option>
-                      <option value="male">Male</option>
-                      <option value="trans">Trans</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Student Email
-                  </label>
-                  <input
-                    type="email"
-                    value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Primary Phone Number <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Residential Address
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={editAddress}
-                    onChange={(e) => setEditAddress(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
               </div>
-            </div>
 
-            {/* Separate Dedicated Scheme Selection Card */}
-            {schemes && schemes.length > 0 && (
-              <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-3">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
-                  <div>
-                    <h3 className="text-xs font-black text-[#590231] uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-[#8A064D]" />
-                      <span>Academy Combo Scheme (Optional)</span>
-                    </h3>
-                    <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                      Select a predefined combo scheme to automatically bundle courses, batches, and apply a fixed monthly discount.
-                    </p>
-                  </div>
-                  {editSelectedSchemeId && (
-                    <button
-                      type="button"
-                      onClick={() => handleApplyScheme('', 'edit')}
-                      className="px-2.5 py-1 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition cursor-pointer"
-                    >
-                      Clear Scheme
-                    </button>
-                  )}
-                </div>
-                <SearchableCombobox
-                  options={schemeComboboxOptions}
-                  value={editSelectedSchemeId}
-                  placeholder="Search & choose a scheme to auto-fill courses, batches & discount..."
-                  onChange={(id) => handleApplyScheme(id, 'edit')}
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Student Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="student@example.com"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                 />
-                {editSelectedSchemeId && (
-                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold flex items-center justify-between">
-                    <span>✓ Active Scheme applied: Courses, batches, and monthly discount auto-configured.</span>
-                    <button
-                      type="button"
-                      onClick={() => handleApplyScheme('', 'edit')}
-                      className="text-rose-600 font-bold hover:underline ml-2 cursor-pointer"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Course & Batch Enrollment Card - Side-by-Side Selection Layout */}
-            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-5">
-              <div className="border-b border-gray-100 pb-3">
-                <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-[#8A064D]" />
-                  <span>Enrolled Courses &amp; Batches</span>
-                </h2>
-                <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                  Select a course on the left, then pick its batch on the right. You can repeat this iteratively to enroll in multiple courses and batches.
-                </p>
               </div>
 
-              {/* Side-by-Side Selection: Left Course, Right Batches */}
-              <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                  {/* Left Column: Course Selection */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-black text-[#590231] uppercase tracking-wide">
-                      Select Course <span className="text-rose-500">*</span>
-                    </label>
-                    <SearchableCombobox
-                      options={studentCourseOptions}
-                      value={activeEditCourseId}
-                      placeholder="Type or click to search course (e.g. Bharatanatyam, Vocal)..."
-                      onChange={(id) => setActiveEditCourseId(id)}
-                    />
-                  </div>
-
-                  {/* Right Column: Available Batches for Selected Course */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-xs font-black text-[#590231] uppercase tracking-wide truncate">
-                        {activeEditCourseId
-                          ? `Batches: ${courses.find(c => c.id === activeEditCourseId)?.title || 'Course'}`
-                          : 'Available Batches'} <span className="text-rose-500">*</span>
-                      </label>
-                      {activeEditCourseId && (
-                        <button
-                          type="button"
-                          onClick={() => setActiveEditCourseId('')}
-                          className="text-[11px] font-semibold text-gray-400 hover:text-gray-600 cursor-pointer"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-
-                    {!activeEditCourseId ? (
-                      <div className="p-3.5 text-center rounded-xl bg-white border border-dashed border-gray-200 text-xs text-gray-400 min-h-[46px] flex items-center justify-center">
-                        Select a course on the left to see available batches and fees.
-                      </div>
-                    ) : (
-                      (() => {
-                        const availableBatches = batches.filter(
-                          b => b.course_id === activeEditCourseId && !editSelectedBatchIds.includes(b.id)
-                        );
-
-                        if (availableBatches.length === 0) {
-                          return (
-                            <div className="p-3 text-center rounded-xl bg-white border border-dashed border-gray-200 text-xs text-gray-500">
-                              All batches for this course are already selected.
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div className="space-y-2 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
-                            {availableBatches.map(b => (
-                              <div
-                                key={b.id}
-                                onClick={() => handleSelectEditBatch(b.id)}
-                                className="p-2.5 bg-white rounded-xl border border-rose-200 hover:border-[#8A064D] hover:shadow-xs transition cursor-pointer flex items-center justify-between gap-2 group"
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-bold text-xs text-[#2D041A] group-hover:text-[#8A064D] truncate">
-                                      {b.name}
-                                    </span>
-                                    {b.code && (
-                                      <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4] font-semibold shrink-0">
-                                        {b.code}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-[10px] text-gray-500 block truncate">
-                                    {b.days_of_week?.join(', ')} • {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)} • {b.trainer_name || 'Guru'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <span className="px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-black tabular-nums">
-                                    ₹{Number(b.monthly_fee || 0).toLocaleString('en-IN')}/mo
-                                  </span>
-                                  <button
-                                    type="button"
-                                    className="px-2 py-1 rounded-lg bg-[#8A064D] text-white text-[10px] font-bold"
-                                  >
-                                    + Add
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()
-                    )}
-                  </div>
-                </div>
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Primary Phone Number <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="10-digit mobile"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
               </div>
 
-              {/* Selected / Enrolled Batches Cards with Course & Batch Name Side-by-Side */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-[#590231] uppercase tracking-wider">
-                    Enrolled Batches ({editSelectedBatchIds.length})
-                  </span>
-                  <span className="text-xs font-black text-[#8A064D]">
-                    Total Monthly Fee: ₹{editSelectedBatchIds.reduce((sum, bId) => {
-                      const b = batches.find(x => x.id === bId);
-                      return sum + (Number(b?.monthly_fee) || 0);
-                    }, 0).toLocaleString('en-IN')}
-                  </span>
-                </div>
-
-                {editSelectedBatchIds.length === 0 ? (
-                  <div className="p-4 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-500">
-                    No batches selected yet. Select a course and batch above to enroll.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {editSelectedBatchIds.map(bId => {
-                      const b = batches.find(x => x.id === bId);
-                      const crs = courses.find(c => c.id === b?.course_id);
-                      return (
-                        <div key={bId} className="p-3.5 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] flex items-start justify-between gap-3 shadow-2xs">
-                          <div className="min-w-0 flex-1">
-                            {/* Course and Batch Name Side by Side */}
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-black text-[#8A064D] uppercase tracking-wide">
-                                {crs?.title || 'Course'}
-                              </span>
-                              {crs?.code && (
-                                <span className="font-mono text-[10px] text-[#8A064D] bg-[#FFF2F8] px-1.5 py-0.5 rounded border border-[#F0D5E4] font-semibold">
-                                  {crs.code}
-                                </span>
-                              )}
-                              <span className="text-gray-300 font-bold">•</span>
-                              <span className="text-xs font-bold text-[#2D041A]">
-                                {b?.name || 'Batch'}
-                              </span>
-                              {b?.code && (
-                                <span className="font-mono text-[10px] text-[#590231] bg-white px-1.5 py-0.5 rounded border border-rose-200 font-semibold">
-                                  {b.code}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
-                              <span>Guru: <strong className="text-gray-700">{b?.trainer_name || 'Assigned'}</strong></span>
-                              <span>•</span>
-                              <span>{b?.start_time?.slice(0, 5)} - {b?.end_time?.slice(0, 5)}</span>
-                              <span>•</span>
-                              <span>Room: {b?.room_or_hall || 'Hall'}</span>
-                            </div>
-                            <span className="text-[11px] font-extrabold text-emerald-700 block mt-1 tabular-nums">
-                              ₹{Number(b?.monthly_fee || 0).toLocaleString('en-IN')}/mo
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveEditBatch(bId)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0"
-                            title="Remove Batch"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Residential Address
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Complete residential address"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
               </div>
             </div>
           </div>
 
-          {/* Right Column (5 cols): Guardian & Fee Summary */}
-          <div className="lg:col-span-5 space-y-6">
-            {/* Guardian & Admission Card */}
-            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
-              <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
-                <ShieldCheck className="w-4 h-4 text-[#8A064D]" />
-                <span>Parent / Guardian &amp; Admission Info</span>
-              </h2>
+          {/* Right Column: Guardian & Admission Details Card */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+            <h2 className="text-base font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
+              <ShieldCheck className="w-5 h-5 text-[#8A064D]" />
+              <span>Parent / Guardian &amp; Admission Details</span>
+            </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Guardian Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editParentName}
-                    onChange={(e) => setEditParentName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Guardian Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Parent / Guardian"
+                  value={editParentName}
+                  onChange={(e) => setEditParentName(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
 
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Relation
-                  </label>
-                  <select
-                    value={editParentRelation}
-                    onChange={(e) => setEditParentRelation(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
-                  >
-                    <option value="Mother">Mother</option>
-                    <option value="Father">Father</option>
-                    <option value="Guardian">Guardian</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Relation
+                </label>
+                <select
+                  value={editParentRelation}
+                  onChange={(e) => setEditParentRelation(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition cursor-pointer"
+                >
+                  <option value="Mother">Mother</option>
+                  <option value="Father">Father</option>
+                  <option value="Guardian">Guardian</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Guardian Phone <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={editParentContact}
-                    onChange={(e) => setEditParentContact(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Guardian Phone <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="10-digit number"
+                  value={editParentContact}
+                  onChange={(e) => setEditParentContact(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
 
-                <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Joining Date
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={editJoiningDate}
-                    onChange={(e) => setEditJoiningDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Joining Date
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={editJoiningDate}
+                  onChange={(e) => setEditJoiningDate(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#1A010F] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
 
+              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
                     Fixed Monthly Discount (₹)
@@ -2134,107 +1961,286 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
                     type="number"
                     min={0}
                     value={editFixedDiscount}
-                    onChange={(e) => setEditFixedDiscount(Number(e.target.value))}
+                    onChange={(e) => handleEditDiscountAmountChange(Number(e.target.value), totalGrossCalculated)}
                     placeholder="e.g. 500"
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D] transition"
                   />
-                  <span className="text-[10px] text-gray-500 font-medium">Deducted every month from total fee</span>
+                  <span className="text-xs text-gray-500 font-medium">Number wise discount (auto-calculates %)</span>
                 </div>
-
                 <div>
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Advance Paid (₹)
+                    Total Discount Percent (%)
                   </label>
                   <input
                     type="number"
                     min={0}
-                    value={editAdvancePaid}
-                    onChange={(e) => setEditAdvancePaid(Number(e.target.value))}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-emerald-800 focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                    max={100}
+                    step="0.1"
+                    value={editDiscountPercent}
+                    onChange={(e) => handleEditDiscountPercentChange(Number(e.target.value), totalGrossCalculated)}
+                    placeholder="e.g. 10%"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-bold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D] transition"
                   />
+                  <span className="text-xs text-gray-500 font-medium">Percent wise discount (auto-calculates ₹)</span>
                 </div>
+              </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                    Student Status
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setEditStatus('active')}
-                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                        editStatus === 'active'
-                          ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
-                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                      }`}
-                    >
-                      Active
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditStatus('inactive')}
-                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                        editStatus === 'inactive'
-                          ? 'bg-rose-500 text-white border-rose-600 shadow-xs'
-                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                      }`}
-                    >
-                      Inactive
-                    </button>
-                  </div>
+              <div>
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Advance Paid (₹)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editAdvancePaid}
+                  onChange={(e) => setEditAdvancePaid(Number(e.target.value))}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-emerald-800 focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                  Student Status
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditStatus('active')}
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold border transition cursor-pointer ${
+                      editStatus === 'active'
+                        ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
+                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    Active
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditStatus('inactive')}
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold border transition cursor-pointer ${
+                      editStatus === 'inactive'
+                        ? 'bg-rose-500 text-white border-rose-600 shadow-xs'
+                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    Inactive
+                  </button>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Dynamic Fee Calculation & Save Card */}
-            <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
-              <h2 className="text-sm font-black text-[#590231] uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
-                <Receipt className="w-4 h-4 text-[#8A064D]" />
-                <span>Fee Summary &amp; Update Record</span>
+        {/* Middle Section (Row 2): Course & Batch Enrollment - OCCUPIES BOTH LEFT TO RIGHT ENDS OF THE PAGE */}
+        <div className="w-full bg-white p-6 sm:p-7 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-6">
+          <div className="border-b border-gray-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
+                <Layers className="w-5 h-5 text-[#8A064D]" />
+                <span>Course &amp; Batch Enrollment</span>
               </h2>
+              <p className="text-xs text-gray-500 font-medium mt-0.5">
+                Search and select course on the left, then pick its batch on the right. You can select multiple courses and multiple batches without restriction.
+              </p>
+            </div>
+            <span className="text-xs font-black text-[#8A064D] bg-[#FFF2F8] px-3 py-1 rounded-full border border-rose-200 shrink-0">
+              {editSelectedBatchIds.length} Batches Selected
+            </span>
+          </div>
 
-              <div className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] space-y-2 text-xs">
-                <div className="flex justify-between items-center text-gray-700">
-                  <span className="font-semibold">Total Monthly Tuition:</span>
-                  <span className="font-black text-sm text-[#2D041A]">₹{totalMonthlyCalculated.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between items-center text-gray-700">
-                  <span className="font-semibold">Fixed Monthly Discount:</span>
-                  <span className="font-black text-emerald-700">-₹{Number(editFixedDiscount || 0).toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between items-center text-gray-700 pt-1 border-t border-[#F0D5E4]/50">
-                  <span className="font-bold">Net Monthly Tuition:</span>
-                  <span className="font-black text-sm text-[#2D041A]">₹{netMonthlyCalculated.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between items-center text-gray-700">
-                  <span className="font-semibold">Advance Payment Applied:</span>
-                  <span className="font-black text-emerald-700">₹{Number(editAdvancePaid || 0).toLocaleString('en-IN')}</span>
-                </div>
-                <div className="pt-2 border-t border-[#F0D5E4] flex justify-between items-center">
-                  <span className="font-black text-[#590231]">Current Balance Due:</span>
-                  <span className="font-black text-base text-[#8A064D]">₹{Math.max(0, calculatedDue).toLocaleString('en-IN')}</span>
-                </div>
+          {/* Searchable Course & Batch Dropdowns Row - Dropdown floats out so page scrolls freely */}
+          <div className="p-5 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+              {/* Left: Searchable Course Combobox */}
+              <div className="space-y-1.5">
+                <label className="block text-sm font-black text-[#590231] uppercase tracking-wide">
+                  Select Course <span className="text-rose-500">*</span>
+                </label>
+                <SearchableCombobox
+                  options={studentCourseOptions}
+                  value={activeEditCourseId}
+                  placeholder="Search course (e.g. Bharatanatyam, Carnatic Music)..."
+                  onChange={(id) => setActiveEditCourseId(id)}
+                />
               </div>
 
-              <button
-                type="button"
-                disabled={savingEdit || !editFullName.trim() || editSelectedBatchIds.length === 0}
-                onClick={handleSaveEdit}
-                className="w-full py-3 rounded-2xl bg-[#8A064D] hover:bg-[#590231] text-white text-xs font-black shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {savingEdit ? (
-                  <>
-                    <Sparkles className="w-4 h-4 animate-spin text-[#F9E33A]" />
-                    <span>Updating Disciple Details...</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4 text-[#F9E33A]" />
-                    <span>Save Disciple Details</span>
-                  </>
-                )}
-              </button>
+              {/* Right: Searchable Batch Combobox */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-black text-[#590231] uppercase tracking-wide truncate">
+                    {activeEditCourseId
+                      ? `Select Batch: ${courses.find(c => c.id === activeEditCourseId)?.title || 'Course'}`
+                      : 'Select Batch'} <span className="text-rose-500">*</span>
+                  </label>
+                  {activeEditCourseId && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveEditCourseId('')}
+                      className="text-xs font-semibold text-gray-400 hover:text-gray-600 cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <SearchableCombobox
+                  options={availableEditBatchOptions}
+                  value=""
+                  placeholder={activeEditCourseId ? "Select batch to enroll..." : "Choose course first or search all batches..."}
+                  onChange={(id) => {
+                    if (id) {
+                      handleSelectEditBatch(id);
+                    }
+                  }}
+                />
+              </div>
             </div>
+          </div>
+
+          {/* Enrolled Courses & Batches Grid - Occupies Both Left to Right Ends */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-black text-[#590231] uppercase tracking-wider">
+                Enrolled Courses &amp; Batches ({editSelectedBatchIds.length})
+              </span>
+              <span className="text-sm font-black text-[#8A064D]">
+                Monthly Gross: ₹{editSelectedBatchIds.reduce((sum, bId) => {
+                  const b = batches.find(x => x.id === bId);
+                  return sum + (Number(b?.monthly_fee) || 0);
+                }, 0).toLocaleString('en-IN')}
+              </span>
+            </div>
+
+            {editSelectedBatchIds.length === 0 ? (
+              <div className="p-8 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-sm text-gray-500">
+                No courses or batches enrolled yet. Use the searchable course and batch dropdowns above to add batches.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {editSelectedBatchIds.map(bId => {
+                  const b = batches.find(x => x.id === bId);
+                  const crs = courses.find(c => c.id === b?.course_id);
+                  const fee = Number(b?.monthly_fee || 0);
+                  const gstPercent = Number(b?.gst_percent !== undefined ? b?.gst_percent : 18);
+                  const base = fee / (1 + (gstPercent / 100));
+                  const gst = fee - base;
+
+                  return (
+                    <div key={bId} className="p-4 rounded-2xl bg-[#FFF9FB] border border-[#F0D5E4] flex flex-col justify-between gap-3 shadow-2xs hover:shadow-xs transition">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-black text-[#8A064D] uppercase tracking-wide">
+                            {crs?.title || 'Course'}
+                          </span>
+                          {b?.code && (
+                            <span className="font-mono text-xs text-[#590231] bg-white px-2 py-0.5 rounded-lg border border-rose-200 font-bold shrink-0">
+                              {b.code}
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-sm font-extrabold text-[#2D041A]">
+                          {b?.name || 'Batch'}
+                        </h4>
+                        <div className="text-xs text-gray-600 space-y-0.5">
+                          <p>Guru: <strong className="text-gray-900">{b?.trainer_name || 'Assigned'}</strong></p>
+                          <p>{b?.days_of_week?.join(', ')} • {b?.start_time?.slice(0, 5)} - {b?.end_time?.slice(0, 5)}</p>
+                          <p className="font-mono text-[11px] text-gray-500">Base: ₹{base.toFixed(2)} + GST ({gstPercent}%): ₹{gst.toFixed(2)}</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-[#F0D5E4]/60 flex items-center justify-between">
+                        <span className="text-sm font-black text-emerald-800 tabular-nums">
+                          ₹{fee.toLocaleString('en-IN')}/mo
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEditBatch(bId)}
+                          className="px-3 py-1 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition flex items-center gap-1 cursor-pointer"
+                          title="Remove Batch"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Section (Row 3): Tuition & Fee Summary at the End */}
+        <div className="w-full bg-white p-6 sm:p-7 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-5">
+          <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+            <h2 className="text-base font-black text-[#590231] uppercase tracking-wider flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-[#8A064D]" />
+              <span>Tuition &amp; Fee Summary</span>
+            </h2>
+            <span className="text-xs text-gray-400 font-medium">All amounts itemized with 18% GST</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 text-center">
+            <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-200">
+              <span className="text-[11px] font-bold text-gray-500 uppercase block">Base Tuition</span>
+              <span className="text-base font-black text-gray-900 mt-1 block">₹{totalBaseCalculated.toFixed(2)}</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200">
+              <span className="text-[11px] font-bold text-emerald-800 uppercase block">GST (18%)</span>
+              <span className="text-base font-black text-emerald-800 mt-1 block">₹{totalGstCalculated.toFixed(2)}</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-[#FFF2F8] border border-rose-200">
+              <span className="text-[11px] font-bold text-[#8A064D] uppercase block">Gross Total</span>
+              <span className="text-base font-black text-[#8A064D] mt-1 block">₹{totalGrossCalculated.toLocaleString('en-IN')}</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-200">
+              <span className="text-[11px] font-bold text-gray-500 uppercase block">Discount</span>
+              <span className="text-base font-black text-emerald-700 mt-1 block">-₹{Number(editFixedDiscount || 0).toLocaleString('en-IN')}</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-rose-50/50 border border-rose-200">
+              <span className="text-[11px] font-bold text-[#590231] uppercase block">Net Tuition</span>
+              <span className="text-base font-black text-[#2D041A] mt-1 block">₹{netMonthlyCalculated.toLocaleString('en-IN')}</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-200">
+              <span className="text-[11px] font-bold text-gray-500 uppercase block">Advance Paid</span>
+              <span className="text-base font-black text-emerald-700 mt-1 block">₹{Number(editAdvancePaid || 0).toLocaleString('en-IN')}</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-[#590231] text-white col-span-2 sm:col-span-1 border border-[#F9E33A]/40">
+              <span className="text-[11px] font-bold text-[#F9E33A] uppercase block">Balance Due</span>
+              <span className="text-base font-black text-white mt-1 block">
+                {calculatedDue < 0 ? `-₹${Math.abs(calculatedDue).toLocaleString('en-IN')}` : `₹${calculatedDue.toLocaleString('en-IN')}`}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => {
+                setPageMode('list');
+                setEditingStudent(null);
+              }}
+              className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-bold transition cursor-pointer text-center"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={savingEdit || !editFullName.trim() || editSelectedBatchIds.length === 0}
+              onClick={handleSaveEdit}
+              className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-[#8A064D] hover:bg-[#590231] text-white text-sm font-black shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer border border-[#F9E33A]/40"
+            >
+              {savingEdit ? (
+                <>
+                  <Sparkles className="w-5 h-5 animate-spin text-[#F9E33A]" />
+                  <span>Saving Changes...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-5 h-5 text-[#F9E33A]" />
+                  <span>Save Changes</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -2604,14 +2610,16 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
                       <span className="truncate">Edit</span>
                     </button>
 
-                    <button
-                      onClick={() => setDeletingStudent(s)}
-                      className="py-2 px-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 hover:text-rose-800 text-[11px] font-bold transition flex items-center justify-center gap-1 shadow-2xs border border-rose-200 cursor-pointer"
-                      title="Delete Student"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      <span className="truncate">Delete</span>
-                    </button>
+                    {canDelete && (
+                      <button
+                        onClick={() => setDeletingStudent(s)}
+                        className="py-2 px-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 hover:text-rose-800 text-[11px] font-bold transition flex items-center justify-center gap-1 shadow-2xs border border-rose-200 cursor-pointer"
+                        title="Delete Student"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                        <span className="truncate">Delete</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -2755,13 +2763,15 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
                               <span>Edit</span>
                             </button>
 
-                            <button
-                              onClick={() => setDeletingStudent(s)}
-                              className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 transition flex items-center shadow-2xs border border-rose-200 cursor-pointer"
-                              title="Delete Student"
-                            >
-                              <Trash2 className="w-4 h-4 text-rose-600" />
-                            </button>
+                            {canDelete && (
+                              <button
+                                onClick={() => setDeletingStudent(s)}
+                                className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 transition flex items-center shadow-2xs border border-rose-200 cursor-pointer"
+                                title="Delete Student"
+                              >
+                                <Trash2 className="w-4 h-4 text-rose-600" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -3087,18 +3097,20 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
 
               {/* Modal Actions */}
               <div className="flex items-center justify-between pt-4 border-t border-[#F0D5E4]/60">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const s = detailStudent;
-                    setDetailStudent(null);
-                    setDeletingStudent(s);
-                  }}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 shadow-2xs border border-rose-200 transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                  <span>Delete Student</span>
-                </button>
+                {canDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const s = detailStudent;
+                      setDetailStudent(null);
+                      setDeletingStudent(s);
+                    }}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 shadow-2xs border border-rose-200 transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Delete Student</span>
+                  </button>
+                ) : <div />}
 
                 <div className="flex items-center gap-2">
                   <button

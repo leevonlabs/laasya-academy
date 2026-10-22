@@ -84,6 +84,7 @@ class NotificationService {
   static Future<void> showAnnouncementNotification({
     required String title,
     required String message,
+    String route = '/announcements',
   }) async {
     try {
       await _channel.invokeMethod('showNotification', {
@@ -91,7 +92,7 @@ class NotificationService {
         'title': title,
         'message': message,
         'channelId': 'laasya_announcements',
-        'route': '/messages',
+        'route': route,
       });
     } catch (_) {}
   }

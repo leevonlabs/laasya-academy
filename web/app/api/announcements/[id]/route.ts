@@ -57,6 +57,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getCurrentUser();
+    if (user && user.role === 'receptionist' && !user.canDelete) {
+      return NextResponse.json({ error: 'Receptionist does not have delete permission.' }, { status: 403, headers: corsHeaders });
+    }
+
     const { id } = await params;
     const deleted = await deleteAnnouncement(id);
 

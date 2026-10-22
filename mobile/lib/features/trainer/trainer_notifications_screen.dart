@@ -61,7 +61,19 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
     }
 
     // 4. Announcements / Messages Redirection
-    if (type == 'announcement' || type == 'message' || title.contains('announcement') || title.contains('message') || title.contains('notice') || title.contains('holiday') || title.contains('extra class')) {
+    final isAnnouncementNotice = type == 'announcement' ||
+        title.contains('announcement') ||
+        type == 'broadcast' ||
+        message.contains('announcement') ||
+        title.contains('broadcast');
+    if (isAnnouncementNotice) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: false)),
+      );
+      return;
+    }
+    if (type == 'message' || title.contains('message') || title.contains('notice') || title.contains('holiday') || title.contains('extra class')) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: true)),
@@ -228,7 +240,7 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
                         ),
                       ),
                     );
-                  } else if (type == 'announcement' || type == 'message' || title.contains('announcement') || title.contains('message')) {
+                  } else if (type == 'announcement' || title.contains('announcement') || type == 'broadcast') {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: SizedBox(
@@ -241,7 +253,28 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           icon: const Icon(Icons.campaign_rounded, size: 18),
-                          label: const Text('Open Noticeboard Messages', style: TextStyle(fontWeight: FontWeight.bold)),
+                          label: const Text('Open Announcements', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: false)));
+                          },
+                        ),
+                      ),
+                    );
+                  } else if (type == 'message' || title.contains('message') || title.contains('notice') || title.contains('circular')) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: LaasyaColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.mail_rounded, size: 18),
+                          label: const Text('Open Messages', style: TextStyle(fontWeight: FontWeight.bold)),
                           onPressed: () {
                             Navigator.pop(ctx);
                             Navigator.push(context, MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: true)));

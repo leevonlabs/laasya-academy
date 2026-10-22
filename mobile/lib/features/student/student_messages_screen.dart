@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -23,6 +24,7 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
   bool _isLoading = true;
   int _unreadCount = 0;
   final ScrollController _scrollController = ScrollController();
+  Timer? _realtimeSyncTimer;
 
   @override
   void initState() {
@@ -59,6 +61,11 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
       if (mounted) setState(() {});
     });
     _loadMessages();
+    _realtimeSyncTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted) {
+        _loadMessages(isBackgroundSync: true);
+      }
+    });
   }
 
   void _scrollToBottom() {
@@ -81,12 +88,28 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
 
   @override
   void dispose() {
+    _realtimeSyncTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadMessages() async {
-    if (_messages.isEmpty) {
+  bool _areMessageListsIdentical(List<Map<String, dynamic>> listA, List<Map<String, dynamic>> listB) {
+    if (listA.length != listB.length) return false;
+    for (int i = 0; i < listA.length; i++) {
+      final a = listA[i];
+      final b = listB[i];
+      if (a['id'] != b['id'] ||
+          a['title'] != b['title'] ||
+          a['message'] != b['message'] ||
+          a['updated_at'] != b['updated_at']) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<void> _loadMessages({bool isBackgroundSync = false}) async {
+    if (_messages.isEmpty && !isBackgroundSync) {
       setState(() => _isLoading = true);
     }
     final msgs = await SupabaseService().getMessageAnnouncements(forceRefresh: true);
@@ -134,6 +157,13 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
         return da.compareTo(db);
       });
 
+      // Prevent continuous re-rendering, flickering, and scroll jumping if content didn't change
+      if (isBackgroundSync && _areMessageListsIdentical(_messages, dedupedValid)) {
+        return;
+      }
+
+      final hasNewMessages = dedupedValid.length != _messages.length;
+
       setState(() {
         _messages = dedupedValid;
         _isLoading = false;
@@ -143,8 +173,10 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
       // Mark as read after user has seen the messages
       SupabaseService().markAllMessagesAsRead(validMsgs);
 
-      // Automatically position at the bottom so newest messages are visible first
-      _scrollToBottom();
+      // Only reposition at bottom if list changed or during initial/manual load
+      if (hasNewMessages || !isBackgroundSync) {
+        _scrollToBottom();
+      }
     }
   }
 
@@ -689,6 +721,7 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                               }
 
                               return Padding(
+                                key: ValueKey(msg['id'] ?? 'msg_$index'),
                                 padding: const EdgeInsets.only(bottom: 14),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -40,6 +40,7 @@ interface Props {
   courses: Course[];
   trainers: Trainer[];
   initialRooms?: Room[];
+  canDelete?: boolean;
 }
 
 interface ScheduleEntry {
@@ -51,7 +52,7 @@ interface ScheduleEntry {
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export default function BatchesListClient({ initialBatches, courses, trainers, initialRooms = [] }: Props) {
+export default function BatchesListClient({ initialBatches, courses, trainers, initialRooms = [], canDelete = true }: Props) {
   const [batches, setBatches] = useState<Batch[]>(initialBatches);
   const [rooms, setRooms] = useState<Room[]>(initialRooms);
   const [searchQuery, setSearchQuery] = useState('');
@@ -290,6 +291,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   const [addBatchName, setAddBatchName] = useState('');
   const [addBatchCode, setAddBatchCode] = useState('');
   const [addMonthlyFee, setAddMonthlyFee] = useState<string>('');
+  const [addGstPercent, setAddGstPercent] = useState<string>('18');
   const [addDescription, setAddDescription] = useState('');
   const [addRoom, setAddRoom] = useState('Natya Mandapam (Room 101)');
   const [addCapacity, setAddCapacity] = useState(25);
@@ -308,6 +310,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     setAddBatchName('');
     setAddBatchCode('');
     setAddMonthlyFee('');
+    setAddGstPercent('18');
     setAddDescription('');
     setAddRoom(rooms[0]?.name || 'Natya Mandapam (Room 101)');
     setAddCapacity(25);
@@ -342,6 +345,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   const [editBatchName, setEditBatchName] = useState('');
   const [editBatchCode, setEditBatchCode] = useState('');
   const [editMonthlyFee, setEditMonthlyFee] = useState<string>('0');
+  const [editGstPercent, setEditGstPercent] = useState<string>('18');
   const [editDescription, setEditDescription] = useState('');
   const [editRoom, setEditRoom] = useState('');
   const [editCapacity, setEditCapacity] = useState(25);
@@ -357,6 +361,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     setEditBatchName(batch.name);
     setEditBatchCode(batch.code || getNextSequentialBatchCode(batch.course_id, batches));
     setEditMonthlyFee(batch.monthly_fee !== undefined ? String(batch.monthly_fee) : '0');
+    setEditGstPercent(batch.gst_percent !== undefined ? String(batch.gst_percent) : '18');
     setEditDescription(batch.description || '');
     setEditRoom(batch.room_or_hall || 'Natya Mandapam (Room 101)');
     setEditCapacity(batch.max_capacity || 25);
@@ -445,9 +450,9 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   }, [courses, courseFilterSearch]);
 
   // Academy summary stats
-  const totalEnrolled = useMemo(() => batches.reduce((sum, b) => sum + (b.enrolled_count || 0), 0), [batches]);
-  const totalCapacity = useMemo(() => batches.reduce((sum, b) => sum + (b.max_capacity || 25), 0), [batches]);
-  const activeBatchesCount = useMemo(() => batches.filter(b => b.is_active !== false).length, [batches]);
+  const totalEnrolled = useMemo(() => filteredBatches.reduce((sum, b) => sum + (b.enrolled_count || 0), 0), [filteredBatches]);
+  const totalCapacity = useMemo(() => filteredBatches.reduce((sum, b) => sum + (b.max_capacity || 25), 0), [filteredBatches]);
+  const activeBatchesCount = useMemo(() => filteredBatches.filter(b => b.is_active !== false).length, [filteredBatches]);
   const fillRate = totalCapacity > 0 ? Math.round((totalEnrolled / totalCapacity) * 100) : 0;
 
   // Available gurus for current Add Course selection (with search)
@@ -656,6 +661,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
           room_or_hall: primaryRoom,
           max_capacity: Number(addCapacity),
           monthly_fee: Number(addMonthlyFee || 0),
+          gst_percent: Number(addGstPercent || 18),
           description: addDescription.trim(),
           is_active: addIsActive,
           schedules: addSchedules
@@ -678,6 +684,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
         course_category: crs?.category || 'Category',
         trainer_name: trn?.full_name || 'Guru',
         monthly_fee: Number(addMonthlyFee || 0),
+        gst_percent: Number(addGstPercent || 18),
         description: addDescription.trim(),
         is_active: addIsActive,
         enrolled_count: 0,
@@ -728,6 +735,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
           room_or_hall: primaryRoom,
           max_capacity: Number(editCapacity),
           monthly_fee: Number(editMonthlyFee || 0),
+          gst_percent: Number(editGstPercent || 18),
           description: editDescription.trim(),
           is_active: editIsActive,
           schedules: editSchedules
@@ -760,6 +768,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 room_or_hall: primaryRoom,
                 max_capacity: Number(editCapacity),
                 monthly_fee: Number(editMonthlyFee || 0),
+                gst_percent: Number(editGstPercent || 18),
                 description: editDescription.trim(),
                 is_active: editIsActive,
                 schedules: editSchedules
@@ -784,6 +793,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
           room_or_hall: editRoom.trim(),
           max_capacity: Number(editCapacity),
           monthly_fee: Number(editMonthlyFee || 0),
+          gst_percent: Number(editGstPercent || 18),
           description: editDescription.trim(),
           is_active: editIsActive,
           schedules: editSchedules
@@ -1120,7 +1130,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
           </div>
           <div>
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Batches</p>
-            <p className="text-xl font-extrabold text-[#2D041A] leading-tight">{batches.length}</p>
+            <p className="text-xl font-extrabold text-[#2D041A] leading-tight">{filteredBatches.length}</p>
           </div>
         </div>
 
@@ -1471,9 +1481,14 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                       <IndianRupee className="w-4 h-4 text-[#8A064D]" />
                       <span>Monthly Fee</span>
                     </span>
-                    <strong className="text-emerald-700 font-extrabold text-base tabular-nums">
-                      ₹{Number(b.monthly_fee || 0).toLocaleString('en-IN')}<span className="text-xs font-normal text-gray-500"> / mo</span>
-                    </strong>
+                    <div className="text-right">
+                      <strong className="text-emerald-700 font-extrabold text-base tabular-nums">
+                        ₹{Number(b.monthly_fee || 0).toLocaleString('en-IN')}<span className="text-xs font-normal text-gray-500"> / mo</span>
+                      </strong>
+                      <span className="text-[10px] text-gray-500 font-medium block">
+                        (incl. {b.gst_percent !== undefined ? b.gst_percent : 18}% GST)
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1514,13 +1529,15 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                      onClick={() => setDeletingBatch(b)}
-                      title="Delete Batch"
-                      className="p-2 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition cursor-pointer shadow-2xs"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {canDelete && (
+                      <button
+                        onClick={() => setDeletingBatch(b)}
+                        title="Delete Batch"
+                        className="p-2 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition cursor-pointer shadow-2xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1596,10 +1613,13 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 </div>
 
                 <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-200">
-                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Monthly Fee</span>
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Monthly Fee (incl. GST)</span>
                   <span className="text-sm font-extrabold text-emerald-700 mt-1 flex items-center gap-1 tabular-nums">
                     <IndianRupee className="w-4 h-4 text-emerald-600" />
                     <span>₹{Number(viewingBatch.monthly_fee || 0).toLocaleString('en-IN')}<span className="text-[10px] font-normal text-gray-500"> / mo</span></span>
+                  </span>
+                  <span className="text-[10px] text-emerald-800 block mt-1 font-medium font-mono">
+                    Base: ₹{(Number(viewingBatch.monthly_fee || 0) / (1 + (Number(viewingBatch.gst_percent !== undefined ? viewingBatch.gst_percent : 18) / 100))).toFixed(2)} + GST ({viewingBatch.gst_percent !== undefined ? viewingBatch.gst_percent : 18}%): ₹{(Number(viewingBatch.monthly_fee || 0) - (Number(viewingBatch.monthly_fee || 0) / (1 + (Number(viewingBatch.gst_percent !== undefined ? viewingBatch.gst_percent : 18) / 100)))).toFixed(2)}
                   </span>
                 </div>
 
@@ -1684,18 +1704,20 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
 
               {/* Actions */}
               <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const b = viewingBatch;
-                    setViewingBatch(null);
-                    setDeletingBatch(b);
-                  }}
-                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition flex items-center gap-1.5"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Delete Batch</span>
-                </button>
+                {canDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const b = viewingBatch;
+                      setViewingBatch(null);
+                      setDeletingBatch(b);
+                    }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Batch</span>
+                  </button>
+                ) : <div />}
 
                 <div className="flex items-center gap-2">
                   <button
@@ -1808,11 +1830,11 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 </div>
               </div>
 
-              {/* Row 3: Monthly Fee & Capacity */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Row 3: Monthly Fee (incl. GST), GST %, and Capacity */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Monthly Fee (₹) <span className="text-rose-500">*</span>
+                    Monthly Fee (incl. GST) (₹) <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-3.5 top-3" />
@@ -1829,6 +1851,25 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                   </div>
                 </div>
                 <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    GST Rate (%) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      max={100}
+                      step={1}
+                      placeholder="18"
+                      value={addGstPercent}
+                      onChange={(e) => setAddGstPercent(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                    />
+                    <span className="text-xs font-bold text-gray-400 absolute right-3.5 top-3">%</span>
+                  </div>
+                </div>
+                <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Class Capacity (Max)</label>
                   <input
                     type="number"
@@ -1840,6 +1881,18 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
+                {Number(addMonthlyFee) > 0 && (
+                  <div className="col-span-full text-[11px] bg-emerald-50 text-emerald-900 px-3.5 py-2 rounded-xl border border-emerald-200 flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold text-emerald-800">Fee Breakdown (GST Included):</span>
+                    <div className="flex items-center gap-3 font-mono">
+                      <span>Base Tuition: <strong>₹{(Number(addMonthlyFee) / (1 + (Number(addGstPercent || 18) / 100))).toFixed(2)}</strong></span>
+                      <span>+</span>
+                      <span>GST ({addGstPercent || 18}%): <strong>₹{(Number(addMonthlyFee) - (Number(addMonthlyFee) / (1 + (Number(addGstPercent || 18) / 100)))).toFixed(2)}</strong></span>
+                      <span>=</span>
+                      <span className="font-bold text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded-md">Total: ₹{Number(addMonthlyFee).toLocaleString('en-IN')}/mo</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 5. Batch Description with AI Enhance - Enlarged */}
@@ -2099,11 +2152,11 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 </div>
               </div>
 
-              {/* 4. Monthly Fee & Capacity */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* 4. Monthly Fee (incl. GST), GST %, and Capacity */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Monthly Fee (₹) <span className="text-rose-500">*</span>
+                    Monthly Fee (incl. GST) (₹) <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
@@ -2119,6 +2172,24 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                   </div>
                 </div>
                 <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    GST Rate (%) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={editGstPercent}
+                      onChange={(e) => setEditGstPercent(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-[#8A064D] focus:ring-2 focus:ring-[#8A064D]"
+                    />
+                    <span className="text-xs font-bold text-gray-400 absolute right-3 top-2.5">%</span>
+                  </div>
+                </div>
+                <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Class Capacity</label>
                   <input
                     type="number"
@@ -2129,6 +2200,18 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D]"
                   />
                 </div>
+                {Number(editMonthlyFee) > 0 && (
+                  <div className="col-span-full text-[11px] bg-emerald-50 text-emerald-900 px-3 py-2 rounded-xl border border-emerald-200 flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold text-emerald-800">Fee Breakdown:</span>
+                    <div className="flex items-center gap-2 font-mono">
+                      <span>Base: <strong>₹{(Number(editMonthlyFee) / (1 + (Number(editGstPercent || 18) / 100))).toFixed(2)}</strong></span>
+                      <span>+</span>
+                      <span>GST ({editGstPercent || 18}%): <strong>₹{(Number(editMonthlyFee) - (Number(editMonthlyFee) / (1 + (Number(editGstPercent || 18) / 100)))).toFixed(2)}</strong></span>
+                      <span>=</span>
+                      <span className="font-bold text-emerald-900">Total: ₹{Number(editMonthlyFee).toLocaleString('en-IN')}/mo</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 5. Batch Description with AI Enhance */}

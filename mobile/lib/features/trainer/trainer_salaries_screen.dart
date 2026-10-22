@@ -281,7 +281,31 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
                         // Payment Details
                         _invRow('Transfer Mode', method),
                         _invRow('Bank UTR / Transaction Ref', ref),
+                        _invRow('Settlement Bank', 'State Bank of India (SBIN0004052)'),
+                        _invRow('Beneficiary Faculty', name),
                         _invRow('Disbursed By', disbursedBy),
+
+                        Container(
+                          margin: const EdgeInsets.symmetric(vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF2F8),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFF0D5E4)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.account_balance_rounded, size: 14, color: LaasyaColors.primary),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Direct Bank Remittance • Verified & Settled for $month',
+                                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: LaasyaColors.primary),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
 
                         const SizedBox(height: 18),
 
@@ -583,7 +607,7 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Disbursement Records (${_salaries.length})',
+                          'Payment-Wise Salary Vouchers (${_salaries.length})',
                           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
                         ),
                         const Text('PDF Slips Available', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),

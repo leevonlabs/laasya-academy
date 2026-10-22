@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -5,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/utils/avatar_helper.dart';
 import 'trainer_create_announcement_screen.dart';
 
 class TrainerAnnouncementsScreen extends StatefulWidget {
@@ -27,6 +29,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
   List<Map<String, dynamic>> _myCourses = [];
   List<Map<String, dynamic>> _myBatches = [];
   final ScrollController _scrollController = ScrollController();
+  Timer? _realtimePollTimer;
 
   String get _trainerName =>
       widget.trainerProfile?['full_name'] ??
@@ -105,7 +108,18 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
     );
   }
 
-  Widget _buildAdminAvatarWidget() {
+  Widget _buildAdminAvatarWidget([String? itemAvatar]) {
+    String adminAvatar = (itemAvatar != null && itemAvatar.trim().isNotEmpty && itemAvatar != 'null')
+        ? itemAvatar.trim()
+        : '';
+    if (adminAvatar.isEmpty || adminAvatar == 'null') {
+      final resolved = SupabaseService().getAdminAvatar();
+      if (resolved != null && resolved.isNotEmpty && resolved != 'null') {
+        adminAvatar = resolved.trim();
+      }
+    }
+    final provider = getAvatarImageProvider((adminAvatar.isNotEmpty && adminAvatar != 'null') ? adminAvatar : null);
+
     return Container(
       width: 36,
       height: 36,
@@ -114,24 +128,34 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
         shape: BoxShape.circle,
         color: const Color(0xFF590231),
         border: Border.all(color: LaasyaColors.accentGold, width: 1.5),
-      ),
-      child: ClipOval(
-        child: Image.asset(
-          'assets/images/app_logo.png',
-          width: 36,
-          height: 36,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Center(
-            child: Text(
-              'LC',
-              style: TextStyle(
-                color: LaasyaColors.accentGold,
-                fontWeight: FontWeight.w900,
-                fontSize: 11.5,
-              ),
-            ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
-        ),
+        ],
+      ),
+      child: CircleAvatar(
+        radius: 17,
+        backgroundColor: Colors.white,
+        backgroundImage: provider,
+        child: provider == null
+            ? ClipOval(
+                child: Image.asset(
+                  'assets/images/header_logo.png',
+                  width: 30,
+                  height: 30,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Text(
+                      '👑',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ),
+              )
+            : null,
       ),
     );
   }
@@ -140,11 +164,13 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
     final list = widget.isMessagesMode
         ? _announcements.where((a) {
             final senderRole = (a['sender_role'] ?? '').toString().toLowerCase();
-            return senderRole != 'trainer' && senderRole != 'guru' && !_isMySentAnnouncement(a);
+            final isGuru = senderRole == 'trainer' || senderRole == 'guru' || _isMySentAnnouncement(a);
+            return !isGuru; // Only admin & reception notices in Messages page
           }).toList()
         : _announcements.where((a) {
             final senderRole = (a['sender_role'] ?? '').toString().toLowerCase();
-            return senderRole == 'trainer' || senderRole == 'guru' || _isMySentAnnouncement(a);
+            final isGuru = senderRole == 'trainer' || senderRole == 'guru' || _isMySentAnnouncement(a);
+            return isGuru; // Only guru announcements in Announcements page
           }).toList();
 
     final seen = <String>{};
@@ -474,6 +500,13 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
   }
 
   Widget _buildMessageActionButtons(Map<String, dynamic> ann) {
+    // User requirement: In Messages page or for notices sent by Admin/Reception, no View, Edit, or Delete options
+    final senderRole = (ann['sender_role'] ?? '').toString().toLowerCase();
+    final isTrainerSender = senderRole.contains('trainer') || senderRole.contains('guru');
+    if (widget.isMessagesMode || !_isMySentAnnouncement(ann) || !isTrainerSender) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       margin: const EdgeInsets.only(top: 8, bottom: 4),
       padding: const EdgeInsets.only(top: 6),
@@ -753,10 +786,11 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                           onPressed: isSaving
                               ? null
                               : () async {
+                                  final messenger = ScaffoldMessenger.of(context);
                                   final newTitle = titleController.text.trim();
                                   final newMsg = messageController.text.trim();
                                   if (newTitle.isEmpty || newMsg.isEmpty) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    messenger.showSnackBar(
                                       const SnackBar(content: Text('Please fill title and message')),
                                     );
                                     return;
@@ -794,7 +828,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                                       Navigator.of(ctx).pop();
                                     }
                                     if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      messenger.showSnackBar(
                                         const SnackBar(
                                           content: Text('Message updated successfully'),
                                           backgroundColor: Color(0xFF03543F),
@@ -804,7 +838,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                                   } catch (e) {
                                     setModalState(() => isSaving = false);
                                     if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      messenger.showSnackBar(
                                         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
                                       );
                                     }
@@ -900,7 +934,37 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
       _isLoading = false;
       _scrollToBottom();
     }
+    SupabaseService().preloadTrainerAvatars().then((_) {
+      if (mounted) setState(() {});
+    });
     _loadData();
+    _realtimePollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted) {
+        _loadAnnouncements(isBackgroundSync: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _realtimePollTimer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  bool _areMessageListsIdentical(List<Map<String, dynamic>> listA, List<Map<String, dynamic>> listB) {
+    if (listA.length != listB.length) return false;
+    for (int i = 0; i < listA.length; i++) {
+      final a = listA[i];
+      final b = listB[i];
+      if (a['id'] != b['id'] ||
+          a['title'] != b['title'] ||
+          a['message'] != b['message'] ||
+          a['updated_at'] != b['updated_at']) {
+        return false;
+      }
+    }
+    return true;
   }
 
   void _sortAnnouncements() {
@@ -927,12 +991,6 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -970,17 +1028,24 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
     }
   }
 
-  Future<void> _loadAnnouncements() async {
+  Future<void> _loadAnnouncements({bool isBackgroundSync = false}) async {
     try {
       final msgs = await SupabaseService().getMessageAnnouncements(forceRefresh: true);
       if (mounted) {
+        if (isBackgroundSync && _areMessageListsIdentical(_announcements, msgs)) {
+          return;
+        }
+        final newCount = msgs.length;
+        final hasNew = newCount != _announcements.length;
         setState(() {
           _announcements = List<Map<String, dynamic>>.from(msgs);
           _sortAnnouncements();
           _isLoading = false;
         });
         SupabaseService().markAllMessagesAsRead(_announcements);
-        _scrollToBottom();
+        if (hasNew || !isBackgroundSync) {
+          _scrollToBottom();
+        }
       }
     } catch (e) {
       debugPrint('Error loading announcements in trainer view: $e');
@@ -1247,6 +1312,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                               }
 
                               return Padding(
+                                key: ValueKey(ann['id'] ?? 'ann_$index'),
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1289,7 +1355,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                                       Row(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          _buildAdminAvatarWidget(),
+                                          _buildAdminAvatarWidget(ann['admin_avatar_url']?.toString()),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Container(
@@ -1441,22 +1507,20 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                                                     ),
                                                   ],
 
-                                                  const SizedBox(height: 6),
-
-                                                  // Action Buttons (View, Edit, Delete)
-                                                  _buildMessageActionButtons(ann),
-
                                                   // Timestamp & Delivered Checks
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.end,
-                                                    children: [
-                                                      Text(
-                                                        timeStr,
-                                                        style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      const Icon(Icons.done_all_rounded, size: 14, color: Color(0xFF34B7F1)),
-                                                    ],
+                                                  Align(
+                                                    alignment: Alignment.bottomRight,
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          timeStr,
+                                                          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        const Icon(Icons.done_all_rounded, size: 14, color: Color(0xFF34B7F1)),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ],
                                               ),
@@ -1541,24 +1605,26 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                                                   _buildMessageActionButtons(ann),
 
                                                   // Time & Blue Double Checks
-                                                  Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    mainAxisAlignment: MainAxisAlignment.end,
-                                                    children: [
-                                                      Text(
-                                                        timeStr,
-                                                        style: TextStyle(
-                                                          fontSize: 10,
-                                                          color: Colors.grey.shade700,
+                                                  Align(
+                                                    alignment: Alignment.bottomRight,
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          timeStr,
+                                                          style: TextStyle(
+                                                            fontSize: 10,
+                                                            color: Colors.grey.shade700,
+                                                          ),
                                                         ),
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      const Icon(
-                                                        Icons.done_all_rounded,
-                                                        size: 14,
-                                                        color: Color(0xFF34B7F1),
-                                                      ),
-                                                    ],
+                                                        const SizedBox(width: 4),
+                                                        const Icon(
+                                                          Icons.done_all_rounded,
+                                                          size: 14,
+                                                          color: Color(0xFF34B7F1),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ],
                                               ),

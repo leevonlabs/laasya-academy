@@ -1605,6 +1605,30 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(_mockBannerAnnouncements);
   }
 
+  Future<void> recordAdvertisementView(String announcementId) async {
+    if (announcementId.isEmpty) return;
+    try {
+      final profile = currentUserProfile;
+      final userId = (profile?['id'] ?? profile?['student_id'] ?? profile?['trainer_id'] ?? 'user_${DateTime.now().millisecondsSinceEpoch}').toString().trim();
+      final role = (profile?['role'] ?? 'student').toString().trim();
+      final name = (profile?['full_name'] ?? profile?['name'] ?? 'Academy Member').toString().trim();
+
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/advertisements/view');
+      await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'announcement_id': announcementId,
+          'user_id': userId,
+          'user_role': role,
+          'user_name': name,
+        }),
+      ).timeout(const Duration(seconds: 4));
+    } catch (e) {
+      debugPrint('Notice: Error recording advertisement view: $e');
+    }
+  }
+
   List<Map<String, dynamic>> _filterAnnouncementsForCurrentUser(List<Map<String, dynamic>> items) {
     final profile = currentUserProfile;
     if (profile == null) return items;
@@ -1781,11 +1805,21 @@ class SupabaseService {
         // A Guru can ONLY send messages to students enrolled in their own batches/courses!
 
         // 1. If individual target students are specified
-        final targetStudents = item['target_students'];
+        dynamic targetStudents = item['target_students'];
+        if (targetStudents is String && targetStudents.trim().startsWith('[')) {
+          try {
+            targetStudents = jsonDecode(targetStudents);
+          } catch (_) {}
+        }
         if (targetStudents is List && targetStudents.isNotEmpty) {
+          final myPhone = (profile['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
           for (var s in targetStudents) {
-            final sStr = (s is Map ? (s['id'] ?? s['roll_number'] ?? s['name']) : s).toString().toLowerCase();
-            if (sStr.contains(myId) || (myRoll.isNotEmpty && sStr.contains(myRoll)) || (myName.isNotEmpty && sStr.contains(myName))) {
+            final sStr = (s is Map ? '${s['id']} ${s['roll_number']} ${s['name']} ${s['phone']}' : s).toString().toLowerCase();
+            final sPhone = (s is Map ? (s['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '') : '');
+            if ((myId.isNotEmpty && sStr.contains(myId)) ||
+                (myRoll.isNotEmpty && sStr.contains(myRoll)) ||
+                (myName.isNotEmpty && sStr.contains(myName)) ||
+                (myPhone.isNotEmpty && sPhone.isNotEmpty && (myPhone.contains(sPhone) || sPhone.contains(myPhone)))) {
               return true;
             }
           }
@@ -1997,14 +2031,14 @@ class SupabaseService {
     if (_cachedMessageAnnouncements.isNotEmpty) {
       return List<Map<String, dynamic>>.from(_cachedMessageAnnouncements);
     }
-    return List<Map<String, dynamic>>.from(_mockMessageAnnouncements);
+    return [];
   }
 
   List<Map<String, dynamic>> getCachedMessageAnnouncements() {
     if (_cachedMessageAnnouncements.isNotEmpty) {
       return List<Map<String, dynamic>>.from(_cachedMessageAnnouncements);
     }
-    return List<Map<String, dynamic>>.from(_mockMessageAnnouncements);
+    return [];
   }
 
   final Set<String> _readNotifIds = {};

@@ -1489,6 +1489,53 @@ export default function GuruSalariesClient({
                 </div>
               </div>
 
+              {/* Official Bank Account & Academy Verification Details */}
+              <div className="grid grid-cols-2 gap-3 py-3 border-t border-gray-150 text-[11px] text-gray-600 bg-gray-50/70 p-3 rounded-xl mt-3">
+                <div>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Bank Settlement Account</span>
+                  <strong className="text-gray-900 block mt-0.5">{slipRecord.guru_name}</strong>
+                  <span className="text-[10px] text-gray-500 font-mono">State Bank of India • IFSC: SBIN0004052</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Remittance Verification</span>
+                  <span className="text-emerald-700 font-bold flex items-center gap-1 mt-0.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Verified &amp; Deposited to Faculty Account</span>
+                  </span>
+                  <span className="text-[10px] text-gray-500">Date: {new Date(slipRecord.payment_date || slipRecord.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                </div>
+              </div>
+
+              {/* Academy Seal & Signatures */}
+              <div className="flex justify-between items-end pt-5 mt-2 border-t border-rose-100 text-xs">
+                <div className="text-center">
+                  <div className="w-28 border-b border-gray-400 pb-1 mb-1 font-serif italic text-xs text-gray-700">
+                    {slipRecord.guru_name.split(' ')[0]}
+                  </div>
+                  <span className="text-[9.5px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Faculty Signature
+                  </span>
+                </div>
+
+                <div className="text-center">
+                  <div className="inline-block px-2 py-0.5 rounded-full border-2 border-[#8A064D] text-[#8A064D] font-black text-[9px] uppercase tracking-tighter mb-1">
+                    ★ LCA OFFICIAL SEAL ★
+                  </div>
+                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">
+                    Registered Society
+                  </span>
+                </div>
+
+                <div className="text-center">
+                  <div className="w-32 border-b border-gray-400 pb-1 mb-1 font-serif font-bold text-xs text-[#8A064D]">
+                    Ramesh Rao
+                  </div>
+                  <span className="text-[9.5px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Director / Authorized Signatory
+                  </span>
+                </div>
+              </div>
+
             </div>
 
           </div>

@@ -9,7 +9,7 @@ export const revalidate = 15;
 
 export default async function FeesPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'owner') {
+  if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
     redirect('/login');
   }
 

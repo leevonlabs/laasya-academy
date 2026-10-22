@@ -46,6 +46,9 @@ export interface StudentFeeInvoice {
   fee_period: string;
   due_date: string;
   total_amount: number;
+  gst_percent?: number;
+  base_amount?: number;
+  gst_amount?: number;
   discount_amount: number;
   paid_amount: number;
   balance_amount: number;

@@ -38,12 +38,14 @@ interface Props {
   initialTrainers: Trainer[];
   courses?: Course[];
   batches?: Batch[];
+  canDelete?: boolean;
 }
 
 export default function TrainersListClient({ 
   initialTrainers, 
   courses = [], 
-  batches = [] 
+  batches = [],
+  canDelete = true
 }: Props) {
   const [trainers, setTrainers] = useState<Trainer[]>(initialTrainers);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1958,14 +1960,16 @@ export default function TrainersListClient({
 
             {/* Modal Actions Footer: Delete Guru, Edit Guru, Close */}
             <div className="flex items-center justify-between pt-5 border-t border-gray-100 mt-5">
-              <button
-                type="button"
-                onClick={() => setDeletingGuru(viewingGuru)}
-                className="px-4 py-2.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete Guru</span>
-              </button>
+              {canDelete ? (
+                <button
+                  type="button"
+                  onClick={() => setDeletingGuru(viewingGuru)}
+                  className="px-4 py-2.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Guru</span>
+                </button>
+              ) : <div />}
 
               <div className="flex items-center gap-2">
                 <button

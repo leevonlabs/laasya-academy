@@ -19,6 +19,8 @@ import { Batch } from '@/lib/academy';
 interface Props {
   onBack?: () => void;
   batches?: Batch[];
+  tallyClasses?: any[];
+  showBackLink?: boolean;
 }
 
 interface TimetableSlot {
@@ -26,6 +28,8 @@ interface TimetableSlot {
   batch: string;
   trainer: string;
   asterisk?: boolean;
+  isRescheduled?: boolean;
+  room?: string;
 }
 
 const COURSES_THEME: Record<string, {
@@ -344,10 +348,69 @@ const TIME_ROWS: Array<{
   }
 ];
 
+const getSlotRoom = (slot: TimetableSlot): string => {
+  if (slot.room && slot.room.trim().length > 0) return slot.room;
+  const courseUpper = slot.course.toUpperCase();
+  if (courseUpper.includes('YOGA')) return 'Room 1 (Yoga Shala)';
+  if (courseUpper.includes('WESTERN')) return 'Room 1 (Dance Studio)';
+  if (courseUpper.includes('BHARATANATYAM') || courseUpper.includes('KALARI') || courseUpper.includes('KUCHIPUDI') || courseUpper.includes('MOHINI')) return 'Room 2 (Natya Mandapam)';
+  if (courseUpper.includes('MUSIC') || courseUpper.includes('INSTRUMENT') || courseUpper.includes('VIOLIN') || courseUpper.includes('KEYBOARD') || courseUpper.includes('GUITAR')) return 'Room 3 (Sangeetha Hall)';
+  if (courseUpper.includes('DRAWING') || courseUpper.includes('ART') || courseUpper.includes('CHESS') || courseUpper.includes('KARATE')) return 'Room 4 (Chitrakala Studio)';
+  return 'Room 2 (Main Hall)';
+};
+
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export default function TimetableView({ onBack, batches }: Props) {
+export default function TimetableView({ onBack, batches, tallyClasses: initialTallyClasses, showBackLink = true }: Props) {
   const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('ALL');
+  const [liveTallyClasses, setLiveTallyClasses] = useState<any[]>(initialTallyClasses || []);
+
+  // Fetch rescheduled tally classes if not passed in props
+  React.useEffect(() => {
+    if (initialTallyClasses && initialTallyClasses.length > 0) {
+      setLiveTallyClasses(initialTallyClasses);
+      return;
+    }
+    fetch('/api/tally-classes')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.classes) {
+          setLiveTallyClasses(data.classes);
+        } else if (Array.isArray(data)) {
+          setLiveTallyClasses(data);
+        }
+      })
+      .catch(() => {
+        // Quiet fallback to mock sample if API route unavailable in some environment
+      });
+  }, [initialTallyClasses]);
+
+  // Dynamic current week dates & Month/Year calculation
+  const { currentMonthYear, weekDates } = useMemo(() => {
+    const now = new Date();
+    const currentMonthYear = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    // Calculate Monday to Sunday of the current week
+    const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday...
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+
+    const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const dates = weekDays.map((dayName, idx) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + idx);
+      const dateFormatted = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const isoDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return {
+        day: dayName,
+        dateFormatted,
+        isoDate
+      };
+    });
+
+    return { currentMonthYear, weekDates: dates };
+  }, []);
 
   const inactiveBatchNames = useMemo(() => {
     return new Set(
@@ -496,13 +559,33 @@ export default function TimetableView({ onBack, batches }: Props) {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="bg-[#2D2427] text-white text-[11px] font-black uppercase tracking-wider border-b border-[#2D2427]">
-                <th className="py-3 px-3 w-32 border-r border-[#3E3438] text-center font-bold">
-                  Time
+              {/* Current Month & Year Master Banner */}
+              <tr className="bg-[#1A010F] text-white border-b border-[#3E3438]">
+                <th colSpan={8} className="py-2.5 px-4 text-center">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black tracking-widest uppercase text-[#F9E33A] flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-[#F9E33A]" />
+                      <span>{currentMonthYear}</span>
+                      <span className="text-white/60 font-normal">| Weekly Master Timetable</span>
+                    </span>
+                    <span className="text-xs font-bold text-amber-300 bg-amber-900/60 border border-amber-500/40 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
+                      <span className="text-base text-amber-400 font-black leading-none drop-shadow-xs animate-pulse">★</span>
+                      <span>Rescheduled / Extra Classes</span>
+                    </span>
+                  </div>
                 </th>
-                {DAYS.map(day => (
+              </tr>
+              <tr className="bg-[#2D2427] text-white text-[11px] font-black uppercase tracking-wider border-b border-[#2D2427]">
+                <th className="py-3 px-3 w-32 border-r border-[#3E3438] text-center font-bold align-middle">
+                  <div>Time</div>
+                  <div className="text-[9.5px] text-gray-400 font-normal mt-0.5 font-mono">1 Hr Slots</div>
+                </th>
+                {weekDates.map(({ day, dateFormatted }) => (
                   <th key={day} className="py-3 px-3 text-center border-r border-[#3E3438] last:border-r-0 font-bold min-w-[130px]">
-                    {day}
+                    <div className="text-[11px] font-black uppercase text-white tracking-wide">{day}</div>
+                    <div className="text-[10px] font-bold text-[#F9E33A] bg-white/10 px-2.5 py-0.5 rounded-md inline-block mt-1 font-mono">
+                      {dateFormatted}
+                    </div>
                   </th>
                 ))}
               </tr>
@@ -516,8 +599,30 @@ export default function TimetableView({ onBack, batches }: Props) {
                   </td>
 
                   {/* Day Columns */}
-                  {DAYS.map(day => {
-                    const rawSlots = row.slots[day] || [];
+                  {weekDates.map(({ day, isoDate }) => {
+                    const rawSlots = [...(row.slots[day] || [])];
+
+                    // Inject any rescheduled tally classes that match this day's ISO date & time
+                    const dayRescheduled = liveTallyClasses.filter(tc => {
+                      if (!tc.rescheduled_date) return false;
+                      const dateMatches = tc.rescheduled_date.startsWith(isoDate);
+                      if (!dateMatches) return false;
+                      // Match approximate start hour or time slot
+                      const tcStart = tc.start_time?.substring(0, 5) || '';
+                      return row.time.includes(tcStart) || row.time.toLowerCase().includes(tc.start_time?.toLowerCase() || '');
+                    });
+
+                    dayRescheduled.forEach(tc => {
+                      rawSlots.push({
+                        course: (tc.course_title || 'CLASSICAL DANCE').toUpperCase(),
+                        batch: tc.batch_name || 'Rescheduled Batch',
+                        trainer: tc.trainer_name || 'Assigned Guru',
+                        isRescheduled: true,
+                        asterisk: true,
+                        room: tc.room_or_hall
+                      });
+                    });
+
                     const activeSlots = rawSlots.filter(s => !inactiveBatchNames.has(s.batch.toLowerCase().trim()));
                     const filteredSlots = selectedCourseFilter === 'ALL'
                       ? activeSlots
@@ -537,16 +642,34 @@ export default function TimetableView({ onBack, batches }: Props) {
                             return (
                               <div
                                 key={sIdx}
-                                className={`p-2 rounded-xl border transition-all text-left shadow-2xs hover:shadow-xs ${theme.bg} ${theme.border}`}
+                                className={`p-2 rounded-xl border transition-all text-left shadow-2xs hover:shadow-xs ${
+                                  slot.isRescheduled
+                                    ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-400/40 shadow-xs'
+                                    : `${theme.bg} ${theme.border}`
+                                }`}
                               >
-                                <div className={`text-[8.5px] font-black uppercase tracking-wider opacity-85 leading-tight ${theme.text}`}>
-                                  {slot.course}
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className={`text-[8.5px] font-black uppercase tracking-wider opacity-90 leading-tight ${theme.text}`}>
+                                    {slot.course}
+                                  </span>
+                                  {slot.isRescheduled && (
+                                    <span className="text-[9.5px] font-black text-amber-950 bg-amber-200/90 border border-amber-400 px-1.5 py-0.5 rounded-md font-mono shrink-0 inline-flex items-center gap-1 shadow-2xs">
+                                      <span className="text-base text-amber-600 font-black leading-none animate-pulse">★</span>
+                                      <span>Rescheduled</span>
+                                    </span>
+                                  )}
                                 </div>
-                                <div className={`text-[11px] font-extrabold leading-snug mt-0.5 text-gray-900`}>
-                                  {slot.batch} {slot.asterisk && <span className="text-gray-500">*</span>}
+                                <div className={`text-[11px] font-extrabold leading-snug mt-0.5 text-gray-900 flex items-center gap-1`}>
+                                  <span>{slot.batch}</span>
+                                  {slot.asterisk && !slot.isRescheduled && <span className="text-gray-500">*</span>}
                                 </div>
-                                <div className={`text-[9.5px] font-medium leading-tight mt-0.5 text-gray-600`}>
-                                  {slot.trainer}
+                                <div className={`text-[9.5px] font-medium leading-tight mt-0.5 text-gray-600 flex items-center gap-1`}>
+                                  <User className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                                  <span>{slot.trainer}</span>
+                                </div>
+                                <div className="flex items-center gap-1 text-[9px] font-bold text-gray-700 mt-1 bg-white/80 px-1.5 py-0.5 rounded border border-gray-200/80 w-fit">
+                                  <DoorOpen className="w-2.5 h-2.5 text-[#8A064D] shrink-0" />
+                                  <span>{getSlotRoom(slot)}</span>
                                 </div>
                               </div>
                             );

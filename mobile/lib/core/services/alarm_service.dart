@@ -41,9 +41,11 @@ class AlarmService {
   static Future<void> showNoticeNotification({
     required String title,
     required String message,
+    String route = '/announcements',
   }) => NotificationService.showAnnouncementNotification(
     title: title,
     message: message,
+    route: route,
   );
 
   static Future<void> requestNotificationPermission() =>

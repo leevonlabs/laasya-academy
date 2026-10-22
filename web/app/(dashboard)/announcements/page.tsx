@@ -9,9 +9,11 @@ export const revalidate = 15;
 
 export default async function AnnouncementsPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'owner') {
+  if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
     redirect('/login');
   }
+
+  const canDelete = user.role === 'owner' || Boolean(user.canDelete);
 
   const [announcements, courses, batches, trainers, students] = await Promise.all([
     getAnnouncements({ announcementType: 'message' }),
@@ -29,6 +31,7 @@ export default async function AnnouncementsPage() {
         batches={batches}
         trainers={trainers}
         students={students}
+        canDelete={canDelete}
       />
     </div>
   );

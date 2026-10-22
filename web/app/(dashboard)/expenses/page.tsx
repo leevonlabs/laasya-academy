@@ -8,9 +8,11 @@ export const revalidate = 15;
 
 export default async function ExpensesPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'owner') {
+  if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
     redirect('/login');
   }
+
+  const canDelete = user.role === 'owner' || Boolean(user.canDelete);
 
   const [expenses, summary, categories] = await Promise.all([
     getExpenses({ includeDeleted: false }),
@@ -24,6 +26,7 @@ export default async function ExpensesPage() {
         initialExpenses={expenses}
         initialSummary={summary}
         categories={categories}
+        canDelete={canDelete}
       />
     </div>
   );

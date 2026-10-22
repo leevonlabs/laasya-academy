@@ -37,9 +37,10 @@ interface Props {
   initialAnnouncements: Announcement[];
   courses: Course[];
   batches: Batch[];
+  canDelete?: boolean;
 }
 
-export default function AdvertisementsClient({ initialAnnouncements, courses, batches }: Props) {
+export default function AdvertisementsClient({ initialAnnouncements, courses, batches, canDelete = true }: Props) {
   const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements);
 
   // Filters state
@@ -53,6 +54,11 @@ export default function AdvertisementsClient({ initialAnnouncements, courses, ba
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [previewAnnouncement, setPreviewAnnouncement] = useState<Announcement | null>(null);
   const [deletingAnnouncement, setDeletingAnnouncement] = useState<Announcement | null>(null);
+
+  // Viewers state
+  const [viewingAdViewers, setViewingAdViewers] = useState<Announcement | null>(null);
+  const [adViewersList, setAdViewersList] = useState<any[]>([]);
+  const [isLoadingViewers, setIsLoadingViewers] = useState(false);
 
   // Multi-select Course & Batch state for form
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
@@ -192,6 +198,29 @@ export default function AdvertisementsClient({ initialAnnouncements, courses, ba
     setFormErrors({});
     setActiveFormTab('edit');
     setIsCreateModalOpen(true);
+  };
+
+  // Open Viewers Modal
+  const handleOpenViewers = async (ann: Announcement) => {
+    setViewingAdViewers(ann);
+    setIsLoadingViewers(true);
+    try {
+      const res = await fetch(`/api/advertisements/view?announcement_id=${ann.id}`);
+      const data = await res.json();
+      if (data.success) {
+        setAdViewersList(data.viewers || []);
+        if (data.views_count !== undefined) {
+          setAnnouncements(prev => prev.map(a => a.id === ann.id ? { ...a, views_count: data.views_count } : a));
+        }
+      } else {
+        setAdViewersList([]);
+      }
+    } catch (err) {
+      console.error('Error fetching advertisement viewers:', err);
+      setAdViewersList([]);
+    } finally {
+      setIsLoadingViewers(false);
+    }
   };
 
   // Open Edit Modal
@@ -709,6 +738,16 @@ export default function AdvertisementsClient({ initialAnnouncements, courses, ba
                     </button>
 
                     <div className="flex items-center gap-1.5">
+                      {/* Beside edit button on each advertisement grid as views */}
+                      <button
+                        onClick={() => handleOpenViewers(ann)}
+                        className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-black transition flex items-center gap-1 cursor-pointer border border-blue-200 shadow-2xs"
+                        title="View Readers Count and Impressions"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-blue-600" />
+                        <span>{ann.views_count || 0} Views</span>
+                      </button>
+
                       <button
                         onClick={() => openEditModal(ann)}
                         className="p-1.5 rounded-xl bg-[#FFF2F8] text-[#8A064D] hover:bg-[#FCE7F3] cursor-pointer"
@@ -716,13 +755,16 @@ export default function AdvertisementsClient({ initialAnnouncements, courses, ba
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        onClick={() => setDeletingAnnouncement(ann)}
-                        className="p-1.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-pointer"
-                        title="Delete Banner"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+
+                      {canDelete && (
+                        <button
+                          onClick={() => setDeletingAnnouncement(ann)}
+                          className="p-1.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-pointer"
+                          title="Delete Banner"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1230,6 +1272,110 @@ export default function AdvertisementsClient({ initialAnnouncements, courses, ba
                 className="px-5 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-md cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? 'Deleting...' : 'Confirm Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADVERTISEMENT VIEWERS MODAL */}
+      {viewingAdViewers && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] overflow-hidden border border-gray-200 shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-[#590231] to-[#8A064D] text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-[#F9E33A] border border-white/20">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black">Advertisement Readership</h3>
+                  <p className="text-xs text-white/80 font-medium">Logged-in Users Who Opened This Notice</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingAdViewers(null)}
+                className="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Sub-header / Summary */}
+            <div className="p-4 bg-blue-50/60 border-b border-blue-100 flex items-center justify-between">
+              <div className="min-w-0 pr-3">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Campaign Title</p>
+                <h4 className="text-sm font-black text-gray-900 truncate">{viewingAdViewers.title}</h4>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-black shadow-xs shrink-0 flex items-center gap-1.5">
+                <Eye className="w-4 h-4" />
+                <span>{adViewersList.length || viewingAdViewers.views_count || 0} Total Views</span>
+              </div>
+            </div>
+
+            {/* Viewers List */}
+            <div className="p-4 flex-1 overflow-y-auto space-y-2">
+              {isLoadingViewers ? (
+                <div className="py-12 text-center text-gray-500 text-xs font-bold flex flex-col items-center justify-center gap-2">
+                  <div className="w-6 h-6 border-2 border-[#590231] border-t-transparent rounded-full animate-spin" />
+                  <span>Loading readership records...</span>
+                </div>
+              ) : adViewersList.length === 0 ? (
+                <div className="py-12 text-center text-gray-500 space-y-1">
+                  <Eye className="w-8 h-8 mx-auto text-gray-300" />
+                  <p className="text-xs font-bold text-gray-700">No readers yet</p>
+                  <p className="text-[11px] text-gray-400">
+                    Views will register here when a student or guru actively taps and reads this advertisement.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {adViewersList.map((viewer: any, idx: number) => {
+                    const roleLabel = viewer.user_role === 'trainer' ? 'Guru / Faculty' : viewer.user_role === 'receptionist' ? 'Receptionist' : 'Student';
+                    const roleBadgeColor = viewer.user_role === 'trainer' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                    const viewTime = viewer.viewed_at ? new Date(viewer.viewed_at).toLocaleString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }) : 'Recently';
+
+                    return (
+                      <div key={viewer.id || idx} className="py-2.5 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-xl bg-gray-100 text-gray-700 font-black text-xs flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-gray-900 truncate">{viewer.user_name || 'Logged-in Member'}</p>
+                            <span className={`inline-block px-1.5 py-0.2 rounded-md text-[9px] font-black uppercase border ${roleBadgeColor}`}>
+                              {roleLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] text-gray-500 font-medium flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-gray-400" />
+                            <span>{viewTime}</span>
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setViewingAdViewers(null)}
+                className="px-5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition cursor-pointer"
+              >
+                Close
               </button>
             </div>
           </div>

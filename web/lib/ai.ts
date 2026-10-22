@@ -2,11 +2,13 @@ import { query, queryOne } from './db';
 
 const DEFAULT_GEMINI_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODELS = [
-  'gemini-3.6-flash',
   'gemini-3.5-flash-lite',
-  'gemini-flash-lite-latest',
+  'gemini-3.5-flash',
+  'gemini-3.6-flash',
+  'gemini-3.7-flash',
   'gemini-3.8-flash',
-  'gemini-3.1-flash-lite',
+  'gemini-flash-latest',
+  'gemini-pro-latest',
 ];
 const GEMINI_MODEL = GEMINI_MODELS[0];
 
@@ -145,7 +147,7 @@ ${trimmed}`;
   let lastError = '';
   for (const model of GEMINI_MODELS) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const maxAttempts = model === 'gemini-3.6-flash' ? 2 : 1;
+    const maxAttempts = 1;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {

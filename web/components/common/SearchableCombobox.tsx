@@ -8,6 +8,7 @@ export interface ComboboxOption {
   label: string;
   subtitle?: string;
   badge?: string;
+  badgeClassName?: string;
 }
 
 interface SearchableComboboxProps {
@@ -148,7 +149,7 @@ export default function SearchableCombobox({
             }
           }}
           onKeyDown={handleKeyDown}
-          className={`w-full pl-3.5 pr-16 py-2.5 bg-gray-50 border rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-medium placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition ${
+          className={`w-full pl-4 pr-16 py-3 bg-gray-50 border rounded-xl text-sm font-semibold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition ${
             isOpen ? 'border-[#8A064D] ring-2 ring-[#8A064D]/10 bg-white' : 'border-gray-200'
           } ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-100' : ''}`}
         />
@@ -199,7 +200,7 @@ export default function SearchableCombobox({
                     key={opt.id}
                     onMouseEnter={() => setHighlightedIndex(idx)}
                     onClick={() => handleSelect(opt)}
-                    className={`px-3.5 py-2.5 flex items-center justify-between text-xs cursor-pointer transition ${
+                    className={`px-4 py-3 flex items-center justify-between text-sm cursor-pointer transition ${
                       isSelected
                         ? 'bg-[#FFF2F8] text-[#8A064D] font-bold'
                         : isHighlighted
@@ -209,15 +210,19 @@ export default function SearchableCombobox({
                   >
                     <div className="min-w-0 pr-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold truncate text-[#2D041A]">{opt.label}</span>
+                        <span className="font-bold truncate text-[#2D041A] text-sm">{opt.label}</span>
                         {opt.badge && (
-                          <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FFF2F8] text-[#8A064D] border border-rose-100">
+                          <span className={`shrink-0 text-xs font-black px-2.5 py-0.5 rounded-full border ${
+                            opt.badgeClassName || (opt.badge.includes('Batch') 
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                              : 'bg-[#FFF2F8] text-[#8A064D] border-rose-200')
+                          }`}>
                             {opt.badge}
                           </span>
                         )}
                       </div>
                       {opt.subtitle && (
-                        <p className="text-[11px] text-gray-500 font-medium truncate mt-0.5">
+                        <p className="text-xs text-gray-500 font-medium truncate mt-1">
                           {opt.subtitle}
                         </p>
                       )}

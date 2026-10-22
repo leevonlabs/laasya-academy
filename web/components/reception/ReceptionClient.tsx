@@ -54,6 +54,7 @@ export interface Receptionist {
   address?: string | null;
   password_hash: string;
   allowed_pages: string[];
+  can_delete?: boolean;
   is_active: boolean;
   monthly_salary?: number;
   created_at: string;
@@ -97,7 +98,6 @@ export const AVAILABLE_MODULES = [
   { label: 'Tally Classes', href: '/tally-classes', icon: CalendarCheck, description: 'Missed & rescheduled extra classes' },
   { label: 'Video Library', href: '/video-library', icon: Video, description: 'Dance & music lesson vault' },
   { label: 'Advertisements', href: '/advertisements', icon: ImageIcon, description: 'Marketing banners & campaigns' },
-  { label: 'Schemes', href: '/schemes', icon: BadgePercent, description: 'Scholarships & discount schemes' },
   { label: 'Expenses', href: '/expenses', icon: TrendingDown, description: 'Academy operational expense logs' },
 ];
 
@@ -139,6 +139,7 @@ export default function ReceptionClient({
   const [showPassword, setShowPassword] = useState(false);
   const [changePassword, setChangePassword] = useState(false);
   const [isActive, setIsActive] = useState(true);
+  const [canDelete, setCanDelete] = useState(false);
   const [monthlySalary, setMonthlySalary] = useState<string>('20000');
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -186,6 +187,7 @@ export default function ReceptionClient({
     setShowPassword(false);
     setChangePassword(false);
     setIsActive(true);
+    setCanDelete(false);
     setMonthlySalary('20000');
     // Default to common front desk pages
     setSelectedPages(['/overview', '/schedule', '/attendance', '/students', '/fees']);
@@ -206,6 +208,7 @@ export default function ReceptionClient({
     setShowPassword(false);
     setChangePassword(false); // Only enable password edit if user explicitly checks it
     setIsActive(rec.is_active);
+    setCanDelete(Boolean(rec.can_delete));
     setMonthlySalary(rec.monthly_salary ? rec.monthly_salary.toString() : '20000');
     setSelectedPages(Array.isArray(rec.allowed_pages) ? rec.allowed_pages : []);
     setFormError(null);
@@ -273,6 +276,7 @@ export default function ReceptionClient({
           address: address.trim() || null,
           allowed_pages: selectedPages,
           is_active: isActive,
+          can_delete: canDelete,
           monthly_salary: monthlySalary ? parseFloat(monthlySalary) : 20000
         };
 
@@ -312,6 +316,7 @@ export default function ReceptionClient({
             password: password.trim(),
             allowed_pages: selectedPages,
             is_active: isActive,
+            can_delete: canDelete,
             monthly_salary: monthlySalary ? parseFloat(monthlySalary) : 20000
           }),
         });
@@ -750,6 +755,20 @@ export default function ReceptionClient({
                           </span>
                           <span className="font-black text-[#590231]">
                             ₹{(Number(rec.monthly_salary) || 20000).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1.5 border-t border-gray-200">
+                          <span className="text-[11px] font-bold text-gray-500 flex items-center gap-1.5">
+                            <ShieldCheck className="w-3 h-3 text-[#590231]" />
+                            <span>Delete Permission</span>
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                            rec.can_delete 
+                              ? 'bg-rose-100 text-rose-700 border border-rose-200' 
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}>
+                            {rec.can_delete ? 'Allowed (Can Delete)' : 'Denied (Safe Mode)'}
                           </span>
                         </div>
                       </div>
@@ -1249,6 +1268,46 @@ export default function ReceptionClient({
                       Clear
                     </button>
                   </div>
+                </div>
+
+                {/* Delete Permission On/Off Switch for Authorized Pages */}
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-gray-50 to-amber-50/30 border border-gray-200 flex items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className={`w-4 h-4 ${canDelete ? 'text-rose-600' : 'text-emerald-600'}`} />
+                      <span className="text-xs font-black text-gray-900">Delete Permission for Pages</span>
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                        canDelete ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      }`}>
+                        {canDelete ? 'ON (Allowed)' : 'OFF (Denied)'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 font-medium">
+                      {canDelete 
+                        ? 'Receptionist can see and use Delete buttons (courses, students, batches, gurus, expenses, video library, messages).' 
+                        : 'Delete buttons will be completely hidden and blocked across courses, students, batches, gurus, expenses, video library, etc.'}
+                    </p>
+                  </div>
+
+                  {/* Switch button */}
+                  <button
+                    type="button"
+                    onClick={() => setCanDelete(!canDelete)}
+                    className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                      canDelete ? 'bg-rose-600' : 'bg-gray-300'
+                    }`}
+                    role="switch"
+                    aria-checked={canDelete}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out flex items-center justify-center text-[10px] font-black ${
+                        canDelete ? 'translate-x-7 text-rose-600' : 'translate-x-0 text-gray-500'
+                      }`}
+                    >
+                      {canDelete ? 'ON' : 'OFF'}
+                    </span>
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1 pr-2">

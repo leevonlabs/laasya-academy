@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function TallyClassesPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'owner') {
+  if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
     redirect('/login');
   }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAnnouncements, createAnnouncement } from '@/lib/announcements';
 import { getCurrentUser } from '@/lib/auth';
-import { sendFcmToRole, sendFcmToBatch, sendFcmToCourse } from '@/lib/fcm';
+import { sendFcmToRole, sendFcmToBatch, sendFcmToCourse, sendFcmToUser } from '@/lib/fcm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -94,12 +94,20 @@ export async function POST(request: NextRequest) {
         body: body.message || 'A new announcement has been published.',
         data: {
           type: 'announcement',
+          route: '/announcements',
           id: String(created?.id || ''),
           sender: String(createdBy)
         }
       };
 
-      if (body.target_batch_id) {
+      if (Array.isArray(body.target_students) && body.target_students.length > 0) {
+        for (const st of body.target_students) {
+          const sId = String(st.id || st.student_id || '');
+          if (sId) {
+            sendFcmToUser(sId, notifPayload).catch(e => console.error('[FCM] Error notifying student:', e));
+          }
+        }
+      } else if (body.target_batch_id) {
         sendFcmToBatch(body.target_batch_id, notifPayload).catch(e => console.error('[FCM] Error notifying batch:', e));
       } else if (body.target_course_id) {
         sendFcmToCourse(body.target_course_id, notifPayload).catch(e => console.error('[FCM] Error notifying course:', e));

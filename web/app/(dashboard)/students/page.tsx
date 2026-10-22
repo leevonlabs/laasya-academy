@@ -1,16 +1,19 @@
 import React from 'react';
-import { getStudents, getBatches, getCourses, getSchemes } from '@/lib/academy';
+import { getStudents, getBatches, getCourses } from '@/lib/academy';
+import { getCurrentUser } from '@/lib/auth';
 import StudentsListClient from '@/components/students/StudentsListClient';
 
 export const revalidate = 15;
 
 export default async function StudentsPage() {
-  const [students, batches, courses, schemes] = await Promise.all([
+  const [user, students, batches, courses] = await Promise.all([
+    getCurrentUser(),
     getStudents(),
     getBatches(),
-    getCourses(),
-    getSchemes()
+    getCourses()
   ]);
+
+  const canDelete = user?.role === 'owner' || Boolean(user?.canDelete);
 
   return (
     <div className="w-full">
@@ -18,7 +21,7 @@ export default async function StudentsPage() {
         initialStudents={students} 
         batches={batches}
         courses={courses}
-        schemes={schemes}
+        canDelete={canDelete}
       />
     </div>
   );

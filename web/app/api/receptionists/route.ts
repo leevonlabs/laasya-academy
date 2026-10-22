@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/auth';
 export async function GET() {
   try {
     const list = await query<any>(`
-      SELECT id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, created_at, updated_at
+      SELECT id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, can_delete, created_at, updated_at
       FROM public.receptionists
       ORDER BY created_at DESC
     `);
@@ -30,7 +30,8 @@ export async function POST(req: NextRequest) {
       password, 
       is_active, 
       allowed_pages, 
-      monthly_salary 
+      monthly_salary,
+      can_delete
     } = body;
 
     if (!full_name || !phone || !password) {
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
     const parsedAge = age ? parseInt(age.toString(), 10) : null;
     const parsedSalary = monthly_salary ? parseFloat(monthly_salary.toString()) : 20000;
     const activeStatus = is_active !== false;
+    const allowDelete = Boolean(can_delete);
 
     const created = await queryOne<any>(
       `INSERT INTO public.receptionists (
@@ -72,10 +74,11 @@ export async function POST(req: NextRequest) {
         password_hash, 
         allowed_pages, 
         is_active, 
-        monthly_salary
+        monthly_salary,
+        can_delete
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
-      RETURNING id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, created_at`,
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11)
+      RETURNING id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, can_delete, created_at`,
       [
         full_name.trim(),
         parsedAge,
@@ -86,7 +89,8 @@ export async function POST(req: NextRequest) {
         password.trim(),
         pagesJson,
         activeStatus,
-        parsedSalary
+        parsedSalary,
+        allowDelete
       ]
     );
 
@@ -111,7 +115,8 @@ export async function PUT(req: NextRequest) {
       password, 
       is_active, 
       allowed_pages, 
-      monthly_salary 
+      monthly_salary,
+      can_delete
     } = body;
 
     if (!id || !full_name || !phone) {
@@ -142,6 +147,7 @@ export async function PUT(req: NextRequest) {
     const parsedAge = age ? parseInt(age.toString(), 10) : null;
     const parsedSalary = monthly_salary ? parseFloat(monthly_salary.toString()) : 20000;
     const activeStatus = is_active !== false;
+    const allowDelete = Boolean(can_delete);
 
     let updated;
     if (password && password.trim().length > 0) {
@@ -157,9 +163,10 @@ export async function PUT(req: NextRequest) {
              allowed_pages = $8::jsonb,
              is_active = $9,
              monthly_salary = $10,
+             can_delete = $11,
              updated_at = NOW()
-         WHERE id = $11
-         RETURNING id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, created_at, updated_at`,
+         WHERE id = $12
+         RETURNING id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, can_delete, created_at, updated_at`,
         [
           full_name.trim(),
           parsedAge,
@@ -171,6 +178,7 @@ export async function PUT(req: NextRequest) {
           pagesJson,
           activeStatus,
           parsedSalary,
+          allowDelete,
           id
         ]
       );
@@ -186,9 +194,10 @@ export async function PUT(req: NextRequest) {
              allowed_pages = $7::jsonb,
              is_active = $8,
              monthly_salary = $9,
+             can_delete = $10,
              updated_at = NOW()
-         WHERE id = $10
-         RETURNING id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, created_at, updated_at`,
+         WHERE id = $11
+         RETURNING id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, can_delete, created_at, updated_at`,
         [
           full_name.trim(),
           parsedAge,
@@ -199,6 +208,7 @@ export async function PUT(req: NextRequest) {
           pagesJson,
           activeStatus,
           parsedSalary,
+          allowDelete,
           id
         ]
       );

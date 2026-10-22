@@ -408,12 +408,15 @@ export default function GuruAttendanceTab({
   // KPIs for the selected Guru
   const currentGuruStats = useMemo(() => {
     const present = currentGuruFilteredRecords.filter(r => r.guru_status === 'present').length;
+    // missed is total absent classes [only guru absent not academy holidays]
     const absent = currentGuruFilteredRecords.filter(r => r.guru_status === 'absent').length;
     const extra = tallyClasses.filter(tc => 
       (currentGuru?.id && tc.trainer_id === currentGuru.id) ||
       (currentGuru?.full_name && tc.trainer_name && tc.trainer_name.toLowerCase().trim() === currentGuru.full_name.toLowerCase().trim())
     ).length;
-    const total = present + absent + extra;
+    // conducted is total classes held in that month [including extra(reschedule class)]
+    const conducted = present + extra;
+    const total = conducted + absent;
     const past = present + absent;
     const complianceRate = past > 0 ? Math.round((present / past) * 100) : 100;
     const totalStudentsRollCall = currentGuruFilteredRecords.reduce((acc, r) => acc + (r.marked_students_count || 0), 0);
@@ -421,6 +424,7 @@ export default function GuruAttendanceTab({
     return {
       total,
       present,
+      conducted,
       absent,
       extra,
       complianceRate,
@@ -566,26 +570,24 @@ export default function GuruAttendanceTab({
           </div>
         </div>
 
-        {/* 2. Guru Individual KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <div className="bg-white p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-xs">
-            <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Conducted (Held)</p>
-            <p className="text-xl font-black text-emerald-700 mt-0.5">{currentGuruStats.present}</p>
+        {/* 2. Guru Individual KPIs: Conducted, Missed, Extra Only */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-white p-4 rounded-2xl border border-emerald-200 bg-emerald-50/30 shadow-xs">
+            <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Conducted (Held)</p>
+            <p className="text-2xl font-black text-emerald-700 mt-0.5">{currentGuruStats.conducted}</p>
+            <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Classes held this month (incl. extra)</p>
           </div>
 
-          <div className="bg-white p-3.5 rounded-xl border border-rose-200 bg-rose-50/20 shadow-xs">
-            <p className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Missed (Absent)</p>
-            <p className="text-xl font-black text-rose-700 mt-0.5">{currentGuruStats.absent}</p>
+          <div className="bg-white p-4 rounded-2xl border border-rose-200 bg-rose-50/30 shadow-xs">
+            <p className="text-xs font-bold text-rose-800 uppercase tracking-wider">Missed (Absent)</p>
+            <p className="text-2xl font-black text-rose-700 mt-0.5">{currentGuruStats.absent}</p>
+            <p className="text-[11px] text-rose-600 font-medium mt-0.5">Guru absence only (excl. holidays)</p>
           </div>
 
-          <div className="bg-white p-3.5 rounded-xl border border-amber-200 bg-amber-50/20 shadow-xs">
-            <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Extra (Rescheduled)</p>
-            <p className="text-xl font-black text-amber-700 mt-0.5">{currentGuruStats.extra}</p>
-          </div>
-
-          <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-xs">
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Classes</p>
-            <p className="text-xl font-black text-gray-900 mt-0.5">{currentGuruStats.total}</p>
+          <div className="bg-white p-4 rounded-2xl border border-amber-200 bg-amber-50/30 shadow-xs">
+            <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">Extra (Rescheduled)</p>
+            <p className="text-2xl font-black text-amber-700 mt-0.5">{currentGuruStats.extra}</p>
+            <p className="text-[11px] text-amber-600 font-medium mt-0.5">Rescheduled extra classes</p>
           </div>
         </div>
 
@@ -727,7 +729,6 @@ export default function GuruAttendanceTab({
                     <th className="py-3 px-4">Course</th>
                     <th className="py-3 px-4">Batch</th>
                     <th className="py-3 px-4">Student Roll-Call</th>
-                    <th className="py-3 px-4">Class Closure</th>
                     <th className="py-3 px-4">Guru Attendance</th>
                     <th className="py-3 px-4 text-right">Details</th>
                   </tr>
@@ -777,18 +778,7 @@ export default function GuruAttendanceTab({
                           </div>
                         </td>
 
-                        {/* 6. Class Closure */}
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            r.session_status === 'completed' || isPresent
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-rose-100 text-rose-800'
-                          }`}>
-                            {r.session_status === 'completed' || isPresent ? 'Closed' : 'Open / Unclosed'}
-                          </span>
-                        </td>
-
-                        {/* 7. Guru Attendance Status */}
+                        {/* 6. Guru Attendance Status */}
                         <td className="py-3 px-4">
                           {isPresent && (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
@@ -1115,7 +1105,8 @@ export default function GuruAttendanceTab({
               (tc.trainer_id && tc.trainer_id === guru.id) ||
               (tc.trainer_name && guru.full_name && tc.trainer_name.toLowerCase().trim() === guru.full_name.toLowerCase().trim())
             ).length;
-            const total = present + absent + extra;
+            const conducted = present + extra; // Total classes held in that month (including extra/rescheduled)
+            const total = conducted + absent;
             const avatar = guru.avatar_url;
 
             return (
@@ -1177,23 +1168,19 @@ export default function GuruAttendanceTab({
                     )}
                   </div>
 
-                  {/* Quick Attendance Stats: Conducted, Missed, Extra [Rescheduled Class], Total */}
-                  <div className="mt-3.5 pt-3 border-t border-gray-100 grid grid-cols-4 gap-1 text-center">
-                    <div className="p-1 rounded-lg bg-emerald-50/70 border border-emerald-100">
-                      <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-tight">Conducted</p>
-                      <p className="text-xs font-black text-emerald-800 mt-0.5">{present}</p>
+                  {/* Quick Attendance Stats: Only Conducted, Missed, Extra */}
+                  <div className="mt-3.5 pt-3 border-t border-gray-100 grid grid-cols-3 gap-1.5 text-center">
+                    <div className="p-1.5 rounded-lg bg-emerald-50/80 border border-emerald-200">
+                      <p className="text-[9.5px] font-bold text-emerald-800 uppercase tracking-tight">Conducted</p>
+                      <p className="text-sm font-black text-emerald-900 mt-0.5">{conducted}</p>
                     </div>
-                    <div className="p-1 rounded-lg bg-rose-50/70 border border-rose-100">
-                      <p className="text-[9px] font-bold text-rose-700 uppercase tracking-tight">Missed</p>
-                      <p className="text-xs font-black text-rose-800 mt-0.5">{absent}</p>
+                    <div className="p-1.5 rounded-lg bg-rose-50/80 border border-rose-200">
+                      <p className="text-[9.5px] font-bold text-rose-800 uppercase tracking-tight">Missed</p>
+                      <p className="text-sm font-black text-rose-900 mt-0.5">{absent}</p>
                     </div>
-                    <div className="p-1 rounded-lg bg-amber-50/70 border border-amber-200" title="Rescheduled Extra Classes">
-                      <p className="text-[9px] font-bold text-amber-700 uppercase tracking-tight">Extra</p>
-                      <p className="text-xs font-black text-amber-800 mt-0.5">{extra}</p>
-                    </div>
-                    <div className="p-1 rounded-lg bg-gray-50 border border-gray-200">
-                      <p className="text-[9px] font-bold text-gray-600 uppercase tracking-tight">Total</p>
-                      <p className="text-xs font-black text-gray-800 mt-0.5">{total}</p>
+                    <div className="p-1.5 rounded-lg bg-amber-50/80 border border-amber-200" title="Rescheduled Extra Classes">
+                      <p className="text-[9.5px] font-bold text-amber-800 uppercase tracking-tight">Extra</p>
+                      <p className="text-sm font-black text-amber-900 mt-0.5">{extra}</p>
                     </div>
                   </div>
                 </div>
