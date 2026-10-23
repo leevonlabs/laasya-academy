@@ -30,14 +30,6 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
 
-  final List<String> _quickPrompts = [
-    'Daily practice & warm-up tips',
-    'Class schedule & timings',
-    'Bharatanatyam mudra guidance',
-    'Carnatic vocal raga basics',
-    'Attendance & leave rules',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -247,38 +239,6 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
       ),
       body: Column(
         children: [
-          // Suggested Query Chips
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            color: Colors.white,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _quickPrompts.map((prompt) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ActionChip(
-                      label: Text(
-                        prompt,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: LaasyaColors.primary,
-                        ),
-                      ),
-                      backgroundColor: const Color(0xFFFFF2F8),
-                      side: BorderSide(color: LaasyaColors.primary.withOpacity(0.2)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      onPressed: () => _sendMessage(prompt),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-
-          const Divider(height: 1, color: Color(0xFFE5D5DC)),
-
           // Messages View
           Expanded(
             child: ListView.builder(
@@ -296,10 +256,10 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (!isUser) ...[
-                        CircleAvatar(
+                        const CircleAvatar(
                           radius: 16,
                           backgroundColor: LaasyaColors.primary,
-                          child: const Icon(Icons.smart_toy_rounded, color: Color(0xFFFBF0B9), size: 18),
+                          child: Icon(Icons.smart_toy_rounded, color: Color(0xFFFBF0B9), size: 18),
                         ),
                         const SizedBox(width: 8),
                       ],
@@ -365,8 +325,8 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
           ),
 
           if (_isLoading)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -378,8 +338,8 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
                       color: LaasyaColors.primary,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
+                  SizedBox(width: 8),
+                  Text(
                     'Laasya AI is generating your response...',
                     style: TextStyle(fontSize: 11, color: Colors.grey),
                   ),

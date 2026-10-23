@@ -32,14 +32,6 @@ const INITIAL_MESSAGES: Message[] = [
   },
 ];
 
-const SUGGESTED_QUESTIONS = [
-  'Courses offered & fees',
-  'Campus timings & address',
-  'Admission via WhatsApp',
-  'Meet our Gurus',
-  'Age criteria for admissions',
-];
-
 export function AiChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
@@ -266,29 +258,13 @@ export function AiChatWidget() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Suggested Quick Questions */}
-          <div className="p-2.5 bg-white border-t border-gray-100 overflow-x-auto">
-            <div className="flex gap-1.5 pb-1">
-              {SUGGESTED_QUESTIONS.map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => handleSendMessage(q)}
-                  className="rounded-full border border-[#D4BAC7] bg-[#FAF5F7] px-2.5 py-1 text-[0.68rem] font-semibold text-[#8A064D] hover:bg-[#8A064D] hover:text-white transition-colors shrink-0 cursor-pointer"
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Input Footer */}
           <form onSubmit={handleFormSubmit} className="p-3 bg-white border-t border-gray-200 flex items-center gap-2">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything about courses, gurus..."
+              placeholder="Ask anything about academy, courses, ERP system..."
               disabled={loading}
               className="flex-1 rounded-xl border border-gray-300 bg-gray-50 px-3.5 py-2 text-xs sm:text-sm text-gray-900 focus:border-[#8A064D] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
             />

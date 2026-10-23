@@ -870,10 +870,10 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                       child: const Icon(Icons.auto_awesome, color: Color(0xFFFBF0B9), size: 18),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'Laasya AI Learning Assistant',
                             style: TextStyle(
