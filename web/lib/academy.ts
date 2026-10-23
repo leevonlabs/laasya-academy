@@ -51,6 +51,7 @@ export interface Trainer {
   specializations: string[];
   display_title?: string;
   bio: string;
+  experience?: string;
   is_active: boolean;
   joined_date: string;
   monthly_salary?: number;
@@ -431,7 +432,7 @@ export async function getTrainers(): Promise<Trainer[]> {
       COALESCE(t.avatar_url, p.avatar_url) as avatar_url,
       COALESCE(t.age, p.age)::int as age,
       COALESCE(t.gender, p.gender) as gender,
-      t.specializations, t.display_title, t.bio, t.is_active, t.joined_date::text as joined_date,
+      t.specializations, t.display_title, t.bio, t.experience, t.is_active, t.joined_date::text as joined_date,
       COALESCE(t.monthly_salary, 25000)::numeric as monthly_salary,
       COALESCE(
         (SELECT status FROM public.guru_salary_records WHERE trainer_id = t.id ORDER BY created_at DESC LIMIT 1),
@@ -463,7 +464,7 @@ export async function getTrainers(): Promise<Trainer[]> {
     JOIN public.profiles p ON p.id = t.profile_id
     LEFT JOIN public.batches b ON b.trainer_id = t.id
     LEFT JOIN public.courses c ON c.id = b.course_id
-    GROUP BY t.id, t.profile_id, t.guru_id, t.code, p.full_name, p.email, p.phone, t.alternate_phone, p.alternate_phone, t.avatar_url, p.avatar_url, t.age, p.age, t.gender, p.gender, t.specializations, t.display_title, t.bio, t.is_active, t.joined_date, t.monthly_salary
+    GROUP BY t.id, t.profile_id, t.guru_id, t.code, p.full_name, p.email, p.phone, t.alternate_phone, p.alternate_phone, t.avatar_url, p.avatar_url, t.age, p.age, t.gender, p.gender, t.specializations, t.display_title, t.bio, t.experience, t.is_active, t.joined_date, t.monthly_salary
     ORDER BY 
       CASE WHEN t.guru_id ~ '^GURU-[0-9]+$' THEN CAST(SUBSTRING(t.guru_id FROM 6) AS INT) ELSE 9999 END ASC,
       p.full_name;
@@ -513,6 +514,7 @@ export async function createTrainer(data: {
   specializations: string[];
   display_title?: string;
   bio?: string;
+  experience?: string;
   monthly_salary?: number;
   is_active?: boolean;
 }) {
@@ -574,10 +576,10 @@ export async function createTrainer(data: {
 
   // Insert trainer
   return queryOne<Trainer>(`
-    INSERT INTO public.trainers (profile_id, guru_id, code, specializations, display_title, bio, is_active, monthly_salary, avatar_url, age, gender, alternate_phone)
-    VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    INSERT INTO public.trainers (profile_id, guru_id, code, specializations, display_title, bio, is_active, monthly_salary, avatar_url, age, gender, alternate_phone, experience)
+    VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     RETURNING *;
-  `, [uid, finalGuruId, data.specializations, displayTitle, bio, isActive, monthlySalary, data.avatar_url || null, age, gender, cleanAlternatePhone]);
+  `, [uid, finalGuruId, data.specializations, displayTitle, bio, isActive, monthlySalary, data.avatar_url || null, age, gender, cleanAlternatePhone, data.experience || '5+ Years']);
 }
 
 export async function updateTrainer(id: string, data: {
@@ -592,6 +594,7 @@ export async function updateTrainer(id: string, data: {
   gender?: string;
   specializations?: string[];
   bio?: string;
+  experience?: string;
   is_active?: boolean;
   monthly_salary?: number;
 }) {
@@ -643,6 +646,7 @@ export async function updateTrainer(id: string, data: {
         alternate_phone = COALESCE($10, alternate_phone),
         guru_id = COALESCE($11, guru_id),
         code = COALESCE($11, code),
+        experience = COALESCE($12, experience),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
@@ -657,7 +661,8 @@ export async function updateTrainer(id: string, data: {
     age !== undefined ? age : null,
     gender !== undefined ? gender : null,
     alternatePhone,
-    cleanGuruId
+    cleanGuruId,
+    data.experience !== undefined ? data.experience : null
   ]);
 }
 

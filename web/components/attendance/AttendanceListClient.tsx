@@ -67,6 +67,50 @@ const COURSE_GURUS_MAP: Record<string, string> = {
   'Chess': 'Coach Sai Krishna (State Medalist)',
 };
 
+const DEFAULT_COURSE_IMAGES: Record<string, string> = {
+  'Bharathanatyam': 'https://images.unsplash.com/photo-1617196034183-421b4917c92d?auto=format&fit=crop&w=800&q=80',
+  'Kuchupudi': 'https://images.unsplash.com/photo-1582234372722-50d7ccc30ebd?auto=format&fit=crop&w=800&q=80',
+  'Mohiniyatam': 'https://images.unsplash.com/photo-1547153760-18fc86324498?auto=format&fit=crop&w=800&q=80',
+  'Semi Classical': 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=800&q=80',
+  'Western Dance': 'https://images.unsplash.com/photo-1535525153412-5a42439a210d?auto=format&fit=crop&w=800&q=80',
+  'Zumba': 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80',
+  'Gymnastic': 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=800&q=80',
+  'Carnatic Music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
+  'Violin': 'https://images.unsplash.com/photo-1612225330812-01a9c6b355ec?auto=format&fit=crop&w=800&q=80',
+  'Keyboard': 'https://images.unsplash.com/photo-1520523839898-50712140e698?auto=format&fit=crop&w=800&q=80',
+  'Guitar': 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=800&q=80',
+  'Ukulele': 'https://images.unsplash.com/photo-1568219656418-15c329312bf1?auto=format&fit=crop&w=800&q=80',
+  'Drawing': 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=800&q=80',
+  'Art and Craft': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=800&q=80',
+  'Kalari': 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80',
+  'Karatte': 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=800&q=80',
+  'Yoga': 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800&q=80',
+  'Chess': 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&w=800&q=80'
+};
+
+const CATEGORY_DEFAULT_IMAGES: Record<string, string> = {
+  'Classical Dance': 'https://images.unsplash.com/photo-1617196034183-421b4917c92d?auto=format&fit=crop&w=800&q=80',
+  'Modern Dance & Fitness': 'https://images.unsplash.com/photo-1535525153412-5a42439a210d?auto=format&fit=crop&w=800&q=80',
+  'Vocal & Music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
+  'Musical Instruments': 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=800&q=80',
+  'Martial Arts': 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=800&q=80',
+  'Fine Arts': 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=800&q=80',
+  'Mind Sports': 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&w=800&q=80'
+};
+
+function getAttendanceCourseImage(course: Course): string {
+  if (course.image_url && course.image_url.trim()) {
+    return course.image_url.trim();
+  }
+  if (DEFAULT_COURSE_IMAGES[course.title]) {
+    return DEFAULT_COURSE_IMAGES[course.title];
+  }
+  if (course.category && CATEGORY_DEFAULT_IMAGES[course.category]) {
+    return CATEGORY_DEFAULT_IMAGES[course.category];
+  }
+  return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80';
+}
+
 export default function AttendanceListClient({ 
   initialAuditRecords, 
   initialGuruAuditRecords = [], 
@@ -496,7 +540,7 @@ export default function AttendanceListClient({
       {/* =================================================================== */}
       {/* 1. PAGE HEADER */}
       {/* =================================================================== */}
-      <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[#F4EAEF] p-6 rounded-3xl border border-[#D4BAC7] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
             <span className="p-2.5 rounded-2xl bg-[#590231] text-[#F9E33A] shadow-xs">
@@ -512,7 +556,7 @@ export default function AttendanceListClient({
         </div>
 
         <div className="flex items-center gap-3">
-          {activeTab !== 'guru_attendance' ? (
+          {activeTab !== 'guru_attendance' && (
             <button
               onClick={() => handleExportCSV(
                 activeTab === 'course_wise' ? filteredBatchRecords : filteredCompleteRecords,
@@ -525,15 +569,6 @@ export default function AttendanceListClient({
               <Download className="w-4 h-4 text-[#F9E33A]" />
               <span>Download CSV Audit</span>
             </button>
-          ) : (
-            <button
-              onClick={fetchLatestGuruAuditRecords}
-              disabled={isGuruRefreshing}
-              className="bg-[#590231] hover:bg-[#780442] text-white border border-[#EBB128] px-4 py-2.5 rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-60"
-            >
-              <RefreshCw className={`w-4 h-4 text-[#F9E33A] ${isGuruRefreshing ? 'animate-spin' : ''}`} />
-              <span>{isGuruRefreshing ? 'Refreshing...' : 'Refresh Audit'}</span>
-            </button>
           )}
         </div>
       </div>
@@ -541,7 +576,7 @@ export default function AttendanceListClient({
       {/* =================================================================== */}
       {/* 2. TOP TABS SWITCHER: EQUAL SIZED 3 COLUMNS */}
       {/* =================================================================== */}
-      <div className="bg-white p-2 rounded-2xl border border-[#F0D5E4] shadow-xs grid grid-cols-1 md:grid-cols-3 gap-2.5">
+      <div className="bg-[#F4EAEF] p-2 rounded-2xl border border-[#D4BAC7] shadow-xs grid grid-cols-1 md:grid-cols-3 gap-2.5">
         <button
           onClick={() => setActiveTab('course_wise')}
           className={`w-full min-h-[58px] py-2.5 px-3 rounded-xl transition flex flex-col items-center justify-center text-center cursor-pointer ${
@@ -611,7 +646,7 @@ export default function AttendanceListClient({
             <div className="space-y-5">
               
               {/* Grid Header & Filters */}
-              <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="bg-[#F4EAEF] p-5 rounded-3xl border border-[#D4BAC7] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-black text-[#1A010F] flex items-center gap-2.5">
                     <span>Academy Courses</span>
@@ -691,20 +726,13 @@ export default function AttendanceListClient({
                           {crs.title}
                         </h3>
 
-                        {/* Guru Info */}
-                        <div className="mt-3 py-2 px-3 rounded-xl bg-gray-50 border border-gray-200 flex items-center gap-2">
-                          <User className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
-                          <span className="text-xs font-bold text-gray-800 truncate">
-                            {guruName}
-                          </span>
-                        </div>
-
-                        {/* Tuition Fee */}
-                        <div className="mt-3 flex items-center justify-between text-xs font-semibold text-gray-700">
-                          <span className="text-gray-500 font-bold">Tuition Fee</span>
-                          <span className="text-[#8A064D] text-sm tabular-nums font-black">
-                            ₹{Number(crs.monthly_fee).toLocaleString('en-IN')}<span className="text-[10px] text-gray-500 font-medium"> / mo</span>
-                          </span>
+                        {/* Course Image Preview */}
+                        <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-gray-100 aspect-[16/10] relative shadow-xs">
+                          <img
+                            src={getAttendanceCourseImage(crs)}
+                            alt={crs.title}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
                         </div>
                       </div>
 
@@ -730,7 +758,7 @@ export default function AttendanceListClient({
             <div className="space-y-4">
               
               {/* Course Top Navigation & Big Course Title Header */}
-              <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="bg-[#F4EAEF] p-5 rounded-3xl border border-[#D4BAC7] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   <button
                     onClick={handleBackToCourses}
@@ -781,7 +809,7 @@ export default function AttendanceListClient({
               </div>
 
               {/* Comprehensive Filter Toolbar Bar */}
-              <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+              <div className="bg-[#F4EAEF] p-5 rounded-3xl border border-[#D4BAC7] shadow-xs space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                   <h4 className="font-bold text-sm text-[#2D041A] flex items-center gap-2">
                     <Filter className="w-4 h-4 text-[#8A064D]" />
@@ -895,7 +923,7 @@ export default function AttendanceListClient({
 
               {/* Summary Stats Row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
+                <div className="bg-[#F4EAEF] p-4 rounded-2xl border border-[#D4BAC7] shadow-xs">
                   <span className="text-[11px] font-bold text-[#6E3955] uppercase tracking-wider block">Audited Records</span>
                   <span className="text-2xl font-black text-[#2D041A] mt-0.5 block tabular-nums">{batchStats.total}</span>
                   <span className="text-[11px] text-[#8C5E77]">{batchMonthLabel || 'All time'}</span>
@@ -921,7 +949,7 @@ export default function AttendanceListClient({
               </div>
 
               {/* Attendance Table */}
-              <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
+              <div className="bg-[#F4EAEF] rounded-3xl border border-[#D4BAC7] shadow-xs overflow-hidden">
                 <div className="p-4 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <ClipboardCheck className="w-4 h-4 text-[#8A064D]" />
@@ -935,57 +963,57 @@ export default function AttendanceListClient({
                 </div>
 
                 <div className="overflow-x-auto w-full">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left">
                     <thead>
-                      <tr className="bg-gray-50/90 text-gray-600 border-b border-gray-200 font-bold uppercase tracking-wider text-[11px]">
-                        <th className="py-3 px-4">Roll Number</th>
-                        <th className="py-3 px-4">Student Name</th>
-                        <th className="py-3 px-4">Course</th>
-                        <th className="py-3 px-4">Batch</th>
-                        <th className="py-3 px-4">Assigned Guru</th>
-                        <th className="py-3 px-4">Date</th>
-                        <th className="py-3 px-4">Status</th>
+                      <tr className="bg-gray-100/90 text-gray-700 border-b-2 border-gray-200 font-extrabold uppercase tracking-wider text-xs sm:text-sm">
+                        <th className="py-3.5 px-4 font-black">Roll Number</th>
+                        <th className="py-3.5 px-4 font-black">Student Name</th>
+                        <th className="py-3.5 px-4 font-black">Course</th>
+                        <th className="py-3.5 px-4 font-black">Batch</th>
+                        <th className="py-3.5 px-4 font-black">Assigned Guru</th>
+                        <th className="py-3.5 px-4 font-black">Date</th>
+                        <th className="py-3.5 px-4 font-black">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-200 text-sm">
                       {filteredBatchRecords.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="py-12 text-center text-gray-400">
                             <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                            <p className="font-bold text-gray-600 text-sm">No attendance records found matching filters.</p>
-                            <p className="text-xs text-gray-400 mt-1">Try selecting "All Batches" or clearing student and month filters.</p>
+                            <p className="font-bold text-gray-700 text-base">No attendance records found matching filters.</p>
+                            <p className="text-sm text-gray-500 mt-1">Try selecting "All Batches" or clearing student and month filters.</p>
                           </td>
                         </tr>
                       ) : (
                         filteredBatchRecords.map((r) => (
-                          <tr key={r.id} className="hover:bg-[#FFFDFC] transition">
-                            <td className="py-3.5 px-4 font-mono font-bold text-gray-700 text-xs">
+                          <tr key={r.id} className="hover:bg-white transition">
+                            <td className="py-4 px-4 font-mono font-bold text-gray-800 text-sm">
                               {r.roll_number || '—'}
                             </td>
-                            <td className="py-3.5 px-4">
-                              <span className="font-bold text-gray-900 text-sm">{r.student_name}</span>
+                            <td className="py-4 px-4">
+                              <span className="font-extrabold text-gray-900 text-base">{r.student_name}</span>
                             </td>
-                            <td className="py-3.5 px-4">
-                              <span className="font-bold text-[#8A064D]">{r.course_title}</span>
+                            <td className="py-4 px-4">
+                              <span className="font-bold text-[#8A064D] text-sm">{r.course_title}</span>
                             </td>
-                            <td className="py-3.5 px-4 font-semibold text-gray-800">
+                            <td className="py-4 px-4 font-bold text-gray-800 text-sm">
                               {r.batch_name}
                             </td>
-                            <td className="py-3.5 px-4 text-gray-700">
+                            <td className="py-4 px-4 text-gray-800 font-medium text-sm">
                               {r.trainer_name}
                             </td>
-                            <td className="py-3.5 px-4 font-medium text-gray-900 whitespace-nowrap">
+                            <td className="py-4 px-4 font-bold text-gray-900 whitespace-nowrap text-sm">
                               {r.session_date}
                             </td>
-                            <td className="py-3.5 px-4">
+                            <td className="py-4 px-4">
                               {r.status !== 'absent' ? (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-2xs">
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-3.5 py-1.5 rounded-full shadow-2xs">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                                   <span>Present</span>
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full shadow-2xs">
-                                  <XCircle className="w-3.5 h-3.5" />
+                                <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-rose-800 bg-rose-100/90 border border-rose-300 px-3.5 py-1.5 rounded-full shadow-2xs">
+                                  <XCircle className="w-4 h-4 text-rose-600" />
                                   <span>Absent</span>
                                 </span>
                               )}
@@ -1011,7 +1039,7 @@ export default function AttendanceListClient({
         <div className="space-y-5 animate-in fade-in duration-200">
           
           {/* Complete Attendance Controls */}
-          <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-4">
+          <div className="bg-[#F4EAEF] p-5 rounded-3xl border border-[#D4BAC7] shadow-xs space-y-4">
             
             {/* Header info & Date Range Filter */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -1110,7 +1138,7 @@ export default function AttendanceListClient({
 
           {/* Complete Academy Summary Metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs">
+            <div className="bg-[#F4EAEF] p-4 rounded-2xl border border-[#D4BAC7] shadow-xs">
               <span className="text-xs font-bold text-[#6E3955] uppercase tracking-wider block">Total Logs Audited</span>
               <span className="text-2xl font-black text-[#2D041A] mt-1 block tabular-nums">{completeStats.total}</span>
               <span className="text-[11px] text-[#8C5E77]">
@@ -1138,7 +1166,7 @@ export default function AttendanceListClient({
           </div>
 
           {/* Unified Table of All Student Attendance */}
-          <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
+          <div className="bg-[#F4EAEF] rounded-3xl border border-[#D4BAC7] shadow-xs overflow-hidden">
             <div className="p-4 bg-gray-50/60 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-[#8A064D]" />

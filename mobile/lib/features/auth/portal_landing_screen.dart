@@ -48,10 +48,14 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
       final id = _identifierController.text.trim();
       final pass = _passwordController.text.trim();
 
-      if (id.isEmpty || pass.isEmpty) {
+      if (id.isEmpty) {
         throw Exception(
-          'Please enter your ${_isStudent ? "mobile number / student roll no" : "registered phone number"} and password.',
+          'Please enter your ${_isStudent ? "mobile number / student roll no" : "registered phone number"}.',
         );
+      }
+
+      if (pass.isEmpty) {
+        throw Exception('Please enter your password.');
       }
 
       if (!_agreeToTerms) {
@@ -61,7 +65,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
       }
 
       final profile = await SupabaseService().signInWithPassword(
-        email: id,
+        identifier: id,
         password: pass,
         role: _isStudent ? 'student' : 'trainer',
       );

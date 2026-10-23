@@ -294,9 +294,9 @@ export default function DashboardShell({ user, children }: Props) {
       </aside>
 
       {/* Main Content Viewport */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-[#E3D5DC]">
         {/* Top Header Bar */}
-        <header className="h-16 bg-white border-b border-[#F0D5E4] px-4 md:px-8 flex items-center justify-between shrink-0 shadow-xs sticky top-0 z-20">
+        <header className="h-16 bg-[#F4EAEF] border-b border-[#D4BAC7] px-4 md:px-8 flex items-center justify-between shrink-0 shadow-xs sticky top-0 z-20">
           <div className="flex items-center gap-3">
             {/* Mobile Menu Button */}
             <button
@@ -330,7 +330,7 @@ export default function DashboardShell({ user, children }: Props) {
 
           <div className="flex items-center gap-3 relative">
             {/* Active Date Chip (No Term displayed) */}
-            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF2F8] border border-[#F0D5E4] text-[#6E3955] text-xs font-bold tabular-nums">
+            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EFE2EA] border border-[#D4BAC7] text-[#590231] text-xs font-bold tabular-nums">
               <CalendarIcon className="w-3.5 h-3.5 text-[#8A064D]" />
               <span>{new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
             </div>
@@ -338,7 +338,7 @@ export default function DashboardShell({ user, children }: Props) {
             {/* Notification Bell Icon - Navigates to dedicated Notifications page */}
             <Link
               href="/notifications"
-              className="relative p-2 rounded-xl bg-[#FFF2F8] hover:bg-rose-100 border border-[#F0D5E4] text-[#8A064D] transition cursor-pointer flex items-center justify-center shadow-2xs"
+              className="relative p-2 rounded-xl bg-[#EFE2EA] hover:bg-[#E7D3DF] border border-[#D4BAC7] text-[#8A064D] transition cursor-pointer flex items-center justify-center shadow-2xs"
               title="Academy Notifications & Alerts"
             >
               <Bell className="w-4 h-4" />
@@ -352,8 +352,8 @@ export default function DashboardShell({ user, children }: Props) {
             {/* Profile Page Icon with Profile Image */}
             <Link
               href="/admin-profile"
-              className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-2xl bg-white hover:bg-[#FFF2F8] border border-[#F0D5E4] hover:border-[#8A064D] shadow-2xs transition group cursor-pointer"
-              title="Director Profile &amp; Academy Settings"
+              className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-2xl bg-[#F4EAEF] hover:bg-[#EBD4E0] border border-[#D4BAC7] hover:border-[#8A064D] shadow-2xs transition group cursor-pointer"
+              title="Director Profile & Academy Settings"
             >
               <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-[#590231] text-[#F9E33A] flex items-center justify-center font-bold text-xs shrink-0 shadow-xs ring-2 ring-emerald-500/40">
                 {adminAvatar ? (

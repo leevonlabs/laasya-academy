@@ -94,7 +94,7 @@ export default function SearchableCombobox({
     setSearchQuery('');
     onChange('', undefined);
     setIsOpen(true);
-    inputRef.current?.focus();
+    inputRef.current?.focus({ preventScroll: true });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -172,7 +172,7 @@ export default function SearchableCombobox({
             onClick={() => {
               if (!disabled) {
                 setIsOpen(!isOpen);
-                inputRef.current?.focus();
+                inputRef.current?.focus({ preventScroll: true });
               }
             }}
             className="p-1 rounded-lg text-gray-400 hover:text-[#8A064D] transition cursor-pointer"

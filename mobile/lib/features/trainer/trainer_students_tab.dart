@@ -16,6 +16,8 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
   final TrainerDataStore _store = TrainerDataStore();
 
   String _searchQuery = '';
+  // Fee status filter: 'all', 'paid', 'pending'
+  String _feeStatusFilter = 'all';
   // Multi-selection filters: selected course IDs and selected batch IDs
   final Set<String> _selectedCourseIds = {};
   final Set<String> _selectedBatchIds = {};
@@ -551,18 +553,9 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            enr['batch_name'],
-                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
-                          ),
-                          Text(
-                            '${enr['batch_timings']} • ${enr['batch_schedule_display']}',
-                            style: const TextStyle(fontSize: 10, color: Colors.grey),
-                          ),
-                        ],
+                      child: Text(
+                        enr['batch_name'],
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
                       ),
                     ),
                   ],
@@ -637,11 +630,36 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
     );
   }
 
+  Widget _feeFilterButton(String key, String label) {
+    final isSelected = _feeStatusFilter == key;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _feeStatusFilter = key),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6.5),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF8A064D) : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? Colors.white : const Color(0xFF6E3955),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final uniqueStudents = _store.getUniqueEnrolledStudents();
 
-    // Filter students by Course & Batch selection and Search Query
+    // Filter students by Course & Batch selection, Fee Status, and Search Query
     final filtered = uniqueStudents.where((s) {
       final enrollments = List<Map<String, dynamic>>.from(s['enrollments'] ?? []);
 
@@ -653,6 +671,14 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
       });
       if (!matchesFilter) return false;
 
+      // Fee status filter: 'paid' (only paid), 'pending' (any pending/due amount)
+      final status = (s['fee_status'] ?? '').toString().toLowerCase();
+      if (_feeStatusFilter == 'paid') {
+        if (status != 'paid') return false;
+      } else if (_feeStatusFilter == 'pending') {
+        if (status == 'paid') return false;
+      }
+
       // Check search query
       if (_searchQuery.trim().isEmpty) return true;
       final q = _searchQuery.toLowerCase();
@@ -661,8 +687,11 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
       return name.contains(q) || roll.contains(q);
     }).toList();
 
+    final paidCount = uniqueStudents.where((s) => (s['fee_status'] ?? '').toString().toLowerCase() == 'paid').length;
+    final pendingCount = uniqueStudents.length - paidCount;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF8FA),
+      backgroundColor: const Color(0xFFE3D5DC),
       body: Column(
         children: [
           // =================================================================
@@ -740,6 +769,25 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                       ),
                     ),
                   ],
+                ),
+
+                const SizedBox(height: 10),
+
+                // FEE STATUS SEGMENTED FILTER BAR
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4EAEF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFD4BAC7)),
+                  ),
+                  child: Row(
+                    children: [
+                      _feeFilterButton('all', 'All (${uniqueStudents.length})'),
+                      _feeFilterButton('paid', 'Paid ($paidCount)'),
+                      _feeFilterButton('pending', 'Pending ($pendingCount)'),
+                    ],
+                  ),
                 ),
 
                 const SizedBox(height: 8),

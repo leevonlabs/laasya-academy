@@ -8,10 +8,10 @@ class LaasyaColors {
   static const Color accentGold = Color(0xFFF9E33A);    // Radiant Cultural Gold
   static const Color goldDark = Color(0xFFD4AF37);      // Heritage Gold
   
-  // Surfaces & Backgrounds
-  static const Color background = Color(0xFFFFF9FB);    // Warm Cream Canvas
-  static const Color cardSurface = Color(0xFFFFFFFF);   // Pure White
-  static const Color border = Color(0xFFF0D5E4);        // Soft Plum Tint Border
+  // Surfaces & Backgrounds (Matching Admin Portal Dusty Rose Theme)
+  static const Color background = Color(0xFFE3D5DC);    // Soft Dusty Rose Canvas
+  static const Color cardSurface = Color(0xFFF4EAEF);   // Pale Plum-Pink Surface
+  static const Color border = Color(0xFFD4BAC7);        // Soft Plum Tint Border
   
   // Typography
   static const Color textDark = Color(0xFF220314);      // Deep Maroon Charcoal

@@ -34,6 +34,32 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
     }
   }
 
+  String _formatTimingsAmPm(String raw) {
+    if (raw.isEmpty) return '05:00 PM – 06:30 PM';
+    if (raw.toUpperCase().contains('AM') || raw.toUpperCase().contains('PM')) return raw;
+    String formatToken(String token) {
+      token = token.trim();
+      final parts = token.split(':');
+      if (parts.length >= 2) {
+        int h = int.tryParse(parts[0]) ?? 17;
+        final m = parts[1];
+        final ampm = h >= 12 ? 'PM' : 'AM';
+        int h12 = h % 12;
+        if (h12 == 0) h12 = 12;
+        return '${h12.toString().padLeft(2, '0')}:$m $ampm';
+      }
+      return token;
+    }
+    if (raw.contains('–')) {
+      final p = raw.split('–');
+      return '${formatToken(p[0])} – ${formatToken(p[1])}';
+    } else if (raw.contains('-')) {
+      final p = raw.split('-');
+      return '${formatToken(p[0])} – ${formatToken(p[1])}';
+    }
+    return formatToken(raw);
+  }
+
   void _showCloseClassConfirmation(Map<String, dynamic> item) {
     showDialog(
       context: context,
@@ -532,7 +558,7 @@ class _TrainerAttendanceTabState extends State<TrainerAttendanceTab> {
                                                     const Icon(Icons.access_time_rounded, size: 15, color: LaasyaColors.primary),
                                                     const SizedBox(width: 8),
                                                     Text(
-                                                      'Class Timings: ${item['timings']}',
+                                                      'Class Timings: ${_formatTimingsAmPm(item['timings']?.toString() ?? '')}',
                                                       style: const TextStyle(
                                                         fontSize: 12.5,
                                                         fontWeight: FontWeight.bold,

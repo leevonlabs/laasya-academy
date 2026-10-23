@@ -20,6 +20,7 @@ import 'student_settings_tab.dart';
 import 'student_notifications_screen.dart';
 import 'student_messages_screen.dart';
 import 'student_video_library_screen.dart';
+import 'student_ai_assistant_screen.dart';
 
 class StudentMainScaffold extends StatefulWidget {
   const StudentMainScaffold({super.key});
@@ -803,6 +804,26 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
       body: IndexedStack(
         index: _currentIndex,
         children: tabs,
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const StudentAiAssistantScreen()),
+          );
+        },
+        backgroundColor: LaasyaColors.primary,
+        elevation: 4,
+        icon: const Icon(Icons.smart_toy_rounded, color: Color(0xFFFBF0B9), size: 20),
+        label: const Text(
+          'Ask AI',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            letterSpacing: 0.3,
+          ),
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

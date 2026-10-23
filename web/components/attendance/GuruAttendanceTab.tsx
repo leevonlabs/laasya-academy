@@ -446,7 +446,6 @@ export default function GuruAttendanceTab({
       'Present Students',
       'Absent Students',
       'Total Enrolled',
-      'Class Closure Status',
       'Guru Verdict'
     ];
 
@@ -461,7 +460,6 @@ export default function GuruAttendanceTab({
       r.present_students_count,
       r.absent_students_count,
       r.total_enrolled,
-      `"${r.session_status === 'completed' ? 'Closed' : r.session_status}"`,
       `"${r.guru_status.toUpperCase()}"`
     ]);
 
@@ -939,54 +937,44 @@ export default function GuruAttendanceTab({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={onRefresh}
-            className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer text-xs flex items-center gap-1.5 font-bold shadow-2xs"
-            title="Refresh Guru Attendance"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh</span>
-          </button>
-        </div>
       </div>
 
       {/* 2. Global KPIs Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white p-3.5 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between">
+        <div className="bg-[#F4EAEF] p-3.5 rounded-2xl border border-[#D4BAC7] shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Faculty Gurus</p>
-            <p className="text-xl font-black text-gray-900 mt-0.5">{globalStats.totalGurus}</p>
+            <p className="text-[10px] font-bold text-[#6E3955] uppercase tracking-wider">Faculty Gurus</p>
+            <p className="text-xl font-black text-[#2D041A] mt-0.5">{globalStats.totalGurus}</p>
           </div>
-          <div className="w-8 h-8 rounded-lg bg-[#FFF2F8] text-[#8A064D] flex items-center justify-center font-bold">
+          <div className="w-8 h-8 rounded-lg bg-[#EBD4E0] text-[#8A064D] flex items-center justify-center font-bold">
             <User className="w-4 h-4" />
           </div>
         </div>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between">
+        <div className="bg-[#F4EAEF] p-3.5 rounded-2xl border border-[#D4BAC7] shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Classes</p>
-            <p className="text-xl font-black text-gray-900 mt-0.5">{globalStats.totalSessions}</p>
+            <p className="text-[10px] font-bold text-[#6E3955] uppercase tracking-wider">Total Classes</p>
+            <p className="text-xl font-black text-[#2D041A] mt-0.5">{globalStats.totalSessions}</p>
           </div>
-          <div className="w-8 h-8 rounded-lg bg-gray-100 text-gray-700 flex items-center justify-center font-bold">
+          <div className="w-8 h-8 rounded-lg bg-[#EBD4E0] text-[#590231] flex items-center justify-center font-bold">
             <BookOpen className="w-4 h-4" />
           </div>
         </div>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 bg-emerald-50/20 shadow-xs flex items-center justify-between">
+        <div className="bg-[#F4EAEF] p-3.5 rounded-2xl border border-emerald-300 bg-emerald-50/40 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Conducted (Present)</p>
-            <p className="text-xl font-black text-emerald-700 mt-0.5">{globalStats.presentSessions}</p>
+            <p className="text-xl font-black text-emerald-800 mt-0.5">{globalStats.presentSessions}</p>
           </div>
           <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
             <CheckCircle2 className="w-4 h-4" />
           </div>
         </div>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-rose-200 bg-rose-50/20 shadow-xs flex items-center justify-between">
+        <div className="bg-[#F4EAEF] p-3.5 rounded-2xl border border-rose-300 bg-rose-50/40 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Missed (Absent)</p>
-            <p className="text-xl font-black text-rose-700 mt-0.5">{globalStats.absentSessions}</p>
+            <p className="text-xl font-black text-rose-800 mt-0.5">{globalStats.absentSessions}</p>
           </div>
           <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
             <XCircle className="w-4 h-4" />
@@ -994,126 +982,189 @@ export default function GuruAttendanceTab({
         </div>
       </div>
 
-      {/* 3. Searchable Multi-Selection Filter Toolbar (Guru, Course, Batch, Text) */}
-      <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Guru Multi-select */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-              Filter Gurus (Multi)
-            </label>
+      {/* 3. Searchable Multi-Selection Filter Toolbar (Unified Pill Container matching reference) */}
+      <div className="bg-[#F4EAEF] p-4 rounded-3xl border border-[#D4BAC7] shadow-xs space-y-3">
+        {/* Row 1: Search on left, Filter Pills on right */}
+        <div className="flex flex-col sm:flex-row items-center gap-2.5">
+          <div className="relative flex-1 w-full">
+            <input
+              type="text"
+              placeholder="Search by guru name, title or discipline"
+              value={gridSearchQuery}
+              onChange={(e) => setGridSearchQuery(e.target.value)}
+              className="w-full px-4 py-2 bg-[#EFE2EA] border border-[#D4BAC7] rounded-xl text-xs text-[#3D102A] placeholder-[#8A5B75] focus:outline-none focus:ring-2 focus:ring-[#8A064D] font-medium"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            {/* Gurus Pill */}
             <TrainerMultiSearchSelect
               trainers={level1TrainerOptions}
               selectedIds={gridSelectedGuruIds}
               onChange={setGridSelectedGuruIds}
-              placeholder="All Gurus (Multi-select)"
-              className="w-full"
+              pillMode={true}
+              buttonLabel="Gurus"
             />
-          </div>
 
-          {/* Course Multi-select */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-              Filter Courses (Multi)
-            </label>
+            {/* Courses Pill */}
             <CourseMultiSearchSelect
               courses={level1CourseOptions}
               selectedIds={gridSelectedCourseIds}
               onChange={setGridSelectedCourseIds}
-              placeholder="All Courses (Multi-select)"
-              className="w-full"
+              pillMode={true}
+              buttonLabel="Courses"
             />
-          </div>
 
-          {/* Batch Multi-select */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-              Filter Batches (Multi)
-            </label>
+            {/* Batches Pill */}
             <BatchMultiSearchSelect
               batches={level1BatchOptions}
               selectedIds={gridSelectedBatchIds}
               onChange={setGridSelectedBatchIds}
-              placeholder="All Batches (Multi-select)"
-              className="w-full"
+              pillMode={true}
+              buttonLabel="Batches"
             />
           </div>
         </div>
 
-        {/* Text Search & Reset Toolbar */}
-        <div className="pt-2 border-t border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Quick search by guru name, title, or discipline..."
-              value={gridSearchQuery}
-              onChange={(e) => setGridSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-[#8A064D] font-medium"
-            />
-          </div>
+        {/* Row 2: Active Filter Chips & Clear All */}
+        {(gridSelectedGuruIds.length > 0 || gridSelectedCourseIds.length > 0 || gridSelectedBatchIds.length > 0 || gridSearchQuery.trim()) && (
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#D4BAC7]/40">
+            {/* Selected Courses Chips */}
+            {gridSelectedCourseIds.map(cId => {
+              const c = courses.find(item => item.id === cId);
+              if (!c) return null;
+              return (
+                <span
+                  key={cId}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#E2CBD7] text-[#590231] rounded-full text-xs font-bold"
+                >
+                  <span>{c.title}</span>
+                  <button
+                    type="button"
+                    onClick={() => setGridSelectedCourseIds(gridSelectedCourseIds.filter(id => id !== cId))}
+                    className="hover:text-rose-800 transition cursor-pointer"
+                    title="Remove filter"
+                  >
+                    ✕
+                  </button>
+                </span>
+              );
+            })}
 
-          <div className="flex items-center justify-between sm:justify-end gap-3">
-            <span className="text-xs text-gray-500 font-semibold">
-              Showing <strong className="text-[#8A064D]">{filteredGurus.length}</strong> of {trainers.length} Gurus
-            </span>
+            {/* Selected Gurus Chips */}
+            {gridSelectedGuruIds.map(gId => {
+              const g = trainers.find(item => item.id === gId);
+              if (!g) return null;
+              return (
+                <span
+                  key={gId}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#E2CBD7] text-[#590231] rounded-full text-xs font-bold"
+                >
+                  <span>{g.full_name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setGridSelectedGuruIds(gridSelectedGuruIds.filter(id => id !== gId))}
+                    className="hover:text-rose-800 transition cursor-pointer"
+                    title="Remove filter"
+                  >
+                    ✕
+                  </button>
+                </span>
+              );
+            })}
 
-            {(gridSelectedGuruIds.length > 0 || gridSelectedCourseIds.length > 0 || gridSelectedBatchIds.length > 0 || gridSearchQuery.trim()) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setGridSelectedGuruIds([]);
-                  setGridSelectedCourseIds([]);
-                  setGridSelectedBatchIds([]);
-                  setGridSearchQuery('');
-                }}
-                className="text-xs text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset Filters</span>
-              </button>
+            {/* Selected Batches Chips */}
+            {gridSelectedBatchIds.map(bId => {
+              const b = level1BatchOptions.find(item => item.id === bId);
+              if (!b) return null;
+              return (
+                <span
+                  key={bId}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#E2CBD7] text-[#590231] rounded-full text-xs font-bold"
+                >
+                  <span>{b.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setGridSelectedBatchIds(gridSelectedBatchIds.filter(id => id !== bId))}
+                    className="hover:text-rose-800 transition cursor-pointer"
+                    title="Remove filter"
+                  >
+                    ✕
+                  </button>
+                </span>
+              );
+            })}
+
+            {/* Search Query Chip */}
+            {gridSearchQuery.trim() && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#E2CBD7] text-[#590231] rounded-full text-xs font-bold">
+                <span>&quot;{gridSearchQuery}&quot;</span>
+                <button
+                  type="button"
+                  onClick={() => setGridSearchQuery('')}
+                  className="hover:text-rose-800 transition cursor-pointer"
+                >
+                  ✕
+                </button>
+              </span>
             )}
+
+            {/* Clear All Filters link */}
+            <button
+              type="button"
+              onClick={() => {
+                setGridSelectedGuruIds([]);
+                setGridSelectedCourseIds([]);
+                setGridSelectedBatchIds([]);
+                setGridSearchQuery('');
+              }}
+              className="text-xs text-[#590231] underline font-bold hover:text-[#8A064D] ml-1 cursor-pointer"
+            >
+              Clear all filters
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* 4. Guru Cards Grid (No compliance percentage displayed) */}
-      {filteredGurus.length === 0 ? (
-        <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center text-gray-500 text-xs space-y-2">
-          <User className="w-8 h-8 text-gray-300 mx-auto" />
-          <p className="font-semibold text-gray-700">No Gurus match the selected criteria.</p>
-          <button
-            onClick={() => {
-              setGridSelectedGuruIds([]);
-              setGridSelectedCourseIds([]);
-              setGridSelectedBatchIds([]);
-              setGridSearchQuery('');
-            }}
-            className="text-xs text-[#8A064D] font-bold hover:underline cursor-pointer"
-          >
-            Clear filters
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredGurus.map((guru) => {
-            const trainerRecs = getTrainerRecords(guru);
-            const coursesTaught = getTrainerCourses(guru, trainerRecs);
-            const present = trainerRecs.filter(r => r.guru_status === 'present').length;
-            const absent = trainerRecs.filter(r => r.guru_status === 'absent').length;
-            const extra = tallyClasses.filter(tc => 
-              (tc.trainer_id && tc.trainer_id === guru.id) ||
-              (tc.trainer_name && guru.full_name && tc.trainer_name.toLowerCase().trim() === guru.full_name.toLowerCase().trim())
-            ).length;
-            const conducted = present + extra; // Total classes held in that month (including extra/rescheduled)
-            const total = conducted + absent;
-            const avatar = guru.avatar_url;
+      {/* 4. Guru Cards Grid (Wrapper with min-h-[550px] to preserve space and prevent scroll jumps) */}
+      <div className="min-h-[550px]">
+        {filteredGurus.length === 0 ? (
+          <div className="bg-[#F4EAEF] min-h-[400px] flex flex-col items-center justify-center p-12 rounded-3xl border border-[#D4BAC7] text-center text-gray-500 text-xs space-y-3">
+            <User className="w-10 h-10 text-gray-400 mx-auto" />
+            <p className="font-bold text-gray-700 text-sm">No Gurus match the selected criteria.</p>
+            <p className="text-[11px] text-[#6E3955]">Try clearing or adjusting your course, guru, or batch filters.</p>
+            <button
+              onClick={() => {
+                setGridSelectedGuruIds([]);
+                setGridSelectedCourseIds([]);
+                setGridSelectedBatchIds([]);
+                setGridSearchQuery('');
+              }}
+              className="text-xs text-[#8A064D] font-black underline cursor-pointer"
+            >
+              Clear all filters
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredGurus.map((guru) => {
+              const trainerRecs = getTrainerRecords(guru);
+              const coursesTaught = getTrainerCourses(guru, trainerRecs);
+              const present = trainerRecs.filter(r => r.guru_status === 'present').length;
+              const absent = trainerRecs.filter(r => r.guru_status === 'absent').length;
+              const extra = tallyClasses.filter(tc => 
+                (tc.trainer_id && tc.trainer_id === guru.id) ||
+                (tc.trainer_name && guru.full_name && tc.trainer_name.toLowerCase().trim() === guru.full_name.toLowerCase().trim())
+              ).length;
+              const conducted = present + extra; // Total classes held in that month (including extra/rescheduled)
+              const total = conducted + absent;
+              const avatar = guru.avatar_url;
 
-            return (
-              <div
-                key={guru.id}
-                className="bg-white rounded-2xl p-4 border border-[#F0D5E4] shadow-xs hover:shadow-md hover:border-[#8A064D]/50 transition-all flex flex-col justify-between group"
-              >
+              return (
+                <div
+                  key={guru.id}
+                  className="bg-[#F4EAEF] rounded-2xl p-4 border border-[#D4BAC7] shadow-xs hover:shadow-md hover:border-[#8A064D] transition-all flex flex-col justify-between group"
+                >
                 <div>
                   {/* Top Bar: Avatar & Active Status Indicator (No Compliance %) */}
                   <div className="flex items-start justify-between gap-3 mb-3">
@@ -1204,6 +1255,7 @@ export default function GuruAttendanceTab({
           })}
         </div>
       )}
+      </div>
 
     </div>
   );

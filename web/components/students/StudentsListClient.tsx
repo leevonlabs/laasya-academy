@@ -8,6 +8,7 @@ import MultiSelectCombobox, { MultiSelectOption } from '@/components/common/Mult
 import { 
   GraduationCap, 
   Search, 
+  Download, 
   Plus, 
   Phone, 
   Mail, 
@@ -2247,6 +2248,65 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
     );
   }
 
+  // Export Students to CSV
+  const handleExportStudentsCSV = () => {
+    const headers = [
+      'Roll Number',
+      'Full Name',
+      'Phone Number',
+      'Email',
+      'Parent / Guardian',
+      'Gender',
+      'Age',
+      'Enrolled Courses & Batches',
+      'Total Monthly Fee (INR)',
+      'Fixed Discount (INR)',
+      'Net Monthly Fee (INR)',
+      'Advance Paid (INR)',
+      'Balance Due (INR)',
+      'Due Date',
+      'Status',
+      'Joining Date'
+    ];
+
+    const rows = sortedStudents.map(s => {
+      const gross = Number(s.total_monthly_fee || 0);
+      const discount = Number(s.fixed_discount || 0);
+      const net = gross - discount;
+      const enrolled = (s.enrolled_batches || []).map(b => `${b.course_title} (${b.batch_name})`).join('; ');
+
+      return [
+        `"${(s.roll_number || '').replace(/"/g, '""')}"`,
+        `"${(s.full_name || '').replace(/"/g, '""')}"`,
+        `"${(s.phone || '').replace(/"/g, '""')}"`,
+        `"${(s.email || '').replace(/"/g, '""')}"`,
+        `"${(s.parent_name || '').replace(/"/g, '""')}"`,
+        `"${(s.gender || 'Not Specified')}"`,
+        `"${s.age || ''}"`,
+        `"${enrolled.replace(/"/g, '""')}"`,
+        gross,
+        discount,
+        net,
+        Number(s.advance_paid || 0),
+        Number(s.due_amount || 0),
+        `"${formatDueDateDisplay(s.due_date)}"`,
+        `"${(s.status || 'ACTIVE').toUpperCase()}"`,
+        `"${s.enrollment_date ? s.enrollment_date.substring(0, 10) : ''}"`
+      ];
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Laasya_Students_Roster_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
 
@@ -2342,6 +2402,16 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
             <span>Register Student</span>
           </button>
 
+          {/* Export CSV Button */}
+          <button
+            onClick={handleExportStudentsCSV}
+            className="bg-[#590231] hover:bg-[#780442] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-sm transition flex items-center gap-2 cursor-pointer border border-[#EBB128]"
+            title="Export Students Roster as CSV"
+          >
+            <Download className="w-4 h-4 text-[#F9E33A]" />
+            <span>Export CSV</span>
+          </button>
+
         </div>
       </div>
 
@@ -2356,7 +2426,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
             className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
               statusFilter === 'active'
                 ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
-                : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
+                : 'bg-[#F4EAEF] text-[#521D38] border border-[#D4BAC7] hover:bg-[#EBD4E0]'
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
@@ -2373,7 +2443,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
             className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
               statusFilter === 'inactive'
                 ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
-                : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
+                : 'bg-[#F4EAEF] text-[#521D38] border border-[#D4BAC7] hover:bg-[#EBD4E0]'
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-gray-400" />
@@ -2390,7 +2460,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
             className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
               statusFilter === 'all'
                 ? 'bg-[#8A064D] text-white shadow-xs ring-2 ring-[#F9E33A]/40'
-                : 'bg-white text-[#521D38] border border-[#F0D5E4] hover:bg-[#FFF9FB]'
+                : 'bg-[#F4EAEF] text-[#521D38] border border-[#D4BAC7] hover:bg-[#EBD4E0]'
             }`}
           >
             <span>All Students</span>
@@ -2434,7 +2504,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
           />
 
           {/* Sort By Dropdown */}
-          <div className="flex items-center gap-1.5 bg-white px-3 py-2 rounded-2xl border border-[#F0D5E4] shadow-xs">
+          <div className="flex items-center gap-1.5 bg-[#F4EAEF] px-3 py-2 rounded-2xl border border-[#D4BAC7] shadow-xs">
             <span className="text-[11px] font-bold text-[#8A064D] uppercase tracking-wider">Sort By:</span>
             <select
               value={sortBy}
@@ -2475,9 +2545,10 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
       {/* 3. MAIN STUDENTS GRID (DISPLAY ONLY REQUIRED FIELDS) */}
       {/* ===================================================================== */}
       {viewMode === 'grid' && (
+        <div className="min-h-[550px]">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4 gap-4">
           {sortedStudents.length === 0 ? (
-            <div className="col-span-full py-16 text-center text-[#6E3955] bg-white rounded-3xl border border-[#F0D5E4]">
+            <div className="col-span-full py-16 text-center text-[#6E3955] bg-[#F4EAEF] rounded-3xl border border-[#D4BAC7]">
               <AlertTriangle className="w-8 h-8 text-[#8A064D]/30 mx-auto mb-2" />
               <p className="font-bold text-[#2D041A]">No {statusFilter !== 'all' ? statusFilter : ''} students found.</p>
               <p className="text-xs text-[#6E3955] mt-1 font-medium">Try switching filters or clearing your search.</p>
@@ -2626,13 +2697,16 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
             })
           )}
         </div>
+        </div>
       )}
 
       {/* ===================================================================== */}
+
       {/* 4. ROW-WISE (TABLE) VIEW */}
       {/* ===================================================================== */}
       {viewMode === 'row' && (
-        <div className="bg-white rounded-3xl border border-[#F0D5E4]/90 shadow-xs overflow-hidden">
+        <div className="min-h-[550px]">
+        <div className="bg-[#F4EAEF] rounded-3xl border border-[#D4BAC7] shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
@@ -2781,6 +2855,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
 

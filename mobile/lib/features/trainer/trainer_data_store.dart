@@ -114,9 +114,26 @@ class TrainerDataStore {
         return d;
       }).join(', ');
 
-      final timings = (b['start_time'] != null && b['end_time'] != null)
-          ? '${b['start_time']} - ${b['end_time']}'
-          : '05:00 PM - 06:30 PM';
+      String formatTime12(dynamic raw) {
+        if (raw == null) return '05:00 PM';
+        final s = raw.toString().trim();
+        if (s.isEmpty) return '05:00 PM';
+        if (s.toUpperCase().contains('AM') || s.toUpperCase().contains('PM')) return s;
+        final parts = s.split(':');
+        if (parts.length >= 2) {
+          int h = int.tryParse(parts[0]) ?? 17;
+          final m = parts[1];
+          final ampm = h >= 12 ? 'PM' : 'AM';
+          int h12 = h % 12;
+          if (h12 == 0) h12 = 12;
+          return '${h12.toString().padLeft(2, '0')}:$m $ampm';
+        }
+        return s;
+      }
+
+      final start12 = formatTime12(b['start_time'] ?? '17:00');
+      final end12 = formatTime12(b['end_time'] ?? '18:30');
+      final timings = '$start12 – $end12';
 
       final batchMap = {
         'id': b['id'].toString(),

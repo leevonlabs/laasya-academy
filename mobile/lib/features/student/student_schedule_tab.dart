@@ -108,7 +108,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
     final displayedClasses = _selectedDay == 'today' ? todayClasses : weekClasses;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF8FA),
+      backgroundColor: const Color(0xFFE3D5DC),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: LaasyaColors.primary))
           : Column(
@@ -120,9 +120,9 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                   margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: const Color(0xFFF4EAEF),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFF0D5E4)),
+                    border: Border.all(color: const Color(0xFFD4BAC7)),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.04),
@@ -230,7 +230,6 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                             itemCount: displayedClasses.length,
                             itemBuilder: (context, index) {
                               final item = displayedClasses[index];
-                              final isToday = item['is_today'] == true || _selectedDay == 'today';
                               final status = item['status'] ?? 'Scheduled';
                               final isHoliday = status.toString().toLowerCase().contains('holiday');
                               final reminderOn = _enabledReminders.contains(item['id']);
@@ -239,17 +238,15 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: const Color(0xFFF4EAEF),
                                   borderRadius: BorderRadius.circular(18),
                                   border: Border.all(
-                                    color: isToday
-                                        ? const Color(0xFFF0D5E4)
-                                        : const Color(0xFFE5E7EB),
+                                    color: const Color(0xFFD4BAC7),
                                     width: 1.2,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.03),
+                                      color: Colors.black.withOpacity(0.04),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -260,177 +257,172 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Wrap(
-                                        spacing: 8,
-                                        runSpacing: 6,
-                                        alignment: WrapAlignment.spaceBetween,
-                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                      // Top Header: Badges on Left, Remind Me Button on Right
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        crossAxisAlignment: CrossAxisAlignment.center,
                                         children: [
-                                          Row(
-                                            children: [
-                                              if (_selectedDay == 'week') ...[
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                  margin: const EdgeInsets.only(right: 6),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFF590231),
-                                                    borderRadius: BorderRadius.circular(8),
-                                                  ),
-                                                  child: Text(
-                                                    dayName.toUpperCase(),
-                                                    style: const TextStyle(
-                                                      color: Color(0xFFF9E33A),
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: 10.5,
+                                          Expanded(
+                                            child: Wrap(
+                                              spacing: 6,
+                                              runSpacing: 6,
+                                              crossAxisAlignment: WrapCrossAlignment.center,
+                                              children: [
+                                                if (_selectedDay == 'week')
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFF8A064D),
+                                                      borderRadius: BorderRadius.circular(8),
+                                                    ),
+                                                    child: Text(
+                                                      dayName.toUpperCase(),
+                                                      style: const TextStyle(
+                                                        color: Color(0xFFFBF0B9),
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 10.5,
+                                                      ),
                                                     ),
                                                   ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(color: const Color(0xFFD4BAC7)),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(Icons.access_time_rounded, size: 13, color: Color(0xFF8A064D)),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        _formatStudentSlotTime(item['time'] ?? 'Regular Hours'),
+                                                        style: const TextStyle(
+                                                          color: Color(0xFF8A064D),
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 11,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
+                                                if (item['is_rescheduled'] == true || item['is_tally'] == true || status.toString().contains('★'))
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFFEF3C7),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      border: Border.all(color: const Color(0xFFF59E0B)),
+                                                    ),
+                                                    child: const Text(
+                                                      'RESCHEDULED ★',
+                                                      style: TextStyle(
+                                                        color: Color(0xFF92400E),
+                                                        fontSize: 9.5,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  )
+                                                else
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                    decoration: BoxDecoration(
+                                                      color: isHoliday ? const Color(0xFFFEF3C7) : const Color(0xFFDEF7EC),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Text(
+                                                      status.toString().toUpperCase(),
+                                                      style: TextStyle(
+                                                        color: isHoliday ? const Color(0xFF92400E) : const Color(0xFF03543F),
+                                                        fontSize: 9.5,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
                                               ],
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+
+                                          // REMIND ME BUTTON ON TOP RIGHT OF EVERY GRID
+                                          Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              onTap: () => _toggleReminder(item['id']),
+                                              borderRadius: BorderRadius.circular(20),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                                 decoration: BoxDecoration(
-                                                  color: const Color(0xFFF3E8EE),
-                                                  borderRadius: BorderRadius.circular(8),
+                                                  color: reminderOn ? const Color(0xFF8A064D) : Colors.white,
+                                                  borderRadius: BorderRadius.circular(20),
+                                                  border: Border.all(
+                                                    color: reminderOn ? const Color(0xFF8A064D) : const Color(0xFFD4BAC7),
+                                                    width: 1.2,
+                                                  ),
                                                 ),
                                                 child: Row(
                                                   mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    const Icon(Icons.access_time_rounded, size: 13, color: LaasyaColors.primary),
+                                                    Icon(
+                                                      reminderOn ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+                                                      size: 13,
+                                                      color: reminderOn ? const Color(0xFFFBF0B9) : const Color(0xFF8A064D),
+                                                    ),
                                                     const SizedBox(width: 4),
                                                     Text(
-                                                      _formatStudentSlotTime(item['time'] ?? 'Regular Hours'),
-                                                      style: const TextStyle(
-                                                        color: LaasyaColors.primary,
+                                                      reminderOn ? 'Reminded' : 'Remind Me',
+                                                      style: TextStyle(
+                                                        fontSize: 10.5,
                                                         fontWeight: FontWeight.bold,
-                                                        fontSize: 11.5,
+                                                        color: reminderOn ? Colors.white : const Color(0xFF8A064D),
                                                       ),
                                                     ),
                                                   ],
                                                 ),
                                               ),
-                                            ],
-                                          ),
-                                          if (item['is_rescheduled'] == true || item['is_tally'] == true || status.toString().contains('★'))
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFFEF3C7),
-                                                borderRadius: BorderRadius.circular(8),
-                                                border: Border.all(color: const Color(0xFFF59E0B)),
-                                              ),
-                                              child: const Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(Icons.star_rounded, size: 13, color: Color(0xFFD97706)),
-                                                  SizedBox(width: 3),
-                                                  Text(
-                                                    'RESCHEDULED ★',
-                                                    style: TextStyle(
-                                                      color: Color(0xFF92400E),
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            )
-                                          else
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                              decoration: BoxDecoration(
-                                                color: isHoliday ? const Color(0xFFFEF3C7) : const Color(0xFFDEF7EC),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                status.toString().toUpperCase(),
-                                                style: TextStyle(
-                                                  color: isHoliday ? const Color(0xFF92400E) : const Color(0xFF03543F),
-                                                  fontSize: 10.5,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
                                             ),
+                                          ),
                                         ],
                                       ),
+
                                       const SizedBox(height: 12),
                                       Text(
                                         item['course'] ?? 'Course Session',
                                         style: const TextStyle(
                                           fontSize: 17,
                                           fontWeight: FontWeight.bold,
-                                          color: LaasyaColors.textDark,
+                                          color: Color(0xFF220314),
                                         ),
                                       ),
                                       const SizedBox(height: 3),
                                       Text(
                                         '${item['batch'] ?? 'Batch'} • Guru: ${item['trainer'] ?? 'Assigned Guru'}',
-                                        style: const TextStyle(fontSize: 12.5, color: LaasyaColors.textMuted),
+                                        style: const TextStyle(fontSize: 12.5, color: Color(0xFF6E3955)),
                                       ),
-                                      const SizedBox(height: 12),
+                                      const SizedBox(height: 10),
+
+                                      // Full Room / Venue Name (No Truncation)
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8.5),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFFFF9FB),
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(color: const Color(0xFFF0D5E4)),
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: const Color(0xFFD4BAC7)),
                                         ),
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Expanded(
-                                              child: Row(
-                                                children: [
-                                                  const Icon(Icons.meeting_room_rounded, size: 16, color: LaasyaColors.primary),
-                                                  const SizedBox(width: 8),
-                                                  Expanded(
-                                                    child: Text(
-                                                      item['room'] ?? 'Hall',
-                                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
-                                                      overflow: TextOverflow.ellipsis,
-                                                      maxLines: 1,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
+                                            const Icon(Icons.meeting_room_rounded, size: 16, color: Color(0xFF8A064D)),
                                             const SizedBox(width: 8),
-                                            Material(
-                                              color: Colors.transparent,
-                                              child: InkWell(
-                                                onTap: () => _toggleReminder(item['id']),
-                                                borderRadius: BorderRadius.circular(8),
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                  decoration: BoxDecoration(
-                                                    color: reminderOn ? const Color(0xFFFFF2F8) : Colors.grey.shade100,
-                                                    borderRadius: BorderRadius.circular(8),
-                                                    border: Border.all(
-                                                      color: reminderOn ? LaasyaColors.primary : Colors.grey.shade300,
-                                                      width: 1,
-                                                    ),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        reminderOn ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
-                                                        size: 14,
-                                                        color: reminderOn ? LaasyaColors.primary : Colors.grey.shade600,
-                                                      ),
-                                                      const SizedBox(width: 5),
-                                                      Text(
-                                                        reminderOn ? 'Reminder On' : 'Remind Me',
-                                                        maxLines: 1,
-                                                        softWrap: false,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: TextStyle(
-                                                          fontSize: 11,
-                                                          fontWeight: FontWeight.bold,
-                                                          color: reminderOn ? LaasyaColors.primary : Colors.grey.shade700,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
+                                            Expanded(
+                                              child: Text(
+                                                item['room'] ?? 'Natya Mandapam',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Color(0xFF220314),
                                                 ),
                                               ),
                                             ),

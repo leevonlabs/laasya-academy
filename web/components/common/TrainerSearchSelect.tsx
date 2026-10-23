@@ -48,7 +48,7 @@ export default function TrainerSearchSelect({
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
       setTimeout(() => {
-        searchInputRef.current?.focus();
+        searchInputRef.current?.focus({ preventScroll: true });
       }, 50);
     }
   }, [isOpen]);

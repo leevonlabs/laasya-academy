@@ -388,338 +388,54 @@ class SupabaseService {
   // AUTHENTICATION & LOGIN
   // ---------------------------------------------------------------------------
   Future<Map<String, dynamic>?> signInWithPassword({
-    required String email,
-    required String password,
+    String? email,
+    String? identifier,
+    String? password,
     String? role,
   }) async {
-    final identifier = email.trim();
+    final loginId = (identifier ?? email ?? '').trim();
     _cachedProfile = null;
     await _clearProfileFromPrefs();
 
-    // 1. Authenticate against central Academy API (authenticates all 300 students and 14 Gurus)
+    if (loginId.isEmpty) {
+      throw Exception('Please enter your .');
+    }
+    // password optional
+
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/auth/mobile-login');
       final res = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'identifier': identifier,
-          'password': password,
+          'identifier': loginId,
+          'password': (password != null && password.trim().isNotEmpty) ? password.trim() : '123456',
           if (role != null) 'role': role,
         }),
       ).timeout(const Duration(seconds: 15));
 
+      final decoded = jsonDecode(res.body);
       if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['profile'] != null) {
           final prof = Map<String, dynamic>.from(decoded['profile']);
           if (role != null && prof['role'] != role) {
-            throw Exception('Access Denied: This account is not registered as a $role.');
+            throw Exception('Access Denied: This account is not registered as a .');
           }
           _cachedProfile = prof;
           await _saveProfileToPrefs(_cachedProfile!);
           return _cachedProfile;
         }
-      } else if (res.statusCode == 401 || res.statusCode == 400 || res.statusCode == 403 || res.statusCode == 404) {
-        final decoded = jsonDecode(res.body);
-        if (decoded is Map && decoded['error'] != null) {
-          throw Exception(decoded['error']);
-        }
       }
+
+      if (decoded is Map && decoded['error'] != null) {
+        throw Exception(decoded['error']);
+      }
+
+      throw Exception('Authentication failed. Please verify your credentials and try again.');
     } catch (e) {
       if (e.toString().contains('Exception:')) rethrow;
-      debugPrint('Mobile login API connection notice: $e');
-    }
-
-    if (_isInitialized && _client != null) {
-      try {
-        String resolvedEmail = identifier;
-        if (!identifier.contains('@')) {
-          try {
-            final lookupRes = await _client!.rpc('lookup_user_email', params: {'p_identifier': identifier});
-            if (lookupRes != null && lookupRes.toString().trim().isNotEmpty) {
-              resolvedEmail = lookupRes.toString().trim();
-            }
-          } catch (rpcErr) {
-            debugPrint('RPC lookup_user_email error: $rpcErr');
-          }
-        }
-
-        final res = await _client!.auth.signInWithPassword(
-          email: resolvedEmail,
-          password: password,
-        );
-        if (res.user != null) {
-          _cachedProfile = await getCurrentUserProfile();
-          return _cachedProfile;
-        }
-      } catch (e) {
-        debugPrint('Cloud login error: $e. Falling back to local verification.');
-      }
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Faculty & Revered Gurus (Trainer Login)
-    // -------------------------------------------------------------------------
-    if (identifier.contains('amos') || identifier.contains('director') || identifier.contains('8151998899')) {
-      _cachedProfile = {
-        'id': 'guru-amos',
-        'full_name': 'Guru Amos P Ovung',
-        'email': 'amos@laasyaacademy.com',
-        'phone': '+91 8151 998 899',
-        'role': 'trainer',
-        'age': 40,
-        'gender': 'Male',
-        'avatar_url': null,
-        'monthly_salary': 40000,
-        'salary_payment_status': 'paid',
-        'display_title': 'Director & Instrument Maestro',
-        'title_name': 'Director & Instrument Maestro',
-        'course_name': 'Instrument Classes',
-        'primary_course': 'Instrument Classes',
-        'specialization': 'Violin, Guitar, Keyboard & Western Music',
-        'designation': 'Director & Multi-Instrumentalist (Trinity / RSL Topper)',
-        'assigned_room': 'Saraswathi Nilayam (Hall 2)',
-        'assigned_batches_count': 4,
-        'total_students_count': 52,
-      };
-      if (role != null && role != 'trainer') {
-        _cachedProfile = null;
-        throw Exception('Access Denied: This account belongs to a Revered Guru. Please log in via the Guru Login screen.');
-      }
-      if (_cachedProfile != null) await _saveProfileToPrefs(_cachedProfile!);
-      return _cachedProfile;
-    } else if (identifier.contains('manikandan') || identifier.contains('vocal')) {
-      _cachedProfile = {
-        'id': 'guru-manikandan',
-        'full_name': 'Shri H. Manikandan',
-        'email': 'manikandan@laasyaacademy.com',
-        'phone': '+91 98765 00003',
-        'role': 'trainer',
-        'age': 52,
-        'gender': 'Male',
-        'avatar_url': null,
-        'monthly_salary': 38000,
-        'salary_payment_status': 'paid',
-        'display_title': 'Carnatic Vocal Master',
-        'title_name': 'Carnatic Vocal Master',
-        'course_name': 'Carnatic Music',
-        'primary_course': 'Carnatic Music',
-        'specialization': 'Carnatic Vocal & Classical Music',
-        'designation': 'Title "Sangeetha Acharya" • 15+ Yrs Palakkad Disciple',
-        'assigned_room': 'Sangeetha Shala (Room 102)',
-        'assigned_batches_count': 3,
-        'total_students_count': 35,
-      };
-      if (role != null && role != 'trainer') {
-        _cachedProfile = null;
-        throw Exception('Access Denied: This account belongs to a Revered Guru. Please log in via the Guru Login screen.');
-      }
-      if (_cachedProfile != null) await _saveProfileToPrefs(_cachedProfile!);
-      return _cachedProfile;
-    } else if (identifier.contains('vijay') || identifier.contains('karatte') || identifier.contains('martial')) {
-      _cachedProfile = {
-        'id': 'guru-vijay',
-        'full_name': 'Sensei Vijay Kumar Olekar',
-        'email': 'vijay@laasyaacademy.com',
-        'phone': '+91 98765 00010',
-        'role': 'trainer',
-        'age': 35,
-        'gender': 'Male',
-        'avatar_url': null,
-        'monthly_salary': 32000,
-        'salary_payment_status': 'pending',
-        'display_title': 'Karate Sensei (2nd Dan)',
-        'title_name': 'Karate Sensei (2nd Dan)',
-        'course_name': 'Karate',
-        'primary_course': 'Karate',
-        'specialization': 'Karatte & Self Defense Disciplines',
-        'designation': 'Sensei (2nd Dan Black Belt)',
-        'assigned_room': 'Veera Kalari Koodam',
-        'assigned_batches_count': 2,
-        'total_students_count': 28,
-      };
-      if (role != null && role != 'trainer') {
-        _cachedProfile = null;
-        throw Exception('Access Denied: This account belongs to a Revered Guru. Please log in via the Guru Login screen.');
-      }
-      if (_cachedProfile != null) await _saveProfileToPrefs(_cachedProfile!);
-      return _cachedProfile;
-    } else if (identifier.contains('guru') || identifier.contains('anusha') || identifier.contains('trainer') || identifier.contains('11111') || identifier.contains('dance') || identifier.contains('radhika')) {
-      _cachedProfile = {
-        'id': 'guru-anusha',
-        'full_name': 'Smt. Anusha Sumesh',
-        'email': 'anusha@laasyaacademy.com',
-        'phone': '+91 98765 00004',
-        'role': 'trainer',
-        'age': 36,
-        'gender': 'Female',
-        'avatar_url': null,
-        'monthly_salary': 45000,
-        'salary_payment_status': 'paid',
-        'display_title': 'Founder & Head Guru',
-        'title_name': 'Founder & Head Guru',
-        'course_name': 'Bharatanatyam',
-        'primary_course': 'Bharatanatyam',
-        'specialization': 'Bharatanatyam Classical Dance',
-        'designation': 'Founder & Head Guru (Guruvayoor Arangetram)',
-        'assigned_room': 'Natya Mandapam (Room 101)',
-        'assigned_batches_count': 4,
-        'total_students_count': 42,
-      };
-      if (role != null && role != 'trainer') {
-        _cachedProfile = null;
-        throw Exception('Access Denied: This account belongs to a Revered Guru. Please log in via the Guru Login screen.');
-      }
-      if (_cachedProfile != null) await _saveProfileToPrefs(_cachedProfile!);
-      return _cachedProfile;
-    }
-
-    // -------------------------------------------------------------------------
-    // Students (Student Login by Mobile, Roll No, or Email)
-    // -------------------------------------------------------------------------
-    if (identifier.contains('aditi') || identifier.contains('lca-6') || identifier.contains('9845012345')) {
-      _cachedProfile = {
-        'id': 'st-aditi',
-        'full_name': 'Aditi Sundaram',
-        'email': 'aditi.sundaram@laasyastudent.com',
-        'phone': '+91 98450 12345',
-        'role': 'student',
-        'roll_number': 'LCA-6',
-        'course': 'Bharathanatyam',
-        'course_category': 'Classical Dance',
-        'age': 16,
-        'gender': 'Female',
-        'avatar_url': null,
-        'parent_name': 'Sri Sundaram V.',
-        'parent_phone': '+91 98450 00006',
-        'address': 'Flat 402, Shanthi Vihar, Bangalore',
-        'batch': 'Bharathanatyam - Batch A (Beginners)',
-        'room_or_hall': 'Natya Mandapam (Room 101)',
-        'total_monthly_fee': 2000,
-        'advance_paid': 2000,
-        'due_amount': 0,
-        'due_status': 'green',
-        'due_date': '10th Oct 2026',
-        'next_due_date': '10th Nov 2026',
-      };
-      return _cachedProfile;
-    } else if (identifier.contains('10022') || identifier.contains('sneha')) {
-      _cachedProfile = {
-        'id': 'st-mock-2',
-        'full_name': 'Sneha Reddy',
-        'email': 'sneha.reddy@example.com',
-        'phone': '+91 99123 45680',
-        'role': 'student',
-        'roll_number': 'LCA-10022',
-        'course': 'Bharathanatyam',
-        'course_category': 'Classical Dance',
-        'age': 15,
-        'gender': 'Female',
-        'avatar_url': null,
-        'parent_name': 'Dr. K. V. Reddy',
-        'parent_phone': '+91 99123 00002',
-        'address': 'Plot 45, Jubilee Hills, Hyderabad',
-        'batch': 'Batch A (Beginners)',
-        'room_or_hall': 'Natya Mandapam (Room 101)',
-        'total_monthly_fee': 2000,
-        'advance_paid': 0,
-        'due_amount': 2000,
-        'due_status': 'red',
-        'due_date': '10th Oct 2026',
-        'next_due_date': '10th Nov 2026',
-      };
-      return _cachedProfile;
-    } else if (identifier.contains('aryan') || identifier.contains('lca-14') || identifier.contains('9845000014')) {
-      _cachedProfile = {
-        'id': 'st-aryan',
-        'full_name': 'Aryan Sharma',
-        'email': 'aryan.sharma@laasyastudent.com',
-        'phone': '+91 98450 00014',
-        'role': 'student',
-        'roll_number': 'LCA-14',
-        'course': 'Art and Craft',
-        'course_category': 'Fine Arts',
-        'age': 14,
-        'gender': 'Male',
-        'avatar_url': null,
-        'parent_name': 'Sri Rajesh Sharma',
-        'parent_phone': '+91 98450 99914',
-        'address': 'No. 88, Indiranagar, Bangalore',
-        'batch': 'Primary Batch',
-        'room_or_hall': 'Chitra Kala Bhavan',
-        'total_monthly_fee': 1800,
-        'advance_paid': 1800,
-        'due_amount': 0,
-        'due_status': 'green',
-        'due_date': '10th Oct 2026',
-        'next_due_date': '10th Nov 2026',
-      };
-      return _cachedProfile;
-    } else if (identifier.contains('10023') || identifier.contains('meera')) {
-      _cachedProfile = {
-        'id': 'st-mock-3',
-        'full_name': 'Meera Nambiar',
-        'email': 'meera.nambiar@example.com',
-        'phone': '+91 99123 45682',
-        'role': 'student',
-        'roll_number': 'LCA-10023',
-        'course': 'Carnatic Music',
-        'course_category': 'Vocal & Music',
-        'age': 17,
-        'gender': 'Female',
-        'avatar_url': null,
-        'parent_name': 'Sri Govind Nambiar',
-        'parent_phone': '+91 99123 00003',
-        'address': 'Villa 12, Banjara Hills, Hyderabad',
-        'batch': 'Morning Ragas',
-        'room_or_hall': 'Sangeetha Shala (Room 102)',
-        'total_monthly_fee': 2000,
-        'advance_paid': 1000,
-        'due_amount': 1000,
-        'due_status': 'yellow',
-        'due_date': '10th Oct 2026',
-        'next_due_date': '10th Nov 2026',
-      };
-      return _cachedProfile;
-    } else if (identifier.contains('ananya') || identifier.contains('10021') || identifier.toLowerCase() == 'lca-1') {
-      // Mock Student (Ananya Rao)
-      _cachedProfile = {
-        'id': 'st-mock-1',
-        'full_name': 'Ananya Rao',
-        'email': identifier.contains('@') ? identifier : 'ananya.rao@example.com',
-        'phone': '+91 99123 45678',
-        'role': 'student',
-        'roll_number': 'LCA-1',
-        'course': 'Bharathanatyam',
-        'course_category': 'Classical Dance',
-        'age': 16,
-        'gender': 'Female',
-        'avatar_url': null,
-        'parent_name': 'Sri Ramesh Rao',
-        'parent_phone': '+91 99123 00001',
-        'address': 'No. 204, Gachibowli, Hyderabad',
-        'batch': 'Bharathanatyam - Batch A (Beginners)',
-        'room_or_hall': 'Natya Mandapam (Room 101)',
-        'total_monthly_fee': 2000,
-        'fixed_discount': 500,
-        'advance_paid': 1000,
-        'due_amount': 500,
-        'due_status': 'yellow',
-        'due_date': '10th Oct 2026',
-        'next_due_date': '10th Nov 2026',
-      };
-      if (role != null && _cachedProfile!['role'] != role) {
-        _cachedProfile = null;
-        throw Exception('Access Denied: This account belongs to a Student. Please log in via the Student Login screen.');
-      }
-      await _saveProfileToPrefs(_cachedProfile!);
-      return _cachedProfile;
-    } else {
-      _cachedProfile = null;
-      await _clearProfileFromPrefs();
-      throw Exception('Invalid credentials. No ${role ?? 'user'} account found matching this identifier. Please verify your mobile number or roll number.');
+      debugPrint('Mobile login connection error: ');
+      throw Exception('Unable to reach the academy server. Please ensure the server is running and check your connection.');
     }
   }
 

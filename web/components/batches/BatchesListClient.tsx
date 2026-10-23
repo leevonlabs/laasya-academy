@@ -1166,7 +1166,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
       </div>
 
       {/* Filter Toolbar: Search Batches + Searchable Multi-Select Course Dropdown */}
-      <div className="bg-white p-4 rounded-3xl border border-[#F0D5E4] shadow-xs space-y-3">
+      <div className="bg-[#F4EAEF] p-4 rounded-3xl border border-[#D4BAC7] shadow-xs space-y-3">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           
           {/* Left Group: Search Input + Course Filter Dropdown */}
@@ -1180,7 +1180,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 placeholder="Search by batch, guru, room..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-[#F0D5E4] rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                className="w-full pl-9 pr-4 py-2.5 bg-[#EFE2EA] border border-[#D4BAC7] rounded-2xl text-xs text-[#3D102A] focus:outline-none focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
               />
               {searchQuery && (
                 <button
@@ -1200,8 +1200,8 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 onClick={() => setIsCourseDropdownOpen(!isCourseDropdownOpen)}
                 className={`w-full px-4 py-2.5 rounded-2xl text-xs font-semibold flex items-center justify-between border transition cursor-pointer ${
                   selectedCourseIds.length > 0
-                    ? 'bg-[#FFF2F8] border-[#8A064D] text-[#8A064D] shadow-xs'
-                    : 'bg-gray-50 hover:bg-gray-100/70 border-[#F0D5E4] text-gray-700'
+                    ? 'bg-[#EBD4E0] border-[#8A064D] text-[#590231] shadow-xs'
+                    : 'bg-[#EFE2EA] hover:bg-[#E7D3DF] border-[#D4BAC7] text-[#3D102A]'
                 }`}
               >
                 <div className="flex items-center gap-2 truncate pr-1">
@@ -1234,7 +1234,6 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                     <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
                     <input
                       type="text"
-                      autoFocus
                       placeholder="Search courses by title, category, code..."
                       value={courseFilterSearch}
                       onChange={(e) => setCourseFilterSearch(e.target.value)}
@@ -1346,7 +1345,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
             </div>
 
               {/* Status Filter Dropdown beside Course Filter */}
-              <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-2 rounded-2xl border border-[#F0D5E4]">
+              <div className="flex items-center gap-1.5 bg-[#EFE2EA] px-3 py-2 rounded-2xl border border-[#D4BAC7]">
                 <span className="text-[11px] font-bold text-[#8A064D] uppercase tracking-wider">Status:</span>
                 <select
                   value={statusFilter}
@@ -1397,7 +1396,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
               return (
                 <span 
                   key={crsId}
-                  className="inline-flex items-center gap-1.5 bg-[#FFF2F8] text-[#8A064D] border border-[#F0D5E4] px-2.5 py-1 rounded-xl text-xs font-bold shadow-2xs animate-in fade-in"
+                  className="inline-flex items-center gap-1.5 bg-[#E2CBD7] text-[#590231] border border-[#D4BAC7] px-2.5 py-1 rounded-full text-xs font-bold shadow-2xs animate-in fade-in"
                 >
                   <span>{c.title}</span>
                   <button 
@@ -1423,6 +1422,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
       </div>
 
       {/* Batches Grid */}
+      <div className="min-h-[550px]">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredBatches.map((b) => {
           const fillPercentage = Math.round(((b.enrolled_count || 0) / (b.max_capacity || 25)) * 100);
@@ -1546,8 +1546,12 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
         })}
 
         {/* Empty State */}
+      </div>
+      </div>
+
+      <div className="min-h-[300px]">
         {filteredBatches.length === 0 && (
-          <div className="col-span-full bg-white rounded-3xl p-12 border border-[#F0D5E4] text-center shadow-xs">
+          <div className="col-span-full bg-[#F4EAEF] rounded-3xl p-12 border border-[#D4BAC7] text-center shadow-xs">
             <div className="w-14 h-14 bg-[#FFF2F8] text-[#8A064D] rounded-2xl flex items-center justify-center mx-auto mb-3 border border-[#F0D5E4]">
               <Layers className="w-7 h-7" />
             </div>

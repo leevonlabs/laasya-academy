@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
       try {
         const studentRows = await query<any>(`
           SELECT s.id, s.profile_id, s.roll_number, p.full_name, be.batch_id,
-                 b.name AS batch_name, c.title AS course_title, c.short_title
+                 b.name AS batch_name, c.title AS course_title
           FROM public.students s
           JOIN public.profiles p ON s.profile_id = p.id
           LEFT JOIN public.batch_enrollments be ON be.student_id = s.id AND be.status = 'active'
@@ -142,7 +142,6 @@ export async function GET(request: NextRequest) {
           if (r.batch_id) studentBatchIds.push(r.batch_id.toLowerCase());
           if (r.batch_name) studentBatchNames.push(r.batch_name.toLowerCase());
           if (r.course_title) studentCourseTitles.push(r.course_title.toLowerCase());
-          if (r.short_title) studentCourseTitles.push(r.short_title.toLowerCase());
         });
       } catch (dbErr) {
         console.warn('Error querying student enrollment context for alerts:', dbErr);

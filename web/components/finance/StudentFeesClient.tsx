@@ -638,6 +638,78 @@ For queries, contact: +91 8151 998 899`;
     setSharingInvoice(null);
   };
 
+  // Export Collections to CSV
+  const handleExportCollectionsCSV = () => {
+    const headers = [
+      'Roll Number',
+      'Student Name',
+      'Phone Number',
+      'Total Monthly Fee (INR)',
+      'Total Paid Amount (INR)',
+      'Balance Due (INR)',
+      'Status'
+    ];
+
+    const rows = filteredCollections.map(c => [
+      `"${c.rollNumber}"`,
+      `"${c.studentName.replace(/"/g, '""')}"`,
+      `"${c.phone}"`,
+      c.totalMonthlyFee,
+      c.totalPaidAmount,
+      c.balanceDue,
+      `"${c.status.toUpperCase()}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Laasya_Fee_Collections_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Export Payments to CSV
+  const handleExportPaymentsCSV = () => {
+    const headers = [
+      'Roll Number',
+      'Student Name',
+      'Phone Number',
+      'Invoice Number',
+      'Amount Paid (INR)',
+      'Due Amount (INR)',
+      'Status',
+      'Due / Billing Date',
+      'Fee Period'
+    ];
+
+    const rows = filteredInvoices.map(inv => [
+      `"${inv.roll_number || ''}"`,
+      `"${(inv.student_name || '').replace(/"/g, '""')}"`,
+      `"${inv.phone || ''}"`,
+      `"${inv.invoice_number || ''}"`,
+      Number(inv.paid_amount || 0),
+      Number(inv.balance_amount || 0),
+      `"${(inv.status || 'PAID').toUpperCase()}"`,
+      `"${inv.due_date || inv.created_at || ''}"`,
+      `"${inv.fee_period || 'Tuition Fee'}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Laasya_Fee_Payments_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
 
@@ -652,7 +724,7 @@ For queries, contact: +91 8151 998 899`;
       {/* ===================================================================== */}
       {/* 1. TOP HEADER WITH 2 PRIMARY TABS: COLLECTIONS & PAYMENTS */}
       {/* ===================================================================== */}
-      <div className="bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[#F4EAEF] p-6 rounded-3xl border border-[#D4BAC7] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-[#FCE7F3] text-[#8A064D]">
@@ -716,7 +788,7 @@ For queries, contact: +91 8151 998 899`;
         <div className="space-y-6">
 
           {/* Month & Year Selection Filter for Collections Audit (MonthPicker from Reference Image 2) */}
-          <div className="bg-white p-4 rounded-2xl border border-[#F0D5E4] shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="bg-[#F4EAEF] p-4 rounded-2xl border border-[#D4BAC7] shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center shrink-0">
                 <Calendar className="w-5 h-5 text-[#8A064D]" />
@@ -748,7 +820,7 @@ For queries, contact: +91 8151 998 899`;
           {/* Collections Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4]/80 shadow-xs">
+            <div className="bg-[#F4EAEF] p-5 rounded-3xl border border-[#D4BAC7]/80 shadow-xs">
               <div className="flex items-center justify-between text-[#6E3955] mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Total Active Learners</span>
                 <Users className="w-5 h-5 text-[#8A064D]" />
@@ -761,7 +833,7 @@ For queries, contact: +91 8151 998 899`;
               </span>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4]/80 shadow-xs">
+            <div className="bg-[#F4EAEF] p-5 rounded-3xl border border-[#D4BAC7]/80 shadow-xs">
               <div className="flex items-center justify-between text-[#6E3955] mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Expected Monthly Fee</span>
                 <IndianRupee className="w-5 h-5 text-[#8A064D]" />
@@ -802,7 +874,7 @@ For queries, contact: +91 8151 998 899`;
           </div>
 
           {/* Collections Search Bar & Top Filter Tabs */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4.5 rounded-3xl border border-[#F0D5E4]">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#F4EAEF] p-4.5 rounded-3xl border border-[#D4BAC7]">
             
             {/* Filter Tabs: All Students, Pending Due, Partial Payments, Paid & Settled */}
             <div className="flex flex-wrap items-center gap-2">
@@ -857,6 +929,18 @@ For queries, contact: +91 8151 998 899`;
               </button>
             </div>
 
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleExportCollectionsCSV}
+                className="bg-[#590231] hover:bg-[#780442] text-white px-3.5 py-2.5 rounded-2xl text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer border border-[#EBB128] shrink-0"
+                title="Export Fee Collections CSV"
+              >
+                <Download className="w-3.5 h-3.5 text-[#F9E33A]" />
+                <span>Export CSV</span>
+              </button>
+            </div>
+
             {/* Search Bar for Collections (Search by Student Name & Roll) */}
             <div className="relative min-w-[260px]">
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -871,8 +955,9 @@ For queries, contact: +91 8151 998 899`;
 
           </div>
 
-          {/* Collections Table (Roll Number, Student Name, Phone Number, Total Monthly Fee, Total Paid Amount, Balance Due, Status, Action) */}
-          <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
+          {/* Collections Table */}
+          <div className="min-h-[500px]">
+          <div className="bg-[#F4EAEF] rounded-3xl border border-[#D4BAC7] shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
@@ -989,6 +1074,7 @@ For queries, contact: +91 8151 998 899`;
               </table>
             </div>
           </div>
+          </div>
 
         </div>
       )}
@@ -1002,7 +1088,7 @@ For queries, contact: +91 8151 998 899`;
           {/* Payments Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4]/80 shadow-xs">
+            <div className="bg-[#F4EAEF] p-5 rounded-3xl border border-[#D4BAC7]/80 shadow-xs">
               <div className="flex items-center justify-between text-[#6E3955] mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Total Payments Received</span>
                 <Receipt className="w-5 h-5 text-[#8A064D]" />
@@ -1028,7 +1114,7 @@ For queries, contact: +91 8151 998 899`;
               </span>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl border border-[#F0D5E4]/80 shadow-xs">
+            <div className="bg-[#F4EAEF] p-5 rounded-3xl border border-[#D4BAC7]/80 shadow-xs">
               <div className="flex items-center justify-between text-[#6E3955] mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Paying Students</span>
                 <Users className="w-5 h-5 text-[#8A064D]" />
@@ -1057,7 +1143,7 @@ For queries, contact: +91 8151 998 899`;
           </div>
 
           {/* Payments Filters: Status Tabs, Student Dropdown, Date Range Filter & Search Bar */}
-          <div className="bg-white p-4.5 rounded-3xl border border-[#F0D5E4] space-y-3.5">
+          <div className="bg-[#F4EAEF] p-4.5 rounded-3xl border border-[#D4BAC7] space-y-3.5">
             
             {/* Row 1: Filter Tabs (Pending Due REMOVED per user instruction) & Search */}
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1097,6 +1183,18 @@ For queries, contact: +91 8151 998 899`;
                   <span className="w-2 h-2 rounded-full bg-amber-500" />
                   <span>Partial Payments</span>
                   <span className="text-xs opacity-80">({paymentsSummary.partialCount})</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportPaymentsCSV}
+                  className="bg-[#590231] hover:bg-[#780442] text-white px-3.5 py-2.5 rounded-2xl text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer border border-[#EBB128] shrink-0"
+                  title="Export Payments CSV"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#F9E33A]" />
+                  <span>Export CSV</span>
                 </button>
               </div>
 
@@ -1236,8 +1334,9 @@ For queries, contact: +91 8151 998 899`;
 
           </div>
 
-          {/* Payments Table (Roll Number, Student Name, Phone Number, Invoice Number, Amount Paid, Due, Status, Actions) */}
-          <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
+          {/* Payments Table */}
+          <div className="min-h-[500px]">
+          <div className="bg-[#F4EAEF] rounded-3xl border border-[#D4BAC7] shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
@@ -1387,6 +1486,7 @@ For queries, contact: +91 8151 998 899`;
                 </tbody>
               </table>
             </div>
+          </div>
           </div>
 
         </div>

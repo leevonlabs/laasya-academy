@@ -17,6 +17,8 @@ interface TrainerMultiSearchSelectProps {
   onChange: (selectedIds: string[]) => void;
   placeholder?: string;
   className?: string;
+  pillMode?: boolean;
+  buttonLabel?: string;
 }
 
 export default function TrainerMultiSearchSelect({
@@ -24,7 +26,9 @@ export default function TrainerMultiSearchSelect({
   selectedIds,
   onChange,
   placeholder = 'All Gurus (Multi-select)',
-  className = ''
+  className = '',
+  pillMode = false,
+  buttonLabel = 'Gurus'
 }: TrainerMultiSearchSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -49,7 +53,7 @@ export default function TrainerMultiSearchSelect({
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
       setTimeout(() => {
-        searchInputRef.current?.focus();
+        searchInputRef.current?.focus({ preventScroll: true });
       }, 50);
     }
   }, [isOpen]);
@@ -88,54 +92,75 @@ export default function TrainerMultiSearchSelect({
   return (
     <div className={`relative inline-block ${className}`} ref={containerRef} suppressHydrationWarning>
       {/* Trigger Button */}
-      <button
-        type="button"
-        suppressHydrationWarning
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full px-3.5 py-2 bg-[#FFF9FB] hover:bg-[#FFF2F8] border border-[#F0D5E4] rounded-xl text-xs font-semibold flex items-center justify-between text-left transition focus:outline-none focus:ring-2 focus:ring-[#8A064D] ${
-          isOpen ? 'ring-2 ring-[#8A064D]/20 border-[#8A064D] bg-white' : ''
-        } cursor-pointer`}
-      >
-        <div className="flex items-center gap-2 truncate pr-2">
-          <User className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
-          <div className="truncate">
-            {selectedIds.length === 0 ? (
-              <span className="text-gray-600 font-bold">{placeholder}</span>
-            ) : selectedIds.length === 1 ? (
-              <span className="text-[#590231] font-bold">
-                {trainers.find(t => t.id === selectedIds[0])?.full_name || '1 Guru Selected'}
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 font-bold text-[#590231]">
-                <span>{selectedIds.length} Gurus Selected</span>
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-[#8A064D] text-white font-black">
-                  {selectedIds.length}
-                </span>
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1 shrink-0">
+      {pillMode ? (
+        <button
+          type="button"
+          suppressHydrationWarning
+          onClick={() => setIsOpen(!isOpen)}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+            selectedIds.length > 0
+              ? 'bg-[#EBD4E0] border border-[#8A064D] text-[#590231]'
+              : 'bg-[#EFE2EA] hover:bg-[#E7D3DF] border border-[#D4BAC7] text-[#3D102A]'
+          } ${isOpen ? 'ring-2 ring-[#8A064D]/25' : ''}`}
+        >
+          <span>{buttonLabel}</span>
           {selectedIds.length > 0 && (
-            <span
-              onClick={(e) => {
-                e.stopPropagation();
-                handleClearAll();
-              }}
-              className="p-1 hover:bg-[#F0D5E4]/60 rounded-lg text-gray-400 hover:text-[#8A064D] cursor-pointer"
-              title="Clear all selected"
-            >
-              <X className="w-3.5 h-3.5" />
+            <span className="w-5 h-5 rounded-full bg-[#69033B] text-white text-[11px] font-black flex items-center justify-center shrink-0">
+              {selectedIds.length}
             </span>
           )}
-          <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-150 ${isOpen ? 'rotate-180 text-[#8A064D]' : ''}`} />
-        </div>
-      </button>
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isOpen ? 'rotate-180 text-[#8A064D]' : 'text-[#590231]'}`} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          suppressHydrationWarning
+          onClick={() => setIsOpen(!isOpen)}
+          className={`w-full px-3.5 py-2 bg-[#FFF9FB] hover:bg-[#FFF2F8] border border-[#F0D5E4] rounded-xl text-xs font-semibold flex items-center justify-between text-left transition focus:outline-none focus:ring-2 focus:ring-[#8A064D] ${
+            isOpen ? 'ring-2 ring-[#8A064D]/20 border-[#8A064D] bg-white' : ''
+          } cursor-pointer`}
+        >
+          <div className="flex items-center gap-2 truncate pr-2">
+            <User className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
+            <div className="truncate">
+              {selectedIds.length === 0 ? (
+                <span className="text-gray-600 font-bold">{placeholder}</span>
+              ) : selectedIds.length === 1 ? (
+                <span className="text-[#590231] font-bold">
+                  {trainers.find(t => t.id === selectedIds[0])?.full_name || '1 Guru Selected'}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 font-bold text-[#590231]">
+                  <span>{selectedIds.length} Gurus Selected</span>
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-[#8A064D] text-white font-black">
+                    {selectedIds.length}
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {selectedIds.length > 0 && (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClearAll();
+                }}
+                className="p-1 hover:bg-[#F0D5E4]/60 rounded-lg text-gray-400 hover:text-[#8A064D] cursor-pointer"
+                title="Clear all selected"
+              >
+                <X className="w-3.5 h-3.5" />
+              </span>
+            )}
+            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-150 ${isOpen ? 'rotate-180 text-[#8A064D]' : ''}`} />
+          </div>
+        </button>
+      )}
 
       {/* Popover Dropdown */}
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1.5 w-80 bg-white rounded-2xl shadow-xl border border-[#F0D5E4] p-3 z-50 animate-in fade-in zoom-in-95 duration-100">
+        <div className={`absolute ${pillMode ? 'right-0' : 'left-0'} top-full mt-1.5 w-80 bg-[#F4EAEF] rounded-2xl shadow-xl border border-[#D4BAC7] p-3 z-50 animate-in fade-in zoom-in-95 duration-100`}>
           {/* Search Box */}
           <div className="relative mb-2">
             <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
@@ -145,7 +170,7 @@ export default function TrainerMultiSearchSelect({
               placeholder="Search faculty guru..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-1 focus:ring-[#8A064D] focus:bg-white"
+              className="w-full pl-8 pr-3 py-1.5 bg-[#EFE2EA] border border-[#D4BAC7] rounded-xl text-xs font-semibold text-[#3D102A] focus:ring-1 focus:ring-[#8A064D] focus:bg-white"
             />
             {search && (
               <button

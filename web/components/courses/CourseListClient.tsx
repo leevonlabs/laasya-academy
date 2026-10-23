@@ -954,13 +954,13 @@ export default function CourseListClient({ initialCourses, initialCategories, ca
                     {c.title}
                   </h3>
 
-                  {/* Guru Name (Sans Font, Avatar, No 'Assigned Guru' text) */}
+                  {/* Total Batches Count Badge */}
                   <div className="mt-2.5 flex items-center gap-2">
                     <div className="w-6 h-6 rounded-full bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D] shrink-0">
-                      <User className="w-3.5 h-3.5" />
+                      <Layers className="w-3.5 h-3.5" />
                     </div>
-                    <span className="font-sans text-xs md:text-sm font-bold text-[#8A064D] truncate">
-                      {COURSE_GURUS_MAP[c.title] || 'Senior Faculty Guru'}
+                    <span className="font-sans text-xs md:text-sm font-bold text-[#8A064D]">
+                      {c.batch_count ?? 0} Active {(c.batch_count ?? 0) === 1 ? 'Batch' : 'Batches'}
                     </span>
                   </div>
 
@@ -1103,12 +1103,8 @@ export default function CourseListClient({ initialCourses, initialCategories, ca
                 </div>
               </div>
 
-              {/* Guru & Batches Info */}
+              {/* Batches Info */}
               <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-100 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-gray-500">Assigned Faculty Guru</span>
-                  <span className="font-black text-[#1A010F]">{COURSE_GURUS_MAP[viewingCourse.title] || 'Senior Faculty'}</span>
-                </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-gray-500">Active Batches</span>
                   <span className="font-black text-[#8A064D] bg-[#FFF2F8] px-2 py-0.5 rounded-md">

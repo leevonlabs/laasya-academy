@@ -34,6 +34,28 @@ import {
 } from 'lucide-react';
 import AiEnhanceButton from '@/components/common/AiEnhanceButton';
 
+function getGuruImage(trainer: { full_name?: string; avatar_url?: string }): string {
+  if (trainer.avatar_url && trainer.avatar_url.trim()) {
+    return trainer.avatar_url.trim();
+  }
+  const name = (trainer.full_name || '').toLowerCase();
+  if (name.includes('manikandan')) return '/images/gurus/manikandan.jpg';
+  if (name.includes('dipan') || name.includes('sarkar')) return '/images/gurus/dipayan_sarkar.jpg';
+  if (name.includes('satish') || name.includes('sathish')) return '/images/gurus/sathish_kale.jpg';
+  if (name.includes('sai') || name.includes('krishna')) return '/images/gurus/sai_krishna.jpg';
+  if (name.includes('nandana')) return '/images/unr05837.jpg';
+  if (name.includes('amrutha')) return '/images/unr05834.jpg';
+  if (name.includes('vismaya')) return '/images/unr05149.jpg';
+  if (name.includes('kavya')) return '/images/unr05952.jpg';
+  if (name.includes('amos') || name.includes('sahil')) return '/images/unr05482.jpg';
+  if (name.includes('vrushhabh')) return '/images/courses/kalari.jpg';
+  if (name.includes('balraj')) return '/images/courses/karate.jpg';
+  if (name.includes('karthik') || name.includes('uday') || name.includes('manjunath')) {
+    return '/images/courses/western_dance.jpg';
+  }
+  return '/images/courses/laasya_bharatanatyam.jpg';
+}
+
 interface Props {
   initialTrainers: Trainer[];
   courses?: Course[];
@@ -80,6 +102,7 @@ export default function TrainersListClient({
   const [addAge, setAddAge] = useState<string>('');
   const [addGender, setAddGender] = useState<'male' | 'female' | 'trans'>('female');
   const [addDisplayTitle, setAddDisplayTitle] = useState('');
+  const [addExperience, setAddExperience] = useState('5+ Years');
   const [addAvatarUrl, setAddAvatarUrl] = useState<string | null>(null);
   const [addSelectedCourses, setAddSelectedCourses] = useState<string[]>([]);
   const [addBio, setAddBio] = useState('');
@@ -98,6 +121,7 @@ export default function TrainersListClient({
   const [editAge, setEditAge] = useState<string>('');
   const [editGender, setEditGender] = useState<'male' | 'female' | 'trans'>('female');
   const [editDisplayTitle, setEditDisplayTitle] = useState('');
+  const [editExperience, setEditExperience] = useState('5+ Years');
   const [editAvatarUrl, setEditAvatarUrl] = useState<string | null>(null);
   const [editSelectedCourses, setEditSelectedCourses] = useState<string[]>([]);
   const [editBio, setEditBio] = useState('');
@@ -259,6 +283,7 @@ export default function TrainersListClient({
     setAddAge('');
     setAddGender('female');
     setAddDisplayTitle('');
+    setAddExperience('5+ Years');
     setAddAvatarUrl(null);
     setAddSelectedCourses([]);
     setAddBio('');
@@ -281,6 +306,7 @@ export default function TrainersListClient({
     setEditAge(guru.age ? String(guru.age) : '');
     setEditGender((guru.gender as any) || 'female');
     setEditDisplayTitle(guru.display_title || '');
+    setEditExperience(guru.experience || '5+ Years');
     setEditAvatarUrl(guru.avatar_url || null);
     setEditSelectedCourses(guru.specializations || []);
     setEditBio(guru.bio || '');
@@ -325,6 +351,7 @@ export default function TrainersListClient({
           age: Number(addAge),
           gender: addGender,
           display_title: addDisplayTitle.trim() || undefined,
+          experience: addExperience.trim() || '5+ Years',
           specializations: addSelectedCourses,
           bio: addBio.trim() || undefined,
           email: addEmail.trim() || undefined,
@@ -346,6 +373,7 @@ export default function TrainersListClient({
           age: Number(addAge),
           gender: addGender,
           display_title: addDisplayTitle.trim() || 'Revered Guru & Mentor',
+          experience: addExperience.trim() || '5+ Years',
           specializations: addSelectedCourses,
           bio: addBio.trim(),
           avatar_url: addAvatarUrl || undefined,
@@ -405,6 +433,7 @@ export default function TrainersListClient({
           age: Number(editAge),
           gender: editGender,
           display_title: editDisplayTitle.trim(),
+          experience: editExperience.trim() || undefined,
           specializations: editSelectedCourses,
           bio: editBio.trim() || undefined,
           phone: editPhone.trim(),
@@ -426,6 +455,7 @@ export default function TrainersListClient({
               age: Number(editAge),
               gender: editGender,
               display_title: editDisplayTitle.trim(),
+          experience: editExperience.trim() || undefined,
               specializations: editSelectedCourses,
               bio: editBio.trim(),
               phone: editPhone.trim(),
@@ -447,6 +477,7 @@ export default function TrainersListClient({
             age: Number(editAge),
             gender: editGender,
             display_title: editDisplayTitle.trim(),
+          experience: editExperience.trim() || undefined,
             specializations: editSelectedCourses,
             bio: editBio.trim(),
             phone: editPhone.trim(),
@@ -618,19 +649,34 @@ export default function TrainersListClient({
                 </div>
               </div>
 
-              {/* Display Title */}
-              <div>
-                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                  Display Title / Designation <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Enter designation (e.g. Senior Faculty / Guru)"
-                  value={addDisplayTitle}
-                  onChange={(e) => setAddDisplayTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
-                />
+              {/* Display Title & Experience */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Display Title / Designation <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter designation (e.g. Senior Faculty / Guru)"
+                    value={addDisplayTitle}
+                    onChange={(e) => setAddDisplayTitle(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Teaching Experience <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 8+ Years / 15+ Years"
+                    value={addExperience}
+                    onChange={(e) => setAddExperience(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
               </div>
 
               {/* Age & Gender */}
@@ -1018,18 +1064,33 @@ export default function TrainersListClient({
                 </div>
               </div>
 
-              {/* Display Title */}
-              <div>
-                <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
-                  Display Title / Designation <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editDisplayTitle}
-                  onChange={(e) => setEditDisplayTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
-                />
+              {/* Display Title & Experience */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Display Title / Designation <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editDisplayTitle}
+                    onChange={(e) => setEditDisplayTitle(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Teaching Experience <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 8+ Years / 15+ Years"
+                    value={editExperience}
+                    onChange={(e) => setEditExperience(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#1A010F] placeholder:font-normal placeholder:text-gray-400 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  />
+                </div>
               </div>
 
               {/* Age & Gender */}
@@ -1468,30 +1529,22 @@ export default function TrainersListClient({
               <div>
                 {/* 1. FIXED OUTLOOK FRAME (4:5 RATIO) MATCHING ADJUSTMENT MODAL EXACTLY */}
                 <div className="relative w-full aspect-[4/5] bg-gradient-to-br from-[#3D0322] via-[#590231] to-[#1A010F] overflow-hidden">
-                  {t.avatar_url ? (
-                    <img
-                      src={t.avatar_url}
-                      alt={t.full_name}
-                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-br from-[#590231] via-[#3A0320] to-[#1F0111]">
-                      <div className="w-24 h-24 rounded-3xl bg-[#F9E33A]/20 border-2 border-[#F9E33A] flex items-center justify-center shadow-inner">
-                        <span className="font-serif text-3xl font-black text-[#F9E33A] tracking-wider">
-                          {t.full_name.slice(0, 2).toUpperCase()}
-                        </span>
-                      </div>
-                      <span className="text-white/70 text-xs font-bold mt-3 tracking-widest uppercase">
-                        Classical Faculty Master
-                      </span>
-                    </div>
-                  )}
+                  <img
+                    src={getGuruImage(t)}
+                    alt={t.full_name}
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                  />
 
                   {/* FLOATING STATUS PILLS AT TOP CORNERS */}
                   <div className="absolute top-3.5 left-3.5 z-20 flex items-center gap-1.5">
                     {(t.guru_id || t.code) && (
                       <span className="font-mono text-xs font-black text-white bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-xl shadow-md border border-white/20">
                         {t.guru_id || t.code}
+                      </span>
+                    )}
+                    {t.experience && (
+                      <span className="text-xs font-black text-[#F9E33A] bg-[#590231]/80 backdrop-blur-md px-2.5 py-1 rounded-xl shadow-md border border-[#F9E33A]/30">
+                        {t.experience}
                       </span>
                     )}
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-extrabold backdrop-blur-md shadow-md border ${
@@ -1688,38 +1741,36 @@ export default function TrainersListClient({
 
               {/* BIG PORTRAIT IMAGE WITH CLICK TO ENLARGE LIGHTBOX */}
               <div className="shrink-0 mx-auto sm:mx-0">
-                {viewingGuru.avatar_url ? (
-                  <div
-                    onClick={() => setLightboxImage({ src: viewingGuru.avatar_url!, title: viewingGuru.full_name })}
-                    className="relative w-44 h-56 sm:w-52 sm:h-64 rounded-2xl overflow-hidden border-2 border-[#F0D5E4] bg-neutral-900 shadow-md group cursor-pointer"
-                    title="Click to view full image"
-                  >
-                    <img
-                      src={viewingGuru.avatar_url}
-                      alt={viewingGuru.full_name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    {/* Hover Overlay with Zoom Icon */}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 p-3 text-center">
-                      <div className="p-2 rounded-full bg-white/20 backdrop-blur-xs">
-                        <ZoomIn className="w-6 h-6 text-[#F9E33A]" />
+                {(() => {
+                  const guruImage = getGuruImage(viewingGuru);
+                  return (
+                    <div
+                      onClick={() => setLightboxImage({ src: guruImage, title: viewingGuru.full_name })}
+                      className="relative w-44 h-56 sm:w-52 sm:h-64 rounded-2xl overflow-hidden border-2 border-[#F0D5E4] bg-neutral-900 shadow-md group cursor-pointer"
+                      title="Click to view full image"
+                    >
+                      <img
+                        src={guruImage}
+                        alt={viewingGuru.full_name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      {/* Hover Overlay with Zoom Icon */}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 p-3 text-center">
+                        <div className="p-2 rounded-full bg-white/20 backdrop-blur-xs">
+                          <ZoomIn className="w-6 h-6 text-[#F9E33A]" />
+                        </div>
+                        <span className="text-[11px] font-bold text-white bg-black/60 px-2.5 py-1 rounded-full border border-white/20">
+                          Click to view full image
+                        </span>
                       </div>
-                      <span className="text-[11px] font-bold text-white bg-black/60 px-2.5 py-1 rounded-full border border-white/20">
-                        Click to view full image
-                      </span>
-                    </div>
 
-                    {/* Subtle Corner Badge Indicator */}
-                    <div className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-black/70 text-white group-hover:opacity-0 transition-opacity">
-                      <Maximize2 className="w-3.5 h-3.5 text-[#F9E33A]" />
+                      {/* Subtle Corner Badge Indicator */}
+                      <div className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-black/70 text-white group-hover:opacity-0 transition-opacity">
+                        <Maximize2 className="w-3.5 h-3.5 text-[#F9E33A]" />
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="w-44 h-56 sm:w-52 sm:h-64 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#590231] text-[#F9E33A] font-bold text-3xl flex flex-col items-center justify-center shadow-md border-2 border-[#F9E33A]/40 gap-2">
-                    <span>{viewingGuru.full_name.slice(0, 2).toUpperCase()}</span>
-                    <span className="text-[10px] text-white/70 uppercase tracking-widest font-sans font-normal">No Photo</span>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
 
               {/* GURU PRIMARY DETAILS & STATUS OVERVIEW */}

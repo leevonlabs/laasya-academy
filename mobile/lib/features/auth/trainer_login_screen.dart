@@ -43,7 +43,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
       }
 
       final profile = await SupabaseService().signInWithPassword(
-        email: input,
+        identifier: input,
         password: password,
         role: 'trainer',
       );
@@ -118,17 +118,17 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF38021F),
+      backgroundColor: const Color(0xFFE3D5DC),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF220314)),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Guru Login',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Color(0xFF220314), fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
@@ -148,7 +148,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                         border: Border.all(color: LaasyaColors.accentGold, width: 2.5),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
+                            color: Colors.black.withOpacity(0.12),
                             blurRadius: 16,
                             offset: const Offset(0, 4),
                           ),
@@ -165,7 +165,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                     const Text(
                       'REVERED GURU & FACULTY ACCESS',
                       style: TextStyle(
-                        color: LaasyaColors.accentGold,
+                        color: Color(0xFF8A064D),
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1.5,
@@ -175,23 +175,25 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                     const Text(
                       'Laasya Cultural Academy Guru Portal',
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: Color(0xFF6E3955),
                         fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
 
-              // White Card Form
+              // Form Card matching Admin Theme
               Container(
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4EAEF),
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(32),
                     topRight: Radius.circular(32),
                   ),
+                  border: Border.all(color: const Color(0xFFD4BAC7)),
                 ),
                 padding: const EdgeInsets.all(26),
                 child: Column(

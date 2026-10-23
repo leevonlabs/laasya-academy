@@ -38,12 +38,16 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
       final input = _identifierController.text.trim();
       final password = _passwordController.text.trim();
 
-      if (input.isEmpty || password.isEmpty) {
-        throw Exception('Please enter your mobile number / roll number and password.');
+      if (input.isEmpty) {
+        throw Exception('Please enter your mobile number or roll number.');
+      }
+
+      if (password.isEmpty) {
+        throw Exception('Please enter your password.');
       }
 
       final profile = await SupabaseService().signInWithPassword(
-        email: input,
+        identifier: input,
         password: password,
         role: 'student',
       );
@@ -118,17 +122,17 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: LaasyaColors.primaryDark,
+      backgroundColor: const Color(0xFFE3D5DC),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF220314)),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Student Login',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Color(0xFF220314), fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
@@ -148,7 +152,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                         border: Border.all(color: LaasyaColors.accentGold, width: 2.5),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
+                            color: Colors.black.withOpacity(0.12),
                             blurRadius: 16,
                             offset: const Offset(0, 4),
                           ),
@@ -165,7 +169,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                     const Text(
                       'STUDENT & LEARNER ACCESS',
                       style: TextStyle(
-                        color: LaasyaColors.accentGold,
+                        color: Color(0xFF8A064D),
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1.5,
@@ -175,23 +179,25 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                     const Text(
                       'Laasya Cultural Academy Student Portal',
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: Color(0xFF6E3955),
                         fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
 
-              // White Card Form
+              // Form Card matching Admin Theme
               Container(
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4EAEF),
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(32),
                     topRight: Radius.circular(32),
                   ),
+                  border: Border.all(color: const Color(0xFFD4BAC7)),
                 ),
                 padding: const EdgeInsets.all(26),
                 child: Column(

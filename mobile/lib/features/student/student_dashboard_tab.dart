@@ -8,6 +8,7 @@ import '../../core/services/supabase_service.dart';
 import '../../core/widgets/laasya_avatar.dart';
 import 'student_messages_screen.dart';
 import 'student_video_library_screen.dart';
+import 'student_ai_assistant_screen.dart';
 
 class StudentDashboardTab extends StatefulWidget {
   final VoidCallback onNavigateToCourses;
@@ -827,6 +828,74 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                   onTap: widget.onNavigateToAttendance,
                 ),
               ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // AI Learning Assistant Banner Card
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const StudentAiAssistantScreen()),
+                );
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF3D0C34), Color(0xFF8A064D)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF8A064D).withOpacity(0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.18),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFFBF0B9), width: 1.2),
+                      ),
+                      child: const Icon(Icons.auto_awesome, color: Color(0xFFFBF0B9), size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Laasya AI Learning Assistant',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Ask 24/7 about practice drills, mudras, ragas & schedules',
+                            style: TextStyle(
+                              color: Color(0xFFFBF0B9),
+                              fontSize: 10.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
+                  ],
+                ),
+              ),
             ),
 
             const SizedBox(height: 18),
