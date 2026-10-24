@@ -1,4 +1,34 @@
 import { query, queryOne } from './db';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+
+export function saveBase64Image(dataUrl?: string | null): string | null {
+  if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
+    return dataUrl || null;
+  }
+  try {
+    const match = dataUrl.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,([\s\S]+)$/);
+    if (!match) return dataUrl;
+    const mime = match[1];
+    const base64Data = match[2];
+    const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+    const hash = crypto.createHash('md5').update(base64Data).digest('hex');
+    const filename = `notice_${hash.substring(0, 12)}.${ext}`;
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'announcements');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const filePath = path.join(uploadsDir, filename);
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+    }
+    return `/uploads/announcements/${filename}`;
+  } catch (err) {
+    console.error('Failed to save base64 image to file:', err);
+    return dataUrl;
+  }
+}
 
 export interface Announcement {
   id: string;
@@ -107,19 +137,15 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
         a.target_students,
         a.target_student_names,
         COALESCE(a.views_count, 0) as views_count,
-        COALESCE(pt.avatar_url, tt.avatar_url, pt2.avatar_url) as trainer_avatar_url,
-        COALESCE(NULLIF((SELECT config_value->>'avatar_url' FROM public.app_config WHERE config_key = 'admin_support_profile'), ''), NULLIF(pa.avatar_url, '')) as admin_avatar_url,
+        COALESCE(pt.avatar_url, tt.avatar_url) as trainer_avatar_url,
+        COALESCE(NULLIF((SELECT config_value->>'avatar_url' FROM public.app_config WHERE config_key = 'admin_support_profile'), ''), (SELECT avatar_url FROM public.profiles WHERE role IN ('admin', 'owner') AND avatar_url IS NOT NULL AND avatar_url != '' LIMIT 1)) as admin_avatar_url,
         a.created_at::text as created_at, 
         a.updated_at::text as updated_at
       FROM public.announcements a
       LEFT JOIN public.courses c ON c.id = a.target_course_id
       LEFT JOIN public.batches b ON b.id = a.target_batch_id
-      LEFT JOIN public.profiles pt ON (pt.id::text = a.trainer_id OR (a.trainer_name IS NOT NULL AND LOWER(pt.full_name) = LOWER(a.trainer_name)))
-      LEFT JOIN public.trainers tt ON (tt.id::text = a.trainer_id OR tt.profile_id = pt.id)
-      LEFT JOIN public.profiles pt2 ON pt2.id = tt.profile_id
-      LEFT JOIN (
-        SELECT avatar_url FROM public.profiles WHERE role IN ('admin', 'owner') AND avatar_url IS NOT NULL AND avatar_url != '' LIMIT 1
-      ) pa ON true
+      LEFT JOIN public.profiles pt ON pt.id::text = a.trainer_id
+      LEFT JOIN public.trainers tt ON tt.id::text = a.trainer_id
       WHERE a.is_deleted = false
     `;
     const params: any[] = [];
@@ -249,7 +275,8 @@ export async function createAnnouncement(data: {
       ? 'Queued for Scheduled Dispatch' 
       : 'System verified (Delivered)';
 
-  const annType = data.announcement_type || (data.image_url ? 'banner' : 'message');
+  const effectiveImageUrl = saveBase64Image(data.image_url);
+  const annType = data.announcement_type || (effectiveImageUrl ? 'banner' : 'message');
 
   // Enforce 30-day lifespan for message broadcasts
   let expiryDate = data.expiry_date || null;
@@ -326,7 +353,7 @@ export async function createAnnouncement(data: {
     expiryDate,
     status,
     deliveryStatus,
-    data.image_url || null,
+    effectiveImageUrl || null,
     annType,
     data.created_by || data.trainer_name || 'Academy Director',
     data.sender_role || 'admin',

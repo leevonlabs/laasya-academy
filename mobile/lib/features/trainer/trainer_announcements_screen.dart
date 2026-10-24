@@ -986,7 +986,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
       if (mounted) setState(() {});
     });
     _loadData();
-    _realtimePollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+    _realtimePollTimer = Timer.periodic(const Duration(seconds: 25), (_) {
       if (mounted) {
         _loadAnnouncements(isBackgroundSync: true);
       }

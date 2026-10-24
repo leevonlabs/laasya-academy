@@ -1,5 +1,6 @@
 import { query, queryOne } from './db';
 import { sendFcmToBatch, sendFcmToCourse, sendFcmToRole, sendFcmToUser } from './fcm';
+import { saveBase64Image } from './announcements';
 
 export interface HolidayAlert {
   id: string;
@@ -216,6 +217,9 @@ export async function createHolidayAlert(data: {
   prevDate.setDate(prevDate.getDate() - 1);
   const dayBeforeHolidayStr = prevDate.toISOString().split('T')[0];
 
+  // Optimize image once before batch insertions to prevent multi-megabyte duplicates
+  const savedHolidayImageUrl = saveBase64Image(data.image_url);
+
   // 1 & 2. Dispatch announcements per affected batch so ONLY enrolled students & assigned gurus receive messages
   for (let i = 0; i < data.target_batch_ids.length; i++) {
     const bId = data.target_batch_ids[i];
@@ -260,7 +264,7 @@ ${data.reason.trim()}`;
           bName,
           todayStr,
           currentTimeStr,
-          data.image_url || null,
+          savedHolidayImageUrl || null,
           data.created_by || 'Admin'
         ]);
       } catch (annErr) {
@@ -311,7 +315,7 @@ ${data.reason.trim()}`;
           dayBeforeHolidayStr,
           isPast6pmToday ? 'Published' : 'Scheduled',
           isPast6pmToday ? 'System verified (Delivered)' : 'Queued for 6:00 PM Dispatch',
-          data.image_url || null,
+          savedHolidayImageUrl || null,
           data.created_by || 'Admin'
         ]);
       } catch (remErr) {

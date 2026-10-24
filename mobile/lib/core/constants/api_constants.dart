@@ -17,6 +17,13 @@ class ApiConstants {
   /// Primary Base URL used across all mobile HTTP calls and image loaders.
   static String get baseUrl {
     if (kIsWeb) {
+      final host = Uri.base.host;
+      if (host.isNotEmpty && host != 'localhost' && host != '127.0.0.1') {
+        if (host.contains('vercel.app')) {
+          return 'https://$host';
+        }
+        return 'http://$host:3000';
+      }
       return localBaseUrl;
     }
     try {

@@ -61,7 +61,7 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
       if (mounted) setState(() {});
     });
     _loadMessages();
-    _realtimeSyncTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+    _realtimeSyncTimer = Timer.periodic(const Duration(seconds: 25), (_) {
       if (mounted) {
         _loadMessages(isBackgroundSync: true);
       }

@@ -105,7 +105,7 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
         uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 12));
+      ).timeout(const Duration(seconds: 8));
 
       String reply = '';
       if (res.statusCode == 200) {
@@ -384,10 +384,50 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const CircleAvatar(
-                    radius: 20,
-                    backgroundColor: LaasyaColors.primary,
-                    child: Icon(Icons.send_rounded, color: Color(0xFFFBF0B9), size: 20),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(24),
+                      onTap: _isLoading
+                          ? null
+                          : () {
+                              final text = _controller.text;
+                              if (text.trim().isNotEmpty) {
+                                _sendMessage(text);
+                              }
+                            },
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: _isLoading ? Colors.grey.shade400 : LaasyaColors.primary,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: LaasyaColors.primary.withOpacity(0.25),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.send_rounded,
+                                  color: Color(0xFFFBF0B9),
+                                  size: 20,
+                                ),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
