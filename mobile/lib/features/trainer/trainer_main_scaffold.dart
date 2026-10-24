@@ -295,33 +295,48 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
 
   void _handleNotificationOpened(Map<String, dynamic> data) {
     if (!mounted) return;
-    final route = data['route']?.toString().toLowerCase();
+    final rawRoute = data['route']?.toString().toLowerCase() ?? '';
+    final cleanRoute = rawRoute.replaceAll('/', '').trim();
     final type = (data['alert_type'] ?? data['type'] ?? '').toString().toLowerCase();
     final title = (data['title'] ?? data['course_title'] ?? '').toString().toLowerCase();
-    if (route == 'announcements' || route == '/announcements' || type == 'announcement' || title.contains('announcement') || type == 'broadcast') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: false)),
-      );
-    } else if (route == 'messages' ||
-        route == '/messages' ||
+
+    // When an Admin sends an announcement, circular, holiday alert, tally class, video, or message,
+    // Gurus view it in their INBOX: TrainerAnnouncementsScreen(isMessagesMode: true)
+    if (cleanRoute == 'announcements' ||
+        cleanRoute == 'messages' ||
+        type == 'announcement' ||
+        type == 'message' ||
         type == 'holiday_alert' ||
         type == 'tally_class' ||
         type == 'session_cancellation' ||
         type == 'video_shared' ||
-        type == 'message') {
+        type == 'admin_alert' ||
+        type == 'broadcast' ||
+        title.contains('announcement') ||
+        title.contains('notice') ||
+        title.contains('holiday') ||
+        title.contains('class cancelled') ||
+        title.contains('rescheduled')) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: true)),
       );
-    } else if (route == 'attendance' || route == '/attendance') {
+    } else if (cleanRoute == 'attendance') {
       setState(() => _currentIndex = 3);
     }
   }
 
   Future<void> _checkInitialNotificationRoute() async {
     try {
-      final data = await AlarmService.getPendingNotificationRoute();
+      if (FcmService.pendingNotificationData != null) {
+        final data = FcmService.pendingNotificationData!;
+        FcmService.pendingNotificationData = null;
+        if (mounted) {
+          _handleNotificationOpened(data);
+          return;
+        }
+      }
+      final data = await NotificationService.getPendingNotificationPayload();
       if (data != null && mounted) {
         _handleNotificationOpened(data);
       }

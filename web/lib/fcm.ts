@@ -106,13 +106,14 @@ export async function sendFcmMessage(token: string, payload: FcmNotificationPayl
         click_action: 'FLUTTER_NOTIFICATION_CLICK'
       },
       android: {
-        priority: 'high' as const,
+        priority: 'HIGH' as const,
         notification: {
           channel_id: 'laasya_announcements',
           sound: payload.sound || 'default',
           default_sound: true,
           default_vibrate_timings: true,
-          notification_priority: 'PRIORITY_HIGH' as const
+          notification_priority: 'PRIORITY_HIGH' as const,
+          click_action: 'FLUTTER_NOTIFICATION_CLICK'
         }
       },
       apns: {
@@ -177,6 +178,33 @@ export async function registerDeviceToken(params: {
   const { userId, role, token, platform = 'android', batchIds = [] } = params;
   if (!token || !userId) return;
 
+  let resolvedBatchIds = [...batchIds];
+
+  // If no batchIds provided by client, auto-resolve user's enrolled or assigned batches
+  if (resolvedBatchIds.length === 0) {
+    try {
+      if (role === 'trainer') {
+        const tb = await query<{ id: string }>(`
+          SELECT id FROM public.batches 
+          WHERE trainer_id::text = $1 
+             OR trainer_id IN (SELECT id FROM public.trainers WHERE profile_id::text = $1);
+        `, [userId]);
+        resolvedBatchIds = tb.map(b => b.id);
+      } else {
+        const be = await query<{ batch_id: string }>(`
+          SELECT be.batch_id FROM public.batch_enrollments be
+          LEFT JOIN public.students s ON s.id = be.student_id
+          WHERE be.student_id::text = $1 
+             OR s.profile_id::text = $1 
+             OR s.id::text = $1;
+        `, [userId]);
+        resolvedBatchIds = be.map(b => b.batch_id);
+      }
+    } catch (resolveErr) {
+      console.warn('[FCM] Error auto-resolving batches for token:', resolveErr);
+    }
+  }
+
   await query(`
     INSERT INTO public.device_tokens (user_id, role, fcm_token, platform, batch_ids, updated_at)
     VALUES ($1, $2, $3, $4, $5, NOW())
@@ -185,9 +213,12 @@ export async function registerDeviceToken(params: {
       user_id = EXCLUDED.user_id,
       role = EXCLUDED.role,
       platform = EXCLUDED.platform,
-      batch_ids = EXCLUDED.batch_ids,
+      batch_ids = CASE 
+        WHEN jsonb_array_length(EXCLUDED.batch_ids) > 0 THEN EXCLUDED.batch_ids 
+        ELSE public.device_tokens.batch_ids 
+      END,
       updated_at = NOW();
-  `, [userId, role, token, platform, JSON.stringify(batchIds)]);
+  `, [userId, role, token, platform, JSON.stringify(resolvedBatchIds)]);
 }
 
 /**
@@ -229,6 +260,9 @@ export async function sendFcmToBatch(batchId: string, payload: FcmNotificationPa
 export async function sendFcmToCourse(courseId: string, payload: FcmNotificationPayload): Promise<number> {
   if (!courseId) return 0;
 
+  const courseIds = courseId.split(',').map(c => c.trim()).filter(Boolean);
+  if (courseIds.length === 0) return 0;
+
   const rows = await query<{ fcm_token: string }>(`
     SELECT DISTINCT dt.fcm_token 
     FROM public.device_tokens dt
@@ -237,10 +271,10 @@ export async function sendFcmToCourse(courseId: string, payload: FcmNotification
     LEFT JOIN public.batches b ON b.id = be.batch_id
     LEFT JOIN public.trainers t ON (t.profile_id = dt.user_id OR t.id = dt.user_id)
     LEFT JOIN public.batches tb ON (tb.trainer_id = t.id OR tb.trainer_id = dt.user_id)
-    WHERE b.course_id::text = $1
-       OR tb.course_id::text = $1
+    WHERE b.course_id::text = ANY($1::text[])
+       OR tb.course_id::text = ANY($1::text[])
        OR dt.role = 'admin';
-  `, [courseId]);
+  `, [courseIds]);
 
   let sent = 0;
   for (const r of rows) {
@@ -275,7 +309,7 @@ export async function sendFcmToRole(role: 'student' | 'trainer' | 'all', payload
 }
 
 /**
- * Send notification to a specific user (handles student_id or profile_id)
+ * Send notification to a specific user (handles student_id, trainer_id, or profile_id)
  */
 export async function sendFcmToUser(userId: string, payload: FcmNotificationPayload): Promise<number> {
   if (!userId) return 0;
@@ -283,9 +317,12 @@ export async function sendFcmToUser(userId: string, payload: FcmNotificationPayl
     SELECT DISTINCT dt.fcm_token 
     FROM public.device_tokens dt
     LEFT JOIN public.students s ON (s.profile_id = dt.user_id OR s.id = dt.user_id)
+    LEFT JOIN public.trainers t ON (t.profile_id = dt.user_id OR t.id = dt.user_id)
     WHERE dt.user_id::text = $1
        OR s.id::text = $1
-       OR s.profile_id::text = $1;
+       OR s.profile_id::text = $1
+       OR t.id::text = $1
+       OR t.profile_id::text = $1;
   `, [userId]);
 
   let sent = 0;

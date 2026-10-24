@@ -58,33 +58,49 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
 
   void _handleNotificationOpened(Map<String, dynamic> data) {
     if (!mounted) return;
-    final route = data['route']?.toString().toLowerCase();
-    final type = data['type']?.toString().toLowerCase();
-    if (route == 'messages' ||
-        route == '/messages' ||
-        route == 'announcements' ||
+    final rawRoute = data['route']?.toString().toLowerCase() ?? '';
+    final cleanRoute = rawRoute.replaceAll('/', '').trim();
+    final type = (data['alert_type'] ?? data['type'] ?? '').toString().toLowerCase();
+    final title = (data['title'] ?? data['course_title'] ?? '').toString().toLowerCase();
+
+    if (cleanRoute == 'messages' ||
+        cleanRoute == 'announcements' ||
         type == 'holiday_alert' ||
         type == 'tally_class' ||
         type == 'announcement' ||
         type == 'session_cancellation' ||
-        type == 'message') {
+        type == 'message' ||
+        type == 'admin_alert' ||
+        title.contains('notice') ||
+        title.contains('announcement') ||
+        title.contains('holiday') ||
+        title.contains('class cancelled') ||
+        title.contains('rescheduled')) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const StudentMessagesScreen()),
       );
-    } else if (route == 'video' || route == '/video' || type == 'video_shared' || type == 'video_library') {
+    } else if (cleanRoute == 'video' || type == 'video_shared' || type == 'video_library') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const StudentVideoLibraryScreen()),
       );
-    } else if (route == 'attendance' || route == '/attendance' || route == 'alarm') {
+    } else if (cleanRoute == 'attendance' || cleanRoute == 'alarm') {
       setState(() => _currentIndex = 3);
     }
   }
 
   Future<void> _checkInitialNotificationRoute() async {
     try {
-      final data = await AlarmService.getPendingNotificationRoute();
+      if (FcmService.pendingNotificationData != null) {
+        final data = FcmService.pendingNotificationData!;
+        FcmService.pendingNotificationData = null;
+        if (mounted) {
+          _handleNotificationOpened(data);
+          return;
+        }
+      }
+      final data = await NotificationService.getPendingNotificationPayload();
       if (data != null && mounted) {
         _handleNotificationOpened(data);
       }

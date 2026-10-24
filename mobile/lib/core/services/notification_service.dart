@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class NotificationService {
   static const MethodChannel _channel = MethodChannel('com.laasyaacademy.app/notifications');
   static Function(Map<String, dynamic> payload)? _onNotificationOpenedCallback;
+  static Map<String, dynamic>? _pendingPayload;
   static bool _isInitialized = false;
 
   static void initialize() {
@@ -17,8 +18,13 @@ class NotificationService {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onNotificationOpened') {
         final data = call.arguments;
-        if (data is Map && _onNotificationOpenedCallback != null) {
-          _onNotificationOpenedCallback!(Map<String, dynamic>.from(data));
+        if (data is Map) {
+          final payload = Map<String, dynamic>.from(data);
+          if (_onNotificationOpenedCallback != null) {
+            _onNotificationOpenedCallback!(payload);
+          } else {
+            _pendingPayload = payload;
+          }
         }
       }
     });
@@ -27,6 +33,11 @@ class NotificationService {
   /// Sets a callback for when the user taps a system notification
   static void setNotificationOpenedHandler(Function(Map<String, dynamic> payload) handler) {
     _onNotificationOpenedCallback = handler;
+    if (_pendingPayload != null) {
+      final p = _pendingPayload!;
+      _pendingPayload = null;
+      Future.microtask(() => handler(p));
+    }
   }
 
   /// Checks if the app was launched from a notification tap

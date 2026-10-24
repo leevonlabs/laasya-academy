@@ -55,8 +55,22 @@ class FcmService {
   static String? _cachedToken;
   static const String _backendBaseUrl = 'https://laasya-academy.vercel.app';
 
+  /// Buffer for notification payload tapped before UI listener mounted
+  static Map<String, dynamic>? pendingNotificationData;
+
   /// Handler for navigation or action when notification tapped
-  static Function(Map<String, dynamic> data)? onNotificationTapped;
+  static Function(Map<String, dynamic> data)? _onNotificationTapped;
+
+  static set onNotificationTapped(Function(Map<String, dynamic> data)? handler) {
+    _onNotificationTapped = handler;
+    if (handler != null && pendingNotificationData != null) {
+      final data = pendingNotificationData!;
+      pendingNotificationData = null;
+      Future.microtask(() => handler(data));
+    }
+  }
+
+  static Function(Map<String, dynamic> data)? get onNotificationTapped => _onNotificationTapped;
 
   static Future<void> initialize() async {
     if (_initialized) return;
@@ -111,8 +125,16 @@ class FcmService {
       // Tapped from background state
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         debugPrint('[FCM] Notification opened from background: ${message.data}');
-        if (onNotificationTapped != null) {
-          onNotificationTapped!(message.data);
+        final data = Map<String, dynamic>.from(message.data);
+        if (message.notification != null) {
+          data['title'] ??= message.notification!.title;
+          data['body'] ??= message.notification!.body;
+          data['message'] ??= message.notification!.body;
+        }
+        if (_onNotificationTapped != null) {
+          _onNotificationTapped!(data);
+        } else {
+          pendingNotificationData = data;
         }
       });
 
@@ -120,11 +142,18 @@ class FcmService {
       final initialMessage = await messaging.getInitialMessage();
       if (initialMessage != null) {
         debugPrint('[FCM] App launched from terminated state via notification: ${initialMessage.data}');
-        Timer(const Duration(milliseconds: 1000), () {
-          if (onNotificationTapped != null) {
-            onNotificationTapped!(initialMessage.data);
-          }
-        });
+        final data = Map<String, dynamic>.from(initialMessage.data);
+        if (initialMessage.notification != null) {
+          data['title'] ??= initialMessage.notification!.title;
+          data['body'] ??= initialMessage.notification!.body;
+          data['message'] ??= initialMessage.notification!.body;
+        }
+        pendingNotificationData = data;
+        if (_onNotificationTapped != null) {
+          final p = pendingNotificationData!;
+          pendingNotificationData = null;
+          _onNotificationTapped!(p);
+        }
       }
     } catch (e) {
       debugPrint('[FCM] Initialization error: $e');

@@ -56,8 +56,26 @@ class _AuthGateState extends State<AuthGate> {
       if (profile != null) {
         final role = profile['role'] ?? 'student';
         final userId = profile['id']?.toString() ?? '';
+        List<String> batchIds = [];
+        if (role == 'trainer') {
+          final tb = SupabaseService().trainerBatches;
+          batchIds = tb.map((b) => (b['id'] ?? '').toString()).where((id) => id.isNotEmpty).toList();
+        } else {
+          final enrolled = profile['enrolled_courses'];
+          if (enrolled is List) {
+            batchIds = enrolled
+                .map((e) => e is Map ? e['batch_id']?.toString() : null)
+                .where((id) => id != null && id.isNotEmpty)
+                .cast<String>()
+                .toList();
+          }
+        }
         if (userId.isNotEmpty) {
-          FcmService.registerDeviceToken(userId: userId, role: role);
+          FcmService.registerDeviceToken(
+            userId: userId,
+            role: role,
+            batchIds: batchIds.isNotEmpty ? batchIds : null,
+          );
         }
         if (role == 'trainer') {
           _targetScreen = const TrainerMainScaffold();

@@ -32,6 +32,9 @@ class MainActivity: FlutterActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         createNotificationChannels()
+        if (savedInstanceState == null) {
+            handleNotificationIntent(intent)
+        }
     }
 
     override fun onNewIntent(newIntent: Intent) {
@@ -40,15 +43,35 @@ class MainActivity: FlutterActivity() {
         handleNotificationIntent(newIntent)
     }
 
+    private fun extractIntentData(intent: Intent?): Map<String, Any>? {
+        if (intent == null) return null
+        val bundle = intent.extras ?: return null
+        val data = mutableMapOf<String, Any>()
+        for (key in bundle.keySet()) {
+            val value = bundle.get(key)
+            if (value != null) {
+                data[key] = value.toString()
+            }
+        }
+        val route = data["route"] ?: data["google.c.a.c_l"] ?: data["gcm.notification.route"]
+        if (route != null) {
+            data["route"] = route
+        }
+        val title = data["title"] ?: data["gcm.notification.title"]
+        if (title != null) data["title"] = title
+        val message = data["message"] ?: data["body"] ?: data["gcm.notification.body"]
+        if (message != null) data["message"] = message
+
+        if (data.containsKey("route") || data.containsKey("type") || data.containsKey("title")) {
+            return data
+        }
+        return null
+    }
+
     private fun handleNotificationIntent(intent: Intent?) {
-        val route = intent?.getStringExtra("route")
-        if (route != null && flutterEngine != null) {
-            val payload = mapOf(
-                "route" to route,
-                "title" to (intent.getStringExtra("title") ?: ""),
-                "message" to (intent.getStringExtra("message") ?: "")
-            )
-            intent.removeExtra("route")
+        val payload = extractIntentData(intent)
+        if (payload != null && flutterEngine != null) {
+            intent?.removeExtra("route")
             MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL_NAME)
                 .invokeMethod("onNotificationOpened", payload)
         }
@@ -71,14 +94,7 @@ class MainActivity: FlutterActivity() {
                     result.success(true)
                 }
                 "getPendingNotificationRoute" -> {
-                    val route = intent?.getStringExtra("route")
-                    val data = if (route != null) {
-                        mapOf(
-                            "route" to route,
-                            "title" to (intent?.getStringExtra("title") ?: ""),
-                            "message" to (intent?.getStringExtra("message") ?: "")
-                        )
-                    } else null
+                    val data = extractIntentData(intent)
                     intent?.removeExtra("route")
                     result.success(data)
                 }

@@ -96,7 +96,10 @@ export async function POST(request: NextRequest) {
           type: 'announcement',
           route: '/announcements',
           id: String(created?.id || ''),
-          sender: String(createdBy)
+          sender: String(createdBy),
+          title: body.title || 'Academy Notice',
+          body: body.message || 'A new announcement has been published.',
+          click_action: 'FLUTTER_NOTIFICATION_CLICK'
         }
       };
 
