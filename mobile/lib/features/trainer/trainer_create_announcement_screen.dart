@@ -263,8 +263,14 @@ class _TrainerCreateAnnouncementScreenState
         );
         Navigator.pop(context, true);
       } else {
-        final errData = jsonDecode(res.body);
-        throw Exception(errData['error'] ?? 'Failed to send announcement');
+        String errMsg = 'Failed to send announcement (HTTP ${res.statusCode})';
+        try {
+          final errData = jsonDecode(res.body);
+          if (errData is Map && errData['error'] != null) {
+            errMsg = errData['error'].toString();
+          }
+        } catch (_) {}
+        throw Exception(errMsg);
       }
     } catch (e) {
       if (mounted) {

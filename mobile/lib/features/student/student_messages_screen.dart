@@ -366,6 +366,39 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
     );
   }
 
+  void _showFullImageDialog(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                color: Colors.black,
+                child: InteractiveViewer(
+                  maxScale: 4.0,
+                  child: _buildNoticeImage(imageUrl),
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const CircleAvatar(
+                backgroundColor: Colors.black54,
+                radius: 16,
+                child: Icon(Icons.close, color: Colors.white, size: 18),
+              ),
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessageBody(String rawContent, bool isHoliday) {
     if (!isHoliday) {
       return Text(
@@ -625,48 +658,68 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                       child: CircularProgressIndicator(color: LaasyaColors.primary),
                     )
                   : _messages.isEmpty
-                      ? Center(
-                          child: Container(
-                            margin: const EdgeInsets.all(24),
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 10,
+                      ? RefreshIndicator(
+                          onRefresh: _loadMessages,
+                          color: LaasyaColors.primary,
+                          child: ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 10,
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFDEF7EC),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.mark_chat_read_rounded, size: 36, color: Color(0xFF03543F)),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFDEF7EC),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.mark_chat_read_rounded, size: 36, color: Color(0xFF03543F)),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    const Text(
+                                      'All Caught Up!',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: LaasyaColors.textDark,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    const Text(
+                                      'No new circulars or notices at this time. Important updates from the Academy Director will appear here.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton.icon(
+                                      onPressed: _loadMessages,
+                                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                                      label: const Text('Check for Updates', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: LaasyaColors.primary,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                                        elevation: 1,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 14),
-                                const Text(
-                                  'All Caught Up!',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: LaasyaColors.textDark,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'No new circulars or notices at this time. Important updates from the Academy Director will appear here.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         )
                       : RefreshIndicator(
@@ -862,13 +915,30 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                                             // Attached Image Media inside bubble
                                             if (imageUrl != null && imageUrl.isNotEmpty) ...[
                                               const SizedBox(height: 8),
-                                              ClipRRect(
-                                                borderRadius: BorderRadius.circular(12),
-                                                child: Container(
-                                                  constraints: const BoxConstraints(maxHeight: 220),
-                                                  width: double.infinity,
-                                                  color: Colors.black.withOpacity(0.04),
-                                                  child: _buildNoticeImage(imageUrl),
+                                              GestureDetector(
+                                                onTap: () => _showFullImageDialog(imageUrl),
+                                                child: ClipRRect(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  child: Container(
+                                                    constraints: const BoxConstraints(maxHeight: 220),
+                                                    width: double.infinity,
+                                                    color: Colors.black.withOpacity(0.04),
+                                                    child: Stack(
+                                                      alignment: Alignment.bottomRight,
+                                                      children: [
+                                                        _buildNoticeImage(imageUrl),
+                                                        Container(
+                                                          margin: const EdgeInsets.all(6),
+                                                          padding: const EdgeInsets.all(4),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.black54,
+                                                            borderRadius: BorderRadius.circular(6),
+                                                          ),
+                                                          child: const Icon(Icons.fullscreen_rounded, color: Colors.white, size: 16),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
                                             ],
