@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     switch (type) {
       case 'attendance': {
-        const result = await getAttendanceReport({ courseId, courseIds, batchId, batchIds, studentId, startDate, endDate });
+        const result = await getAttendanceReport({ courseId, courseIds, batchId, batchIds, studentId, startDate, endDate, status });
         return NextResponse.json({ success: true, type, ...result });
       }
       case 'absence': {

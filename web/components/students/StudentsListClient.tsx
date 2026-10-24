@@ -2253,6 +2253,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
     const headers = [
       'Roll Number',
       'Full Name',
+      'Joining Date',
       'Phone Number',
       'Email',
       'Parent / Guardian',
@@ -2265,8 +2266,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
       'Advance Paid (INR)',
       'Balance Due (INR)',
       'Due Date',
-      'Status',
-      'Joining Date'
+      'Status'
     ];
 
     const rows = sortedStudents.map(s => {
@@ -2274,10 +2274,13 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
       const discount = Number(s.fixed_discount || 0);
       const net = gross - discount;
       const enrolled = (s.enrolled_batches || []).map(b => `${b.course_title} (${b.batch_name})`).join('; ');
+      const rawDate = s.enrollment_date || (s as any).joining_date || (s as any).created_at || '';
+      const formattedJoiningDate = rawDate ? (formatDdMonthName(rawDate, true) || String(rawDate).substring(0, 10)) : 'N/A';
 
       return [
         `"${(s.roll_number || '').replace(/"/g, '""')}"`,
         `"${(s.full_name || '').replace(/"/g, '""')}"`,
+        `"${formattedJoiningDate.replace(/"/g, '""')}"`,
         `"${(s.phone || '').replace(/"/g, '""')}"`,
         `"${(s.email || '').replace(/"/g, '""')}"`,
         `"${(s.parent_name || '').replace(/"/g, '""')}"`,
@@ -2290,8 +2293,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
         Number(s.advance_paid || 0),
         Number(s.due_amount || 0),
         `"${formatDueDateDisplay(s.due_date)}"`,
-        `"${(s.status || 'ACTIVE').toUpperCase()}"`,
-        `"${s.enrollment_date ? s.enrollment_date.substring(0, 10) : ''}"`
+        `"${(s.status || 'ACTIVE').toUpperCase()}"`
       ];
     });
 

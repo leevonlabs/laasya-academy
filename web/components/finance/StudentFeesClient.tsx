@@ -602,7 +602,6 @@ _Unleash Your Talent_
 • Balance Due: *₹${Number(inv.balance_amount).toLocaleString('en-IN')}*
 • Status: *${inv.status === 'paid' ? '✅ PAID & SETTLED' : inv.status === 'partial' ? '⏳ PARTIALLY PAID' : '⚠️ PENDING DUE'}*
 
-📄 The official fee invoice PDF has been downloaded to your device for sharing.
 Namaste ${recipientName}, thank you for being a valued part of Laasya Cultural Academy!
 For queries, contact: +91 8151 998 899`;
   };
@@ -622,9 +621,6 @@ For queries, contact: +91 8151 998 899`;
       alert('Contact phone number not available for this recipient.');
       return;
     }
-
-    // Trigger vector PDF download for the invoice
-    downloadStudentFeeInvoicePdf(inv);
 
     // Clean phone number (remove spaces, symbols)
     let cleanPhone = targetPhone.replace(/\D/g, '');
@@ -1988,7 +1984,6 @@ For queries, contact: +91 8151 998 899`;
                   type="button"
                   onClick={() => {
                     const inv = viewingInvoice;
-                    downloadStudentFeeInvoicePdf(inv);
                     setViewingInvoice(null);
                     setSharingInvoice(inv);
                   }}

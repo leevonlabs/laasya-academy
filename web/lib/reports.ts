@@ -219,6 +219,7 @@ export async function getAttendanceReport(filters: {
   studentId?: string;
   startDate?: string;
   endDate?: string;
+  status?: string;
 }): Promise<{
   summary: AttendanceReportSummary;
   records: AttendanceReportRow[];
@@ -232,16 +233,15 @@ export async function getAttendanceReport(filters: {
         COALESCE(b.name, 'All Batches') as batch_name,
         COALESCE(p.full_name, 'Student') as student_name,
         COALESCE(s.roll_number, 'N/A') as roll_number,
-        COALESCE(a.status, 'not-marked') as status,
+        COALESCE(a.status, 'absent') as status,
         a.check_in_time::text as check_in_time,
         a.remarks
-      FROM public.class_sessions cs
+      FROM public.attendance a
+      JOIN public.class_sessions cs ON cs.id = a.session_id
+      JOIN public.students s ON s.id = a.student_id
+      JOIN public.profiles p ON p.id = s.profile_id
       LEFT JOIN public.batches b ON b.id = cs.batch_id
       LEFT JOIN public.courses c ON c.id = b.course_id
-      LEFT JOIN public.batch_enrollments be ON be.batch_id = cs.batch_id
-      LEFT JOIN public.students s ON s.id = be.student_id
-      LEFT JOIN public.profiles p ON p.id = s.profile_id
-      LEFT JOIN public.attendance a ON a.session_id = cs.id AND a.student_id = s.id
       WHERE 1=1
     `;
     const params: any[] = [];
@@ -277,7 +277,12 @@ export async function getAttendanceReport(filters: {
       sql += ` AND cs.session_date::date <= $${params.length}::date`;
     }
 
-    sql += ` ORDER BY cs.session_date DESC, student_name ASC LIMIT 500;`;
+    if (filters.status && filters.status !== 'all') {
+      params.push(filters.status.toLowerCase());
+      sql += ` AND LOWER(a.status) = $${params.length}`;
+    }
+
+    sql += ` ORDER BY cs.session_date DESC, student_name ASC LIMIT 3000;`;
 
     const rawRows = await query<AttendanceReportRow>(sql, params);
 
