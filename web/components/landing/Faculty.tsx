@@ -56,13 +56,16 @@ function GuruCard({ member, delay }: { member: TrainerItem; delay: number }) {
   return (
     <Reveal delay={delay} className="h-full">
       <article className="group flex h-full flex-col overflow-hidden rounded-3xl border border-[#D4BAC7]/70 bg-white shadow-warm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-gold">
-        {/* Aspect Ratio Container (No floating emojis) */}
-        <Link href={`/gurus/${member.id}`} className="block relative aspect-[4/3] w-full overflow-hidden bg-[#FAF5F7]">
+        {/* Aspect Ratio Container: 4:5 vertical portrait matching Admin Login exactly */}
+        <Link 
+          href={`/gurus/${member.id}`} 
+          className="block relative aspect-[4/5] w-full overflow-hidden bg-gradient-to-br from-[#3D0322] via-[#590231] to-[#1A010F]"
+        >
           <img
             src={imageSrc}
             alt={member.full_name}
             loading="lazy"
-            className="h-full w-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
+            className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#3d0c34]/90 via-[#3d0c34]/20 to-transparent" />
 
