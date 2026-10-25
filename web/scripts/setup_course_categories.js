@@ -1,6 +1,25 @@
+
+const fs = require('fs');
+const path = require('path');
+let dbUrl = process.env.DATABASE_URL || '';
+if (!dbUrl) {
+  try {
+    const envPath = path.join(__dirname, '../.env.local');
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      for (const line of envContent.split('\n')) {
+        if (line.startsWith('DATABASE_URL=')) dbUrl = line.substring(13).trim();
+      }
+    }
+  } catch (_) {}
+}
+if (!dbUrl) {
+  throw new Error('DATABASE_URL is not configured in process.env or web/.env.local');
+}
+
 const { Client } = require('pg');
 const client = new Client({
-  connectionString: 'postgresql://postgres.bhpqzrcohjigkkpmcdsy:Satya%4024530@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres'
+  connectionString: dbUrl
 });
 
 async function run() {
