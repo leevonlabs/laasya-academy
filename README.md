@@ -12,7 +12,7 @@ A multi-role Academy Management System tailored for traditional and contemporary
 ## Architecture & Repositories
 
 ### 1. Database & Backend (`supabase/`)
-* **Database**: PostgreSQL hosted on Supabase (Project ID: `bhpqzrcohjigkkpmcdsy`).
+* **Database**: PostgreSQL hosted on Supabase (Project ID: `kumbtvmjpmjtmoefddux`, Region: AWS `ap-south-1` Mumbai).
 * **Tables (8)**: `profiles`, `courses`, `trainers`, `students`, `batches`, `batch_enrollments`, `class_sessions`, `attendance`.
 * **Seed Data**: Preloaded with all **18 Academy courses** (Classical Dance, Modern & Fitness, Vocal & Music, Musical Instruments, Martial Arts, Fine Arts & Mind Sports).
 * **Security**: Row Level Security (RLS) active on all tables. Students have zero direct write permission on attendance; student check-ins are verified exclusively via the secure PostgreSQL function `student_self_check_in(p_session_id, p_code)`.

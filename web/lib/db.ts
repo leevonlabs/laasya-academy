@@ -19,7 +19,7 @@ export function clearDbCache() {
 
 export function getDbPool(): Pool {
   if (!globalThis._pgPool) {
-    const connectionString = process.env.DATABASE_URL || 'postgresql://postgres.bhpqzrcohjigkkpmcdsy:Satya%4024530@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres';
+    const connectionString = process.env.DATABASE_URL || 'postgresql://postgres.kumbtvmjpmjtmoefddux:Laasya%4024530@aws-0-ap-south-1.pooler.supabase.com:6543/postgres';
     globalThis._pgPool = new Pool({
       connectionString,
       ssl: {

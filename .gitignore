@@ -44,5 +44,8 @@ temp/
 .DS_Store
 Thumbs.db
 
+# Backups & Migration dumps
+backups/
+
 # Agent skills & tooling
 .agent/
