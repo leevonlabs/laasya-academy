@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
@@ -68,12 +69,16 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
           child = _guruInitials();
         }
       } else {
-        child = Image.network(
-          avatar.startsWith('/') ? '${ApiConstants.baseUrl}$avatar' : avatar,
+        final fullAvatarUrl = avatar.startsWith('/') ? '${ApiConstants.baseUrl}$avatar' : avatar;
+        child = CachedNetworkImage(
+          imageUrl: fullAvatarUrl,
           width: 36,
           height: 36,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _guruInitials(),
+          memCacheWidth: 72,
+          memCacheHeight: 72,
+          placeholder: (_, __) => _guruInitials(),
+          errorWidget: (_, __, ___) => _guruInitials(),
         );
       }
     } else {
@@ -367,10 +372,15 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
       fullUrl = '${ApiConstants.baseUrl}$fullUrl';
     }
 
-    return Image.network(
-      fullUrl,
+    return CachedNetworkImage(
+      imageUrl: fullUrl,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      placeholder: (_, __) => Container(
+        height: 140,
+        color: Colors.grey.shade100,
+        child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: LaasyaColors.accentGold)),
+      ),
+      errorWidget: (_, __, ___) => const SizedBox.shrink(),
     );
   }
 

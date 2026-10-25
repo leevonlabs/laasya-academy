@@ -153,7 +153,12 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
 
   @override
   void dispose() {
-    _realtimeChannel?.unsubscribe();
+    if (_realtimeChannel != null) {
+      try {
+        SupabaseService().client.removeChannel(_realtimeChannel!);
+      } catch (_) {}
+      _realtimeChannel = null;
+    }
     _alertPollTimer?.cancel();
     AlarmService.stopAlarmRing();
     TrainerDataStore.classClosedAlertNotifier.removeListener(_onClassClosedAlert);
@@ -162,7 +167,10 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
 
   void _subscribeSupabaseRealtime() {
     try {
-      _realtimeChannel?.unsubscribe();
+      if (_realtimeChannel != null) {
+        SupabaseService().client.removeChannel(_realtimeChannel!);
+        _realtimeChannel = null;
+      }
       _realtimeChannel = SupabaseService().client
           .channel('public:student_session_alerts_feed')
           .onPostgresChanges(

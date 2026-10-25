@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
@@ -359,10 +360,15 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
       fullUrl = '${ApiConstants.baseUrl}$fullUrl';
     }
 
-    return Image.network(
-      fullUrl,
+    return CachedNetworkImage(
+      imageUrl: fullUrl,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      placeholder: (_, __) => Container(
+        height: 140,
+        color: Colors.grey.shade100,
+        child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: LaasyaColors.accentGold)),
+      ),
+      errorWidget: (_, __, ___) => const SizedBox.shrink(),
     );
   }
 

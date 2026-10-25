@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
@@ -261,14 +262,11 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
         } catch (_) {}
       } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
         final fullUrl = trimmed.startsWith('/') ? '${ApiConstants.baseUrl}$trimmed' : trimmed;
-        return Image.network(
-          fullUrl,
+        return CachedNetworkImage(
+          imageUrl: fullUrl,
           fit: BoxFit.contain,
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return const Center(child: CircularProgressIndicator(color: LaasyaColors.accentGold));
-          },
-          errorBuilder: (_, __, ___) => _buildPlaceholderPhoto(),
+          placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: LaasyaColors.accentGold)),
+          errorWidget: (_, __, ___) => _buildPlaceholderPhoto(),
         );
       } else if (trimmed.startsWith('assets/')) {
         return Image.asset(trimmed, fit: BoxFit.contain);

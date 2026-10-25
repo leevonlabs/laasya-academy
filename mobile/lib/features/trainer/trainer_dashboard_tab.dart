@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
@@ -219,10 +220,10 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
       fullUrl = '${ApiConstants.baseUrl}$fullUrl';
     }
 
-    return Image.network(
-      fullUrl,
+    return CachedNetworkImage(
+      imageUrl: fullUrl,
       fit: fit,
-      errorBuilder: (_, __, ___) => _bannerFallback(fit),
+      errorWidget: (_, __, ___) => _bannerFallback(fit),
     );
   }
 
@@ -583,15 +584,11 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
         } catch (_) {}
       } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
         final fullUrl = trimmed.startsWith('/') ? '${ApiConstants.baseUrl}$trimmed' : trimmed;
-        return Image.network(
-          fullUrl,
+        return CachedNetworkImage(
+          imageUrl: fullUrl,
           fit: BoxFit.contain,
-          gaplessPlayback: true,
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return const Center(child: CircularProgressIndicator(color: LaasyaColors.accentGold));
-          },
-          errorBuilder: (_, __, ___) => _buildPlaceholderPhoto(),
+          placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: LaasyaColors.accentGold)),
+          errorWidget: (_, __, ___) => _buildPlaceholderPhoto(),
         );
       } else if (trimmed.startsWith('assets/')) {
         return Image.asset(trimmed, fit: BoxFit.contain, gaplessPlayback: true);

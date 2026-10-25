@@ -82,7 +82,10 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
 
   void _subscribeSupabaseRealtime() {
     try {
-      _realtimeChannel?.unsubscribe();
+      if (_realtimeChannel != null) {
+        SupabaseService().client.removeChannel(_realtimeChannel!);
+        _realtimeChannel = null;
+      }
       _realtimeChannel = SupabaseService().client
           .channel('public:trainer_session_alerts_feed')
           .onPostgresChanges(
@@ -125,7 +128,12 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
 
   @override
   void dispose() {
-    _realtimeChannel?.unsubscribe();
+    if (_realtimeChannel != null) {
+      try {
+        SupabaseService().client.removeChannel(_realtimeChannel!);
+      } catch (_) {}
+      _realtimeChannel = null;
+    }
     _alertPollTimer?.cancel();
     super.dispose();
   }

@@ -72,26 +72,14 @@ class SessionAlertListener with WidgetsBindingObserver {
   }
 
   void _subscribeSupabaseRealtime() {
+    // Redundant duplicate subscription removed.
+    // Active Realtime feeds are managed with full lifecycle hooks in StudentMainScaffold and TrainerMainScaffold.
     try {
-      final client = Supabase.instance.client;
-      _realtimeChannel?.unsubscribe();
-
-      _realtimeChannel = client.channel('public:session_alerts_feed')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'session_alerts',
-            callback: (payload) {
-              final newRecord = payload.newRecord;
-              if (newRecord.isNotEmpty) {
-                _processAlertMap(Map<String, dynamic>.from(newRecord));
-              }
-            },
-          )
-          .subscribe();
-    } catch (e) {
-      debugPrint('Supabase realtime subscription notice: $e');
-    }
+      if (_realtimeChannel != null) {
+        Supabase.instance.client.removeChannel(_realtimeChannel!);
+        _realtimeChannel = null;
+      }
+    } catch (_) {}
   }
 
   @override
@@ -203,8 +191,10 @@ class SessionAlertListener with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
 
     try {
-      _realtimeChannel?.unsubscribe();
-      _realtimeChannel = null;
+      if (_realtimeChannel != null) {
+        Supabase.instance.client.removeChannel(_realtimeChannel!);
+        _realtimeChannel = null;
+      }
     } catch (_) {}
 
     await AlarmService.stopBackgroundAlertService();

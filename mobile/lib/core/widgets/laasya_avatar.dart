@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/api_constants.dart';
 import '../constants/colors.dart';
 
@@ -100,31 +101,31 @@ class LaasyaAvatar extends StatelessWidget {
       }
     }
 
-    // 2. HTTP / HTTPS Network Image
+    // 2. HTTP / HTTPS Network Image (Persistent Disk Caching)
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return Image.network(
-        trimmed,
+      return CachedNetworkImage(
+        imageUrl: trimmed,
         fit: BoxFit.cover,
         width: size,
         height: size,
-        gaplessPlayback: true,
-        cacheWidth: (size * 2).round(),
-        cacheHeight: (size * 2).round(),
-        errorBuilder: (_, __, ___) => _buildFallback(),
+        memCacheWidth: (size * 2).round(),
+        memCacheHeight: (size * 2).round(),
+        placeholder: (_, __) => _buildFallback(),
+        errorWidget: (_, __, ___) => _buildFallback(),
       );
     }
 
     // 2b. Relative backend URL (e.g. /uploads/avatars/...)
     if (trimmed.startsWith('/')) {
-      return Image.network(
-        '${ApiConstants.baseUrl}$trimmed',
+      return CachedNetworkImage(
+        imageUrl: '${ApiConstants.baseUrl}$trimmed',
         fit: BoxFit.cover,
         width: size,
         height: size,
-        gaplessPlayback: true,
-        cacheWidth: (size * 2).round(),
-        cacheHeight: (size * 2).round(),
-        errorBuilder: (_, __, ___) => _buildFallback(),
+        memCacheWidth: (size * 2).round(),
+        memCacheHeight: (size * 2).round(),
+        placeholder: (_, __) => _buildFallback(),
+        errorWidget: (_, __, ___) => _buildFallback(),
       );
     }
 

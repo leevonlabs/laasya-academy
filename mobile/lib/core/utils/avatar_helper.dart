@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/api_constants.dart';
 
 /// Resolves any image URL to a full network URL if it's relative
@@ -28,12 +29,12 @@ ImageProvider? getAvatarImageProvider(dynamic rawUrl) {
     }
 
     if (s.startsWith('http://') || s.startsWith('https://')) {
-      return NetworkImage(s);
+      return CachedNetworkImageProvider(s);
     }
 
     // Relative uploads path from ERP web backend
     if (s.startsWith('/')) {
-      return NetworkImage('${ApiConstants.baseUrl}$s');
+      return CachedNetworkImageProvider('${ApiConstants.baseUrl}$s');
     }
 
     // Attempt raw base64 decode if long enough
