@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
+import '../../core/utils/avatar_helper.dart';
 import '../../core/services/supabase_service.dart';
 
 class TrainerSessionScreen extends StatefulWidget {
@@ -272,7 +273,7 @@ class _TrainerSessionScreenState extends State<TrainerSessionScreen> {
                         final fullName = profile['full_name'] ?? studentItem['name'] ?? 'Student';
                         final rollNumber = student['roll_number'] ?? studentItem['roll_number'] ?? 'LCA-0';
                         final rawAvatar = (profile['avatar_url'] ?? student['avatar_url'] ?? studentItem['avatar_url'])?.toString().trim();
-                        final hasPhoto = rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com');
+                        final imageProvider = getAvatarImageProvider(rawAvatar);
 
                         return Container(
                           padding: const EdgeInsets.all(14),
@@ -298,8 +299,8 @@ class _TrainerSessionScreenState extends State<TrainerSessionScreen> {
                               CircleAvatar(
                                 radius: 20,
                                 backgroundColor: const Color(0xFF590231),
-                                backgroundImage: hasPhoto ? NetworkImage(rawAvatar) : null,
-                                child: hasPhoto
+                                backgroundImage: imageProvider,
+                                child: imageProvider != null
                                     ? null
                                     : const Icon(Icons.person_rounded, size: 22, color: Colors.white70),
                               ),

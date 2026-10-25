@@ -1,4 +1,5 @@
 import { query, queryOne } from './db';
+import { saveBase64Media } from './media';
 
 export interface Course {
   id: string;
@@ -374,7 +375,7 @@ export async function createCourse(data: {
     INSERT INTO public.courses (title, code, category, description, monthly_fee, is_active, image_url)
     VALUES ($1, $2, $3, $4, $5, true, $6)
     RETURNING *;
-  `, [data.title, courseCode, data.category || '', data.description, data.monthly_fee || 0, data.image_url || null]);
+  `, [data.title, courseCode, data.category || '', data.description, data.monthly_fee || 0, (data.image_url ? await saveBase64Media(data.image_url, 'courses') : null)]);
 }
 
 export async function updateCourse(id: string, data: {
@@ -407,7 +408,7 @@ export async function updateCourse(id: string, data: {
     data.monthly_fee,
     data.description, 
     data.is_active,
-    data.image_url !== undefined ? data.image_url : null
+    data.image_url !== undefined ? (data.image_url ? await saveBase64Media(data.image_url, 'courses') : null) : null
   ]);
 }
 
@@ -572,14 +573,14 @@ export async function createTrainer(data: {
       avatar_url = COALESCE(EXCLUDED.avatar_url, profiles.avatar_url),
       age = COALESCE(EXCLUDED.age, profiles.age),
       gender = COALESCE(EXCLUDED.gender, profiles.gender);
-  `, [uid, data.full_name, cleanEmail, cleanPhone, cleanAlternatePhone, data.avatar_url || null, age, gender]);
+  `, [uid, data.full_name, cleanEmail, cleanPhone, cleanAlternatePhone, (data.avatar_url ? await saveBase64Media(data.avatar_url, 'avatars') : null), age, gender]);
 
   // Insert trainer
   return queryOne<Trainer>(`
     INSERT INTO public.trainers (profile_id, guru_id, code, specializations, display_title, bio, is_active, monthly_salary, avatar_url, age, gender, alternate_phone, experience)
     VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     RETURNING *;
-  `, [uid, finalGuruId, data.specializations, displayTitle, bio, isActive, monthlySalary, data.avatar_url || null, age, gender, cleanAlternatePhone, data.experience || '5+ Years']);
+  `, [uid, finalGuruId, data.specializations, displayTitle, bio, isActive, monthlySalary, (data.avatar_url ? await saveBase64Media(data.avatar_url, 'avatars') : null), age, gender, cleanAlternatePhone, data.experience || '5+ Years']);
 }
 
 export async function updateTrainer(id: string, data: {
@@ -628,7 +629,7 @@ export async function updateTrainer(id: string, data: {
     data.full_name, 
     data.phone, 
     alternatePhone,
-    data.avatar_url !== undefined ? data.avatar_url : null,
+    data.avatar_url !== undefined ? (data.avatar_url ? await saveBase64Media(data.avatar_url, 'avatars') : null) : null,
     age !== undefined ? age : null,
     gender !== undefined ? gender : null
   ]);
@@ -657,7 +658,7 @@ export async function updateTrainer(id: string, data: {
     data.bio !== undefined ? data.bio : null, 
     data.is_active, 
     data.monthly_salary, 
-    data.avatar_url !== undefined ? data.avatar_url : null,
+    data.avatar_url !== undefined ? (data.avatar_url ? await saveBase64Media(data.avatar_url, 'avatars') : null) : null,
     age !== undefined ? age : null,
     gender !== undefined ? gender : null,
     alternatePhone,
@@ -1070,7 +1071,7 @@ export async function createStudent(data: {
       avatar_url = COALESCE(EXCLUDED.avatar_url, profiles.avatar_url),
       age = COALESCE(EXCLUDED.age, profiles.age),
       gender = COALESCE(EXCLUDED.gender, profiles.gender);
-  `, [uid, data.full_name, cleanEmail, data.phone, data.avatar_url || null, age, gender]);
+  `, [uid, data.full_name, cleanEmail, data.phone, (data.avatar_url ? await saveBase64Media(data.avatar_url, 'avatars') : null), age, gender]);
 
   const joiningDate = data.joining_date || new Date().toISOString().split('T')[0];
   const advancePaid = Number(data.advance_paid || 0);
@@ -1111,7 +1112,7 @@ export async function createStudent(data: {
     joiningDate,
     advancePaid,
     fixedDiscount,
-    data.avatar_url || null,
+    (data.avatar_url ? await saveBase64Media(data.avatar_url, 'avatars') : null),
     age,
     gender,
     dob
@@ -1189,7 +1190,7 @@ export async function updateStudent(id: string, data: {
       data.full_name, 
       data.email, 
       data.phone, 
-      data.avatar_url !== undefined ? data.avatar_url : null,
+      data.avatar_url !== undefined ? (data.avatar_url ? await saveBase64Media(data.avatar_url, 'avatars') : null) : null,
       age !== undefined ? age : null,
       gender !== undefined ? gender : null
     ]);
@@ -1215,7 +1216,7 @@ export async function updateStudent(id: string, data: {
   `, [
     id, data.parent_name, data.parent_relation, data.parent_contact, 
     data.address, data.status, data.joining_date, data.advance_paid,
-    data.avatar_url !== undefined ? data.avatar_url : null,
+    data.avatar_url !== undefined ? (data.avatar_url ? await saveBase64Media(data.avatar_url, 'avatars') : null) : null,
     age !== undefined ? age : null,
     gender !== undefined ? gender : null,
     dob,

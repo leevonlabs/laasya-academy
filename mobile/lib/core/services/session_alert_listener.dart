@@ -59,9 +59,9 @@ class SessionAlertListener with WidgetsBindingObserver {
     // 4. Subscribe to Supabase Realtime for sub-second alert broadcast
     _subscribeSupabaseRealtime();
 
-    // 5. High-speed polling fallback every 3 seconds while app is in foreground for realtime alerts
+    // 5. Periodic polling fallback every 60 seconds (Realtime WebSocket & FCM handle instant events)
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+    _pollTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (_isListening) {
         _pollServerForAlerts();
       }

@@ -41,8 +41,8 @@ export default function PhotoUploadInput({
   // Fixed outlook frame dimensions: exact 4:5 portrait ratio (280px wide x 350px tall)
   const FRAME_W = 280;
   const FRAME_H = 350;
-  const CANVAS_W = 560;
-  const CANVAS_H = 700;
+  const CANVAS_W = 400;
+  const CANVAS_H = 500;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -198,7 +198,7 @@ export default function PhotoUploadInput({
         renderedH * scale
       );
 
-      const finalDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      const finalDataUrl = canvas.toDataURL('image/jpeg', 0.78);
       onChange(finalDataUrl);
     } catch {
       onChange(adjustImageSrc);

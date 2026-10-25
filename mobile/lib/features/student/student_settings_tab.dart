@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/widgets/laasya_avatar.dart';
 import '../auth/portal_landing_screen.dart';
@@ -257,9 +258,10 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
           final bytes = base64Decode(trimmed.split(',').last);
           return Image.memory(bytes, fit: BoxFit.contain, gaplessPlayback: true);
         } catch (_) {}
-      } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
+        final fullUrl = trimmed.startsWith('/') ? '${ApiConstants.baseUrl}$trimmed' : trimmed;
         return Image.network(
-          trimmed,
+          fullUrl,
           fit: BoxFit.contain,
           gaplessPlayback: true,
           loadingBuilder: (context, child, progress) {

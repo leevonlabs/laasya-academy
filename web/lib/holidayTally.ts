@@ -1,6 +1,6 @@
 import { query, queryOne } from './db';
 import { sendFcmToBatch, sendFcmToCourse, sendFcmToRole, sendFcmToUser } from './fcm';
-import { saveBase64Image } from './announcements';
+import { saveBase64Media } from './media';
 
 export interface HolidayAlert {
   id: string;
@@ -157,6 +157,7 @@ export async function createHolidayAlert(data: {
   const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
 
   const status = holidayDate === todayStr ? 'Active' : holidayDate < todayStr ? 'Passed' : 'Scheduled';
+  const effectiveImageUrl = data.image_url ? await saveBase64Media(data.image_url, 'holidays') : null;
 
   const [row] = await query<any>(`
     INSERT INTO public.holiday_alerts (
@@ -202,7 +203,7 @@ export async function createHolidayAlert(data: {
     JSON.stringify(data.affected_guru_ids || []),
     JSON.stringify(data.affected_guru_names || []),
     status,
-    data.image_url || null,
+    effectiveImageUrl || null,
     data.created_by || 'Admin'
   ]);
 
@@ -218,7 +219,7 @@ export async function createHolidayAlert(data: {
   const dayBeforeHolidayStr = prevDate.toISOString().split('T')[0];
 
   // Optimize image once before batch insertions to prevent multi-megabyte duplicates
-  const savedHolidayImageUrl = saveBase64Image(data.image_url);
+  const savedHolidayImageUrl = effectiveImageUrl;
 
   // 1 & 2. Dispatch announcements per affected batch so ONLY enrolled students & assigned gurus receive messages
   for (let i = 0; i < data.target_batch_ids.length; i++) {
@@ -374,6 +375,7 @@ export async function updateHolidayAlert(data: {
   affected_guru_names: string[];
   image_url?: string | null;
 }): Promise<HolidayAlert> {
+  const effectiveImageUrl = data.image_url ? await saveBase64Media(data.image_url, 'holidays') : data.image_url;
   const [row] = await query<any>(`
     UPDATE public.holiday_alerts
     SET 
@@ -417,7 +419,7 @@ export async function updateHolidayAlert(data: {
     JSON.stringify(data.target_batch_names || []),
     JSON.stringify(data.affected_guru_ids || []),
     JSON.stringify(data.affected_guru_names || []),
-    data.image_url || null
+    effectiveImageUrl || null
   ]);
 
   return {

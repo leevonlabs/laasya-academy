@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../constants/api_constants.dart';
 import '../constants/colors.dart';
 
 /// Rock-solid, flicker-free avatar widget that prevents "glittering"
@@ -103,6 +104,20 @@ class LaasyaAvatar extends StatelessWidget {
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return Image.network(
         trimmed,
+        fit: BoxFit.cover,
+        width: size,
+        height: size,
+        gaplessPlayback: true,
+        cacheWidth: (size * 2).round(),
+        cacheHeight: (size * 2).round(),
+        errorBuilder: (_, __, ___) => _buildFallback(),
+      );
+    }
+
+    // 2b. Relative backend URL (e.g. /uploads/avatars/...)
+    if (trimmed.startsWith('/')) {
+      return Image.network(
+        '${ApiConstants.baseUrl}$trimmed',
         fit: BoxFit.cover,
         width: size,
         height: size,

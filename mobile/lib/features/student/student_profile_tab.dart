@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
+import '../../core/widgets/laasya_avatar.dart';
 import '../../core/services/supabase_service.dart';
 import '../auth/portal_landing_screen.dart';
 import 'student_video_library_screen.dart';
@@ -229,25 +230,11 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                   Row(
                     children: [
                       // Avatar
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: LaasyaColors.accentGold, width: 2.2),
-                          color: const Color(0xFF740340),
-                        ),
-                        child: ClipOval(
-                          child: (avatarUrl != null && avatarUrl.isNotEmpty)
-                              ? (avatarUrl.startsWith('data:')
-                                  ? const Icon(Icons.person_rounded, color: Colors.white, size: 44)
-                                  : Image.network(
-                                      avatarUrl,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Colors.white, size: 44),
-                                    ))
-                              : const Icon(Icons.person_rounded, color: Colors.white, size: 44),
-                        ),
+                      LaasyaAvatar(
+                        avatarUrl: avatarUrl,
+                        size: 72,
+                        borderWidth: 2.2,
+                        showShadow: false,
                       ),
                       const SizedBox(width: 16),
                       Expanded(

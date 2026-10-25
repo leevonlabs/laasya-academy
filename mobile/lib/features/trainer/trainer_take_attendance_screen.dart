@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/utils/avatar_helper.dart';
 import '../../core/services/supabase_service.dart';
 import 'trainer_data_store.dart';
 
@@ -647,7 +648,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                 final isUnmarked = status.isEmpty;
 
                     final rawAvatar = stu['avatar_url']?.toString().trim();
-                    final hasPhoto = rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com');
+                    final imageProvider = getAvatarImageProvider(rawAvatar);
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -672,8 +673,8 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                                 : isAbsent
                                     ? const Color(0xFFFDE8E8)
                                     : Colors.grey.shade100,
-                            backgroundImage: hasPhoto ? NetworkImage(rawAvatar) : null,
-                            child: hasPhoto
+                            backgroundImage: imageProvider,
+                            child: imageProvider != null
                                 ? null
                                 : Icon(
                                     Icons.person_rounded,
@@ -867,7 +868,7 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                 final isAbsent = status == 'absent';
                 final isUnmarked = status.isEmpty;
                 final rawAvatar = stu['avatar_url']?.toString().trim();
-                final hasPhoto = rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com');
+                final imageProvider = getAvatarImageProvider(rawAvatar);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 9),
@@ -892,8 +893,8 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                       CircleAvatar(
                         radius: 20,
                         backgroundColor: themeColor.withOpacity(0.12),
-                        backgroundImage: hasPhoto ? NetworkImage(rawAvatar) : null,
-                        child: hasPhoto
+                        backgroundImage: imageProvider,
+                        child: imageProvider != null
                             ? null
                             : Icon(
                                 Icons.person_rounded,

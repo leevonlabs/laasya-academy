@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
+import '../../core/widgets/laasya_avatar.dart';
 import '../../core/services/supabase_service.dart';
 
 class TrainerProfileDetailsScreen extends StatefulWidget {
@@ -144,25 +145,11 @@ class _TrainerProfileDetailsScreenState extends State<TrainerProfileDetailsScree
                   const SizedBox(height: 18),
                   Row(
                     children: [
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: LaasyaColors.accentGold, width: 2.2),
-                          color: const Color(0xFF740340),
-                        ),
-                        child: ClipOval(
-                          child: (avatarUrl != null && avatarUrl.isNotEmpty)
-                              ? (avatarUrl.startsWith('data:')
-                                  ? const Icon(Icons.person, color: Colors.white, size: 44)
-                                  : Image.network(
-                                      avatarUrl,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 44),
-                                    ))
-                              : const Icon(Icons.person, color: Colors.white, size: 44),
-                        ),
+                      LaasyaAvatar(
+                        avatarUrl: avatarUrl,
+                        size: 72,
+                        borderWidth: 2.2,
+                        showShadow: false,
                       ),
                       const SizedBox(width: 16),
                       Expanded(

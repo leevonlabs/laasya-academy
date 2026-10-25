@@ -1,5 +1,17 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../constants/api_constants.dart';
+
+/// Resolves any image URL to a full network URL if it's relative
+String resolveImageUrl(dynamic rawUrl) {
+  if (rawUrl == null) return '';
+  final s = rawUrl.toString().trim();
+  if (s.isEmpty || s == 'null') return '';
+  if (s.startsWith('/')) {
+    return '${ApiConstants.baseUrl}$s';
+  }
+  return s;
+}
 
 ImageProvider? getAvatarImageProvider(dynamic rawUrl) {
   if (rawUrl == null) return null;
@@ -17,6 +29,11 @@ ImageProvider? getAvatarImageProvider(dynamic rawUrl) {
 
     if (s.startsWith('http://') || s.startsWith('https://')) {
       return NetworkImage(s);
+    }
+
+    // Relative uploads path from ERP web backend
+    if (s.startsWith('/')) {
+      return NetworkImage('${ApiConstants.baseUrl}$s');
     }
 
     // Attempt raw base64 decode if long enough

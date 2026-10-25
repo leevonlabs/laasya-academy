@@ -41,8 +41,8 @@ export default function GuruPhotoUploadInput({
   // Fixed outlook frame dimensions: exact 4:5 ratio (300px wide x 375px tall)
   const FRAME_W = 300;
   const FRAME_H = 375;
-  const CANVAS_W = 600;
-  const CANVAS_H = 750;
+  const CANVAS_W = 400;
+  const CANVAS_H = 500;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -198,7 +198,7 @@ export default function GuruPhotoUploadInput({
         renderedH * scale
       );
 
-      const finalDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      const finalDataUrl = canvas.toDataURL('image/jpeg', 0.78);
       onChange(finalDataUrl);
     } catch {
       onChange(adjustImageSrc);

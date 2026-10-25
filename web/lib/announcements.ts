@@ -1,4 +1,5 @@
 import { query, queryOne } from './db';
+import { saveBase64Media } from './media';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -26,7 +27,7 @@ export function saveBase64Image(dataUrl?: string | null): string | null {
     return `/uploads/announcements/${filename}`;
   } catch (err) {
     console.error('Failed to save base64 image to file:', err);
-    return dataUrl;
+    return null;
   }
 }
 
@@ -188,7 +189,8 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
       sql += ` AND (LOWER(a.title) LIKE $${params.length} OR LOWER(a.message) LIKE $${params.length})`;
     }
 
-    sql += ` ORDER BY a.publish_date DESC, a.created_at DESC;`;
+    const limit = (filters as any)?.limit && (filters as any).limit > 0 ? (filters as any).limit : 100;
+    sql += ` ORDER BY a.publish_date DESC, a.created_at DESC LIMIT ${limit};`;
 
     const rows = await query<Announcement>(sql, params);
 
@@ -275,7 +277,7 @@ export async function createAnnouncement(data: {
       ? 'Queued for Scheduled Dispatch' 
       : 'System verified (Delivered)';
 
-  const effectiveImageUrl = saveBase64Image(data.image_url);
+  const effectiveImageUrl = await saveBase64Media(data.image_url, 'announcements');
   const annType = data.announcement_type || (effectiveImageUrl ? 'banner' : 'message');
 
   // Enforce 30-day lifespan for message broadcasts
@@ -455,6 +457,7 @@ export async function updateAnnouncement(
 
   const validCourseId = isValidUuid(data.target_course_id) ? data.target_course_id : null;
   const validBatchId = isValidUuid(data.target_batch_id) ? data.target_batch_id : null;
+  const effectiveImageUrl = data.image_url ? await saveBase64Media(data.image_url, 'announcements') : data.image_url;
 
   const [updated] = await query<Announcement>(`
     UPDATE public.announcements
@@ -512,7 +515,7 @@ export async function updateAnnouncement(
     data.expiry_date || null,
     status,
     deliveryStatus,
-    data.image_url !== undefined ? data.image_url : null,
+    effectiveImageUrl !== undefined ? effectiveImageUrl : null,
     data.announcement_type || null,
     data.action_links !== undefined ? JSON.stringify(data.action_links || []) : null
   ]);

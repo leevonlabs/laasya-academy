@@ -182,7 +182,7 @@ export default function CourseImageUploadInput({
         renderedHeight * scaleFactorH
       );
 
-      const finalDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      const finalDataUrl = canvas.toDataURL('image/jpeg', 0.78);
       onChange(finalDataUrl);
     } catch {
       onChange(adjustImageSrc);

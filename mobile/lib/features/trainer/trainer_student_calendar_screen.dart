@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/colors.dart';
+import '../../core/utils/avatar_helper.dart';
 import 'trainer_data_store.dart';
 
 class TrainerStudentCalendarScreen extends StatefulWidget {
@@ -174,7 +175,7 @@ class _TrainerStudentCalendarScreenState extends State<TrainerStudentCalendarScr
     };
 
     final rawAvatar = stu['avatar_url']?.toString().trim();
-    final hasPhoto = rawAvatar != null && rawAvatar.isNotEmpty && !rawAvatar.contains('unsplash.com');
+    final imageProvider = getAvatarImageProvider(rawAvatar);
 
     final attendanceMap = _store.getStudentMonthAttendance(
       student: mergedStudent,
@@ -234,8 +235,8 @@ class _TrainerStudentCalendarScreenState extends State<TrainerStudentCalendarScr
                   CircleAvatar(
                     radius: 28,
                     backgroundColor: Colors.white,
-                    backgroundImage: hasPhoto ? NetworkImage(rawAvatar) : null,
-                    child: hasPhoto
+                    backgroundImage: imageProvider,
+                    child: imageProvider != null
                         ? null
                         : Icon(Icons.person_rounded, size: 30, color: themeColor),
                   ),

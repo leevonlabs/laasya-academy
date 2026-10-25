@@ -166,7 +166,7 @@ export default function AdvertisementsClient({ initialAnnouncements, courses, ba
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.88);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
           setFormData(prev => ({ ...prev, image_url: dataUrl }));
         }
       };

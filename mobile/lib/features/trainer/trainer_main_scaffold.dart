@@ -132,8 +132,8 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
 
   void _startNetworkAlertPolling() {
     _alertPollTimer?.cancel();
-    // Poll every 3 seconds for live circulars and administrative alerts
-    _alertPollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollSessionAlerts());
+    // Periodic fallback every 60 seconds (Realtime WebSocket & FCM handle instant events)
+    _alertPollTimer = Timer.periodic(const Duration(seconds: 60), (_) => _pollSessionAlerts());
   }
 
   Future<void> _pollSessionAlerts() async {

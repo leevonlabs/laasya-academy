@@ -230,13 +230,36 @@ export default function HolidayAlertClient({
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Image size exceeds 5MB limit', 'error');
+    if (file.size > 8 * 1024 * 1024) {
+      showToast('Image size exceeds 8MB limit', 'error');
       return;
     }
     const reader = new FileReader();
     reader.onload = (event) => {
-      setImageUrl(event.target?.result as string);
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 1000;
+        const maxH = 1000;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxW || h > maxH) {
+          const ratio = Math.min(maxW / w, maxH / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressed = canvas.toDataURL('image/jpeg', 0.78);
+          setImageUrl(compressed);
+        } else {
+          setImageUrl(event.target?.result as string);
+        }
+      };
+      img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
   };

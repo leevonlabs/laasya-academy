@@ -581,9 +581,10 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
           final bytes = base64Decode(trimmed.split(',').last);
           return Image.memory(bytes, fit: BoxFit.contain, gaplessPlayback: true);
         } catch (_) {}
-      } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
+        final fullUrl = trimmed.startsWith('/') ? '${ApiConstants.baseUrl}$trimmed' : trimmed;
         return Image.network(
-          trimmed,
+          fullUrl,
           fit: BoxFit.contain,
           gaplessPlayback: true,
           loadingBuilder: (context, child, progress) {

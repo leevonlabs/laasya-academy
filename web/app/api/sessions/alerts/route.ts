@@ -101,6 +101,16 @@ export async function GET(request: NextRequest) {
       LIMIT 50;
     `, [windowSeconds]);
 
+    // Fast-path: If no alerts exist in the time window, return immediately without joining student tables
+    if (!alerts || alerts.length === 0) {
+      return NextResponse.json({ success: true, alerts: [] }, { 
+        headers: {
+          ...corsHeaders,
+          'Cache-Control': 'public, max-age=10, stale-while-revalidate=30',
+        }
+      });
+    }
+
     const roleParam = (searchParams.get('role') || 'student').toLowerCase();
     const isTrainer = roleParam === 'trainer' || roleParam === 'guru' || roleParam === 'faculty';
 
@@ -267,7 +277,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, alerts: deduplicated }, { headers: corsHeaders });
+    return NextResponse.json({ success: true, alerts: deduplicated }, { 
+      headers: {
+        ...corsHeaders,
+        'Cache-Control': 'public, max-age=5, stale-while-revalidate=15',
+      }
+    });
   } catch (error: any) {
     console.error('Fetch session alerts error:', error);
     return NextResponse.json(
