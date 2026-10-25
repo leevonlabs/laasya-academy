@@ -92,6 +92,8 @@ export async function POST(request: NextRequest) {
       const notifPayload = {
         title: body.title || 'Academy Notice',
         body: body.message || 'A new announcement has been published.',
+        channelId: 'laasya_announcements',
+        route: '/announcements',
         data: {
           type: 'announcement',
           route: '/announcements',
@@ -103,9 +105,18 @@ export async function POST(request: NextRequest) {
         }
       };
 
-      if (Array.isArray(body.target_students) && body.target_students.length > 0) {
-        for (const st of body.target_students) {
-          const sId = String(st.id || st.student_id || '');
+      let studentList: any[] = [];
+      if (Array.isArray(body.target_students)) {
+        studentList = body.target_students;
+      } else if (typeof body.target_students === 'string' && body.target_students.trim().startsWith('[')) {
+        try {
+          studentList = JSON.parse(body.target_students);
+        } catch (_) {}
+      }
+
+      if (studentList.length > 0) {
+        for (const st of studentList) {
+          const sId = String(st.id || st.student_id || st.profile_id || '');
           if (sId) {
             sendFcmToUser(sId, notifPayload).catch(e => console.error('[FCM] Error notifying student:', e));
           }

@@ -71,7 +71,7 @@ class _AuthGateState extends State<AuthGate> {
           }
         }
         if (userId.isNotEmpty) {
-          FcmService.registerDeviceToken(
+          await FcmService.registerDeviceToken(
             userId: userId,
             role: role,
             batchIds: batchIds.isNotEmpty ? batchIds : null,

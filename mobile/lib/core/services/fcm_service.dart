@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'notification_service.dart';
 
 @pragma('vm:entry-point')
@@ -115,9 +116,12 @@ class FcmService {
         debugPrint('[FCM] Foreground message: ${message.notification?.title} - ${message.notification?.body}');
         final notif = message.notification;
         if (notif != null) {
+          final data = Map<String, dynamic>.from(message.data);
+          final route = data['route']?.toString() ?? '/announcements';
           NotificationService.showAnnouncementNotification(
             title: notif.title ?? 'Laasya Academy Notice',
             message: notif.body ?? '',
+            route: route,
           );
         }
       });
@@ -178,7 +182,13 @@ class FcmService {
     required String role,
     List<String>? batchIds,
   }) async {
-    final token = await getToken();
+    String? token = await getToken();
+    if (token == null || token.isEmpty) {
+      try {
+        token = await FirebaseMessaging.instance.getToken();
+        _cachedToken = token;
+      } catch (_) {}
+    }
     if (token == null || token.isEmpty || userId.isEmpty) return;
 
     // Cache locally
@@ -191,6 +201,23 @@ class FcmService {
 
     final platform = Platform.isIOS ? 'ios' : 'android';
 
+    // 1. Direct Supabase sync for 100% resilience
+    try {
+      final client = Supabase.instance.client;
+      await client.from('device_tokens').upsert({
+        'user_id': userId,
+        'role': role,
+        'fcm_token': token,
+        'platform': platform,
+        'batch_ids': batchIds ?? [],
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'fcm_token');
+      debugPrint('[FCM] Token synced directly to Supabase device_tokens');
+    } catch (sbErr) {
+      debugPrint('[FCM] Supabase direct token sync note: $sbErr');
+    }
+
+    // 2. HTTP API sync to Vercel backend
     try {
       final response = await http.post(
         Uri.parse('$_backendBaseUrl/api/notifications/device-token'),

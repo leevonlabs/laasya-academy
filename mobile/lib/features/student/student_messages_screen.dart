@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
@@ -26,6 +27,7 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
   int _unreadCount = 0;
   final ScrollController _scrollController = ScrollController();
   Timer? _realtimeSyncTimer;
+  RealtimeChannel? _realtimeChannel;
 
   @override
   void initState() {
@@ -62,11 +64,36 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
       if (mounted) setState(() {});
     });
     _loadMessages();
-    _realtimeSyncTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+    _subscribeSupabaseRealtime();
+    _realtimeSyncTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (mounted) {
         _loadMessages(isBackgroundSync: true);
       }
     });
+  }
+
+  void _subscribeSupabaseRealtime() {
+    try {
+      if (_realtimeChannel != null) {
+        SupabaseService().client.removeChannel(_realtimeChannel!);
+        _realtimeChannel = null;
+      }
+      _realtimeChannel = SupabaseService().client
+          .channel('public:student_announcements_live_feed')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'announcements',
+            callback: (payload) {
+              if (mounted) {
+                _loadMessages(isBackgroundSync: true);
+              }
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('Realtime announcements subscribe notice: $e');
+    }
   }
 
   void _scrollToBottom() {
@@ -89,6 +116,12 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
 
   @override
   void dispose() {
+    if (_realtimeChannel != null) {
+      try {
+        SupabaseService().client.removeChannel(_realtimeChannel!);
+      } catch (_) {}
+      _realtimeChannel = null;
+    }
     _realtimeSyncTimer?.cancel();
     _scrollController.dispose();
     super.dispose();

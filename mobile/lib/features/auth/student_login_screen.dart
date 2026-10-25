@@ -63,7 +63,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
 
       final userId = profile['id']?.toString() ?? '';
       if (userId.isNotEmpty) {
-        FcmService.registerDeviceToken(userId: userId, role: 'student');
+        await FcmService.registerDeviceToken(userId: userId, role: 'student');
       }
 
       if (!mounted) return;

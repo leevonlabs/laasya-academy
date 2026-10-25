@@ -27,20 +27,30 @@ class MainActivity: FlutterActivity() {
         const val NOTIF_ID_CLASS_COMPLETED = 2001
         const val NOTIF_ID_ATTENDANCE = 2002
         const val NOTIF_ID_ANNOUNCEMENT = 2003
+
+        var initialNotificationPayload: Map<String, Any>? = null
     }
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         createNotificationChannels()
-        if (savedInstanceState == null) {
-            handleNotificationIntent(intent)
+        val payload = extractIntentData(intent)
+        if (payload != null) {
+            initialNotificationPayload = payload
         }
     }
 
     override fun onNewIntent(newIntent: Intent) {
         super.onNewIntent(newIntent)
         setIntent(newIntent)
-        handleNotificationIntent(newIntent)
+        val payload = extractIntentData(newIntent)
+        if (payload != null) {
+            initialNotificationPayload = payload
+            if (flutterEngine != null) {
+                MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL_NAME)
+                    .invokeMethod("onNotificationOpened", payload)
+            }
+        }
     }
 
     private fun extractIntentData(intent: Intent?): Map<String, Any>? {
@@ -94,8 +104,8 @@ class MainActivity: FlutterActivity() {
                     result.success(true)
                 }
                 "getPendingNotificationRoute" -> {
-                    val data = extractIntentData(intent)
-                    intent?.removeExtra("route")
+                    val data = initialNotificationPayload ?: extractIntentData(intent)
+                    initialNotificationPayload = null
                     result.success(data)
                 }
                 "requestNotificationPermission" -> {

@@ -81,6 +81,8 @@ export interface FcmNotificationPayload {
   body: string;
   data?: Record<string, string>;
   sound?: string;
+  channelId?: string;
+  route?: string;
 }
 
 /**
@@ -93,6 +95,14 @@ export async function sendFcmMessage(token: string, payload: FcmNotificationPayl
     const sa = getServiceAccount();
     const projectId = sa.project_id || 'laasya-academy';
 
+    const channelId = payload.channelId || (
+      payload.data?.type === 'class_closed' || payload.data?.type === 'attendance_marked' 
+        ? 'laasya_classes' 
+        : 'laasya_announcements'
+    );
+
+    const targetRoute = payload.route || payload.data?.route || '/announcements';
+
     const message = {
       token,
       notification: {
@@ -103,16 +113,19 @@ export async function sendFcmMessage(token: string, payload: FcmNotificationPayl
         ...(payload.data || {}),
         title: payload.title,
         body: payload.body,
+        route: targetRoute,
         click_action: 'FLUTTER_NOTIFICATION_CLICK'
       },
       android: {
         priority: 'HIGH' as const,
         notification: {
-          channel_id: 'laasya_announcements',
+          channel_id: channelId,
           sound: payload.sound || 'default',
           default_sound: true,
           default_vibrate_timings: true,
           notification_priority: 'PRIORITY_HIGH' as const,
+          visibility: 'PUBLIC' as const,
+          icon: 'ic_launcher',
           click_action: 'FLUTTER_NOTIFICATION_CLICK'
         }
       },

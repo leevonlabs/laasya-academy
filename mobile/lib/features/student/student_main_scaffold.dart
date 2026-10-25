@@ -96,13 +96,17 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
         final data = FcmService.pendingNotificationData!;
         FcmService.pendingNotificationData = null;
         if (mounted) {
-          _handleNotificationOpened(data);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _handleNotificationOpened(data);
+          });
           return;
         }
       }
       final data = await NotificationService.getPendingNotificationPayload();
       if (data != null && mounted) {
-        _handleNotificationOpened(data);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _handleNotificationOpened(data);
+        });
       }
     } catch (_) {}
   }

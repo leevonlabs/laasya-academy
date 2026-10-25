@@ -59,7 +59,7 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
 
       final userId = profile['id']?.toString() ?? '';
       if (userId.isNotEmpty) {
-        FcmService.registerDeviceToken(userId: userId, role: 'trainer');
+        await FcmService.registerDeviceToken(userId: userId, role: 'trainer');
       }
 
       if (!mounted) return;
