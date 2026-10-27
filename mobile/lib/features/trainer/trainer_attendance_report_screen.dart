@@ -254,18 +254,25 @@ class _TrainerAttendanceReportScreenState extends State<TrainerAttendanceReportS
       trainerBatches = await SupabaseService().getTrainerBatches();
     } catch (_) {}
 
+    final prof = widget.trainerProfile ?? SupabaseService().currentUserProfile;
+    final myId = (prof?['id'] ?? prof?['trainer_id'] ?? prof?['profile_id'] ?? '').toString();
+    final myPhone = (prof?['phone'] ?? '').toString();
+    final myName = _guruName.toLowerCase().trim();
+    final myBatchIds = trainerBatches.map((b) => b['id']?.toString()).whereType<String>().toSet();
+
     try {
-      final uri = Uri.parse('${ApiConstants.baseUrl}/api/attendance?guruAudit=true&t=${DateTime.now().millisecondsSinceEpoch}');
+      final uri = Uri.parse(
+        '${ApiConstants.baseUrl}/api/attendance?guruAudit=true'
+        '&trainerId=${Uri.encodeComponent(myId)}'
+        '&phone=${Uri.encodeComponent(myPhone)}'
+        '&trainerName=${Uri.encodeComponent(myName)}'
+        '&t=${DateTime.now().millisecondsSinceEpoch}',
+      );
       final res = await http.get(uri).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
-        if (decoded is Map && decoded['records'] is List && (decoded['records'] as List).isNotEmpty) {
+        if (decoded is Map && decoded['records'] is List) {
           final liveList = List<Map<String, dynamic>>.from(decoded['records']);
-          
-          final prof = widget.trainerProfile ?? SupabaseService().currentUserProfile;
-          final myId = (prof?['id'] ?? prof?['trainer_id'] ?? prof?['profile_id'] ?? '').toString();
-          final myName = _guruName.toLowerCase().trim();
-          final myBatchIds = trainerBatches.map((b) => b['id']?.toString()).whereType<String>().toSet();
 
           final matched = liveList.where((r) {
             final rTrainerId = (r['trainer_id'] ?? '').toString();
@@ -300,14 +307,12 @@ class _TrainerAttendanceReportScreenState extends State<TrainerAttendanceReportS
             };
           }).toList();
 
-          if (matched.isNotEmpty) {
-            if (mounted) {
-              setState(() {
-                _allAuditRecords = matched;
-                _isLoading = false;
-              });
-              return;
-            }
+          if (mounted) {
+            setState(() {
+              _allAuditRecords = matched;
+              _isLoading = false;
+            });
+            return;
           }
         }
       }
@@ -315,87 +320,13 @@ class _TrainerAttendanceReportScreenState extends State<TrainerAttendanceReportS
       debugPrint('Error fetching attendance audit: $e');
     }
 
-    // Fallback: Generate structured realistic session audit records strictly using the guru's real assigned courses and batches
+    // Follow admin database only - never generate random/synthetic mock data
     if (mounted) {
-      _allAuditRecords = _generateFallbackAuditRecords(trainerBatches);
-      setState(() => _isLoading = false);
+      setState(() {
+        _allAuditRecords = [];
+        _isLoading = false;
+      });
     }
-  }
-
-  List<Map<String, dynamic>> _generateFallbackAuditRecords(List<Map<String, dynamic>> trainerBatches) {
-    final now = DateTime.now();
-    final records = <Map<String, dynamic>>[];
-
-    // Extract real batches and courses from the guru's live enrollments
-    final List<Map<String, String>> assignedCourses = [];
-    if (trainerBatches.isNotEmpty) {
-      for (final b in trainerBatches) {
-        final cTitle = (b['course_title'] ?? b['course_name'] ?? 'Classical Dance').toString();
-        final bName = (b['name'] ?? b['batch_name'] ?? 'Batch').toString();
-        final bRoom = (b['room_or_hall'] ?? 'Natya Mandapam (Room 101)').toString();
-        final enrolled = (b['enrolled_count'] ?? 12).toString();
-        assignedCourses.add({
-          'course': cTitle,
-          'batch': bName,
-          'room': bRoom,
-          'enrolled': enrolled,
-        });
-      }
-    }
-
-    if (assignedCourses.isEmpty) {
-      final myDiscipline = widget.trainerProfile?['specialization'] ??
-          widget.trainerProfile?['department'] ??
-          'Bharatanatyam';
-      assignedCourses.addAll([
-        {'course': myDiscipline, 'batch': 'Morning Riyaaz (A1)', 'room': 'Natya Mandapam (Room 101)', 'enrolled': '14'},
-        {'course': myDiscipline, 'batch': 'Evening Varnam (B2)', 'room': 'Natya Mandapam (Room 101)', 'enrolled': '12'},
-        {'course': 'Carnatic Classical Vocal', 'batch': 'Sangeetha Abhyasa', 'room': 'Sangeetha Shala (Room 102)', 'enrolled': '10'},
-      ]);
-    }
-
-    // Populate records for current year and previous year across all months
-    for (int y = now.year - 1; y <= now.year; y++) {
-      final maxMonth = (y == now.year) ? now.month : 12;
-      for (int m = 1; m <= maxMonth; m++) {
-        final daysInMonth = DateTime(y, m + 1, 0).day;
-        final maxDay = (y == now.year && m == now.month) ? now.day : daysInMonth;
-
-        for (int d = 1; d <= maxDay; d++) {
-          final dt = DateTime(y, m, d);
-          if (dt.weekday == DateTime.sunday) continue; // Sunday off
-
-          final cInfo = assignedCourses[d % assignedCourses.length];
-          final isAbsent = (d == 5 && m == now.month) || (d == 14 && m == now.month - 1) || (d == 8);
-          final isExtra = (d == 12 || d == 22);
-          final isHoliday = (d == 2 && m == 10); // Gandhi Jayanti
-
-          String status = 'GURU PRESENT';
-          String studentCount = '${cInfo['enrolled']} / ${cInfo['enrolled']} Marked Present';
-          if (isHoliday) {
-            status = 'HOLIDAY';
-            studentCount = '0 / ${cInfo['enrolled']} (Academy Holiday)';
-          } else if (isAbsent) {
-            status = 'GURU ABSENT';
-            studentCount = 'Class Cancelled (Trainer Absent)';
-          } else if (isExtra) {
-            status = 'EXTRA / RESCHEDULED';
-            studentCount = '${cInfo['enrolled']} / ${cInfo['enrolled']} Marked Present';
-          }
-
-          records.add({
-            'session_date': '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}',
-            'course_title': cInfo['course']!,
-            'batch_name': cInfo['batch']!,
-            'room': cInfo['room']!,
-            'student_count': studentCount,
-            'status': status,
-          });
-        }
-      }
-    }
-
-    return records;
   }
 
   // All records for the selected month (used to calculate summary counts)

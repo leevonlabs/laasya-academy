@@ -94,6 +94,7 @@ interface Props {
   defaultTab?: 'admin_sent' | 'guru_sent';
   defaultViewMode?: 'overview' | 'chat';
   canDelete?: boolean;
+  userRole?: string;
 }
 
 // -------------------------------------------------------------
@@ -272,7 +273,8 @@ export default function AnnouncementsClient({
   students = [],
   defaultTab = 'admin_sent',
   defaultViewMode = 'overview',
-  canDelete = true
+  canDelete = true,
+  userRole
 }: Props) {
   const router = useRouter();
   const [announcements, setAnnouncements] = useState<Announcement[]>(
@@ -949,7 +951,9 @@ export default function AnnouncementsClient({
                   </span>
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-gray-900 group-hover:text-[#075E54] transition-colors">Admin Broadcasts</h2>
+                  <h2 className="text-lg font-black text-gray-900 group-hover:text-[#075E54] transition-colors">
+                    {userRole === 'receptionist' ? 'Reception & Admin Broadcasts' : 'Admin Broadcasts'}
+                  </h2>
                   <p className="text-xs text-gray-600 font-medium mt-1.5 leading-relaxed">
                     Official academy-wide notices, fee reminders, schedule changes, and general broadcasts sent directly to students and gurus.
                   </p>
@@ -960,7 +964,7 @@ export default function AnnouncementsClient({
                 href="/announcements/admin-broadcasts"
                 className="w-full py-3 px-4 rounded-xl bg-[#075E54] hover:bg-[#064e46] active:scale-98 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-sm text-center"
               >
-                <span>Open Admin Chat</span>
+                <span>{userRole === 'receptionist' ? 'Open Broadcast Chat' : 'Open Admin Chat'}</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -1138,7 +1142,9 @@ export default function AnnouncementsClient({
                   <div className="w-12 h-12 rounded-full bg-emerald-50 text-[#075E54] mx-auto flex items-center justify-center">
                     <MessageSquare className="w-6 h-6" />
                   </div>
-                  <h3 className="text-sm font-black text-gray-800">No Admin Broadcasts Found</h3>
+                  <h3 className="text-sm font-black text-gray-800">
+                    {userRole === 'receptionist' ? 'No Reception / Admin Broadcasts Found' : 'No Admin Broadcasts Found'}
+                  </h3>
                   <p className="text-xs text-gray-500">
                     No messages match current filters. Click "Reset" or broadcast a new message.
                   </p>
@@ -1167,20 +1173,28 @@ export default function AnnouncementsClient({
                           {/* Top Header: Sender & Date */}
                           <div className="flex items-center justify-between border-b border-[#C2EDB9] pb-1.5 gap-2">
                             <div className="flex items-center gap-1.5">
-                              <div className="w-6 h-6 rounded-full bg-[#075E54] text-white flex items-center justify-center font-black text-[10px] shadow-2xs">
-                                👑
-                              </div>
-                              <div>
-                                <div className="text-[11px] font-black text-[#075E54] flex items-center gap-1">
-                                  <span>Academy Administration</span>
-                                  <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-[#075E54] text-white">
-                                    Director
-                                  </span>
-                                </div>
-                                <div className="text-[9px] text-gray-500 font-semibold">
-                                  {date}
-                                </div>
-                              </div>
+                              {(() => {
+                                const isReception = ann.sender_role === 'receptionist' || 
+                                  (ann.created_by && ann.created_by.toLowerCase().includes('reception'));
+                                return (
+                                  <>
+                                    <div className={`w-6 h-6 rounded-full ${isReception ? 'bg-[#8A064D]' : 'bg-[#075E54]'} text-white flex items-center justify-center font-black text-[10px] shadow-2xs`}>
+                                      {isReception ? '🛎️' : '👑'}
+                                    </div>
+                                    <div>
+                                      <div className={`text-[11px] font-black ${isReception ? 'text-[#8A064D]' : 'text-[#075E54]'} flex items-center gap-1`}>
+                                        <span>{isReception ? (ann.created_by || 'Academy Reception') : 'Academy Administration'}</span>
+                                        <span className={`px-1.5 py-0.2 rounded text-[8px] font-black ${isReception ? 'bg-[#8A064D]' : 'bg-[#075E54]'} text-white`}>
+                                          {isReception ? 'Reception' : 'Director'}
+                                        </span>
+                                      </div>
+                                      <div className="text-[9px] text-gray-500 font-semibold">
+                                        {date}
+                                      </div>
+                                    </div>
+                                  </>
+                                );
+                              })()}
                             </div>
 
                             <div className="shrink-0">
@@ -1559,17 +1573,33 @@ export default function AnnouncementsClient({
           <div className="bg-white rounded-3xl max-w-xl w-full border border-gray-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200 my-8">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
               <div className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs ${
-                  isGuruSent(detailModalAnnouncement) ? 'bg-emerald-100 text-[#075E54]' : 'bg-[#075E54] text-white'
-                }`}>
-                  {isGuruSent(detailModalAnnouncement) ? '🙏' : '👑'}
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-gray-900">Broadcast Message Details</h3>
-                  <p className="text-[10px] text-gray-500 font-medium">
-                    {isGuruSent(detailModalAnnouncement) ? 'Sent by Faculty Guru' : 'Sent by Academy Administration'}
-                  </p>
-                </div>
+                {(() => {
+                  const isRec = detailModalAnnouncement?.sender_role === 'receptionist' || 
+                    (detailModalAnnouncement?.created_by && detailModalAnnouncement.created_by.toLowerCase().includes('reception'));
+                  return (
+                    <>
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs ${
+                        isGuruSent(detailModalAnnouncement) 
+                          ? 'bg-emerald-100 text-[#075E54]' 
+                          : isRec 
+                            ? 'bg-rose-100 text-[#8A064D]' 
+                            : 'bg-[#075E54] text-white'
+                      }`}>
+                        {isGuruSent(detailModalAnnouncement) ? '🙏' : isRec ? '🛎️' : '👑'}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-gray-900">Broadcast Message Details</h3>
+                        <p className="text-[10px] text-gray-500 font-medium">
+                          {isGuruSent(detailModalAnnouncement) 
+                            ? 'Sent by Faculty Guru' 
+                            : isRec 
+                              ? 'Sent by Reception' 
+                              : 'Sent by Academy Administration'}
+                        </p>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
               <button
                 onClick={() => setDetailModalAnnouncement(null)}
@@ -1589,8 +1619,16 @@ export default function AnnouncementsClient({
                 </div>
                 <div>
                   <span className="text-gray-500 font-bold">Role: </span>
-                  <span className="font-black text-[#075E54]">
-                    {isGuruSent(detailModalAnnouncement) ? 'Faculty Guru' : 'Admin / Director'}
+                  <span className={`font-black ${
+                    detailModalAnnouncement?.sender_role === 'receptionist' || (detailModalAnnouncement?.created_by && detailModalAnnouncement.created_by.toLowerCase().includes('reception'))
+                      ? 'text-[#8A064D]'
+                      : 'text-[#075E54]'
+                  }`}>
+                    {isGuruSent(detailModalAnnouncement) 
+                      ? 'Faculty Guru' 
+                      : (detailModalAnnouncement?.sender_role === 'receptionist' || (detailModalAnnouncement?.created_by && detailModalAnnouncement.created_by.toLowerCase().includes('reception')))
+                        ? 'Reception'
+                        : 'Admin / Director'}
                   </span>
                 </div>
                 <div>
@@ -2152,11 +2190,13 @@ export default function AnnouncementsClient({
                   <div className="max-w-md mx-auto bg-[#D9FDD3] rounded-2xl rounded-tr-xs p-3.5 shadow-sm border border-[#C2EDB9] space-y-2.5">
                     <div className="flex items-center justify-between border-b border-[#C2EDB9] pb-1.5">
                       <div className="flex items-center gap-1.5">
-                        <div className="w-6 h-6 rounded-full bg-[#075E54] text-white flex items-center justify-center font-black text-[10px]">
-                          👑
+                        <div className={`w-6 h-6 rounded-full ${userRole === 'receptionist' ? 'bg-[#8A064D]' : 'bg-[#075E54]'} text-white flex items-center justify-center font-black text-[10px]`}>
+                          {userRole === 'receptionist' ? '🛎️' : '👑'}
                         </div>
                         <div>
-                          <div className="text-[11px] font-black text-[#075E54]">Academy Administration</div>
+                          <div className={`text-[11px] font-black ${userRole === 'receptionist' ? 'text-[#8A064D]' : 'text-[#075E54]'}`}>
+                            {userRole === 'receptionist' ? 'Reception Desk' : 'Academy Administration'}
+                          </div>
                           <div className="text-[9px] text-gray-500">Today</div>
                         </div>
                       </div>

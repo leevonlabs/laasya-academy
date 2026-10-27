@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +14,13 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Faculty compliance audit is restricted to Academy Staff' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
     const { searchParams } = new URL(request.url);
     const currentDate = new Date();
     const defaultMonth = (currentDate.getMonth() + 1).toString();

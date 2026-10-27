@@ -1,43 +1,194 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Sparkles, 
   X, 
   Send, 
-  LogIn, 
   MessageCircle, 
   Bot, 
   User, 
-  ExternalLink,
-  ChevronRight,
-  Clock,
-  MapPin,
-  BookOpen
+  FileText,
+  ChevronRight
 } from 'lucide-react';
+import { useEnquiry } from './EnquiryContext';
 
 interface Message {
   id: string;
   role: 'assistant' | 'user';
   text: string;
   time: string;
+  hasMore?: boolean;
 }
 
 const INITIAL_MESSAGES: Message[] = [
   {
     id: 'welcome',
     role: 'assistant',
-    text: "Namaste! 🙏 Welcome to **Laasya Cultural Academy**.\n\nI am your 24/7 AI Guide. You can ask me any questions about our 18+ fine arts courses, certified gurus, campus timings, fees, trial classes, or admissions.\n\nHow may I help you today?",
+    text: "Namaste! 🙏 Welcome to **Laasya Cultural Academy**.\n\nI am your live AI Admissions Assistant. You can ask me about our courses (Bharatanatyam, Carnatic Music, Western Dance, Yoga, Instruments), published fees, batch timings, seat availability, or booking a complimentary trial class.\n\nHow may I help you today?",
     time: 'Just now',
   },
 ];
 
-export function AiChatWidget() {
+const SUGGESTION_CHIPS = [
+  'Bharatanatyam batches & fees',
+  'Complimentary trial class',
+  'Weekend batch timings',
+  'Age criteria & admissions',
+];
+
+// --------------------------------------------------------------------------
+// ROBUST MARKDOWN PARSER FOR CHAT MESSAGES
+// --------------------------------------------------------------------------
+function renderInline(str: string): React.ReactNode[] {
+  // Matches markdown links [text](url), bold **text**, and italic *text*
+  const pattern = /(\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*)/g;
+  const parts: React.ReactNode[] = [];
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(str)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push(str.substring(lastIdx, match.index));
+    }
+    if (match[2] && match[3]) {
+      // Link [text](url)
+      parts.push(
+        <a
+          key={`link-${match.index}`}
+          href={match[3]}
+          target="_blank"
+          rel="noreferrer"
+          className="font-semibold text-[#8A064D] underline hover:text-[#3d0c34] transition-colors"
+        >
+          {match[2]}
+        </a>
+      );
+    } else if (match[4]) {
+      // Bold **text**
+      parts.push(
+        <strong key={`bold-${match.index}`} className="font-bold text-[#3d0c34]">
+          {match[4]}
+        </strong>
+      );
+    } else if (match[5]) {
+      // Italic *text*
+      parts.push(
+        <em key={`italic-${match.index}`} className="italic text-gray-700">
+          {match[5]}
+        </em>
+      );
+    }
+    lastIdx = pattern.lastIndex;
+  }
+
+  if (lastIdx < str.length) {
+    parts.push(str.substring(lastIdx));
+  }
+
+  return parts.length > 0 ? parts : [str];
+}
+
+function FormattedMarkdown({ text, isUser }: { text: string; isUser: boolean }) {
+  if (isUser) {
+    return <div className="whitespace-pre-wrap">{text}</div>;
+  }
+
+  const lines = text.split('\n');
+  const renderedElements: React.ReactNode[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const trimmed = rawLine.trim();
+
+    if (!trimmed) {
+      renderedElements.push(<div key={`sp-${i}`} className="h-1.5" />);
+      continue;
+    }
+
+    // Dividers: ---, ***, ___
+    if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+      renderedElements.push(<hr key={`hr-${i}`} className="my-2 border-t border-[#D4BAC7]/60" />);
+      continue;
+    }
+
+    // Headings: ###, ##, #
+    if (trimmed.startsWith('### ')) {
+      renderedElements.push(
+        <h4 key={`h4-${i}`} className="text-xs sm:text-sm font-bold text-[#3d0c34] mt-2 mb-1 flex items-center gap-1.5">
+          {renderInline(trimmed.slice(4))}
+        </h4>
+      );
+      continue;
+    }
+    if (trimmed.startsWith('## ')) {
+      renderedElements.push(
+        <h3 key={`h3-${i}`} className="text-sm sm:text-base font-bold text-[#3d0c34] mt-2.5 mb-1">
+          {renderInline(trimmed.slice(3))}
+        </h3>
+      );
+      continue;
+    }
+    if (trimmed.startsWith('# ')) {
+      renderedElements.push(
+        <h2 key={`h2-${i}`} className="text-base sm:text-lg font-bold text-[#3d0c34] mt-3 mb-1.5">
+          {renderInline(trimmed.slice(2))}
+        </h2>
+      );
+      continue;
+    }
+
+    // Unordered list items: •, *, -
+    if (trimmed.startsWith('• ') || trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+      const content = trimmed.slice(2);
+      renderedElements.push(
+        <div key={`li-${i}`} className="flex items-start gap-2 my-1 pl-1">
+          <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-[#8A064D] shrink-0" />
+          <span className="flex-1 leading-relaxed">{renderInline(content)}</span>
+        </div>
+      );
+      continue;
+    }
+
+    // Numbered list items: 1. , 2. , etc.
+    const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+    if (numMatch) {
+      renderedElements.push(
+        <div key={`ol-${i}`} className="flex items-start gap-2 my-1 pl-1">
+          <span className="font-bold text-[#8A064D] text-xs shrink-0 mt-0.5">{numMatch[1]}.</span>
+          <span className="flex-1 leading-relaxed">{renderInline(numMatch[2])}</span>
+        </div>
+      );
+      continue;
+    }
+
+    // Default regular paragraph
+    renderedElements.push(
+      <p key={`p-${i}`} className="my-0.5 leading-relaxed">
+        {renderInline(trimmed)}
+      </p>
+    );
+  }
+
+  return <div className="space-y-0.5">{renderedElements}</div>;
+}
+
+interface AiChatWidgetProps {
+  whatsappNumber?: string;
+  campusAddress?: string;
+}
+
+export function AiChatWidget({ whatsappNumber, campusAddress }: AiChatWidgetProps = {}) {
+  const targetWa = whatsappNumber?.trim() || '+91 8151 998 899';
+  const cleanWa = targetWa.replace(/[^0-9]/g, '');
+  const targetAddress = campusAddress?.trim() || 'VV Maple Hub, Kannamangala';
+
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { openEnquiryModal } = useEnquiry();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -81,21 +232,23 @@ export function AiChatWidget() {
       }
 
       const data = await res.json();
-      const replyText = data.reply || "Thank you for reaching out. Please connect with our admissions team on WhatsApp at +91 8151 998 899 for immediate assistance.";
+      const replyText = data.reply || `Thank you for reaching out. Please connect with our admissions team on WhatsApp at ${targetWa} for immediate assistance.`;
+      const hasMore = Boolean(data.hasMore);
 
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         text: replyText,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        hasMore,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
-    } catch (err) {
+    } catch {
       const fallbackMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        text: "Thank you for reaching out to Laasya Cultural Academy! You can speak directly with our academy administrators on WhatsApp at **+91 8151 998 899** or visit our campus at VV Maple Hub, Kannamangala.",
+        text: `Thank you for reaching out to Laasya Cultural Academy! You can speak directly with our academy administrators on WhatsApp at **${targetWa}** or visit our campus at ${targetAddress}.`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, fallbackMsg]);
@@ -107,17 +260,6 @@ export function AiChatWidget() {
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     handleSendMessage(input);
-  };
-
-  const formatMessageText = (text: string) => {
-    // Quick bold parser for markdown
-    const parts = text.split(/(\*\*.*?\*\*)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} className="font-bold text-[#3d0c34]">{part.slice(2, -2)}</strong>;
-      }
-      return part;
-    });
   };
 
   return (
@@ -153,7 +295,7 @@ export function AiChatWidget() {
         </button>
       </div>
 
-      {/* Floating Chat Modal / Drawer - Vertically Long Expanded Size */}
+      {/* Floating Chat Modal / Drawer */}
       {isOpen && (
         <div className="fixed bottom-20 right-3 sm:bottom-24 sm:right-7 z-50 w-[420px] sm:w-[500px] md:w-[540px] max-w-[95vw] h-[740px] sm:h-[820px] max-h-[93vh] rounded-3xl border-2 border-[#D4AF37]/50 bg-white shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
           {/* Header */}
@@ -173,7 +315,7 @@ export function AiChatWidget() {
                     Laasya AI Assistant
                   </h3>
                   <p className="text-[0.7rem] sm:text-xs text-white/80">
-                    Online 24/7 · Ask any questions about our academy
+                    Online 24/7 · Live Admissions & Academy Guide
                   </p>
                 </div>
               </div>
@@ -186,17 +328,25 @@ export function AiChatWidget() {
               </button>
             </div>
 
-            {/* Quick WhatsApp Admin Action Button */}
-            <div className="mt-3.5">
+            {/* Quick Actions Bar */}
+            <div className="mt-3.5 grid grid-cols-2 gap-2">
               <a
-                href="https://wa.me/918151998899"
+                href={`https://wa.me/${cleanWa}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-[#20ba59] transition-all"
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-[#25D366] px-3 py-2 text-xs font-bold text-white shadow hover:bg-[#20ba59] transition-all"
               >
-                <MessageCircle className="h-4 w-4" />
-                <span>Chat with Academy Admin on WhatsApp (+91 8151 998 899)</span>
+                <MessageCircle className="h-3.5 w-3.5" />
+                <span>WhatsApp Admissions</span>
               </a>
+              <button
+                type="button"
+                onClick={() => openEnquiryModal()}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#F3E5AB] text-[#3d0c34] px-3 py-2 text-xs font-bold shadow hover:brightness-105 transition-all cursor-pointer"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span>Book Trial / Enquiry</span>
+              </button>
             </div>
           </div>
 
@@ -214,15 +364,30 @@ export function AiChatWidget() {
                 )}
 
                 <div
-                  className={`max-w-[82%] rounded-2xl p-3 sm:p-3.5 text-xs sm:text-sm leading-relaxed shadow-xs ${
+                  className={`max-w-[85%] rounded-2xl p-3 sm:p-3.5 text-xs sm:text-sm leading-relaxed shadow-xs ${
                     m.role === 'user'
                       ? 'bg-gradient-to-r from-[#8A064D] to-[#610a39] text-white rounded-tr-none'
                       : 'bg-white text-gray-800 border border-[#D4BAC7]/70 rounded-tl-none'
                   }`}
                 >
-                  <div className="whitespace-pre-line">
-                    {formatMessageText(m.text)}
-                  </div>
+                  <FormattedMarkdown text={m.text} isUser={m.role === 'user'} />
+
+                  {/* Interactive continuation button if more results exist */}
+                  {m.hasMore && (
+                    <div className="mt-3 pt-2.5 border-t border-[#D4BAC7]/60 flex items-center justify-between">
+                      <span className="text-[0.7rem] text-gray-500 italic">More batches available</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSendMessage('Show more batches and timings')}
+                        disabled={loading}
+                        className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#F3E5AB] text-[#3d0c34] px-3 py-1.5 text-xs font-bold shadow hover:brightness-105 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        <span>➕ Show More Batches</span>
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+
                   <span
                     className={`block mt-1 text-[0.6rem] text-right ${
                       m.role === 'user' ? 'text-white/70' : 'text-gray-400'
@@ -258,13 +423,28 @@ export function AiChatWidget() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Quick Suggestions Chips */}
+          <div className="px-3 pt-2 pb-1 bg-white border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+            {SUGGESTION_CHIPS.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                onClick={() => handleSendMessage(chip)}
+                disabled={loading}
+                className="whitespace-nowrap rounded-full border border-[#D4AF37]/50 bg-[#FAF5F7] px-2.5 py-1 text-[0.7rem] font-medium text-[#8A064D] hover:bg-[#8A064D] hover:text-white transition-colors cursor-pointer shrink-0 disabled:opacity-40"
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+
           {/* Input Footer */}
           <form onSubmit={handleFormSubmit} className="p-3 bg-white border-t border-gray-200 flex items-center gap-2">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything about academy, courses, ERP system..."
+              placeholder="Ask about courses, batch timings, fees, trial class..."
               disabled={loading}
               className="flex-1 rounded-xl border border-gray-300 bg-gray-50 px-3.5 py-2 text-xs sm:text-sm text-gray-900 focus:border-[#8A064D] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#8A064D]"
             />

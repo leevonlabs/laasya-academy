@@ -35,6 +35,7 @@ export default async function AdminBroadcastsPage() {
         defaultTab="admin_sent"
         defaultViewMode="chat"
         canDelete={canDelete}
+        userRole={user.role}
       />
     </div>
   );

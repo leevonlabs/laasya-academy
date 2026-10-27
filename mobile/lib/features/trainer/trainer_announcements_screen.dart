@@ -1506,19 +1506,32 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                                                   Row(
                                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                     children: [
-                                                      const Row(
+                                                      Row(
                                                         mainAxisSize: MainAxisSize.min,
                                                         children: [
                                                           Text(
-                                                            'Academy Administration',
+                                                            ((ann['sender_role'] ?? '').toString().toLowerCase().contains('reception') ||
+                                                             (ann['created_by'] ?? '').toString().toLowerCase().contains('reception'))
+                                                                ? (ann['created_by'] ?? 'Academy Reception')
+                                                                : 'Academy Administration',
                                                             style: TextStyle(
                                                               fontSize: 12,
                                                               fontWeight: FontWeight.bold,
-                                                              color: Color(0xFF075E54),
+                                                              color: ((ann['sender_role'] ?? '').toString().toLowerCase().contains('reception') ||
+                                                                      (ann['created_by'] ?? '').toString().toLowerCase().contains('reception'))
+                                                                  ? const Color(0xFF8A064D)
+                                                                  : const Color(0xFF075E54),
                                                             ),
                                                           ),
-                                                          SizedBox(width: 4),
-                                                          Icon(Icons.verified_rounded, size: 13, color: LaasyaColors.accentGold),
+                                                          const SizedBox(width: 4),
+                                                          Icon(
+                                                            ((ann['sender_role'] ?? '').toString().toLowerCase().contains('reception') ||
+                                                             (ann['created_by'] ?? '').toString().toLowerCase().contains('reception'))
+                                                                ? Icons.support_agent_rounded
+                                                                : Icons.verified_rounded,
+                                                            size: 13,
+                                                            color: LaasyaColors.accentGold,
+                                                          ),
                                                         ],
                                                       ),
                                                       if (typeTag != null)

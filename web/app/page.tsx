@@ -1,6 +1,6 @@
 import React from 'react';
 import LandingPageClient from '@/components/landing/LandingPageClient';
-import { getCourses, getBatches, getTrainers } from '@/lib/academy';
+import { getCourses, getBatches, getTrainers, getPublicAcademyProfile } from '@/lib/academy';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -22,10 +22,19 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function HomePage() {
-  const [courses, batches, trainers] = await Promise.all([
+  const [courses, batches, trainers, contactProfile] = await Promise.all([
     getCourses().catch(() => []),
     getBatches().catch(() => []),
     getTrainers().catch(() => []),
+    getPublicAcademyProfile().catch(() => ({
+      full_name: 'Laasya Cultural Academy',
+      designation: 'Academy Administration',
+      whatsapp_number: '+91 8151 998 899',
+      contacts: [{ title: 'Office Desk & Admissions', phone: '+91 8151 998 899' }],
+      emails: [{ title: 'Official Inquiries', email: 'admin@laasyaacademy.com' }],
+      campus_address: 'VV Maple Hub, 2nd Floor, Kannamangala, Bangalore 560115',
+      map_url: 'https://maps.app.goo.gl/BXwHcSPeUzExxR6V7',
+    })),
   ]);
 
   // Clean serialization for Client Components
@@ -87,6 +96,7 @@ export default async function HomePage() {
       initialCourses={serializedCourses}
       initialBatches={serializedBatches}
       initialTrainers={serializedTrainers}
+      contactProfile={contactProfile}
     />
   );
 }

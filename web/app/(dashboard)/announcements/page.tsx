@@ -32,6 +32,7 @@ export default async function AnnouncementsPage() {
         trainers={trainers}
         students={students}
         canDelete={canDelete}
+        userRole={user.role}
       />
     </div>
   );

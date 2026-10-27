@@ -8,6 +8,7 @@ import {
   getGuruComplianceData,
 } from '@/lib/videoLibrary';
 import { sendFcmToUser, sendFcmToBatch, sendFcmToCourse, sendFcmToRole } from '@/lib/fcm';
+import { getCurrentUser } from '@/lib/auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -86,7 +87,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    const isOwner = user?.role === 'owner';
+
     const body = await request.json();
+    const isTrainer = user?.role === 'trainer' || (body.shared_by_type === 'guru' && body.trainer_id);
+
+    if (!isOwner && !isTrainer) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Faculty or Owner access required to upload videos.' },
+        { status: 403, headers: corsHeaders }
+      );
+    }
 
     const {
       title,

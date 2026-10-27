@@ -8,8 +8,8 @@ export async function POST(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'owner') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
+      return NextResponse.json({ error: 'Unauthorized: Staff access required' }, { status: 401 });
     }
 
     const { id } = await params;

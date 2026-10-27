@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,8 +14,29 @@ export async function OPTIONS() {
 
 export async function GET(req: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Authentication required.' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
+    if (user.role !== 'owner' && user.role !== 'trainer') {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Access denied.' },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const trainerId = searchParams.get('trainerId');
+
+    // Trainers can only access their own salary records
+    let targetTrainerFilter = trainerId;
+    if (user.role === 'trainer') {
+      targetTrainerFilter = user.userId;
+    }
 
     let sql = `
       SELECT 
@@ -43,9 +65,9 @@ export async function GET(req: NextRequest) {
       JOIN public.profiles p ON t.profile_id = p.id
     `;
     const params: any[] = [];
-    if (trainerId && trainerId.trim() && trainerId !== 'null' && trainerId !== 'undefined') {
+    if (targetTrainerFilter && targetTrainerFilter.trim() && targetTrainerFilter !== 'null' && targetTrainerFilter !== 'undefined') {
       sql += ` WHERE (t.id = $1 OR t.profile_id = $1)`;
-      params.push(trainerId.trim());
+      params.push(targetTrainerFilter.trim());
     }
     sql += ` ORDER BY sr.created_at DESC;`;
 

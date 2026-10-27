@@ -18,17 +18,20 @@ import { AppShowcase } from './AppShowcase';
 import { EnquiryProvider } from './EnquiryContext';
 import { EnquiryModal } from './EnquiryModal';
 import { AiChatWidget } from './AiChatWidget';
+import type { PublicAcademyProfile } from '@/lib/academy';
 
 interface LandingPageClientProps {
   initialCourses?: CourseItem[];
   initialBatches?: BatchItem[];
   initialTrainers?: TrainerItem[];
+  contactProfile?: PublicAcademyProfile;
 }
 
 export default function LandingPageClient({
   initialCourses,
   initialBatches,
   initialTrainers,
+  contactProfile,
 }: LandingPageClientProps) {
   return (
     <EnquiryProvider>
@@ -44,11 +47,14 @@ export default function LandingPageClient({
           <WhyUs />
           <Gallery />
           <CtaBanner />
-          <Contact />
+          <Contact contactProfile={contactProfile} />
         </main>
-        <Footer />
-        <EnquiryModal />
-        <AiChatWidget />
+        <Footer contactProfile={contactProfile} />
+        <EnquiryModal whatsappNumber={contactProfile?.whatsapp_number} />
+        <AiChatWidget 
+          whatsappNumber={contactProfile?.whatsapp_number} 
+          campusAddress={contactProfile?.campus_address} 
+        />
       </div>
     </EnquiryProvider>
   );

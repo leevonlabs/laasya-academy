@@ -164,6 +164,10 @@ class FcmService {
     }
   }
 
+  /// Current operating environment: 'production' for release builds (APK/Store), 'development' for local/debug
+  static String get currentEnvironment =>
+      const String.fromEnvironment('APP_ENV', defaultValue: kReleaseMode ? 'production' : 'development');
+
   /// Get current FCM registration token
   static Future<String?> getToken() async {
     if (_cachedToken != null) return _cachedToken;
@@ -200,6 +204,7 @@ class FcmService {
     }
 
     final platform = Platform.isIOS ? 'ios' : 'android';
+    final env = currentEnvironment;
 
     // 1. Direct Supabase sync for 100% resilience
     try {
@@ -210,9 +215,10 @@ class FcmService {
         'fcm_token': token,
         'platform': platform,
         'batch_ids': batchIds ?? [],
+        'environment': env,
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'fcm_token');
-      debugPrint('[FCM] Token synced directly to Supabase device_tokens');
+      debugPrint('[FCM] Token synced directly to Supabase device_tokens (env: $env)');
     } catch (sbErr) {
       debugPrint('[FCM] Supabase direct token sync note: $sbErr');
     }
@@ -228,10 +234,11 @@ class FcmService {
           'token': token,
           'platform': platform,
           'batchIds': batchIds ?? [],
+          'environment': env,
         }),
       ).timeout(const Duration(seconds: 10));
 
-      debugPrint('[FCM] Token registered with backend: ${response.statusCode}');
+      debugPrint('[FCM] Token registered with backend: ${response.statusCode} (env: $env)');
     } catch (e) {
       debugPrint('[FCM] Failed to register token with backend: $e');
     }

@@ -35,6 +35,7 @@ export default async function GuruAnnouncementsPage() {
         defaultTab="guru_sent"
         defaultViewMode="chat"
         canDelete={canDelete}
+        userRole={user.role}
       />
     </div>
   );

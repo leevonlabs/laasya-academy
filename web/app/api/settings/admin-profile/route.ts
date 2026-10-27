@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser, updateAdminPassword } from '@/lib/auth';
+import { getCurrentUser, updateAdminPassword, verifyCurrentPassword } from '@/lib/auth';
 import { query, queryOne } from '@/lib/db';
 
 const corsHeaders = {
@@ -20,6 +20,7 @@ export async function GET() {
         p.id,
         p.full_name,
         p.phone,
+        p.whatsapp_number,
         p.email,
         p.role,
         p.avatar_url,
@@ -41,18 +42,23 @@ export async function GET() {
       full_name: cfg.full_name || profile?.full_name || 'Satya',
       avatar_url: cfg.avatar_url || profile?.avatar_url || '',
       designation: cfg.designation || 'Academy Director & Operations Lead',
+      // Private primary login phone for admin dashboard login:
+      primary_login_phone: profile?.phone || '7780763121',
+      // Official WhatsApp number for landing page link-ups:
+      whatsapp_number: cfg.whatsapp_number || profile?.whatsapp_number || '+91 8151 998 899',
+      // Public contacts displayed on landing page and bottom bar:
       contacts: (Array.isArray(cfg.contacts) && cfg.contacts.length > 0)
         ? cfg.contacts
         : [
-            { title: 'Office Desk & Admissions', phone: profile?.phone || '7780763121' }
+            { title: 'Office Desk & Admissions', phone: '+91 8151 998 899' }
           ],
       emails: (Array.isArray(cfg.emails) && cfg.emails.length > 0)
         ? cfg.emails
         : [
             { title: 'Official Inquiries', email: profile?.email || 'admin@laasyaacademy.com' }
           ],
-      campus_address: cfg.campus_address || 'Laasya Cultural Academy, Main Campus, Hyderabad',
-      map_url: cfg.map_url || 'https://maps.google.com/?q=Laasya+Cultural+Academy',
+      campus_address: cfg.campus_address || 'Laasya Cultural Academy, Main Campus, Bangalore / Hyderabad',
+      map_url: cfg.map_url || 'https://maps.app.goo.gl/BXwHcSPeUzExxR6V7',
     };
 
     return NextResponse.json({ success: true, profile: adminDetails }, { headers: corsHeaders });
@@ -67,19 +73,37 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== 'owner') {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Administrator access required.' },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
     const body = await request.json();
 
     // 1. Handle Admin Password Update
     if (body.action === 'change_password' || (body.new_password && !body.action)) {
-      const { new_password } = body;
-      if (!new_password || new_password.trim().length < 4) {
+      const { new_password, current_password } = body;
+      if (!new_password || new_password.trim().length < 6) {
         return NextResponse.json(
-          { success: false, error: 'New password must be at least 4 characters long.' },
+          { success: false, error: 'New password must be at least 6 characters long.' },
           { status: 400, headers: corsHeaders }
         );
       }
 
-      await updateAdminPassword(new_password.trim());
+      if (current_password) {
+        const isValid = await verifyCurrentPassword(user.userId, current_password);
+        if (!isValid) {
+          return NextResponse.json(
+            { success: false, error: 'Current password is incorrect.' },
+            { status: 401, headers: corsHeaders }
+          );
+        }
+      }
+
+      await updateAdminPassword(new_password.trim(), user.userId);
       return NextResponse.json({
         success: true,
         message: 'Admin password updated successfully.'
@@ -89,11 +113,13 @@ export async function POST(request: NextRequest) {
     // 2. Handle Admin Profile Edit & Save
     const fullName = (body.full_name || body.name || 'Satya').toString().trim();
     const designation = (body.designation || 'Academy Director & Operations Lead').toString().trim();
-    const campusAddress = (body.campus_address || 'Laasya Cultural Academy, Main Campus, Hyderabad').toString().trim();
+    const campusAddress = (body.campus_address || 'Laasya Cultural Academy, Main Campus, Bangalore / Hyderabad').toString().trim();
     const mapUrl = (body.map_url || '').toString().trim();
     const avatarUrl = body.avatar_url !== undefined ? body.avatar_url : null;
+    const whatsappNumber = (body.whatsapp_number || '+91 8151 998 899').toString().trim();
+    const primaryLoginPhone = (body.primary_login_phone || '').toString().trim();
 
-    // Contacts array: [{ title, phone }]
+    // Public contacts array: [{ title, phone }] (filtered to exclude developer/private contact)
     let contacts: Array<{ title: string; phone: string }> = [];
     if (Array.isArray(body.contacts)) {
       contacts = body.contacts
@@ -104,7 +130,7 @@ export async function POST(request: NextRequest) {
         }));
     }
     if (contacts.length === 0) {
-      contacts = [{ title: 'Office Desk & Admissions', phone: '7780763121' }];
+      contacts = [{ title: 'Office Desk & Admissions', phone: whatsappNumber || '+91 8151 998 899' }];
     }
 
     // Emails array: [{ title, email }]
@@ -125,6 +151,7 @@ export async function POST(request: NextRequest) {
       full_name: fullName,
       avatar_url: avatarUrl,
       designation,
+      whatsapp_number: whatsappNumber,
       contacts,
       emails,
       campus_address: campusAddress,
@@ -142,35 +169,41 @@ export async function POST(request: NextRequest) {
     `, [
       'admin_support_profile',
       JSON.stringify(supportConfig),
-      'Official academy support directory and admin contact information'
+      'Official academy support directory, public WhatsApp, and contact information'
     ]);
 
-    // Also sync to public.profiles table for the owner
-    const primaryPhone = contacts[0]?.phone || '7780763121';
+    // Update public.profiles table for the owner:
+    // Update whatsapp_number, and if primary_login_phone is provided, update phone (admin dashboard login credential)
     const currentUser = await getCurrentUser();
     if (currentUser?.userId) {
       await query(`
         UPDATE public.profiles
         SET full_name = $1,
-            phone = COALESCE($2, phone),
-            avatar_url = COALESCE($3, avatar_url),
+            avatar_url = COALESCE($2, avatar_url),
+            whatsapp_number = $3,
+            phone = CASE WHEN LENGTH($4) > 0 THEN $4 ELSE phone END,
             updated_at = NOW()
-        WHERE id = $4;
-      `, [fullName, primaryPhone, avatarUrl, currentUser.userId]);
+        WHERE id = $5;
+      `, [fullName, avatarUrl, whatsappNumber, primaryLoginPhone, currentUser.userId]);
     } else {
       await query(`
         UPDATE public.profiles
         SET full_name = $1,
             avatar_url = COALESCE($2, avatar_url),
+            whatsapp_number = $3,
+            phone = CASE WHEN LENGTH($4) > 0 THEN $4 ELSE phone END,
             updated_at = NOW()
         WHERE role = 'owner';
-      `, [fullName, avatarUrl]);
+      `, [fullName, avatarUrl, whatsappNumber, primaryLoginPhone]);
     }
 
     return NextResponse.json({
       success: true,
       message: 'Admin profile updated successfully!',
-      profile: supportConfig
+      profile: {
+        ...supportConfig,
+        primary_login_phone: primaryLoginPhone || '7780763121'
+      }
     }, { headers: corsHeaders });
   } catch (error: any) {
     console.error('Error updating admin profile:', error);
@@ -179,4 +212,8 @@ export async function POST(request: NextRequest) {
       { status: 500, headers: corsHeaders }
     );
   }
+}
+
+export async function PUT(request: NextRequest) {
+  return POST(request);
 }

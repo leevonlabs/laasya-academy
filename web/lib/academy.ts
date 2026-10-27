@@ -1728,7 +1728,7 @@ export async function getGuruAttendanceAuditRecords(options?: {
   const params: any[] = [];
   if (options?.trainerId && options.trainerId !== 'all') {
     params.push(options.trainerId);
-    sql += ` AND t.id = $${params.length}`;
+    sql += ` AND (t.id = $${params.length} OR t.profile_id = $${params.length})`;
   }
   if (options?.courseId && options.courseId !== 'all') {
     params.push(options.courseId);
@@ -1852,3 +1852,50 @@ export async function deleteScheme(id: string) {
   `, [id]);
 }
 
+
+// --------------------------------------------------------------------------
+// PUBLIC ACADEMY DIRECTORY & CONTACT PROFILE
+// --------------------------------------------------------------------------
+export interface PublicAcademyProfile {
+  full_name: string;
+  designation: string;
+  whatsapp_number: string;
+  contacts: Array<{ title: string; phone: string }>;
+  emails: Array<{ title: string; email: string }>;
+  campus_address: string;
+  map_url: string;
+  avatar_url?: string;
+}
+
+export async function getPublicAcademyProfile(): Promise<PublicAcademyProfile> {
+  const row = await queryOne<{ config_value: any }>(
+    "SELECT config_value FROM public.app_config WHERE config_key = 'admin_support_profile' LIMIT 1"
+  );
+  const cfg = row?.config_value || {};
+
+  // Clean contacts: only public helpline & office desk numbers (strictly filter out private login contact)
+  const contacts = (Array.isArray(cfg.contacts) ? cfg.contacts : [])
+    .filter((c: any) => c && c.phone && !String(c.phone).includes('7780763121'))
+    .map((c: any) => ({
+      title: String(c.title || 'Office Desk').trim(),
+      phone: String(c.phone || '').trim(),
+    }));
+
+  const whatsappNumber = cfg.whatsapp_number || '+91 8151 998 899';
+
+  return {
+    full_name: cfg.full_name || 'Laasya Cultural Academy',
+    designation: cfg.designation || 'Academy Administration',
+    whatsapp_number: whatsappNumber,
+    contacts: contacts.length > 0 ? contacts : [{ title: 'Office Desk & Admissions', phone: whatsappNumber }],
+    emails: Array.isArray(cfg.emails) && cfg.emails.length > 0
+      ? cfg.emails.map((e: any) => ({
+          title: String(e.title || 'Official Inquiries').trim(),
+          email: String(e.email || 'admin@laasyaacademy.com').trim(),
+        }))
+      : [{ title: 'Official Inquiries', email: 'admin@laasyaacademy.com' }],
+    campus_address: cfg.campus_address || 'VV Maple Hub, 2nd Floor, Kannamangala, Bangalore 560115',
+    map_url: cfg.map_url || 'https://maps.app.goo.gl/BXwHcSPeUzExxR6V7',
+    avatar_url: cfg.avatar_url || '',
+  };
+}

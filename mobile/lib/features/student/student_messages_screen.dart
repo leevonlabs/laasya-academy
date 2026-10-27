@@ -789,10 +789,14 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                                               (msg['sender_role'] ?? '').toString().toLowerCase().contains('guru') ||
                                               msg['trainer_id'] != null ||
                                               (msg['trainer_name'] != null && msg['trainer_name'].toString().trim().isNotEmpty));
+                              final isReception = (msg['sender_role'] ?? '').toString().toLowerCase().contains('reception') ||
+                                                  (msg['created_by'] ?? '').toString().toLowerCase().contains('reception');
                               String sender;
                               if (isGuru) {
                                 final tName = (msg['trainer_name'] ?? msg['created_by'] ?? 'Faculty').toString().trim();
                                 sender = tName.toLowerCase().startsWith('guru') ? tName : 'Guru $tName';
+                              } else if (isReception) {
+                                sender = msg['created_by'] ?? 'Reception';
                               } else {
                                 sender = msg['created_by'] ?? msg['sender_name'] ?? 'Academy Director';
                               }
@@ -918,13 +922,17 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                                                         child: Text(
                                                           ((msg['sender_role'] ?? '').toString().toLowerCase().contains('trainer') || (msg['sender_role'] ?? '').toString().toLowerCase().contains('guru') || msg['trainer_id'] != null)
                                                               ? 'Guru / Trainer'
-                                                              : 'Admin / Director',
+                                                              : isReception
+                                                                  ? 'Reception'
+                                                                  : 'Admin / Director',
                                                           style: TextStyle(
                                                             fontSize: 8.5,
                                                             fontWeight: FontWeight.bold,
                                                             color: ((msg['sender_role'] ?? '').toString().toLowerCase().contains('trainer') || (msg['sender_role'] ?? '').toString().toLowerCase().contains('guru') || msg['trainer_id'] != null)
                                                                 ? const Color(0xFFC2410C)
-                                                                : const Color(0xFF075E54),
+                                                                : isReception
+                                                                    ? const Color(0xFF8A064D)
+                                                                    : const Color(0xFF075E54),
                                                           ),
                                                         ),
                                                       ),
@@ -1179,7 +1187,13 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
         margin: const EdgeInsets.only(top: 2),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFF075E54), width: 1.5),
+          border: Border.all(
+            color: ((msg['sender_role'] ?? '').toString().toLowerCase().contains('reception') ||
+                    (msg['created_by'] ?? '').toString().toLowerCase().contains('reception'))
+                ? const Color(0xFF8A064D)
+                : const Color(0xFF075E54),
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.12),
@@ -1199,10 +1213,16 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                     width: 30,
                     height: 30,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const CircleAvatar(
+                    errorBuilder: (_, __, ___) => CircleAvatar(
                       radius: 17,
                       backgroundColor: Color(0xFF075E54),
-                      child: Text('👑', style: TextStyle(fontSize: 14)),
+                      child: Text(
+                        ((msg['sender_role'] ?? '').toString().toLowerCase().contains('reception') ||
+                         (msg['created_by'] ?? '').toString().toLowerCase().contains('reception'))
+                            ? '🛎️'
+                            : '👑',
+                        style: const TextStyle(fontSize: 14),
+                      ),
                     ),
                   ),
                 )

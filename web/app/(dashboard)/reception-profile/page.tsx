@@ -34,7 +34,7 @@ export default async function ReceptionProfilePage() {
     receptionist = {
       id: user.userId,
       full_name: user.fullName || 'Receptionist',
-      phone: user.email?.split('@')[0] || '7780763121',
+      phone: user.email?.split('@')[0] || '',
       email: user.email,
       age: 26,
       alternative_phone: '9848022338',

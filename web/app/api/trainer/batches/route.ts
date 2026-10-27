@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { query, queryOne } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -43,10 +44,50 @@ export async function GET(request: NextRequest) {
       LEFT JOIN public.profiles p ON t.profile_id = p.id
     `;
 
-    let batches: any[] = [];
+    const user = await getCurrentUser();
+    const isStaff = user && (user.role === 'owner' || user.role === 'receptionist');
+
     const cleanId = (trainerId || '').trim();
     const cleanPhone = (phone || '').replace(/\D/g, '');
     const cleanName = (trainerName || '').trim();
+
+    if (!isStaff) {
+      if (!cleanId && cleanPhone.length < 6 && !cleanName) {
+        return NextResponse.json(
+          { success: false, error: 'Authentication required: Active faculty credentials must be provided.' },
+          { status: 401, headers: corsHeaders }
+        );
+      }
+
+      let verifiedTrainer: any = null;
+      if (cleanId && cleanId !== 'null' && cleanId !== 'undefined') {
+        verifiedTrainer = await queryOne(
+          `SELECT t.id, t.status FROM public.trainers t WHERE (t.id = $1 OR t.profile_id = $1) AND t.status = 'Active' LIMIT 1`,
+          [cleanId]
+        );
+      }
+      if (!verifiedTrainer && cleanPhone.length >= 6) {
+        verifiedTrainer = await queryOne(
+          `SELECT t.id, t.status FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%' AND t.status = 'Active' LIMIT 1`,
+          [cleanPhone]
+        );
+      }
+      if (!verifiedTrainer && cleanName && cleanName !== 'null' && cleanName !== 'undefined') {
+        verifiedTrainer = await queryOne(
+          `SELECT t.id, t.status FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE p.full_name ILIKE $1 AND t.status = 'Active' LIMIT 1`,
+          [`%${cleanName}%`]
+        );
+      }
+
+      if (!verifiedTrainer) {
+        return NextResponse.json(
+          { success: false, error: 'Access denied: Active faculty account required.' },
+          { status: 403, headers: corsHeaders }
+        );
+      }
+    }
+
+    let batches: any[] = [];
 
     // 1. Primary lookup by trainer UUID / profile ID
     if (cleanId && cleanId !== 'null' && cleanId !== 'undefined') {

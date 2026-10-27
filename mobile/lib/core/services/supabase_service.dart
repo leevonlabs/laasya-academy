@@ -398,9 +398,11 @@ class SupabaseService {
     await _clearProfileFromPrefs();
 
     if (loginId.isEmpty) {
-      throw Exception('Please enter your .');
+      throw Exception('Please enter your mobile number or roll number.');
     }
-    // password optional
+    if (password == null || password.trim().isEmpty) {
+      throw Exception('Please enter your password.');
+    }
 
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/auth/mobile-login');
@@ -409,7 +411,7 @@ class SupabaseService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'identifier': loginId,
-          'password': (password != null && password.trim().isNotEmpty) ? password.trim() : '123456',
+          'password': password.trim(),
           if (role != null) 'role': role,
         }),
       ).timeout(const Duration(seconds: 15));
@@ -574,6 +576,51 @@ class SupabaseService {
   }) async {
     // In live cloud mode, calls client.auth.updateUser(UserAttributes(password: newPassword))
     return true;
+  }
+
+  Future<String?> getAuthToken() async {
+    final cached = _cachedProfile?['token']?.toString();
+    if (cached != null && cached.isNotEmpty) {
+      return cached;
+    }
+    try {
+      final profile = await getCurrentUserProfile();
+      final token = profile?['token']?.toString();
+      if (token != null && token.isNotEmpty) {
+        _cachedProfile?['token'] = token;
+        return token;
+      }
+      final profileId = profile?['profile_id']?.toString() ?? profile?['id']?.toString();
+      final phone = profile?['phone']?.toString() ?? profile?['parent_phone']?.toString() ?? '';
+      final rollNumber = profile?['roll_number']?.toString() ?? '';
+      final role = profile?['role']?.toString() ?? 'student';
+      if (profileId != null || rollNumber.isNotEmpty) {
+        final res = await http.post(
+          Uri.parse('${ApiConstants.baseUrl}/api/auth/token'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'profileId': profileId ?? '',
+            'phone': phone,
+            'rollNumber': rollNumber,
+            'role': role,
+          }),
+        ).timeout(const Duration(seconds: 8));
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body);
+          final newToken = data['token']?.toString();
+          if (newToken != null && newToken.isNotEmpty) {
+            _cachedProfile?['token'] = newToken;
+            if (_cachedProfile != null) {
+              await _saveProfileToPrefs(_cachedProfile!);
+            }
+            return newToken;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to get or refresh auth token: $e');
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -2295,7 +2342,9 @@ class SupabaseService {
 
   Future<List<Map<String, dynamic>>> _fetchLiveStudentPayments() async {
     try {
-      final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/student-payments');
+      final sId = (_cachedProfile?['student_id'] ?? _cachedProfile?['id'] ?? '').toString();
+      final roll = (_cachedProfile?['roll_number'] ?? _cachedProfile?['roll'] ?? '').toString();
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/student-payments?studentId=${Uri.encodeComponent(sId)}&rollNumber=${Uri.encodeComponent(roll)}');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);

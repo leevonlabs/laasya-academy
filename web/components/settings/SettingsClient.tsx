@@ -28,6 +28,7 @@ import {
   Trash2,
   MapPin,
   ExternalLink,
+  MessageCircle,
   Upload,
   Image as ImageIcon
 } from 'lucide-react';
@@ -56,6 +57,8 @@ export default function SettingsClient({
     full_name: string;
     avatar_url: string;
     designation: string;
+    primary_login_phone: string;
+    whatsapp_number: string;
     contacts: Array<{ title: string; phone: string }>;
     emails: Array<{ title: string; email: string }>;
     campus_address: string;
@@ -64,10 +67,12 @@ export default function SettingsClient({
     full_name: 'Satya',
     avatar_url: '',
     designation: 'Academy Director & Operations Lead',
-    contacts: [{ title: 'Office Desk & Admissions', phone: '7780763121' }],
+    primary_login_phone: '7780763121',
+    whatsapp_number: '+91 8151 998 899',
+    contacts: [{ title: 'Office Desk & Admissions', phone: '+91 8151 998 899' }],
     emails: [{ title: 'Official Inquiries', email: 'admin@laasyaacademy.com' }],
-    campus_address: 'Laasya Cultural Academy, Main Campus, Hyderabad',
-    map_url: 'https://maps.google.com/?q=Laasya+Cultural+Academy'
+    campus_address: 'VV Maple Hub, 2nd Floor, Kannamangala, Bangalore 560115',
+    map_url: 'https://maps.app.goo.gl/BXwHcSPeUzExxR6V7'
   });
 
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
@@ -383,12 +388,24 @@ export default function SettingsClient({
                   {adminProfile.full_name}
                 </h2>
                 <div className="text-xs sm:text-sm text-rose-100/90 flex flex-wrap items-center gap-3">
+                  {adminProfile.whatsapp_number && (
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(adminProfile.whatsapp_number, 'hero_wa')}
+                      className="flex items-center gap-1.5 font-mono font-bold text-emerald-300 bg-emerald-950/40 hover:bg-emerald-900/60 px-2.5 py-1 rounded-xl transition cursor-pointer border border-emerald-500/30"
+                      title="Click to copy official WhatsApp number"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{adminProfile.whatsapp_number}</span>
+                      {copiedIndex === 'hero_wa' ? <Check className="w-3 h-3 text-emerald-400 ml-1" /> : <Copy className="w-3 h-3 text-white/50 ml-1" />}
+                    </button>
+                  )}
                   {adminProfile.contacts.length > 0 && (
                     <button
                       type="button"
                       onClick={() => copyToClipboard(adminProfile.contacts[0].phone, 'hero_phone')}
                       className="flex items-center gap-1.5 font-mono font-bold text-[#F9E33A] bg-black/20 hover:bg-black/40 px-2.5 py-1 rounded-xl transition cursor-pointer border border-[#D4AF37]/20"
-                      title="Click to copy admin phone"
+                      title="Click to copy public helpline"
                     >
                       <Phone className="w-3.5 h-3.5" />
                       <span>{adminProfile.contacts[0].phone}</span>
@@ -472,11 +489,75 @@ export default function SettingsClient({
                     <span className="text-sm font-bold text-gray-800 mt-1 block">{adminProfile.designation}</span>
                   </div>
 
+                  {/* Primary Admin Dashboard Login Contact (Private) */}
+                  <div className="bg-[#FFFDF5] p-4 rounded-2xl border border-amber-300/80 sm:col-span-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-700" />
+                        <span className="text-[11px] text-amber-900 font-bold uppercase tracking-wider">
+                          Primary Admin Dashboard Login Contact (Private)
+                        </span>
+                      </div>
+                      <span className="inline-block text-[10px] bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full font-bold">
+                        Admin Login Credential · Hidden From Landing Page
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-amber-200 mt-2">
+                      <div>
+                        <span className="text-[10px] font-bold text-amber-800 uppercase block">Login Account Contact</span>
+                        <span className="text-xs font-mono font-bold text-gray-900">{adminProfile.primary_login_phone || '7780763121'}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(adminProfile.primary_login_phone, 'login_phone')}
+                        className="p-1.5 text-gray-400 hover:text-amber-800 rounded-lg hover:bg-amber-50 cursor-pointer"
+                        title="Copy login phone"
+                      >
+                        {copiedIndex === 'login_phone' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-amber-800/80 mt-1.5 leading-relaxed">
+                      This number is used strictly for authenticating into the Admin Portal dashboard. It is never displayed on the public landing page.
+                    </p>
+                  </div>
+
+                  {/* Official WhatsApp Number (Public) */}
+                  <div className="bg-[#F0FDF4] p-4 rounded-2xl border border-emerald-300 sm:col-span-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <MessageCircle className="w-3.5 h-3.5 text-emerald-700" />
+                        <span className="text-[11px] text-emerald-900 font-bold uppercase tracking-wider">
+                          Official Academy WhatsApp Number (Public Admissions)
+                        </span>
+                      </div>
+                      <span className="inline-block text-[10px] bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                        Linked To Landing Page &amp; Chatbot
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-emerald-200 mt-2">
+                      <div>
+                        <span className="text-[10px] font-bold text-emerald-800 uppercase block">Landing Page WhatsApp Link</span>
+                        <span className="text-xs font-mono font-bold text-emerald-950">{adminProfile.whatsapp_number || '+91 8151 998 899'}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(adminProfile.whatsapp_number, 'wa_phone')}
+                        className="p-1.5 text-emerald-600 hover:text-emerald-800 rounded-lg hover:bg-emerald-50 cursor-pointer"
+                        title="Copy WhatsApp"
+                      >
+                        {copiedIndex === 'wa_phone' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-emerald-800/80 mt-1.5 leading-relaxed">
+                      All "Book Trial", "Send Enquiry", floating WhatsApp buttons, and AI Admissions assistant across the landing page link up directly to this contact.
+                    </p>
+                  </div>
+
                   {/* Contacts */}
                   <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Contact Numbers</span>
-                      <span className="text-[10px] text-gray-400 font-medium">{adminProfile.contacts.length} registered</span>
+                      <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Public Office &amp; Helpline Numbers</span>
+                      <span className="text-[10px] text-gray-400 font-medium">{adminProfile.contacts.length} displayed on website</span>
                     </div>
                     <div className="space-y-2">
                       {adminProfile.contacts.map((c, i) => (
@@ -719,12 +800,53 @@ export default function SettingsClient({
                     />
                   </div>
 
+                  {/* Primary Admin Dashboard Login Contact (Private) */}
+                  <div className="bg-[#FFFDF5] p-3.5 rounded-2xl border border-amber-300">
+                    <label className="block text-xs font-bold text-amber-950 mb-1">
+                      Primary Admin Dashboard Login Contact (Private) *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={editProfileForm.primary_login_phone}
+                      onChange={(e) => setEditProfileForm(prev => ({ ...prev, primary_login_phone: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-amber-300 bg-white text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500"
+                      placeholder="e.g. 7780763121"
+                    />
+                    <p className="text-[11px] text-amber-800 mt-1">
+                      🔒 <strong>Private Credential:</strong> Used strictly for signing into this Admin Dashboard. This number will <strong>NEVER</strong> be displayed on the public landing page.
+                    </p>
+                  </div>
+
+                  {/* Official Academy WhatsApp Number (Public) */}
+                  <div className="bg-[#F0FDF4] p-3.5 rounded-2xl border border-emerald-300">
+                    <label className="block text-xs font-bold text-emerald-950 mb-1">
+                      Official Academy WhatsApp Number (Public Admissions) *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={editProfileForm.whatsapp_number}
+                      onChange={(e) => setEditProfileForm(prev => ({ ...prev, whatsapp_number: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-300 bg-white text-xs font-mono font-bold focus:ring-2 focus:ring-emerald-500"
+                      placeholder="e.g. +91 8151 998 899"
+                    />
+                    <p className="text-[11px] text-emerald-800 mt-1">
+                      💬 <strong>Public Link-Up:</strong> All website WhatsApp buttons, "Book Trial / Send Enquiry" forms, and AI chatbot link up directly to this contact.
+                    </p>
+                  </div>
+
                   {/* Contacts List */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="block text-xs font-bold text-[#2D041A]">
-                        Contact Numbers (Title & Phone)
-                      </label>
+                      <div>
+                        <label className="block text-xs font-bold text-[#2D041A]">
+                          Public Office &amp; Helpline Numbers
+                        </label>
+                        <p className="text-[10px] text-gray-500">
+                          Displayed publicly on the landing page contact cards and footer bottom bar.
+                        </p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => setEditProfileForm(prev => ({
@@ -759,7 +881,7 @@ export default function SettingsClient({
                               newC[i].phone = e.target.value;
                               setEditProfileForm(prev => ({ ...prev, contacts: newC }));
                             }}
-                            placeholder="Phone (e.g. 7780763121)"
+                            placeholder="Phone (e.g. +91 8151 998 899)"
                             className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs font-mono"
                           />
                           {editProfileForm.contacts.length > 1 && (

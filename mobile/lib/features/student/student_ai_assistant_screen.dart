@@ -30,6 +30,14 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
 
+  final List<String> _quickSuggestions = [
+    '📚 What batches are assigned to me?',
+    '📅 Do I have a class today?',
+    '⏰ What is my next class?',
+    '📆 My classes this week',
+    '✨ Any extra or make-up classes?',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -45,12 +53,13 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
         role: 'assistant',
         text: 'Namaste, $studentName! 🙏\n\n'
             'I am your personal **Laasya AI Learning Companion**.\n\n'
-            'I can guide you on:\n'
-            '• Daily practice drills and warmup routines\n'
-            '• Classical mudras, adavus, and vocal exercises\n'
-            '• Class schedule, batch timings, and holiday alerts\n'
-            '• Event video library & guru feedback questions\n\n'
-            'What would you like assistance with today?',
+            'You can ask me:\n'
+            '• "What batches are assigned to me?"\n'
+            '• "Do I have a class today?"\n'
+            '• "What is my next class?"\n'
+            '• "What are my classes this week?"\n'
+            '• "Are any extra or make-up classes available for me?"\n\n'
+            'How may I assist your practice today?',
         timestamp: DateTime.now(),
       ),
     );
@@ -93,7 +102,34 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
     _scrollToBottom();
 
     try {
+      final token = await SupabaseService().getAuthToken();
+
+      if (token == null || token.isEmpty) {
+        // Fallback to verified local cached student profile to prevent public-mode downgrade
+        if (mounted) {
+          setState(() {
+            _messages.add(
+              ChatMessage(
+                role: 'assistant',
+                text: _localKnowledgeReply(trimmed),
+                timestamp: DateTime.now(),
+              ),
+            );
+            _isLoading = false;
+          });
+          _scrollToBottom();
+        }
+        return;
+      }
+
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        'X-Chat-Mode': 'student',
+      };
+
       final payload = {
+        'mode': 'student',
         'messages': _messages.map((m) => {
           'role': m.role,
           'content': m.text,
@@ -103,14 +139,17 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/ai-chat');
       final res = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 15));
 
       String reply = '';
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         reply = data['reply']?.toString() ?? '';
+      } else if (res.statusCode == 401) {
+        reply = '🔒 **Session Expired or Sign-In Required**\n\n'
+            'Your student session could not be verified or has expired. Please sign out and sign in again to view your personal timetable and assigned batches.';
       }
 
       if (reply.trim().isEmpty) {
@@ -148,37 +187,196 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
   }
 
   String _localKnowledgeReply(String query) {
+    final profile = SupabaseService().currentUserProfile;
+    final studentName = profile?['full_name']?.toString() ?? 'Disciple';
+    final courses = (profile?['enrolled_courses'] as List<dynamic>?) ?? [];
     final q = query.toLowerCase();
-    if (q.contains('practice') || q.contains('warm') || q.contains('drill')) {
+
+    if (courses.isEmpty) {
+      return 'Namaste, **$studentName**! 🙏\n\n'
+          'You are currently not enrolled in an active batch. Please speak with academy administration or visit the reception desk to complete your batch allocation.';
+    }
+
+    if (q.contains('assigned') || q.contains('my batch') || q.contains('what batches') || q.contains('which batch') || q.contains('batches assigned')) {
+      var resp = 'Namaste, **$studentName**! 🙏\n\n'
+          '**Your Assigned Batches & Schedule:**\n\n';
+      for (final c in courses) {
+        resp += '• **${c['title']} — ${c['batch_name']}:** ${c['timings'] ?? 'Regular timing'}\n'
+            '  📍 Venue: ${c['room'] ?? 'Studio'} | Guru: ${c['trainer_name'] ?? 'Assigned Guru'}\n';
+      }
+      return resp;
+    }
+
+    if (q.contains('today') || q.contains('class today')) {
+      final now = DateTime.now();
+      final weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      final todayName = weekdays[now.weekday - 1];
+
+      final todayBatches = courses.where((c) {
+        final days = c['days_of_week'];
+        if (days is List) {
+          return days.any((d) => d.toString().toLowerCase() == todayName.toLowerCase());
+        }
+        return false;
+      }).toList();
+
+      if (todayBatches.isNotEmpty) {
+        var resp = 'Namaste, **$studentName**! 🙏\n\n'
+            '**Yes, you have class today ($todayName):**\n\n';
+        for (final b in todayBatches) {
+          resp += '• **${b['title']} (${b['batch_name']}):** ${b['timings'] ?? 'Regular timing'}\n'
+              '  📍 Venue: ${b['room'] ?? 'Studio'} | Guru: ${b['trainer_name'] ?? 'Faculty Guru'}\n';
+        }
+        return resp;
+      } else {
+        return 'Namaste, **$studentName**! 🙏\n\n'
+            '**No classes are scheduled for you today ($todayName).**\n\n'
+            'Your enrolled batches run on:\n'
+            '${courses.map((c) => '• ${c['title']} (${c['batch_name']}): ${c['timings']}').join('\n')}';
+      }
+    } else if (q.contains('timing') || q.contains('schedule') || q.contains('batch')) {
+      var resp = 'Namaste, **$studentName**! 🙏\n\n'
+          '**Your Enrolled Batch Timetable:**\n\n';
+      for (final c in courses) {
+        resp += '• **${c['title']} (${c['batch_name']}):** ${c['timings']}\n'
+            '  📍 Venue: ${c['room'] ?? 'Studio'} | Guru: ${c['trainer_name'] ?? 'Assigned Guru'}\n';
+      }
+      return resp;
+    } else if (q.contains('extra') || q.contains('make-up') || q.contains('makeup') || q.contains('tally')) {
+      return 'Namaste, **$studentName**! 🙏\n\n'
+          'Extra and make-up classes are scheduled when regular sessions are impacted by holidays or Guru leave.\n\n'
+          'Currently, no special make-up classes are pending for your batches. Regular classes follow your standard timetable.';
+    } else if (q.contains('practice') || q.contains('warm') || q.contains('drill')) {
       return '🧘 **Recommended Daily Practice Routine:**\n\n'
           '1. **Warm-Up (10 mins):** Neck rotations, arm circles, ankle stretching, and Suryanamaskar.\n'
           '2. **Technical Basics (20 mins):** Practice fundamental steps (Tatta Adavu / Natta Adavu for dance, or Sarali Varisai in 3 speeds for music).\n'
           '3. **Core Repertoire (25 mins):** Practice the specific item assigned by your Guru in your latest session.\n'
           '4. **Cool Down (5 mins):** Deep breathing and namaskaram.\n\n'
           'Consistent daily 45-minute practice yields the greatest artistic transformation!';
-    } else if (q.contains('timing') || q.contains('schedule') || q.contains('class') || q.contains('time')) {
-      return '⏰ **Academy Schedule & Timings:**\n\n'
-          '• **Weekday Classes (Mon–Fri):** 08:30 AM – 08:30 PM\n'
-          '• **Weekend Classes (Sat–Sun):** 07:30 AM – 08:30 PM\n\n'
-          'You can see your enrolled batch timing directly in the **"Schedule"** tab of this app!';
-    } else if (q.contains('mudra') || q.contains('dance') || q.contains('bharat')) {
-      return '💃 **Classical Dance Foundations:**\n\n'
-          '• **Asamyutta Hastas (Single Hand Mudras):** Pataka, Tripataka, Ardhapataka, Kartarimukha...\n'
-          '• **Posture:** Maintain Aramandi (half-sit) with erect spine and focused eye movements (Drishti Bhedas).\n'
-          '• Check the **"Videos"** library tab in the app to view monthly practice recordings shared by your Guru!';
-    } else if (q.contains('vocal') || q.contains('carnatic') || q.contains('raga') || q.contains('music')) {
-      return '🎶 **Carnatic Vocal Fundamentals:**\n\n'
-          '• **Akaram Practice:** Sing basic swara exercises in Akaram to cultivate voice flexibility and resonance.\n'
-          '• **Shruti Alignment:** Always align precisely with your Tanpura pitch (Sa - Pa - Sa).\n'
-          '• **Tala Keeping:** Maintain steady hand counts with the appropriate Jaathi & Tala beats.';
-    } else if (q.contains('attendance') || q.contains('leave') || q.contains('absent')) {
-      return '📋 **Attendance Policy:**\n\n'
-          '• Students should maintain at least **80% attendance** for annual showcase eligibility and certification.\n'
-          '• When taking planned leave, please notify your Guru in advance through the Messages tab.';
     }
 
-    return 'Namaste! 🙏 I am here to help you excel in your classical arts training.\n\n'
-        'You can ask me about practice techniques, mudras, vocal exercises, syllabus, or academy batch schedules!';
+    return 'Namaste, **$studentName**! 🙏\n\n'
+        'You can ask me about:\n'
+        '• "What batches are assigned to me?"\n'
+        '• "Do I have a class today?"\n'
+        '• "What is my next class?"\n'
+        '• "What are my classes this week?"\n'
+        '• "What are my batch timings?"';
+  }
+
+  Widget _buildFormattedMessage(String text, bool isUser) {
+    if (isUser) {
+      return Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+          height: 1.45,
+        ),
+      );
+    }
+
+    final lines = text.split('\n');
+    final widgets = <Widget>[];
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isEmpty) {
+        widgets.add(const SizedBox(height: 5));
+        continue;
+      }
+
+      if (line == '---' || line == '***' || line == '___') {
+        widgets.add(const Divider(color: Color(0xFFE2D4DC), height: 12));
+        continue;
+      }
+
+      if (line.startsWith('### ') || line.startsWith('## ') || line.startsWith('# ')) {
+        final headingText = line.replaceFirst(RegExp(r'^#+\s*'), '');
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 3),
+            child: Text(
+              headingText,
+              style: const TextStyle(
+                color: LaasyaColors.primary,
+                fontSize: 13.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
+        continue;
+      }
+
+      final isBullet = line.startsWith('• ') || line.startsWith('* ') || line.startsWith('- ');
+      final content = isBullet ? line.substring(2) : line;
+
+      final spans = <TextSpan>[];
+      final regex = RegExp(r'\*\*(.*?)\*\*');
+      int lastIndex = 0;
+
+      for (final match in regex.allMatches(content)) {
+        if (match.start > lastIndex) {
+          spans.add(TextSpan(
+            text: content.substring(lastIndex, match.start),
+            style: const TextStyle(color: Color(0xFF220314), fontSize: 13, height: 1.4),
+          ));
+        }
+        spans.add(TextSpan(
+          text: match.group(1),
+          style: const TextStyle(
+            color: LaasyaColors.primary,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            height: 1.4,
+          ),
+        ));
+        lastIndex = match.end;
+      }
+
+      if (lastIndex < content.length) {
+        spans.add(TextSpan(
+          text: content.substring(lastIndex),
+          style: const TextStyle(color: Color(0xFF220314), fontSize: 13, height: 1.4),
+        ));
+      }
+
+      if (isBullet) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 1.5, bottom: 1.5, left: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 6, right: 6),
+                  child: CircleAvatar(
+                    radius: 2.5,
+                    backgroundColor: LaasyaColors.primary,
+                  ),
+                ),
+                Expanded(
+                  child: RichText(text: TextSpan(children: spans)),
+                ),
+              ],
+            ),
+          ),
+        );
+      } else {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 1),
+            child: RichText(text: TextSpan(children: spans)),
+          ),
+        );
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
   }
 
   @override
@@ -289,14 +487,7 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                msg.text,
-                                style: TextStyle(
-                                  color: isUser ? Colors.white : const Color(0xFF220314),
-                                  fontSize: 13,
-                                  height: 1.45,
-                                ),
-                              ),
+                              _buildFormattedMessage(msg.text, isUser),
                               const SizedBox(height: 4),
                               Text(
                                 '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
@@ -347,6 +538,36 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
               ),
             ),
 
+          // Quick Suggestion Chips
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            color: Colors.white,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _quickSuggestions.map((suggestion) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ActionChip(
+                      label: Text(
+                        suggestion,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: LaasyaColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      backgroundColor: const Color(0xFFFAF5F7),
+                      side: const BorderSide(color: Color(0xFFD4BAC7)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      onPressed: _isLoading ? null : () => _sendMessage(suggestion),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+
           // Input Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -375,7 +596,7 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
                         textInputAction: TextInputAction.send,
                         onSubmitted: _sendMessage,
                         decoration: const InputDecoration(
-                          hintText: 'Ask your AI assistant anything...',
+                          hintText: 'Ask about your schedule, assigned batches, practice...',
                           hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
                           contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           border: InputBorder.none,

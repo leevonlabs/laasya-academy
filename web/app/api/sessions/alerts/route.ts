@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { sendFcmToBatch } from '@/lib/fcm';
+import { getCurrentUser } from '@/lib/auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,6 +15,9 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    const isOwner = user?.role === 'owner';
+
     const body = await request.json();
     const { batch_id, batch_name, course_title, trainer_name, message } = body;
 
@@ -22,6 +26,23 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'batch_id, batch_name, and course_title are required.' },
         { status: 400, headers: corsHeaders }
       );
+    }
+
+    if (!isOwner) {
+      // Must be an active batch assigned to an active trainer
+      const batchCheck = await queryOne<{ id: string }>(`
+        SELECT b.id FROM public.batches b
+        JOIN public.trainers t ON b.trainer_id = t.id
+        WHERE (b.id::text = $1 OR LOWER(b.name) = LOWER($2)) AND t.is_active = true
+        LIMIT 1;
+      `, [batch_id, batch_name]);
+
+      if (!batchCheck) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized: Valid faculty assignment required for this batch.' },
+          { status: 403, headers: corsHeaders }
+        );
+      }
     }
 
     const alertMessage = message || `Class Completed! Please come to collect your child. The ${course_title} (${batch_name}) session has concluded. Please take your child back from the academy hall safely.`;

@@ -212,3 +212,16 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .animate-scroll-hint {
   animation: bounce-soft 2.2s ease-in-out infinite;
 }
+
+@keyframes shine {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+
+.animate-shine {
+  animation: shine 4s linear infinite;
+}

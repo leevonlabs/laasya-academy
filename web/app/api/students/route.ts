@@ -3,6 +3,11 @@ import { getCurrentUser } from '@/lib/auth';
 import { getStudents, createStudent, updateStudent, deleteStudent } from '@/lib/academy';
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
+    return NextResponse.json({ error: 'Unauthorized: Staff access required' }, { status: 403 });
+  }
+
   const students = await getStudents();
   return NextResponse.json(students);
 }

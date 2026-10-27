@@ -3,7 +3,38 @@ import { getCurrentUser } from '@/lib/auth';
 import { getTrainers, createTrainer, updateTrainer, deleteTrainer } from '@/lib/academy';
 
 export async function GET() {
+  const user = await getCurrentUser();
   const trainers = await getTrainers();
+  const isStaff = user?.role === 'owner' || user?.role === 'receptionist';
+
+  if (!isStaff) {
+    // Sanitize and redact private payroll, phone, and personal contact details for public view
+    const publicTrainers = trainers.map((t: any) => ({
+      id: t.id,
+      guru_id: t.guru_id,
+      code: t.code,
+      full_name: t.full_name,
+      avatar_url: t.avatar_url,
+      display_title: t.display_title,
+      specializations: t.specializations,
+      bio: t.bio,
+      experience: t.experience,
+      is_active: t.is_active,
+      batches_assigned: t.batches_assigned,
+      batches: (t.batches || []).map((b: any) => ({
+        id: b.id,
+        name: b.name,
+        code: b.code,
+        course_title: b.course_title,
+        course_category: b.course_category,
+        days_of_week: b.days_of_week,
+        start_time: b.start_time,
+        end_time: b.end_time,
+      }))
+    }));
+    return NextResponse.json(publicTrainers);
+  }
+
   return NextResponse.json(trainers);
 }
 

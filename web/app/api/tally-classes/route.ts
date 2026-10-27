@@ -27,6 +27,10 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
+    if (!user || (user.role !== 'owner' && user.role !== 'receptionist' && user.role !== 'trainer')) {
+      return NextResponse.json({ error: 'Unauthorized: Staff or Faculty access required' }, { status: 403, headers: corsHeaders });
+    }
+
     const body = await request.json();
 
     if (!body.batch_id) {

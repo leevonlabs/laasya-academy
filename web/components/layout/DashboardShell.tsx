@@ -86,14 +86,16 @@ export default function DashboardShell({ user, children }: Props) {
       setIsCollapsed(true);
     }
 
-    fetch('/api/settings/admin-profile')
-      .then(r => r.json())
-      .then(d => {
-        if (d?.profile?.avatar_url) setAdminAvatar(d.profile.avatar_url);
-        if (d?.profile?.full_name) setAdminName(d.profile.full_name);
-      })
-      .catch(() => {});
-  }, []);
+    if (user?.role === 'owner') {
+      fetch('/api/settings/admin-profile')
+        .then(r => r.json())
+        .then(d => {
+          if (d?.profile?.avatar_url) setAdminAvatar(d.profile.avatar_url);
+          if (d?.profile?.full_name) setAdminName(d.profile.full_name);
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   const toggleCollapse = () => {
     setIsCollapsed(prev => {
@@ -128,7 +130,12 @@ export default function DashboardShell({ user, children }: Props) {
     if (user?.role === 'receptionist') {
       const allowed = new Set(user.allowedPages || []);
       const filtered = academyNavItems.filter(item => {
-        if (item.href === '/reception' || item.href === '/password-management' || item.href === '/admin-profile') {
+        if (
+          item.href === '/reception' || 
+          item.href === '/password-management' || 
+          item.href === '/admin-profile' ||
+          item.href.startsWith('/settings')
+        ) {
           return false;
         }
         return allowed.has(item.href) || allowed.has(item.label);
@@ -351,12 +358,14 @@ export default function DashboardShell({ user, children }: Props) {
 
             {/* Profile Page Icon with Profile Image */}
             <Link
-              href="/admin-profile"
+              href={user?.role === 'receptionist' ? '/reception-profile' : '/admin-profile'}
               className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-2xl bg-[#F4EAEF] hover:bg-[#EBD4E0] border border-[#D4BAC7] hover:border-[#8A064D] shadow-2xs transition group cursor-pointer"
-              title="Director Profile & Academy Settings"
+              title={user?.role === 'receptionist' ? 'Reception Profile' : 'Director Profile & Academy Settings'}
             >
               <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-[#590231] text-[#F9E33A] flex items-center justify-center font-bold text-xs shrink-0 shadow-xs ring-2 ring-emerald-500/40">
-                {adminAvatar ? (
+                {user?.role === 'receptionist' ? (
+                  <span>{user.fullName ? user.fullName.charAt(0).toUpperCase() : 'R'}</span>
+                ) : adminAvatar ? (
                   <img
                     src={adminAvatar}
                     alt={adminName}
@@ -372,10 +381,10 @@ export default function DashboardShell({ user, children }: Props) {
               </div>
               <div className="hidden sm:block text-left">
                 <span className="text-xs font-extrabold text-[#2D041A] group-hover:text-[#8A064D] block leading-tight truncate max-w-[100px]">
-                  {adminName}
+                  {user?.role === 'receptionist' ? (user.fullName || 'Reception Desk') : adminName}
                 </span>
                 <span className="text-[10px] text-emerald-700 font-bold block leading-tight">
-                  Director
+                  {user?.role === 'receptionist' ? 'Front Desk' : 'Director'}
                 </span>
               </div>
             </Link>

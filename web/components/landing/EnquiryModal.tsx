@@ -4,7 +4,13 @@ import React, { useState } from 'react';
 import { X, CheckCircle2, MessageCircle, Trash2, Calendar, User, Phone, Sparkles } from 'lucide-react';
 import { useEnquiry } from './EnquiryContext';
 
-export function EnquiryModal() {
+interface EnquiryModalProps {
+  whatsappNumber?: string;
+}
+
+export function EnquiryModal({ whatsappNumber }: EnquiryModalProps = {}) {
+  const targetWa = whatsappNumber?.trim() || '+91 8151 998 899';
+  const cleanWa = targetWa.replace(/[^0-9]/g, '');
   const {
     isModalOpen,
     closeEnquiryModal,
@@ -66,7 +72,7 @@ export function EnquiryModal() {
     message += `━━━━━━━━━━━━━━━━━━━━\n`;
     message += `Please provide admission details, fee breakdown, and schedule confirmation.`;
 
-    const waUrl = `https://wa.me/918151998899?text=${encodeURIComponent(message)}`;
+    const waUrl = `https://wa.me/${cleanWa}?text=${encodeURIComponent(message)}`;
 
     setSubmitted(true);
     window.open(waUrl, '_blank');
@@ -106,7 +112,7 @@ export function EnquiryModal() {
               Send Admission Enquiry
             </h3>
             <p className="text-xs text-[#6E3955]">
-              Direct enquiry to Academy Admin WhatsApp (+91 8151 998 899)
+              Direct enquiry to Academy Admin WhatsApp ({targetWa})
             </p>
           </div>
         </div>

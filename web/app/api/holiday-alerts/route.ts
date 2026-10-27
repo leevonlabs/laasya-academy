@@ -27,6 +27,10 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
+    if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
+      return NextResponse.json({ error: 'Unauthorized: Staff access required' }, { status: 403, headers: corsHeaders });
+    }
+
     const body = await request.json();
 
     if (!body.holiday_date) {
@@ -59,6 +63,11 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
+      return NextResponse.json({ error: 'Unauthorized: Staff access required' }, { status: 403, headers: corsHeaders });
+    }
+
     const body = await request.json();
     if (!body.id) {
       return NextResponse.json({ error: 'Holiday alert ID is required' }, { status: 400, headers: corsHeaders });

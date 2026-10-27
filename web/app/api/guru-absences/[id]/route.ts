@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deleteGuruAbsence } from '@/lib/holidayTally';
+import { getCurrentUser } from '@/lib/auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,6 +20,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getCurrentUser();
+    if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
+      return NextResponse.json({ error: 'Unauthorized: Staff access required' }, { status: 403, headers: corsHeaders });
+    }
+
     const { id } = await params;
     if (!id) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400, headers: corsHeaders });

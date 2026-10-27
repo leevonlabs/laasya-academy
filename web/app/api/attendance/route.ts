@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAttendanceAuditRecords, getGuruAttendanceAuditRecords } from '@/lib/academy';
 import { query, queryOne } from '@/lib/db';
 import { sendFcmToUser } from '@/lib/fcm';
+import { getCurrentUser } from '@/lib/auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -68,10 +69,31 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, history: formatted }, { headers: corsHeaders });
     }
 
-    // 2. Guru Attendance Audit for admin portal
+    // 2. Guru Attendance Audit for admin portal & Guru mobile app
     const isGuruAudit = searchParams.get('guruAudit') === 'true' || searchParams.get('type') === 'guru';
     if (isGuruAudit) {
-      const trainerId = searchParams.get('trainerId') || undefined;
+      const user = await getCurrentUser();
+      const isStaff = user && (user.role === 'owner' || user.role === 'receptionist');
+
+      let trainerId = searchParams.get('trainerId') || undefined;
+      const trainerName = searchParams.get('trainerName') || undefined;
+      const phone = searchParams.get('phone') || undefined;
+
+      // If mobile app queries with phone or trainerName, resolve trainerId from db
+      if (!trainerId && (phone || trainerName)) {
+        const cleanPhone = (phone || '').replace(/\D/g, '');
+        const cleanName = (trainerName || '').trim();
+        const found = await queryOne<{ id: string }>(
+          `SELECT t.id FROM public.trainers t
+           JOIN public.profiles p ON t.profile_id = p.id
+           WHERE (LENGTH($1) >= 6 AND regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
+              OR ($2 <> '' AND LOWER(p.full_name) = LOWER($2))
+           LIMIT 1`,
+          [cleanPhone, cleanName]
+        );
+        if (found) trainerId = found.id;
+      }
+
       const courseId = searchParams.get('courseId') || searchParams.get('course_id') || undefined;
       const startDate = searchParams.get('startDate') || searchParams.get('start_date') || undefined;
       const endDate = searchParams.get('endDate') || searchParams.get('end_date') || undefined;
@@ -91,6 +113,11 @@ export async function GET(req: Request) {
     }
 
     // 3. Default student audit view for admin portal
+    const user = await getCurrentUser();
+    if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
+      return NextResponse.json({ error: 'Unauthorized: Staff access required' }, { status: 403, headers: corsHeaders });
+    }
+
     const courseId = searchParams.get('courseId') || searchParams.get('course_id') || undefined;
     const startDate = searchParams.get('startDate') || searchParams.get('start_date') || undefined;
     const endDate = searchParams.get('endDate') || searchParams.get('end_date') || undefined;
@@ -113,6 +140,9 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    const isOwner = user?.role === 'owner';
+
     const body = await req.json();
     const { batch_id, batch_name, course_title, trainer_name, records } = body;
 
@@ -141,6 +171,23 @@ export async function POST(req: NextRequest) {
       } else {
         const anyBatch = await queryOne<{ id: string }>(`SELECT id FROM public.batches LIMIT 1;`);
         if (anyBatch) actualBatchId = anyBatch.id;
+      }
+    }
+
+    // Verify batch authorization if not owner
+    if (!isOwner) {
+      const batchCheck = await queryOne<{ id: string }>(`
+        SELECT b.id FROM public.batches b
+        JOIN public.trainers t ON b.trainer_id = t.id
+        WHERE b.id = $1::uuid AND t.is_active = true
+        LIMIT 1;
+      `, [actualBatchId]);
+
+      if (!batchCheck) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized: Valid faculty assignment required for this batch.' },
+          { status: 403, headers: corsHeaders }
+        );
       }
     }
 

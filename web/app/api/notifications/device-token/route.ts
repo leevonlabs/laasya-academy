@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { registerDeviceToken } from '@/lib/fcm';
-import { query } from '@/lib/db';
+import { query, queryOne } from '@/lib/db';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,13 +15,14 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, user_id, role, token, fcm_token, platform, batchIds, batch_ids } = body;
+    const { userId, user_id, role, token, fcm_token, platform, batchIds, batch_ids, environment } = body;
 
     const actualUserId = user_id || userId;
     const actualToken = fcm_token || token;
     const actualRole = role || 'student';
     const actualPlatform = platform || 'android';
     const actualBatchIds = batch_ids || batchIds || [];
+    const actualEnvironment = environment; // 'development' | 'production' or undefined (defaults inside registerDeviceToken)
 
     if (!actualUserId || !actualToken) {
       return NextResponse.json(
@@ -30,12 +31,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Verify user exists in database
+    const userRow = await queryOne<{ id: string }>(
+      `SELECT id FROM public.profiles 
+       WHERE id::text = $1 
+          OR id IN (SELECT profile_id FROM public.students WHERE id::text = $1)
+          OR id IN (SELECT profile_id FROM public.trainers WHERE id::text = $1)
+       LIMIT 1`,
+      [actualUserId]
+    );
+
+    if (!userRow) {
+      return NextResponse.json(
+        { success: false, error: 'Target user identity not found.' },
+        { status: 404, headers: corsHeaders }
+      );
+    }
+
     await registerDeviceToken({
       userId: actualUserId,
       role: actualRole,
       token: actualToken,
       platform: actualPlatform,
-      batchIds: actualBatchIds
+      batchIds: actualBatchIds,
+      environment: actualEnvironment,
     });
 
     return NextResponse.json(

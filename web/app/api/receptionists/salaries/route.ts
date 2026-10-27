@@ -4,6 +4,11 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== 'owner') {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Owner access required' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const receptionistId = searchParams.get('receptionist_id');
 
@@ -44,6 +49,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== 'owner') {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Owner access required' }, { status: 403 });
+    }
+
     const body = await req.json();
     const { receptionist_id, month_year, amount, status, payment_date, payment_mode, notes } = body;
 
@@ -86,6 +96,11 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== 'owner') {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Owner access required' }, { status: 403 });
+    }
+
     const body = await req.json();
     const { id, amount, status, payment_date, payment_mode, notes } = body;
 
@@ -121,6 +136,11 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== 'owner') {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Owner access required' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
 

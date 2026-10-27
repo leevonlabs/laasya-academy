@@ -19,8 +19,9 @@ class _SupportScreenState extends State<SupportScreen> {
     'full_name': 'Satya',
     'avatar_url': '',
     'designation': 'Academy Director & Operations Lead',
+    'whatsapp_number': '+91 8151 998 899',
     'contacts': [
-      {'title': 'Office Desk & Admissions', 'phone': '7780763121'}
+      {'title': 'Office Desk & Admissions', 'phone': '+91 8151 998 899'}
     ],
     'emails': [
       {'title': 'Official Inquiries', 'email': 'admin@laasyaacademy.com'}
@@ -109,7 +110,7 @@ class _SupportScreenState extends State<SupportScreen> {
     final rawContacts = _profile['contacts'];
     final List<Map<String, dynamic>> contacts = (rawContacts is List)
         ? rawContacts.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList()
-        : [{'title': 'Office Desk', 'phone': '7780763121'}];
+        : [{'title': 'Office Desk', 'phone': '+91 8151 998 899'}];
 
     final rawEmails = _profile['emails'];
     final List<Map<String, dynamic>> emails = (rawEmails is List)
@@ -211,7 +212,70 @@ class _SupportScreenState extends State<SupportScreen> {
 
                   const SizedBox(height: 20),
 
-                  // 2. Contact Numbers Section
+                  // 2. Official WhatsApp Section
+                  if ((_profile['whatsapp_number'] ?? '').toString().isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        'OFFICIAL ACADEMY WHATSAPP',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
+                          color: Color(0xFF075E54),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFC7F0DB)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        leading: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F8F0),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.chat_bubble_rounded, color: Color(0xFF25D366), size: 20),
+                        ),
+                        title: const Text(
+                          'Admissions & Enquiries Desk',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF075E54)),
+                        ),
+                        subtitle: Text(
+                          _profile['whatsapp_number'].toString(),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF2D041A)),
+                        ),
+                        trailing: ElevatedButton.icon(
+                          onPressed: () => _openWhatsApp(_profile['whatsapp_number'].toString()),
+                          icon: const Icon(Icons.chat, size: 14, color: Colors.white),
+                          label: const Text('Chat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF25D366),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+
+                  // 3. Contact Numbers Section
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 4),
                     child: Text(

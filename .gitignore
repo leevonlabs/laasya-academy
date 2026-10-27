@@ -49,3 +49,6 @@ backups/
 
 # Agent skills & tooling
 .agent/
+.agents/
+scratch/
+skills-lock.json

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAnnouncements, createAnnouncement } from '@/lib/announcements';
 import { getCurrentUser } from '@/lib/auth';
 import { sendFcmToRole, sendFcmToBatch, sendFcmToCourse, sendFcmToUser } from '@/lib/fcm';
+import { queryOne } from '@/lib/db';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -54,10 +55,44 @@ export async function POST(request: NextRequest) {
     const user = await getCurrentUser();
     const body = await request.json();
 
-    const isGuru = body.sender_role === 'trainer' || body.trainer_name || body.trainer_id;
-    const isAdmin = user?.role === 'owner' || body.sender_role === 'admin' || body.announcement_type === 'banner' || (!isGuru && !user);
-    if (!user && !isGuru && !isAdmin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
+    const isOwner = user?.role === 'owner';
+    const isReceptionist = user?.role === 'receptionist';
+    let verifiedRole: 'admin' | 'trainer' | 'receptionist';
+    let verifiedName: string;
+    let verifiedTrainerId: string | null = null;
+
+    if (isOwner) {
+      verifiedRole = 'admin';
+      verifiedName = user.fullName || 'Academy Director';
+    } else if (isReceptionist) {
+      verifiedRole = 'receptionist';
+      verifiedName = user.fullName ? `${user.fullName} (Reception)` : 'Reception';
+    } else if (body.sender_role === 'trainer' && body.trainer_id) {
+      // Validate that trainer exists and is active in database
+      const activeTrainer = await queryOne<{ id: string; full_name: string; is_active: boolean }>(
+        `SELECT t.id, p.full_name, t.is_active
+         FROM public.trainers t
+         JOIN public.profiles p ON t.profile_id = p.id
+         WHERE (t.id = $1 OR t.profile_id = $1) AND t.is_active = true
+         LIMIT 1`,
+        [body.trainer_id]
+      );
+
+      if (!activeTrainer) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Valid active faculty credentials required.' },
+          { status: 403, headers: corsHeaders }
+        );
+      }
+
+      verifiedRole = 'trainer';
+      verifiedName = activeTrainer.full_name;
+      verifiedTrainerId = activeTrainer.id;
+    } else {
+      return NextResponse.json(
+        { error: 'Unauthorized: Please log in to publish announcements.' },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
     if (!body.title || body.title.trim() === '') {
@@ -75,15 +110,14 @@ export async function POST(request: NextRequest) {
       body.publish_date = new Date().toISOString().split('T')[0];
     }
 
-    const senderRole = isGuru ? 'trainer' : (user?.role === 'owner' ? 'admin' : 'trainer');
-    const createdBy = isGuru ? (body.trainer_name || 'Guru Faculty') : (user?.fullName || 'Academy Director');
-
     const created = await createAnnouncement({
       ...body,
-      sender_role: senderRole,
-      created_by: createdBy,
-      trainer_name: body.trainer_name || (isGuru ? createdBy : null),
-      trainer_id: body.trainer_id || null,
+      type_tag: body.type_tag || 'General',
+      audience: body.audience || 'All Students & Gurus',
+      sender_role: verifiedRole,
+      created_by: verifiedName,
+      trainer_name: verifiedRole === 'trainer' ? verifiedName : null,
+      trainer_id: verifiedTrainerId,
     });
 
     // Send real-time FCM Push Notification to target audience
@@ -98,8 +132,9 @@ export async function POST(request: NextRequest) {
           type: 'announcement',
           route: '/announcements',
           id: String(created?.id || ''),
-          sender: String(createdBy),
-          title: body.title || 'Academy Notice',
+          sender: isReceptionist ? 'Reception' : String(verifiedName),
+          sender_role: verifiedRole,
+          title: body.title || (isReceptionist ? 'Reception Notice' : 'Academy Notice'),
           body: body.message || 'A new announcement has been published.',
           click_action: 'FLUTTER_NOTIFICATION_CLICK'
         }

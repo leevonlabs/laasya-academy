@@ -1,3 +1,4 @@
+import 'trainer_login_screen.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
@@ -338,7 +339,24 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                               ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 12),
+
+                    // Switch to Guru Portal
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(builder: (_) => const TrainerLoginScreen()),
+                          );
+                        },
+                        icon: const Icon(Icons.person_outline_rounded, size: 16, color: Color(0xFF8A064D)),
+                        label: const Text(
+                          'Revered Guru or Faculty? Switch to Guru Login',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF8A064D)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
                     // Privacy Policy & Terms Links
                     Center(

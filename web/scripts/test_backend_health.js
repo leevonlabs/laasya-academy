@@ -1,8 +1,7 @@
 const { Pool } = require('pg');
-
-const pool = 
 const fs = require('fs');
 const path = require('path');
+
 let dbUrl = process.env.DATABASE_URL || '';
 if (!dbUrl) {
   try {
@@ -19,7 +18,7 @@ if (!dbUrl) {
   throw new Error('DATABASE_URL is not configured in process.env or web/.env.local');
 }
 
-new Pool({
+const pool = new Pool({
   connectionString: dbUrl
 });
 

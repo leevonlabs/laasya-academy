@@ -3,9 +3,14 @@ import { query, queryOne } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'owner') {
+    return NextResponse.json({ success: false, error: 'Unauthorized: Owner access required' }, { status: 403 });
+  }
+
   try {
     const list = await query<any>(`
-      SELECT id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, can_delete, created_at, updated_at
+      SELECT id, full_name, age, phone, alternative_phone, email, address, allowed_pages, is_active, monthly_salary, can_delete, created_at, updated_at
       FROM public.receptionists
       ORDER BY created_at DESC
     `);
@@ -18,6 +23,11 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'owner') {
+    return NextResponse.json({ success: false, error: 'Unauthorized: Owner access required' }, { status: 403 });
+  }
+
   try {
     const body = await req.json();
     const { 
@@ -77,8 +87,8 @@ export async function POST(req: NextRequest) {
         monthly_salary,
         can_delete
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11)
-      RETURNING id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, can_delete, created_at`,
+      VALUES ($1, $2, $3, $4, $5, $6, crypt($7, gen_salt('bf')), $8::jsonb, $9, $10, $11)
+      RETURNING id, full_name, age, phone, alternative_phone, email, address, allowed_pages, is_active, monthly_salary, can_delete, created_at`,
       [
         full_name.trim(),
         parsedAge,
@@ -102,6 +112,11 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'owner') {
+    return NextResponse.json({ success: false, error: 'Unauthorized: Owner access required' }, { status: 403 });
+  }
+
   try {
     const body = await req.json();
     const { 
@@ -159,14 +174,14 @@ export async function PUT(req: NextRequest) {
              alternative_phone = $4,
              email = $5,
              address = $6,
-             password_hash = $7,
+             password_hash = crypt($7, gen_salt('bf')),
              allowed_pages = $8::jsonb,
              is_active = $9,
              monthly_salary = $10,
              can_delete = $11,
              updated_at = NOW()
          WHERE id = $12
-         RETURNING id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, can_delete, created_at, updated_at`,
+         RETURNING id, full_name, age, phone, alternative_phone, email, address, allowed_pages, is_active, monthly_salary, can_delete, created_at, updated_at`,
         [
           full_name.trim(),
           parsedAge,
@@ -197,7 +212,7 @@ export async function PUT(req: NextRequest) {
              can_delete = $10,
              updated_at = NOW()
          WHERE id = $11
-         RETURNING id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, can_delete, created_at, updated_at`,
+         RETURNING id, full_name, age, phone, alternative_phone, email, address, allowed_pages, is_active, monthly_salary, can_delete, created_at, updated_at`,
         [
           full_name.trim(),
           parsedAge,
@@ -222,6 +237,11 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'owner') {
+    return NextResponse.json({ success: false, error: 'Unauthorized: Owner access required' }, { status: 403 });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAiApiKey, setAiApiKey, testAiConnection } from '@/lib/ai';
+import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,12 +12,16 @@ function maskApiKey(key: string): string {
 }
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'owner') {
+    return NextResponse.json({ success: false, error: 'Unauthorized: Owner access required' }, { status: 403 });
+  }
+
   try {
     const rawKey = await getAiApiKey();
     return NextResponse.json({
       success: true,
       apiKeyMasked: maskApiKey(rawKey),
-      apiKey: rawKey,
       model: 'gemini-3.8-flash',
       isConfigured: Boolean(rawKey && rawKey.trim().length > 0)
     });
@@ -29,6 +34,11 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'owner') {
+    return NextResponse.json({ success: false, error: 'Unauthorized: Owner access required' }, { status: 403 });
+  }
+
   try {
     const body = await req.json();
     const { apiKey } = body;
@@ -56,6 +66,11 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'owner') {
+    return NextResponse.json({ success: false, error: 'Unauthorized: Owner access required' }, { status: 403 });
+  }
+
   try {
     const body = await req.json().catch(() => ({}));
     const { apiKey } = body;

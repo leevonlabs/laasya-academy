@@ -52,6 +52,69 @@ import {
   GuruComplianceDisciple,
 } from '@/lib/videoLibrary';
 
+const DEFAULT_COURSE_IMAGES: Record<string, string> = {
+  'Bharathanatyam': 'https://images.unsplash.com/photo-1617196034183-421b4917c92d?auto=format&fit=crop&w=800&q=80',
+  'Bharatanatyam': 'https://images.unsplash.com/photo-1617196034183-421b4917c92d?auto=format&fit=crop&w=800&q=80',
+  'Kuchupudi': 'https://images.unsplash.com/photo-1582234372722-50d7ccc30ebd?auto=format&fit=crop&w=800&q=80',
+  'Kuchipudi': 'https://images.unsplash.com/photo-1582234372722-50d7ccc30ebd?auto=format&fit=crop&w=800&q=80',
+  'Mohiniyatam': 'https://images.unsplash.com/photo-1547153760-18fc86324498?auto=format&fit=crop&w=800&q=80',
+  'Mohiniyattam': 'https://images.unsplash.com/photo-1547153760-18fc86324498?auto=format&fit=crop&w=800&q=80',
+  'Semi Classical': 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=800&q=80',
+  'Western Dance': 'https://images.unsplash.com/photo-1535525153412-5a42439a210d?auto=format&fit=crop&w=800&q=80',
+  'Zumba': 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80',
+  'Gymnastic': 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=800&q=80',
+  'Gymnastics': 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=800&q=80',
+  'Carnatic Music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
+  'Violin': 'https://images.unsplash.com/photo-1612225330812-01a9c6b355ec?auto=format&fit=crop&w=800&q=80',
+  'Keyboard': 'https://images.unsplash.com/photo-1520523839898-50712140e698?auto=format&fit=crop&w=800&q=80',
+  'Guitar': 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=800&q=80',
+  'Ukulele': 'https://images.unsplash.com/photo-1568219656418-15c329312bf1?auto=format&fit=crop&w=800&q=80',
+  'Drawing': 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=800&q=80',
+  'Art and Craft': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=800&q=80',
+  'Kalari': 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80',
+  'Kalaripayattu': 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80',
+  'Karatte': 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=800&q=80',
+  'Karate': 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=800&q=80',
+  'Yoga': 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800&q=80',
+  'Chess': 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&w=800&q=80'
+};
+
+function resolveCourseImage(title?: string | null, category?: string | null, imageUrl?: string | null): string {
+  if (imageUrl && imageUrl.trim()) {
+    return imageUrl.trim();
+  }
+  const cleanTitle = (title || '').trim();
+  if (DEFAULT_COURSE_IMAGES[cleanTitle]) {
+    return DEFAULT_COURSE_IMAGES[cleanTitle];
+  }
+  const lower = cleanTitle.toLowerCase();
+  for (const [key, url] of Object.entries(DEFAULT_COURSE_IMAGES)) {
+    if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) {
+      return url;
+    }
+  }
+  if (lower.includes('bharat')) return DEFAULT_COURSE_IMAGES['Bharatanatyam'];
+  if (lower.includes('kuchi')) return DEFAULT_COURSE_IMAGES['Kuchipudi'];
+  if (lower.includes('mohini')) return DEFAULT_COURSE_IMAGES['Mohiniyattam'];
+  if (lower.includes('guitar')) return DEFAULT_COURSE_IMAGES['Guitar'];
+  if (lower.includes('keyboard') || lower.includes('piano')) return DEFAULT_COURSE_IMAGES['Keyboard'];
+  if (lower.includes('violin')) return DEFAULT_COURSE_IMAGES['Violin'];
+  if (lower.includes('vocal') || lower.includes('music') || lower.includes('carnatic')) return DEFAULT_COURSE_IMAGES['Carnatic Music'];
+  if (lower.includes('ukulele')) return DEFAULT_COURSE_IMAGES['Ukulele'];
+  if (lower.includes('draw') || lower.includes('paint')) return DEFAULT_COURSE_IMAGES['Drawing'];
+  if (lower.includes('craft')) return DEFAULT_COURSE_IMAGES['Art and Craft'];
+  if (lower.includes('karat')) return DEFAULT_COURSE_IMAGES['Karate'];
+  if (lower.includes('kalari')) return DEFAULT_COURSE_IMAGES['Kalari'];
+  if (lower.includes('yoga')) return DEFAULT_COURSE_IMAGES['Yoga'];
+  if (lower.includes('chess')) return DEFAULT_COURSE_IMAGES['Chess'];
+  if (lower.includes('zumba')) return DEFAULT_COURSE_IMAGES['Zumba'];
+  if (lower.includes('gymnast')) return DEFAULT_COURSE_IMAGES['Gymnastic'];
+  if (lower.includes('western')) return DEFAULT_COURSE_IMAGES['Western Dance'];
+  if (lower.includes('semi')) return DEFAULT_COURSE_IMAGES['Semi Classical'];
+
+  return 'https://images.unsplash.com/photo-1617196034183-421b4917c92d?auto=format&fit=crop&w=800&q=80';
+}
+
 interface Props {
   initialCourses: CourseWithDetails[];
   initialItems: VideoLibraryItem[];
@@ -303,17 +366,17 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
     return ['All', ...Array.from(set)];
   }, [courses]);
 
-  // Filtered Courses
+  // Filtered Courses (Display only existing active courses, searched by title or details)
   const filteredCourses = useMemo(() => {
+    const q = courseSearch.trim().toLowerCase();
+    if (!q) return courses;
     return courses.filter(c => {
-      const matchCat = selectedCategory === 'All' || c.category === selectedCategory;
-      const matchSearch =
-        courseSearch === '' ||
-        c.title.toLowerCase().includes(courseSearch.toLowerCase()) ||
-        c.batches.some(b => b.trainer_name?.toLowerCase().includes(courseSearch.toLowerCase()));
-      return matchCat && matchSearch;
+      return (
+        c.title.toLowerCase().includes(q) ||
+        (c.description && c.description.toLowerCase().includes(q))
+      );
     });
-  }, [courses, selectedCategory, courseSearch]);
+  }, [courses, courseSearch]);
 
   // Month Options for Filter
   const MONTHS = [
@@ -1068,9 +1131,6 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
               </button>
 
               <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full text-xs font-black bg-[#FFF2F8] text-[#8A064D] border border-rose-200">
-                  {selectedCourseSubpage.category}
-                </span>
                 <span className="text-xs text-gray-500 font-medium">
                   {selectedCourseSubpage.batches.length} Batches • {selectedCourseSubpage.student_count} Enrolled
                 </span>
@@ -1078,16 +1138,23 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
             </div>
 
             {/* Course Header Banner */}
-            <div className="bg-gradient-to-r from-[#590231] via-[#740340] to-[#8A064D] text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-[#D4AF37]/30 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-              <div className="space-y-2 z-10">
+            <div className="relative overflow-hidden text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-[#D4AF37]/30 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div
+                className="absolute inset-0 bg-cover bg-center brightness-40 scale-105"
+                style={{
+                  backgroundImage: `url('${resolveCourseImage(selectedCourseSubpage.title, selectedCourseSubpage.category, selectedCourseSubpage.image_url)}')`
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#590231]/90 via-[#740340]/80 to-[#8A064D]/90" />
+              <div className="space-y-2 z-10 relative">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#F9E33A] font-mono text-xs font-bold border border-[#D4AF37]/30 uppercase tracking-wider">
-                  Course Subpage • {selectedCourseSubpage.category || 'Classical Discipline'}
+                  Course Subpage • Video Library
                 </span>
                 <h2 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-white">
                   {selectedCourseSubpage.title}
                 </h2>
                 <p className="text-xs sm:text-sm text-rose-100/90 max-w-xl leading-relaxed">
-                  Faculty: <strong>{stripGuruPrefix(selectedCourseSubpage.batches[0]?.trainer_name) || 'Assigned Faculty'}</strong> • Hall: {selectedCourseSubpage.batches[0]?.room || 'Mandapam'}
+                  {selectedCourseSubpage.batches.length} active batches configured for this course
                 </p>
               </div>
 
@@ -1551,26 +1618,6 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                   Showing <span className="text-[#8A064D] font-bold">{filteredCourses.length}</span> of {courses.length} courses
                 </div>
               </div>
-
-              {/* Category Filter Pills */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                {categories.map((cat, idx) => {
-                  const isSelected = selectedCategory === cat;
-                  return (
-                    <button
-                      key={`cat-pill-${cat}-${idx}`}
-                      onClick={() => setSelectedCategory(cat)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                        isSelected
-                          ? 'bg-[#590231] text-white shadow-sm font-bold'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
             {/* Courses Grid */}
@@ -1587,12 +1634,12 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                 <div className="bg-white rounded-2xl p-12 text-center border border-gray-200">
                   <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                   <h3 className="text-base font-bold text-gray-700">No courses match your search</h3>
-                  <p className="text-xs text-gray-500 mt-1">Try clearing filters or search keywords</p>
+                  <p className="text-xs text-gray-500 mt-1">Try clearing search keywords</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                   {filteredCourses.map((course, idx) => {
-                    const primaryTrainer = course.batches[0]?.trainer_name || 'Assigned Guru';
+                    const courseImg = resolveCourseImage(course.title, course.category, course.image_url);
                     return (
                       <div
                         key={`course-card-${course.id}-${idx}`}
@@ -1607,25 +1654,18 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                         className="group bg-white rounded-2xl overflow-hidden border border-[#F0D5E4] hover:border-[#8A064D] shadow-xs hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between"
                       >
                         {/* Course Image Banner */}
-                        <div className="relative h-36 w-full bg-gray-100 overflow-hidden">
-                          {course.image_url ? (
-                            <img
-                              src={course.image_url}
-                              alt={course.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-[#FFF2F8] text-[#8A064D]">
-                              <BookOpen className="w-12 h-12 opacity-40" />
-                            </div>
-                          )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                          
-                          {/* Category Tag */}
-                          <span className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-[#590231]/90 backdrop-blur-md text-white text-[10.5px] font-bold tracking-wide">
-                            {course.category}
-                          </span>
+                        <div className="relative h-40 w-full bg-gray-100 overflow-hidden">
+                          <img
+                            src={courseImg}
+                            alt={course.title}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                'https://images.unsplash.com/photo-1617196034183-421b4917c92d?auto=format&fit=crop&w=800&q=80';
+                            }}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
 
                           {/* Shared Folders Badge */}
                           <span className="absolute top-3 right-3 px-2.5 py-1 rounded-md bg-[#03543F]/90 backdrop-blur-md text-emerald-200 text-[10.5px] font-bold flex items-center gap-1 border border-emerald-400/30">
@@ -1634,13 +1674,10 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
                           </span>
 
                           {/* Course Title on Banner */}
-                          <div className="absolute bottom-2.5 left-3 right-3 text-white">
+                          <div className="absolute bottom-3 left-3.5 right-3.5 text-white">
                             <h3 className="font-bold text-base leading-tight drop-shadow-sm group-hover:text-[#D4AF37] transition-colors">
                               {course.title}
                             </h3>
-                            <p className="text-[11px] text-white/80 line-clamp-1 mt-0.5">
-                              Faculty: {stripGuruPrefix(primaryTrainer)}
-                            </p>
                           </div>
                         </div>
 

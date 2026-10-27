@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
+import { createToken } from '@/lib/auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,12 +34,6 @@ export async function POST(request: NextRequest) {
     let rawInput = identifier.trim();
     let cleanDigits = rawInput.replace(/\D/g, '');
     const trimmedPass = password.trim();
-
-    // Graceful alias support for demo credentials
-    if (rawInput.toLowerCase().includes('anusha') || cleanDigits.includes('8151998899')) {
-      rawInput = 'Nandana';
-      cleanDigits = '9876500001';
-    }
 
     // Determine target role (default to student if not specified, or auto-detect)
     const targetRole = role === 'trainer' ? 'trainer' : (role === 'student' ? 'student' : null);
@@ -90,11 +85,6 @@ export async function POST(request: NextRequest) {
           );
           if (passCheck?.match) isPasswordValid = true;
         }
-        if (!isPasswordValid) {
-          if (trimmedPass === '123456' || trimmedPass === '123456789' || (cleanDigits.length >= 6 && trimmedPass === cleanDigits.slice(-6))) {
-            isPasswordValid = true;
-          }
-        }
 
         if (isPasswordValid) {
           // Fetch trainer batches count, student count, and primary course title
@@ -133,7 +123,14 @@ export async function POST(request: NextRequest) {
             total_students_count: Number(batchStats?.total_students_count ?? 0),
           };
 
-          return NextResponse.json({ success: true, profile }, { headers: corsHeaders });
+          const token = createToken({
+            userId: trainer.profile_id,
+            email: trainer.email || `${cleanDigits}@laasyaacademy.com`,
+            fullName: trainer.full_name,
+            role: 'trainer',
+          });
+
+          return NextResponse.json({ success: true, profile: { ...profile, token }, token }, { headers: corsHeaders });
         } else if (targetRole === 'trainer') {
           return NextResponse.json(
             { success: false, error: 'Incorrect faculty password. Please verify your credentials or contact admin.' },
@@ -228,11 +225,6 @@ export async function POST(request: NextRequest) {
             [trimmedPass, student.profile_id]
           );
           if (passCheck?.match) isPasswordValid = true;
-        }
-        if (!isPasswordValid) {
-          if (trimmedPass === '123456' || trimmedPass === '123456789' || (cleanDigits.length >= 6 && trimmedPass === cleanDigits.slice(-6))) {
-            isPasswordValid = true;
-          }
         }
 
         if (isPasswordValid) {
@@ -344,10 +336,17 @@ export async function POST(request: NextRequest) {
             enrolled_courses: formattedEnrollments,
           };
 
-          return NextResponse.json({ success: true, profile }, { headers: corsHeaders });
+          const token = createToken({
+            userId: student.profile_id,
+            email: student.email || `${student.roll_number || cleanDigits}@laasyaacademy.com`,
+            fullName: student.full_name,
+            role: 'student',
+          });
+
+          return NextResponse.json({ success: true, profile: { ...profile, token }, token }, { headers: corsHeaders });
         } else {
           return NextResponse.json(
-            { success: false, error: 'Incorrect password. Default password is "123456". Contact admin if forgotten.' },
+            { success: false, error: 'Incorrect password. Please verify your credentials or contact admin if forgotten.' },
             { status: 401, headers: corsHeaders }
           );
         }

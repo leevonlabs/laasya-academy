@@ -13,7 +13,7 @@ export default async function ReceptionPage() {
   }
 
   const receptionists = await query<any>(`
-    SELECT id, full_name, age, phone, alternative_phone, email, address, password_hash, allowed_pages, is_active, monthly_salary, created_at, updated_at
+    SELECT id, full_name, age, phone, alternative_phone, email, address, allowed_pages, is_active, monthly_salary, created_at, updated_at
     FROM public.receptionists
     ORDER BY created_at DESC
   `);

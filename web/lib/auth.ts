@@ -3,7 +3,11 @@ import crypto from 'crypto';
 import { query, queryOne } from './db';
 
 const SESSION_COOKIE_NAME = 'laasya_owner_session';
-const SECRET_KEY = process.env.SESSION_SECRET || 'laasya-cultural-academy-secret-2026-auth-session';
+const SECRET_KEY = process.env.SESSION_SECRET || (
+  process.env.NODE_ENV === 'production'
+    ? 'laasya-prod-session-fallback-secret-2026-secure'
+    : 'laasya-dev-session-secret-2026-auth-session'
+);
 
 export interface UserSession {
   userId: string;
@@ -12,6 +16,7 @@ export interface UserSession {
   role: 'owner' | 'trainer' | 'student' | 'receptionist';
   allowedPages?: string[];
   canDelete?: boolean;
+  exp?: number;
 }
 
 function signPayload(data: string): string {
@@ -21,7 +26,11 @@ function signPayload(data: string): string {
 }
 
 export function createToken(payload: UserSession): string {
-  const data = JSON.stringify(payload);
+  const tokenPayload: UserSession = {
+    ...payload,
+    exp: payload.exp || Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days expiration
+  };
+  const data = JSON.stringify(tokenPayload);
   const base64 = Buffer.from(data).toString('base64url');
   const signature = signPayload(base64);
   return `${base64}.${signature}`;
@@ -38,7 +47,17 @@ export function verifyToken(token: string): UserSession | null {
     }
 
     const json = Buffer.from(base64, 'base64url').toString('utf8');
-    return JSON.parse(json) as UserSession;
+    const session = JSON.parse(json) as UserSession;
+
+    // Reject expired tokens
+    if (session.exp && typeof session.exp === 'number') {
+      const now = Math.floor(Date.now() / 1000);
+      if (now > session.exp) {
+        return null;
+      }
+    }
+
+    return session;
   } catch {
     return null;
   }
@@ -74,13 +93,7 @@ export async function authenticateOwner(
          OR LOWER(u.email) = LOWER($2)
          OR LOWER(p.email) = LOWER($2)
        )
-       AND (
-         u.encrypted_password = crypt($3, u.encrypted_password)
-         OR (
-           ($1 = '7780763121' OR LOWER($2) = 'admin@laasyaacademy.com') 
-           AND $3 = '123456789'
-         )
-       )
+       AND u.encrypted_password = crypt($3, u.encrypted_password)
        AND p.role = 'owner'
        LIMIT 1`,
       [cleanDigits, raw, trimmedPass]
@@ -114,8 +127,18 @@ export async function authenticateOwner(
       );
 
       if (receptionist) {
-        const isMatch = trimmedPass === receptionist.password_hash || trimmedPass === '123456';
-        if (isMatch) {
+        // Securely verify password using crypt or stored hash without hardcoded fallbacks
+        const passCheck = await queryOne<{ match: boolean }>(
+          `SELECT (
+             password_hash = crypt($1, password_hash)
+             OR password_hash = $1
+           ) as match
+           FROM public.receptionists
+           WHERE id = $2`,
+          [trimmedPass, receptionist.id]
+        );
+
+        if (passCheck?.match) {
           let pages: string[] = [];
           if (Array.isArray(receptionist.allowed_pages)) {
             pages = receptionist.allowed_pages;
@@ -134,29 +157,7 @@ export async function authenticateOwner(
         }
       }
 
-      // Fallback: check if phone is 7780763121 and pass is 123456789
-      if ((cleanDigits === '7780763121' || raw.toLowerCase() === 'admin@laasyaacademy.com') && trimmedPass === '123456789') {
-        const adminProfile = await queryOne<{ id: string; email: string; full_name: string; role: string }>(
-          `SELECT u.id, u.email, p.full_name, p.role
-           FROM auth.users u
-           JOIN public.profiles p ON u.id = p.id
-           WHERE p.role = 'owner'
-           LIMIT 1`
-        );
-        if (adminProfile) {
-          return {
-            success: true,
-            user: {
-              userId: adminProfile.id,
-              email: adminProfile.email,
-              fullName: adminProfile.full_name || 'Satya',
-              role: 'owner',
-              canDelete: true
-            }
-          };
-        }
-      }
-      return { success: false, error: 'Invalid phone number or password. Please verify your credentials.' };
+      return { success: false, error: 'Invalid credentials. Please verify your phone/email and password.' };
     }
 
     const sessionUser: UserSession = {
@@ -174,21 +175,42 @@ export async function authenticateOwner(
   }
 }
 
-export async function updateAdminPassword(newPassword: string): Promise<boolean> {
+export async function verifyCurrentPassword(userId: string, currentPassword: string): Promise<boolean> {
+  const trimmed = currentPassword.trim();
+  if (!trimmed) return false;
+  const row = await queryOne<{ match: boolean }>(
+    `SELECT (encrypted_password = crypt($1, encrypted_password)) as match 
+     FROM auth.users 
+     WHERE id = $2`,
+    [trimmed, userId]
+  );
+  return Boolean(row?.match);
+}
+
+export async function updateAdminPassword(newPassword: string, userId?: string): Promise<boolean> {
   const trimmed = newPassword.trim();
-  if (!trimmed || trimmed.length < 4) {
-    throw new Error('New password must be at least 4 characters long.');
+  if (!trimmed || trimmed.length < 6) {
+    throw new Error('New password must be at least 6 characters long.');
   }
 
-  // Update password in auth.users for owner/admin accounts
-  await query(`
-    UPDATE auth.users
-    SET encrypted_password = crypt($1, gen_salt('bf')),
-        updated_at = NOW()
-    WHERE id IN (
-      SELECT id FROM public.profiles WHERE role = 'owner'
-    )
-  `, [trimmed]);
+  if (userId) {
+    await query(`
+      UPDATE auth.users
+      SET encrypted_password = crypt($1, gen_salt('bf')),
+          updated_at = NOW()
+      WHERE id = $2
+    `, [trimmed, userId]);
+  } else {
+    // Update password in auth.users for owner account
+    await query(`
+      UPDATE auth.users
+      SET encrypted_password = crypt($1, gen_salt('bf')),
+          updated_at = NOW()
+      WHERE id IN (
+        SELECT id FROM public.profiles WHERE role = 'owner'
+      )
+    `, [trimmed]);
+  }
 
   return true;
 }

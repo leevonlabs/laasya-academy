@@ -1,3 +1,4 @@
+import 'student_login_screen.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
@@ -337,7 +338,24 @@ class _TrainerLoginScreenState extends State<TrainerLoginScreen> {
                               ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 12),
+
+                    // Switch to Student Portal
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(builder: (_) => const StudentLoginScreen()),
+                          );
+                        },
+                        icon: const Icon(Icons.school_outlined, size: 16, color: Color(0xFF8A064D)),
+                        label: const Text(
+                          'Student or Parent? Switch to Student Login',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF8A064D)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
                     // Privacy Policy & Terms Links
                     Center(
