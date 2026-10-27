@@ -14,17 +14,17 @@ export async function OPTIONS() {
 
 export async function GET() {
   try {
-    // 1. Fetch admin profile from profiles table
+    // 0. Ensure schema compatibility for whatsapp_number column
+    try {
+      await query(`ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS whatsapp_number text;`);
+    } catch {
+      // Ignore if DDL is restricted or column already present
+    }
+
+    // 1. Fetch admin profile from profiles table using SELECT p.* for backward compatibility
     const profile = await queryOne<any>(`
       SELECT 
-        p.id,
-        p.full_name,
-        p.phone,
-        p.whatsapp_number,
-        p.email,
-        p.role,
-        p.avatar_url,
-        p.created_at
+        p.*
       FROM public.profiles p
       WHERE p.role = 'owner'
       ORDER BY p.created_at ASC
@@ -174,6 +174,12 @@ export async function POST(request: NextRequest) {
 
     // Update public.profiles table for the owner:
     // Update whatsapp_number, and if primary_login_phone is provided, update phone (admin dashboard login credential)
+    try {
+      await query(`ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS whatsapp_number text;`);
+    } catch {
+      // Ignore
+    }
+
     const currentUser = await getCurrentUser();
     if (currentUser?.userId) {
       await query(`
