@@ -46,12 +46,14 @@ export async function GET() {
       primary_login_phone: profile?.phone || '7780763121',
       // Official WhatsApp number for landing page link-ups:
       whatsapp_number: cfg.whatsapp_number || profile?.whatsapp_number || '+91 8151 998 899',
-      // Public contacts displayed on landing page and bottom bar:
-      contacts: (Array.isArray(cfg.contacts) && cfg.contacts.length > 0)
-        ? cfg.contacts
-        : [
-            { title: 'Office Desk & Admissions', phone: '+91 8151 998 899' }
-          ],
+      // Public contacts displayed on landing page and bottom bar (strictly exclude private developer login phone):
+      contacts: (() => {
+        const raw = Array.isArray(cfg.contacts) ? cfg.contacts : [];
+        const cleaned = raw.filter((c: any) => c && c.phone && !String(c.phone).replace(/[^0-9]/g, '').includes('7780763121'));
+        return cleaned.length > 0
+          ? cleaned
+          : [{ title: 'Office Desk & Admissions', phone: '+91 8151 998 899' }];
+      })(),
       emails: (Array.isArray(cfg.emails) && cfg.emails.length > 0)
         ? cfg.emails
         : [
