@@ -8,8 +8,20 @@ String resolveImageUrl(dynamic rawUrl) {
   if (rawUrl == null) return '';
   final s = rawUrl.toString().trim();
   if (s.isEmpty || s == 'null') return '';
+  if (s.startsWith('http://') || s.startsWith('https://')) {
+    return s;
+  }
   if (s.startsWith('/')) {
     return '${ApiConstants.baseUrl}$s';
+  }
+  if (s.startsWith('uploads/')) {
+    return '${ApiConstants.baseUrl}/$s';
+  }
+  if (s.startsWith('avatars/')) {
+    return '${ApiConstants.baseUrl}/uploads/$s';
+  }
+  if (s.contains('.') && !s.contains(' ') && (s.endsWith('.jpg') || s.endsWith('.jpeg') || s.endsWith('.png') || s.endsWith('.webp') || s.endsWith('.gif'))) {
+    return '${ApiConstants.baseUrl}/uploads/avatars/$s';
   }
   return s;
 }
@@ -28,13 +40,9 @@ ImageProvider? getAvatarImageProvider(dynamic rawUrl) {
       return MemoryImage(bytes);
     }
 
-    if (s.startsWith('http://') || s.startsWith('https://')) {
-      return CachedNetworkImageProvider(s);
-    }
-
-    // Relative uploads path from ERP web backend
-    if (s.startsWith('/')) {
-      return CachedNetworkImageProvider('${ApiConstants.baseUrl}$s');
+    final resolved = resolveImageUrl(s);
+    if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
+      return CachedNetworkImageProvider(resolved);
     }
 
     // Attempt raw base64 decode if long enough
@@ -75,7 +83,6 @@ class AppAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageProvider = getAvatarImageProvider(avatarUrl);
     final initials = (name ?? '')
         .trim()
         .split(' ')
@@ -85,23 +92,60 @@ class AppAvatar extends StatelessWidget {
         .join()
         .toUpperCase();
 
-    Widget avatar = CircleAvatar(
-      radius: radius,
-      backgroundColor: backgroundColor ?? const Color(0xFFFFF2F8),
-      backgroundImage: imageProvider,
-      child: imageProvider == null
-          ? (initials.isNotEmpty
-              ? Text(
-                  initials,
-                  style: TextStyle(
-                    fontSize: radius * 0.75,
-                    fontWeight: FontWeight.bold,
-                    color: textColor ?? const Color(0xFF8A064D),
-                  ),
-                )
-              : (fallbackIcon ?? Icon(Icons.person_rounded, size: radius * 1.1, color: textColor ?? const Color(0xFF8A064D))))
-          : null,
+    final fallbackWidget = Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        color: backgroundColor ?? const Color(0xFFFFF2F8),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: initials.isNotEmpty
+          ? Text(
+              initials,
+              style: TextStyle(
+                fontSize: radius * 0.75,
+                fontWeight: FontWeight.bold,
+                color: textColor ?? const Color(0xFF8A064D),
+              ),
+            )
+          : (fallbackIcon ?? Icon(Icons.person_rounded, size: radius * 1.1, color: textColor ?? const Color(0xFF8A064D))),
     );
+
+    final resolved = resolveImageUrl(avatarUrl);
+    final isDataUri = (avatarUrl != null && avatarUrl.toString().contains(';base64,'));
+    final isNetwork = resolved.startsWith('http://') || resolved.startsWith('https://');
+
+    Widget avatar;
+    if (isNetwork) {
+      avatar = ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: resolved,
+          width: radius * 2,
+          height: radius * 2,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => fallbackWidget,
+          errorWidget: (_, __, ___) => fallbackWidget,
+        ),
+      );
+    } else if (isDataUri) {
+      final imgProvider = getAvatarImageProvider(avatarUrl);
+      if (imgProvider != null) {
+        avatar = ClipOval(
+          child: Image(
+            image: imgProvider,
+            width: radius * 2,
+            height: radius * 2,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => fallbackWidget,
+          ),
+        );
+      } else {
+        avatar = fallbackWidget;
+      }
+    } else {
+      avatar = fallbackWidget;
+    }
 
     if (border != null) {
       avatar = Container(

@@ -55,7 +55,7 @@ function GuruCard({ member, delay }: { member: TrainerItem; delay: number }) {
 
   return (
     <Reveal delay={delay} className="h-full">
-      <article className="group flex h-full flex-col overflow-hidden rounded-3xl border border-[#D4BAC7]/70 bg-white shadow-warm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-gold">
+      <article className="group flex h-full flex-col overflow-hidden rounded-2xl sm:rounded-3xl border border-[#D4BAC7]/70 bg-white shadow-warm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-gold">
         {/* Aspect Ratio Container: 4:5 vertical portrait matching Admin Login exactly */}
         <Link 
           href={`/gurus/${member.id}`} 
@@ -70,44 +70,44 @@ function GuruCard({ member, delay }: { member: TrainerItem; delay: number }) {
           <div className="absolute inset-0 bg-gradient-to-t from-[#3d0c34]/90 via-[#3d0c34]/20 to-transparent" />
 
           {/* Role badge */}
-          <span className="absolute bottom-3.5 left-3.5 rounded-full bg-[#3d0c34]/90 px-3 py-0.5 text-[0.65rem] sm:text-xs font-bold text-[#fbf0b9] backdrop-blur-md shadow">
+          <span className="absolute bottom-2 left-2 sm:bottom-3.5 sm:left-3.5 rounded-full bg-[#3d0c34]/90 px-2 py-0.5 sm:px-3 sm:py-0.5 text-[0.55rem] sm:text-xs font-bold text-[#fbf0b9] backdrop-blur-md shadow truncate max-w-[85%]">
             {member.display_title || member.specializations?.[0] || 'Faculty Guru'}
           </span>
 
-          {/* Guru Experience badge in place of Guru ID */}
-          <span className="absolute right-3.5 top-3.5 flex items-center gap-1 rounded-full bg-gold-gradient px-2.5 sm:px-3 py-0.5 sm:py-1 text-[0.65rem] sm:text-[0.7rem] font-bold text-[#220314] shadow-gold">
-            <Award className="h-3 w-3" />
-            {member.experience || '10+ Years Experience'}
+          {/* Guru Experience badge */}
+          <span className="absolute right-2 top-2 sm:right-3.5 sm:top-3.5 flex items-center gap-1 rounded-full bg-gold-gradient px-1.5 py-0.5 sm:px-3 sm:py-1 text-[0.55rem] sm:text-[0.7rem] font-bold text-[#220314] shadow-gold">
+            <Award className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+            <span className="truncate">{member.experience || '10+ Yrs'}</span>
           </span>
         </Link>
 
         {/* Content Body */}
-        <div className="flex flex-1 flex-col p-5 sm:p-6 pt-4 sm:pt-5">
+        <div className="flex flex-1 flex-col p-2.5 sm:p-5 sm:pt-4">
           <div className="flex items-center justify-between gap-1">
             <Link href={`/gurus/${member.id}`} className="hover:text-[#8A064D] transition-colors min-w-0">
-              <h3 className="font-display text-xl sm:text-2xl font-bold text-[#220314] truncate">
+              <h3 className="font-display text-xs sm:text-xl font-bold text-[#220314] truncate">
                 {member.full_name}
               </h3>
             </Link>
             {batchesCount > 0 && (
-              <span className="shrink-0 flex items-center gap-1 rounded-full bg-[#8A064D]/10 px-2 py-0.5 text-[0.65rem] sm:text-xs font-bold text-[#8A064D]">
-                <Calendar className="h-3 w-3" />
-                {batchesCount} Batch{batchesCount > 1 ? 'es' : ''}
+              <span className="shrink-0 flex items-center gap-0.5 rounded-full bg-[#8A064D]/10 px-1.5 py-0.5 text-[0.55rem] sm:text-xs font-bold text-[#8A064D]">
+                <Calendar className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                <span>{batchesCount}B</span>
               </span>
             )}
           </div>
 
-          <p className="mt-1 text-xs font-bold uppercase tracking-wider text-[#8A064D]">
+          <p className="mt-0.5 sm:mt-1 text-[0.62rem] sm:text-xs font-bold uppercase tracking-wider text-[#8A064D] truncate">
             {member.display_title || 'Faculty Guru'}
           </p>
 
-          {/* Specialization Tags from Admin */}
+          {/* Specialization Tags (Shown on Tablet/Desktop, or 1 tag on Mobile) */}
           {member.specializations && member.specializations.length > 0 && (
-            <div className="mt-2.5 flex flex-wrap gap-1">
-              {member.specializations.map((spec) => (
+            <div className="mt-1 sm:mt-2.5 flex flex-wrap gap-1">
+              {member.specializations.slice(0, 2).map((spec) => (
                 <span
                   key={spec}
-                  className="rounded-full border border-[#8A064D]/30 bg-[#8A064D]/10 px-2.5 py-0.5 text-[0.65rem] font-bold text-[#8A064D]"
+                  className="rounded-full border border-[#8A064D]/30 bg-[#8A064D]/10 px-1.5 py-0.5 text-[0.58rem] sm:text-[0.65rem] font-bold text-[#8A064D] truncate max-w-full"
                 >
                   {spec}
                 </span>
@@ -115,8 +115,8 @@ function GuruCard({ member, delay }: { member: TrainerItem; delay: number }) {
             </div>
           )}
 
-          {/* Bio from Admin */}
-          <Link href={`/gurus/${member.id}`} className="mt-3.5 block group-hover:text-[#220314]">
+          {/* Bio (Desktop/Tablet only to keep mobile cards neat and compact) */}
+          <Link href={`/gurus/${member.id}`} className="mt-2 sm:mt-3.5 hidden sm:block group-hover:text-[#220314]">
             <p className="text-xs sm:text-sm leading-relaxed text-[#59424F] line-clamp-3 hover:text-[#220314] transition-colors">
               {member.bio ||
                 `${member.full_name} is an esteemed mentor at Laasya Cultural Academy, guiding students with authentic shastras and artistic excellence.`}
@@ -124,17 +124,17 @@ function GuruCard({ member, delay }: { member: TrainerItem; delay: number }) {
           </Link>
 
           {/* Bottom Action: View Full Profile */}
-          <div className="mt-auto pt-4 flex items-center justify-between border-t border-[#D4BAC7]/50">
-            <span className="text-[0.7rem] sm:text-xs font-bold text-[#6E3955]">
-              {member.experience || 'Certified Faculty'}
+          <div className="mt-auto pt-2 sm:pt-4 flex items-center justify-between border-t border-[#D4BAC7]/50">
+            <span className="text-[0.6rem] sm:text-xs font-bold text-[#6E3955] truncate">
+              {member.experience || 'Certified'}
             </span>
 
             <Link
               href={`/gurus/${member.id}`}
-              className="inline-flex items-center gap-1.5 rounded-full bg-stage-gradient px-3.5 sm:px-4 py-1.5 sm:py-2 text-[0.7rem] sm:text-xs font-bold text-white shadow-warm hover:scale-[1.03] transition-all cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-xl sm:rounded-full bg-stage-gradient px-2 sm:px-4 py-1 sm:py-2 text-[0.62rem] sm:text-xs font-bold text-white shadow-warm hover:scale-[1.03] transition-all cursor-pointer shrink-0"
             >
-              <span>View Full Bio</span>
-              <ArrowRight className="h-3.5 w-3.5" />
+              <span>View Bio</span>
+              <ArrowRight className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5" />
             </Link>
           </div>
         </div>
@@ -158,26 +158,26 @@ export function Faculty({ initialTrainers }: FacultyProps) {
   }, [initialTrainers]);
 
   return (
-    <section id="faculty" className="scroll-mt-24 bg-[#F5ECEF] py-16 sm:py-24 lg:py-28">
+    <section id="faculty" className="scroll-mt-20 bg-[#F5ECEF] py-8 sm:py-20 lg:py-24">
       {/* Utilized full container width (max-w-[1650px]) */}
-      <div className="mx-auto max-w-[1650px] px-4 sm:px-8 lg:px-12 xl:px-16">
+      <div className="mx-auto max-w-[1650px] px-3 sm:px-8 lg:px-12 xl:px-16">
         <Reveal>
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.25em] text-[#8A064D]">
+            <p className="text-[0.65rem] sm:text-sm font-semibold uppercase tracking-[0.2em] sm:tracking-[0.25em] text-[#8A064D]">
               Our Esteemed Gurus &amp; Faculty
             </p>
-            <h2 className="mt-2.5 sm:mt-3 font-display text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight text-[#220314]">
+            <h2 className="mt-1.5 sm:mt-3 font-display text-2xl sm:text-4xl lg:text-5xl font-bold leading-tight text-[#220314]">
               Learn from Accomplished Masters
             </h2>
-            <p className="mt-3 sm:mt-4 text-sm sm:text-base text-[#6E3955]">
+            <p className="mt-2 sm:mt-4 text-xs sm:text-base text-[#6E3955]">
               Dedicated performers, certified masters, and passionate mentors
               registered across our academy disciplines. Click any profile to read their full artistic biography.
             </p>
           </div>
         </Reveal>
 
-        {/* 4 GRIDS IN EACH ROW on Large Screens (grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4) */}
-        <div className="mt-10 sm:mt-14 grid gap-5 sm:gap-6 xl:gap-7 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {/* 2 GRIDS IN EACH ROW ON MOBILE, 3-4 on Tablet/Desktop */}
+        <div className="mt-6 sm:mt-12 grid gap-2.5 sm:gap-6 xl:gap-7 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
           {trainers.map((member, i) => (
             <GuruCard key={member.id} member={member} delay={(i % 4) * 80} />
           ))}

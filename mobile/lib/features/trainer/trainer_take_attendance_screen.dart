@@ -647,11 +647,8 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                 final isAbsent = status == 'absent';
                 final isUnmarked = status.isEmpty;
 
-                    final rawAvatar = stu['avatar_url']?.toString().trim();
-                    final imageProvider = getAvatarImageProvider(rawAvatar);
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -666,25 +663,20 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                       ),
                       child: Row(
                         children: [
-                          CircleAvatar(
+                          AppAvatar(
+                            avatarUrl: stu['avatar_url'],
+                            name: stu['name'],
                             radius: 18,
                             backgroundColor: isPresent
                                 ? const Color(0xFFDEF7EC)
                                 : isAbsent
                                     ? const Color(0xFFFDE8E8)
                                     : Colors.grey.shade100,
-                            backgroundImage: imageProvider,
-                            child: imageProvider != null
-                                ? null
-                                : Icon(
-                                    Icons.person_rounded,
-                                    size: 18,
-                                    color: isPresent
-                                        ? const Color(0xFF03543F)
-                                        : isAbsent
-                                            ? const Color(0xFF991B1B)
-                                            : Colors.grey.shade700,
-                                  ),
+                            textColor: isPresent
+                                ? const Color(0xFF03543F)
+                                : isAbsent
+                                    ? const Color(0xFF991B1B)
+                                    : Colors.grey.shade700,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -867,8 +859,6 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                 final isPresent = status == 'present';
                 final isAbsent = status == 'absent';
                 final isUnmarked = status.isEmpty;
-                final rawAvatar = stu['avatar_url']?.toString().trim();
-                final imageProvider = getAvatarImageProvider(rawAvatar);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 9),
@@ -890,17 +880,12 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
                   ),
                   child: Row(
                     children: [
-                      CircleAvatar(
+                      AppAvatar(
+                        avatarUrl: stu['avatar_url'],
+                        name: stu['name'],
                         radius: 20,
                         backgroundColor: themeColor.withOpacity(0.12),
-                        backgroundImage: imageProvider,
-                        child: imageProvider != null
-                            ? null
-                            : Icon(
-                                Icons.person_rounded,
-                                size: 22,
-                                color: themeColor.withOpacity(0.7),
-                              ),
+                        textColor: themeColor,
                       ),
                       const SizedBox(width: 12),
                       Expanded(

@@ -12,6 +12,17 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
+function normalizeAvatarUrl(url?: string | null): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const s = url.trim();
+  if (!s || s === 'null') return null;
+  if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:')) return s;
+  if (s.startsWith('/')) return s;
+  if (s.startsWith('uploads/')) return `/${s}`;
+  if (s.startsWith('avatars/')) return `/uploads/${s}`;
+  return `/uploads/avatars/${s}`;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -196,7 +207,7 @@ export async function GET(request: NextRequest) {
           this_month_held: e.this_month_held ?? 0,
           this_month_absent: e.this_month_absent ?? 0,
           fee_status: e.fee_status || 'Paid',
-          avatar_url: e.avatar_url && e.avatar_url.trim().length > 0 ? e.avatar_url.trim() : null,
+          avatar_url: normalizeAvatarUrl(e.avatar_url),
           rate: e.rate ?? 92
         }))
     }));

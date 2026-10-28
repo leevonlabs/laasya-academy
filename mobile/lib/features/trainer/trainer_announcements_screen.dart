@@ -199,9 +199,8 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
     if (item is Map) {
       final rawCreated = item['created_at'];
       if (rawCreated != null && rawCreated.toString().trim().isNotEmpty) {
-        try {
-          return DateTime.parse(rawCreated.toString()).toLocal();
-        } catch (_) {}
+        final parsed = _tryParseDateTime(rawCreated);
+        if (parsed != null) return parsed;
       }
       final rawPub = (item['publish_date'] ?? item['date'])?.toString().trim();
       final rawTime = (item['publish_time'] ?? item['time'])?.toString().trim();
@@ -223,14 +222,29 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
         } catch (_) {}
       }
     } else if (item != null) {
-      final s = item.toString().trim();
-      if (s.isNotEmpty) {
-        try {
-          return DateTime.parse(s).toLocal();
-        } catch (_) {}
-      }
+      final parsed = _tryParseDateTime(item);
+      if (parsed != null) return parsed;
     }
-    return DateTime(2000);
+    return DateTime.now();
+  }
+
+  DateTime? _tryParseDateTime(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val.toLocal();
+    var s = val.toString().trim();
+    if (s.isEmpty || s == 'null') return null;
+    try {
+      if (s.length >= 19 && s[10] == ' ') {
+        s = '${s.substring(0, 10)}T${s.substring(11)}';
+      }
+      if (s.endsWith('+00:00') || s.endsWith('+00')) {
+        s = '${s.substring(0, s.lastIndexOf('+'))}Z';
+      } else if (RegExp(r'[+-]\d{2}$').hasMatch(s)) {
+        s = '$s:00';
+      }
+      return DateTime.parse(s).toLocal();
+    } catch (_) {}
+    return null;
   }
 
   String _getDateGroupLabel(dynamic val) {
@@ -999,7 +1013,7 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
     });
     _loadData();
     _subscribeSupabaseRealtime();
-    _realtimePollTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+    _realtimePollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (mounted) {
         _loadAnnouncements(isBackgroundSync: true);
       }

@@ -81,8 +81,8 @@ export function AppShowcase() {
   ];
 
   return (
-    <section id="mobile-app" className="scroll-mt-20 py-12 sm:py-16 lg:py-20 bg-gradient-to-b from-[#FAF5F7] via-white to-[#FAF5F7]">
-      <div className="mx-auto max-w-[1500px] px-4 sm:px-6 lg:px-10">
+    <section id="mobile-app" className="scroll-mt-20 py-6 sm:py-14 lg:py-18 bg-gradient-to-b from-[#FAF5F7] via-white to-[#FAF5F7]">
+      <div className="mx-auto max-w-[1500px] px-3 sm:px-6 lg:px-10">
         
         {/* Main 2-Column Showcase in 1 Page */}
         <div className="rounded-3xl border border-[#D4BAC7]/70 bg-gradient-to-br from-white via-[#FAF5F7]/80 to-white p-6 sm:p-10 lg:p-12 shadow-warm">

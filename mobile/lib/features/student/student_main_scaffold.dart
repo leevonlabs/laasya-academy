@@ -268,8 +268,8 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
 
   void _startNetworkAlertPolling() {
     _alertPollTimer?.cancel();
-    // Periodic fallback every 60 seconds (Realtime WebSocket & FCM handle instant events)
-    _alertPollTimer = Timer.periodic(const Duration(seconds: 60), (_) => _pollSessionAlerts());
+    // Fast periodic fallback every 6 seconds (Realtime WebSocket & FCM handle instant events)
+    _alertPollTimer = Timer.periodic(const Duration(seconds: 6), (_) => _pollSessionAlerts());
   }
 
   Future<void> _pollSessionAlerts() async {

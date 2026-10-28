@@ -140,8 +140,8 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
         COALESCE(a.views_count, 0) as views_count,
         COALESCE(pt.avatar_url, tt.avatar_url) as trainer_avatar_url,
         COALESCE(NULLIF((SELECT config_value->>'avatar_url' FROM public.app_config WHERE config_key = 'admin_support_profile'), ''), (SELECT avatar_url FROM public.profiles WHERE role IN ('admin', 'owner') AND avatar_url IS NOT NULL AND avatar_url != '' LIMIT 1)) as admin_avatar_url,
-        a.created_at::text as created_at, 
-        a.updated_at::text as updated_at
+        COALESCE(TO_CHAR(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), a.created_at::text) as created_at, 
+        COALESCE(TO_CHAR(a.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), a.updated_at::text) as updated_at
       FROM public.announcements a
       LEFT JOIN public.courses c ON c.id = a.target_course_id
       LEFT JOIN public.batches b ON b.id = a.target_batch_id
@@ -199,8 +199,15 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
     const processed = rows
       .map(r => {
         const computedStatus = calculateStatus(r);
+        let isoCreated = r.created_at;
+        if (isoCreated && typeof isoCreated === 'string' && !isoCreated.endsWith('Z')) {
+          try {
+            isoCreated = new Date(isoCreated).toISOString();
+          } catch (_) {}
+        }
         return {
           ...r,
+          created_at: isoCreated || r.created_at,
           status: computedStatus
         };
       })
@@ -221,7 +228,7 @@ export async function getAnnouncements(filters?: AnnouncementFilters): Promise<A
       : (filters?.announcementType === 'message'
           ? processed.filter(r => r.status === 'Published')
           : processed);
-    announcementsCache.set(cacheKey, { data: finalResult, expiry: Date.now() + 15000 });
+    announcementsCache.set(cacheKey, { data: finalResult, expiry: Date.now() + 3000 });
     return finalResult;
   } catch (err) {
     console.error('Error fetching announcements:', err);
@@ -340,8 +347,8 @@ export async function createAnnouncement(data: {
       trainer_name,
       target_students,
       target_student_names,
-      created_at::text as created_at, 
-      updated_at::text as updated_at;
+      COALESCE(TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), created_at::text) as created_at, 
+      COALESCE(TO_CHAR(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), updated_at::text) as updated_at;
   `, [
     data.title.trim(),
     effectiveMessage,
@@ -507,8 +514,8 @@ export async function updateAnnouncement(
       is_deleted, 
       deleted_at::text as deleted_at, 
       created_by, 
-      created_at::text as created_at, 
-      updated_at::text as updated_at;
+      COALESCE(TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), created_at::text) as created_at, 
+      COALESCE(TO_CHAR(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), updated_at::text) as updated_at;
   `, [
     id,
     data.title.trim(),
@@ -589,8 +596,8 @@ export async function unpublishAnnouncement(id: string): Promise<Announcement> {
       is_deleted, 
       deleted_at::text as deleted_at, 
       created_by, 
-      created_at::text as created_at, 
-      updated_at::text as updated_at;
+      COALESCE(TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), created_at::text) as created_at, 
+      COALESCE(TO_CHAR(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), updated_at::text) as updated_at;
   `, [id]);
 
   return row;
@@ -624,8 +631,8 @@ export async function deleteAnnouncement(id: string): Promise<Announcement> {
       is_deleted, 
       deleted_at::text as deleted_at, 
       created_by, 
-      created_at::text as created_at, 
-      updated_at::text as updated_at;
+      COALESCE(TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), created_at::text) as created_at, 
+      COALESCE(TO_CHAR(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), updated_at::text) as updated_at;
   `, [id]);
 
   return row;

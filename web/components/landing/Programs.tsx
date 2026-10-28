@@ -295,18 +295,18 @@ export function Programs({ initialCourses, initialBatches }: ProgramsProps) {
     : [];
 
   return (
-    <section id="programs" className="scroll-mt-24 py-16 sm:py-24 lg:py-28 bg-[#FAF5F7]">
+    <section id="programs" className="scroll-mt-20 py-8 sm:py-20 lg:py-24 bg-[#FAF5F7]">
       {/* Utilized full container width (max-w-[1650px]) */}
-      <div className="mx-auto max-w-[1650px] px-4 sm:px-8 lg:px-12 xl:px-16">
+      <div className="mx-auto max-w-[1650px] px-3 sm:px-8 lg:px-12 xl:px-16">
         <Reveal>
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.25em] text-[#8A064D]">
+            <p className="text-[0.65rem] sm:text-sm font-semibold uppercase tracking-[0.2em] sm:tracking-[0.25em] text-[#8A064D]">
               Our Programs · Academy Curriculum
             </p>
-            <h2 className="mt-2.5 sm:mt-3 font-display text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight text-[#220314]">
+            <h2 className="mt-1.5 sm:mt-3 font-display text-2xl sm:text-4xl lg:text-5xl font-bold leading-tight text-[#220314]">
               Curated Courses &amp; Available Batches
             </h2>
-            <p className="mt-3 sm:mt-4 text-sm sm:text-base text-[#6E3955]">
+            <p className="mt-2 sm:mt-4 text-xs sm:text-base text-[#6E3955]">
               Explore classical dance, vocal &amp; instrumental music, visual arts,
               karate, yoga, and chess directly from our academy roster.
             </p>
@@ -364,67 +364,69 @@ export function Programs({ initialCourses, initialBatches }: ProgramsProps) {
           {filteredCourses.length === 1 ? '' : 's'}
         </div>
 
-        {/* 4 GRIDS IN EACH ROW on Large Screens (grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4) */}
-        <div className="mt-8 sm:mt-10 grid gap-5 sm:gap-6 xl:gap-7 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {/* 2 GRIDS IN EACH ROW ON MOBILE, 3-4 on Tablet/Desktop */}
+        <div className="mt-6 sm:mt-10 grid gap-2.5 sm:gap-6 xl:gap-7 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
           {filteredCourses.map((course, i) => {
             const courseBatches = courseBatchesMap.get(course.id) || [];
             const imageSrc = getCourseImage(course);
 
             return (
               <Reveal key={course.id} delay={(i % 4) * 60}>
-                <article className="group flex h-full flex-col overflow-hidden rounded-3xl border border-[#D4BAC7]/70 bg-white shadow-warm transition-transform hover:-translate-y-1.5">
-                  {/* Uniform Aspect Ratio Container (No floating emojis) */}
-                  <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#FAF5F7]">
+                <article className="group flex h-full flex-col overflow-hidden rounded-2xl sm:rounded-3xl border border-[#D4BAC7]/70 bg-white shadow-warm transition-transform hover:-translate-y-1.5">
+                  {/* Uniform Aspect Ratio Container */}
+                  <div className="relative aspect-[16/11] sm:aspect-[16/10] w-full overflow-hidden bg-[#FAF5F7]">
                     <img
                       src={imageSrc}
                       alt={course.title}
                       loading="lazy"
                       className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                     />
-                    <span className="absolute left-3.5 top-3.5 rounded-full bg-[#3d0c34]/90 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-wider text-[#fbf0b9] backdrop-blur-sm shadow">
+                    <span className="absolute left-2 top-2 sm:left-3.5 sm:top-3.5 rounded-full bg-[#3d0c34]/90 px-1.5 py-0.5 sm:px-3 sm:py-1 text-[0.55rem] sm:text-[0.65rem] font-bold uppercase tracking-wider text-[#fbf0b9] backdrop-blur-sm shadow truncate max-w-[85%]">
                       {course.category}
                     </span>
                   </div>
 
-                  <div className="flex flex-1 flex-col p-5 sm:p-6 pt-4 sm:pt-5">
-                    {/* Course Title and ONLY Batch Count (No batch details on main grid) */}
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-display text-xl sm:text-2xl font-bold text-[#220314] leading-snug">
+                  <div className="flex flex-1 flex-col p-2.5 sm:p-5 sm:pt-4">
+                    {/* Course Title and Batch Count */}
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-2">
+                      <h3 className="font-display text-xs sm:text-xl font-bold text-[#220314] leading-tight line-clamp-1 sm:line-clamp-2">
                         {course.title}
                       </h3>
-                      <span className="shrink-0 rounded-full bg-[#8A064D]/10 px-2.5 py-0.5 text-xs font-bold text-[#8A064D] whitespace-nowrap">
+                      <span className="self-start shrink-0 rounded-full bg-[#8A064D]/10 px-1.5 py-0.5 text-[0.55rem] sm:text-xs font-bold text-[#8A064D] whitespace-nowrap">
                         {courseBatches.length > 0
                           ? `${courseBatches.length} Batch${courseBatches.length > 1 ? 'es' : ''}`
-                          : 'Open for Enrolment'}
+                          : 'Open'}
                       </span>
                     </div>
 
-                    <p className="mt-2 text-xs sm:text-sm leading-relaxed text-[#59424F] line-clamp-3">
+                    <p className="mt-1 text-[0.65rem] sm:text-sm leading-relaxed text-[#59424F] line-clamp-2 sm:line-clamp-3">
                       {course.description ||
                         'Comprehensive training designed for beginners, intermediate learners, and advanced disciples.'}
                     </p>
 
                     {/* Monthly Fee Indicator */}
                     {course.monthly_fee && (
-                      <p className="mt-3 text-xs font-bold text-[#8A064D]">
-                        Starting from ₹{course.monthly_fee}/month
+                      <p className="mt-1 sm:mt-2 text-[0.62rem] sm:text-xs font-bold text-[#8A064D]">
+                        From ₹{course.monthly_fee}/mo
                       </p>
                     )}
 
                     {/* View Batches Action */}
-                    <div className="mt-auto pt-5">
+                    <div className="mt-auto pt-2 sm:pt-4">
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedCourse(course);
                           setDetailedBatch(null);
                         }}
-                        className="flex w-full items-center justify-center gap-2 rounded-full bg-stage-gradient px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white shadow-warm transition-transform hover:scale-[1.02] cursor-pointer"
+                        className="flex w-full items-center justify-center gap-1 sm:gap-2 rounded-xl sm:rounded-full bg-stage-gradient px-2 sm:px-4 py-1.5 sm:py-2.5 text-[0.65rem] sm:text-xs font-semibold text-white shadow-warm transition-transform hover:scale-[1.02] cursor-pointer"
                       >
-                        <Calendar className="h-4 w-4" />
-                        {courseBatches.length > 0
-                          ? `View Batches (${courseBatches.length})`
-                          : 'Inquire About Course'}
+                        <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+                        <span className="truncate">
+                          {courseBatches.length > 0
+                            ? `Batches (${courseBatches.length})`
+                            : 'Inquire'}
+                        </span>
                       </button>
                     </div>
                   </div>

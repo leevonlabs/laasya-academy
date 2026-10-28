@@ -429,8 +429,9 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
     final primaryColor = enrollments.isNotEmpty
         ? (enrollments.first['course_color'] as Color? ?? LaasyaColors.primary)
         : LaasyaColors.primary;
-    final avatarProvider = getAvatarImageProvider(stu['avatar_url']);
-    final hasPhoto = avatarProvider != null;
+    final hasPhoto = stu['avatar_url'] != null &&
+        stu['avatar_url'].toString().trim().isNotEmpty &&
+        stu['avatar_url'].toString().trim() != 'null';
 
     showModalBottomSheet(
       context: context,
@@ -464,13 +465,12 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                   child: Stack(
                     alignment: Alignment.bottomRight,
                     children: [
-                      CircleAvatar(
+                      AppAvatar(
+                        avatarUrl: stu['avatar_url'],
+                        name: stu['name'],
                         radius: 32,
                         backgroundColor: primaryColor.withOpacity(0.12),
-                        backgroundImage: avatarProvider,
-                        child: hasPhoto
-                            ? null
-                            : Icon(Icons.person_rounded, size: 34, color: primaryColor.withOpacity(0.7)),
+                        textColor: primaryColor,
                       ),
                       if (hasPhoto)
                         Container(
@@ -847,8 +847,9 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                       final primaryColor = enrollments.isNotEmpty
                           ? (enrollments.first['course_color'] as Color? ?? LaasyaColors.primary)
                           : LaasyaColors.primary;
-                      final avatarProvider = getAvatarImageProvider(stu['avatar_url']);
-                      final hasPhoto = avatarProvider != null;
+                      final hasPhoto = stu['avatar_url'] != null &&
+                          stu['avatar_url'].toString().trim().isNotEmpty &&
+                          stu['avatar_url'].toString().trim() != 'null';
                       final courseNames = enrollments.map((e) => e['course_short_title'] as String? ?? '').toSet().where((c) => c.isNotEmpty).join(', ');
                       final displayCourse = courseNames.isNotEmpty ? courseNames : 'Classical Dance';
 
@@ -876,13 +877,12 @@ class _TrainerStudentsTabState extends State<TrainerStudentsTab> {
                                 // Student Image Avatar (Tappable to view full length photo only if real photo exists)
                                 GestureDetector(
                                   onTap: hasPhoto ? () => _showFullLengthPhoto(context, stu) : null,
-                                  child: CircleAvatar(
+                                  child: AppAvatar(
+                                    avatarUrl: stu['avatar_url'],
+                                    name: stu['name'],
                                     radius: 22,
                                     backgroundColor: primaryColor.withOpacity(0.14),
-                                    backgroundImage: avatarProvider,
-                                    child: hasPhoto
-                                        ? null
-                                        : Icon(Icons.person_rounded, size: 24, color: primaryColor.withOpacity(0.7)),
+                                    textColor: primaryColor,
                                   ),
                                 ),
                                 const SizedBox(width: 12),

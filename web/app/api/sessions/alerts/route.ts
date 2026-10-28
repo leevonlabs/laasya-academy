@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, alerts: [] }, { 
         headers: {
           ...corsHeaders,
-          'Cache-Control': 'public, max-age=10, stale-while-revalidate=30',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
         }
       });
     }
@@ -301,7 +301,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, alerts: deduplicated }, { 
       headers: {
         ...corsHeaders,
-        'Cache-Control': 'public, max-age=5, stale-while-revalidate=15',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
       }
     });
   } catch (error: any) {

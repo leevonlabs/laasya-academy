@@ -24,7 +24,7 @@ export function Hero() {
   return (
     <section
       id="home"
-      className="relative flex min-h-[100svh] items-center overflow-hidden"
+      className="relative flex min-h-[85svh] sm:min-h-[100svh] items-center overflow-hidden"
     >
       <div className="absolute inset-0">
         {slides.map((slide, i) => (
@@ -49,21 +49,21 @@ export function Hero() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#4d1544]/75 via-transparent to-[#4d1544]/40" />
       </div>
 
-      <div className="relative mx-auto w-full max-w-[1650px] px-4 pb-20 pt-28 sm:px-8 lg:px-12 xl:px-16">
+      <div className="relative mx-auto w-full max-w-[1650px] px-3 pb-12 pt-20 sm:px-8 sm:pb-20 sm:pt-28 lg:px-12 xl:px-16">
         <div className="max-w-4xl">
           <Reveal>
-            <span className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-[#D4AF37]/50 bg-[#4d1544]/60 px-4 py-1.5 sm:px-5 sm:py-2 text-[0.7rem] sm:text-xs font-semibold uppercase tracking-[0.2em] sm:tracking-[0.25em] text-[#fbf0b9] backdrop-blur-md">
+            <span className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-[#D4AF37]/50 bg-[#4d1544]/60 px-3 py-1 sm:px-5 sm:py-2 text-[0.65rem] sm:text-xs font-semibold uppercase tracking-[0.18em] sm:tracking-[0.25em] text-[#fbf0b9] backdrop-blur-md">
               ✦ Nurturing Creativity &amp; Excellence
             </span>
           </Reveal>
           <Reveal delay={150}>
-            <h1 className="mt-4 sm:mt-6 font-display text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-[1.08] text-white">
+            <h1 className="mt-2.5 sm:mt-6 font-display text-3xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-[1.1] text-white">
               Unleash Your{' '}
               <span className="bg-gold-text font-display italic">Talent</span>
             </h1>
           </Reveal>
           <Reveal delay={300}>
-            <p className="mt-4 sm:mt-6 max-w-2xl text-sm sm:text-base md:text-lg leading-relaxed text-white/90">
+            <p className="mt-2.5 sm:mt-6 max-w-2xl text-xs sm:text-base md:text-lg leading-relaxed text-white/90">
               Welcome to Laasya Cultural Academy. We offer premium training in
               Classical Dance, Vocal Music, Instruments, Visual Arts, and
               Martial Arts to inspire young minds, build lifelong confidence,
@@ -71,18 +71,18 @@ export function Hero() {
             </p>
           </Reveal>
           <Reveal delay={450}>
-            <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
+            <div className="mt-5 sm:mt-10 flex flex-row flex-wrap gap-2.5 sm:gap-4">
               <a
                 href="#programs"
-                className="inline-flex items-center justify-center rounded-full bg-gold-gradient px-7 py-3 sm:px-8 sm:py-3.5 text-xs sm:text-sm md:text-base font-bold text-[#220314] shadow-gold transition-transform hover:scale-[1.04] text-center"
+                className="inline-flex items-center justify-center rounded-full bg-gold-gradient px-4 py-2.5 sm:px-8 sm:py-3.5 text-xs sm:text-base font-bold text-[#220314] shadow-gold transition-transform hover:scale-[1.04] text-center"
               >
-                Explore Courses &amp; Batches
+                Explore Courses
               </a>
               <a
                 href="#faculty"
-                className="inline-flex items-center justify-center rounded-full border border-white/70 bg-black/20 backdrop-blur-xs px-7 py-3 sm:px-8 sm:py-3.5 text-xs sm:text-sm md:text-base font-bold text-white transition-colors hover:bg-white hover:text-black text-center"
+                className="inline-flex items-center justify-center rounded-full border border-white/70 bg-black/20 backdrop-blur-xs px-4 py-2.5 sm:px-8 sm:py-3.5 text-xs sm:text-base font-bold text-white transition-colors hover:bg-white hover:text-black text-center"
               >
-                Meet Our Gurus
+                Meet Gurus
               </a>
             </div>
           </Reveal>

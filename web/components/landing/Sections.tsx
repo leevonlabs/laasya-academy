@@ -35,8 +35,8 @@ export function Stats() {
 
 export function Story() {
   return (
-    <section id="story" className="scroll-mt-24 py-16 sm:py-24 lg:py-28">
-      <div className="mx-auto max-w-[1650px] px-4 sm:px-8 lg:px-12 xl:px-16">
+    <section id="story" className="scroll-mt-20 py-8 sm:py-20 lg:py-24">
+      <div className="mx-auto max-w-[1650px] px-3 sm:px-8 lg:px-12 xl:px-16">
         <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-16">
           <Reveal>
             <div className="relative">
@@ -135,8 +135,8 @@ export function WhyUs() {
   ];
 
   return (
-    <section className="bg-[#FAF5F7] py-16 sm:py-24 lg:py-28">
-      <div className="mx-auto max-w-[1650px] px-4 sm:px-8 lg:px-12 xl:px-16">
+    <section className="bg-[#FAF5F7] py-8 sm:py-20 lg:py-24">
+      <div className="mx-auto max-w-[1650px] px-3 sm:px-8 lg:px-12 xl:px-16">
         <Reveal>
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.25em] text-[#8A064D]">
@@ -176,8 +176,8 @@ export function WhyUs() {
 
 export function Gallery() {
   return (
-    <section id="gallery" className="scroll-mt-24 py-16 sm:py-24 lg:py-28">
-      <div className="mx-auto max-w-[1650px] px-4 sm:px-8 lg:px-12 xl:px-16">
+    <section id="gallery" className="scroll-mt-20 py-8 sm:py-20 lg:py-24">
+      <div className="mx-auto max-w-[1650px] px-3 sm:px-8 lg:px-12 xl:px-16">
         <Reveal>
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.25em] text-[#8A064D]">
@@ -249,7 +249,7 @@ export function Gallery() {
 
 export function CtaBanner() {
   return (
-    <section className="relative overflow-hidden bg-stage-gradient py-16 sm:py-20 lg:py-24">
+    <section className="relative overflow-hidden bg-stage-gradient py-8 sm:py-16 lg:py-20">
       <Reveal>
         <div className="relative mx-auto max-w-4xl px-4 text-center sm:px-6">
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-white">
@@ -295,8 +295,8 @@ export function Contact({ contactProfile }: { contactProfile?: PublicAcademyProf
   const mapUrl = contactProfile?.map_url || 'https://maps.app.goo.gl/BXwHcSPeUzExxR6V7';
 
   return (
-    <section id="contact" className="scroll-mt-24 py-16 sm:py-24 lg:py-28 bg-[#FAF5F7]">
-      <div className="mx-auto max-w-[1650px] px-4 sm:px-8 lg:px-12 xl:px-16">
+    <section id="contact" className="scroll-mt-20 py-8 sm:py-20 lg:py-24 bg-[#FAF5F7]">
+      <div className="mx-auto max-w-[1650px] px-3 sm:px-8 lg:px-12 xl:px-16">
         <Reveal>
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.25em] text-[#8A064D]">

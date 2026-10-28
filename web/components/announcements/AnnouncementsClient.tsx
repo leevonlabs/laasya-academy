@@ -609,6 +609,35 @@ export default function AnnouncementsClient({
     }
   }, [viewMode, activeTab, adminMessages.length, guruMessages.length]);
 
+  // Periodic background auto-refresh to keep Admin & Guru message feeds live without manual reload
+  useEffect(() => {
+    let active = true;
+    const fetchLatest = async () => {
+      try {
+        const res = await fetch('/api/announcements?announcementType=message');
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.success && Array.isArray(json.announcements) && active) {
+          const fresh = json.announcements.filter((a: Announcement) => a.announcement_type !== 'banner');
+          setAnnouncements(prev => {
+            if (prev.length !== fresh.length) return fresh;
+            const prevIds = new Set(prev.map(p => p.id));
+            const hasNew = fresh.some((f: Announcement) => !prevIds.has(f.id));
+            return hasNew ? fresh : prev;
+          });
+        }
+      } catch {
+        // Silent background sync
+      }
+    };
+
+    const interval = setInterval(fetchLatest, 6000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   // Fetch Recipient Students for "View Recipient Students" button
   const handleOpenRecipientsModal = async (ann: Announcement) => {
     setRecipientModalAnnouncement(ann);
