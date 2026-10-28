@@ -496,37 +496,37 @@ export function Footer({ contactProfile }: { contactProfile?: PublicAcademyProfi
   ];
 
   return (
-    <footer className="bg-[#2a0624] pb-8 pt-12 sm:pt-16 text-white border-t border-white/10">
-      <div className="mx-auto max-w-[1650px] px-4 sm:px-8 lg:px-12 xl:px-16 grid gap-8 sm:gap-10 sm:grid-cols-2 lg:grid-cols-4">
+    <footer className="bg-[#2a0624] pb-6 sm:pb-8 pt-7 sm:pt-16 text-white border-t border-white/10">
+      <div className="mx-auto max-w-[1650px] px-4 sm:px-8 lg:px-12 xl:px-16 grid gap-6 sm:gap-10 sm:grid-cols-2 lg:grid-cols-4">
         {/* Brand & Socials */}
         <div className="flex flex-col justify-between">
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-3">
               <img
                 src="/images/laasya_logo.png"
                 alt="Laasya Cultural Academy logo"
-                className="h-12 w-12 sm:h-14 sm:w-14 object-contain rounded-full bg-white/10 p-1"
+                className="h-10 w-10 sm:h-14 sm:w-14 object-contain rounded-full bg-white/10 p-1 shrink-0"
               />
               <div>
-                <p className="font-display text-base sm:text-lg font-bold text-[#fbf0b9]">
+                <p className="font-display text-base sm:text-lg font-bold text-[#fbf0b9] leading-tight">
                   Laasya Cultural Academy
                 </p>
-                <p className="text-[0.55rem] sm:text-[0.6rem] font-medium uppercase tracking-[0.3em] text-[#e8c078]">
+                <p className="text-[0.52rem] sm:text-[0.6rem] font-medium uppercase tracking-[0.25em] sm:tracking-[0.3em] text-[#e8c078]">
                   Unleash Your Talent
                 </p>
               </div>
             </div>
-            <p className="mt-4 text-xs sm:text-sm leading-relaxed text-white/75">
+            <p className="mt-2.5 sm:mt-4 text-xs sm:text-sm leading-snug sm:leading-relaxed text-white/75 line-clamp-2 sm:line-clamp-none">
               Bangalore's premier fine arts sanctuary delivering authentic mastery in Classical Dance, Vocal Music, Instruments, Visual Arts, and Martial Arts.
             </p>
           </div>
 
           {/* Social Media Links */}
-          <div className="mt-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#fbf0b9]/90 mb-3">
+          <div className="mt-4 sm:mt-6">
+            <p className="hidden sm:block text-xs font-semibold uppercase tracking-wider text-[#fbf0b9]/90 mb-3">
               Follow &amp; Connect With Us
             </p>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2 sm:gap-2.5">
               {socialLinks.map((s) => (
                 <a
                   key={s.name}
@@ -534,7 +534,7 @@ export function Footer({ contactProfile }: { contactProfile?: PublicAcademyProfi
                   target="_blank"
                   rel="noreferrer"
                   aria-label={s.name}
-                  className={`flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white/85 shadow-sm transition-all duration-300 hover:scale-110 hover:text-white hover:shadow-lg ${s.hoverBg}`}
+                  className={`flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white/85 shadow-sm transition-all duration-300 hover:scale-110 hover:text-white hover:shadow-lg ${s.hoverBg}`}
                 >
                   {s.icon}
                 </a>
@@ -629,18 +629,18 @@ export function Footer({ contactProfile }: { contactProfile?: PublicAcademyProfi
       </div>
 
       {/* Footer Bottom Bar with all registered academy contacts displayed */}
-      <div className="mx-auto mt-10 sm:mt-12 max-w-[1650px] px-4 sm:px-8 lg:px-12 xl:px-16 border-t border-white/10 pt-6">
+      <div className="mx-auto mt-6 sm:mt-12 max-w-[1650px] px-4 sm:px-8 lg:px-12 xl:px-16 border-t border-white/10 pt-4 sm:pt-6">
         {/* Dynamic Registered Academy Contacts from Admin Profile */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-y-3 gap-x-6 text-xs text-white/80 pb-4 border-b border-white/10 mb-4">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-y-2.5 gap-x-6 text-xs text-white/80 pb-3 sm:pb-4 border-b border-white/10 mb-3 sm:mb-4">
           {/* Mobile Clean Contact Bar (< md) */}
-          <div className="flex md:hidden flex-col items-center gap-3 w-full text-center">
+          <div className="flex md:hidden flex-col items-center gap-2.5 w-full text-center">
             <div className="flex flex-wrap items-center justify-center gap-2">
               <a
                 href="/contact"
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gold-gradient text-[#220314] font-bold text-xs shadow-gold hover:scale-105 transition"
               >
                 <MapPin className="h-3 w-3" />
-                <span>Contact Us &amp; Campus Info</span>
+                <span>Contact &amp; Campus Map</span>
               </a>
               <a
                 href={`https://wa.me/${cleanWa}`}
@@ -649,10 +649,10 @@ export function Footer({ contactProfile }: { contactProfile?: PublicAcademyProfi
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#25D366] text-white font-bold text-xs hover:bg-[#20ba59] transition"
               >
                 <MessageCircle className="h-3.5 w-3.5" />
-                <span>WhatsApp</span>
+                <span>WhatsApp Us</span>
               </a>
             </div>
-            <p className="text-[11px] text-white/70">
+            <p className="text-[11px] text-white/70 line-clamp-1">
               📍 {campusAddress}
             </p>
           </div>
@@ -700,11 +700,12 @@ export function Footer({ contactProfile }: { contactProfile?: PublicAcademyProfi
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left text-xs text-white/60">
-          <p>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left text-xs text-white/60">
+          <p className="text-[11px] sm:text-xs">
             &copy; {new Date().getFullYear()} <span className="text-[#fbf0b9] font-medium">Laasya Cultural Academy</span>. All rights reserved. Unleash Your Talent.
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+          {/* Desktop social text links (hidden on mobile to prevent duplicate repetition) */}
+          <div className="hidden md:flex flex-wrap items-center justify-center gap-4 text-xs">
             <a
               href="https://www.facebook.com/share/1Dvap6Up7t/"
               target="_blank"

@@ -77,7 +77,7 @@ export function generateStudentFeeInvoicePdfDoc(invoice: StudentFeeInvoice): jsP
 
   doc.setFontSize(7.5);
   doc.setTextColor(230, 210, 225);
-  doc.text('VV Maple Hub, 2nd Floor, Kannamangala, Bengaluru - 560067 | Ph: +91 8151 998 899 | info@laasyaacademy.com', 35, 22);
+  doc.text('Laasya Cultural Academy, Main Campus, Hyderabad | Ph: +91 8151 998 899 | shanmukvarada@gmail.com', 35, 22);
 
   // 2. DOCUMENT SUBHEADER
   let y = 38;
@@ -312,7 +312,7 @@ export function generateStudentFeeInvoicePdfDoc(invoice: StudentFeeInvoice): jsP
   doc.text('LAASYA CULTURAL ACADEMY', 196, footerY + 5, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(120, 120, 120);
-  doc.text('Bengaluru, Karnataka', 196, footerY + 9, { align: 'right' });
+  doc.text('Main Campus, Hyderabad', 196, footerY + 9, { align: 'right' });
 
   return doc;
 }
@@ -384,7 +384,7 @@ export function generateGuruSalarySlipPdfDoc(slip: GuruSalaryRecord): jsPDF {
 
   doc.setFontSize(7.5);
   doc.setTextColor(230, 210, 225);
-  doc.text('VV Maple Hub, 2nd Floor, Kannamangala, Bengaluru - 560067 | Ph: +91 8151 998 899', 35, 22);
+  doc.text('Laasya Cultural Academy, Main Campus, Hyderabad | Ph: +91 8151 998 899 | shanmukvarada@gmail.com', 35, 22);
 
   // 2. DOCUMENT SUBHEADER
   let y = 38;
@@ -542,7 +542,7 @@ export function generateGuruSalarySlipPdfDoc(slip: GuruSalaryRecord): jsPDF {
   doc.text('LAASYA CULTURAL ACADEMY', 196, footerY + 5, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(120, 120, 120);
-  doc.text('Bengaluru, Karnataka', 196, footerY + 9, { align: 'right' });
+  doc.text('Main Campus, Hyderabad', 196, footerY + 9, { align: 'right' });
 
   return doc;
 }

@@ -21,11 +21,52 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
   List<Map<String, dynamic>> _payments = [];
   bool _isLoading = true;
   String _paymentTypeFilter = 'all'; // 'all', 'upi', 'card', 'netbanking'
+  int _currentMonthDue = 0;
+  bool _isPaidCurrentMonth = true;
+  String _currentMonthName = 'October 2026';
+
+  String _monthFullName(int m) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return (m >= 1 && m <= 12) ? months[m - 1] : 'Month';
+  }
+
+  void _updateDueStatus() {
+    final now = DateTime.now();
+    _currentMonthName = '${_monthFullName(now.month)} ${now.year}';
+    final curMShort = _monthName(now.month).toLowerCase();
+    final curMFull = _monthFullName(now.month).toLowerCase();
+    final curY = now.year.toString();
+
+    final hasPaymentThisMonth = _payments.any((p) {
+      final period = (p['fee_period'] ?? '').toString().toLowerCase();
+      final date = (p['payment_date'] ?? '').toString().toLowerCase();
+      final matchesMonth = period.contains(curMShort) || period.contains(curMFull) ||
+                           date.contains(curMShort) || date.contains(curMFull);
+      final matchesYear = period.contains(curY) || date.contains(curY);
+      return matchesMonth && matchesYear;
+    });
+
+    final rawDue = widget.studentProfile?['due_amount'];
+    if (hasPaymentThisMonth) {
+      _currentMonthDue = 0;
+      _isPaidCurrentMonth = true;
+    } else if (rawDue is num && rawDue > 0) {
+      _currentMonthDue = rawDue.toInt();
+      _isPaidCurrentMonth = false;
+    } else {
+      _currentMonthDue = 0;
+      _isPaidCurrentMonth = true;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _payments = SupabaseService().getCachedPayments();
+    _updateDueStatus();
     _isLoading = _payments.isEmpty;
     _loadPayments();
   }
@@ -39,6 +80,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
       setState(() {
         _payments = data;
         _isLoading = false;
+        _updateDueStatus();
       });
     }
   }
@@ -159,6 +201,13 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                         Center(
                           child: Column(
                             children: [
+                              Image.asset(
+                                'assets/images/crest_logo.png',
+                                width: 44,
+                                height: 44,
+                                errorBuilder: (c, e, s) => const SizedBox.shrink(),
+                              ),
+                              const SizedBox(height: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
@@ -177,12 +226,14 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                               ),
                               const SizedBox(height: 4),
                               const Text(
-                                'Society Reg. No: REG/HYD/2018/84920',
-                                style: TextStyle(fontSize: 10, color: Colors.grey),
+                                'Laasya Cultural Academy, Main Campus, Hyderabad | Ph: +91 8151 998 899',
+                                style: TextStyle(fontSize: 9.5, color: Colors.grey, fontWeight: FontWeight.w500),
+                                textAlign: TextAlign.center,
                               ),
                               const Text(
-                                'Center for Classical Arts, Dance & Music',
-                                style: TextStyle(fontSize: 10, color: Colors.black54),
+                                'shanmukvarada@gmail.com • Society Reg. No: REG/HYD/2018/84920',
+                                style: TextStyle(fontSize: 9.5, color: Colors.black54),
+                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
@@ -436,12 +487,13 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
     );
   }
 
-  // Interactive Premium Self-Service Payment Gateway Modal for Students
+  // Interactive Premium Self-Service Payment Gateway Modal for Students (Demo Mode)
   void _showPaymentGatewayModal(int feeAmount, String courseTitle) {
     int selectedTab = 0; // 0: UPI, 1: Card, 2: NetBanking
+    String selectedOutcome = 'SUCCESS'; // SUCCESS, FAILURE, CANCELLED, TIMEOUT, PENDING
     bool isProcessing = false;
     String processingStage = 'Initializing secure payment session...';
-    String selectedBank = 'State Bank of India (SBI)';
+    String selectedBank = 'Axis Bank Retail (Demo)';
     final studentName = widget.studentProfile?['full_name'] ?? 'Student';
     final rollNo = widget.studentProfile?['roll_number'] ?? 'LCA-6';
     final double baseFee = feeAmount / 1.18;
@@ -455,7 +507,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
         return StatefulBuilder(
           builder: (ctx, setMState) {
             return Container(
-              height: MediaQuery.of(context).size.height * 0.90,
+              height: MediaQuery.of(context).size.height * 0.92,
               decoration: const BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.only(
@@ -487,17 +539,17 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                             Container(
                               padding: const EdgeInsets.all(7),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFDEF7EC),
+                                color: const Color(0xFFFEF3C7),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.verified_user_rounded, color: Color(0xFF03543F), size: 20),
+                              child: const Icon(Icons.shield_rounded, color: Color(0xFFB45309), size: 20),
                             ),
                             const SizedBox(width: 10),
                             const Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Axis Bank Payment Gateway',
+                                  'Axis Bank Demo Gateway',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -505,8 +557,8 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                   ),
                                 ),
                                 Text(
-                                  'Axis EasyPay Merchant PG • 256-Bit SSL • PCI DSS Level 1',
-                                  style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w500),
+                                  'DEMO SIMULATOR • PCI DSS Level 1 Sandbox',
+                                  style: TextStyle(fontSize: 10, color: Color(0xFF92400E), fontWeight: FontWeight.bold),
                                 ),
                               ],
                             ),
@@ -553,7 +605,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Processing ₹$feeAmount tuition fee payment for $studentName ($rollNo)...',
+                                    'Simulating demo payment of ₹$feeAmount for $studentName ($rollNo)...',
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                                   ),
@@ -561,11 +613,11 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                   const Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.lock_rounded, size: 14, color: Color(0xFF03543F)),
+                                      Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFB45309)),
                                       SizedBox(width: 4),
                                       Text(
-                                        'Do not close or press back button',
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF03543F)),
+                                        'DEMO MODE — NO REAL MONEY WILL BE TRANSFERRED',
+                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
                                       ),
                                     ],
                                   ),
@@ -578,7 +630,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Axis Bank PG Merchant Header & Dev Mock Notice Banner
+                                // MANDATORY DEMO NOTICE BANNER
                                 Container(
                                   margin: const EdgeInsets.only(bottom: 14),
                                   padding: const EdgeInsets.all(12),
@@ -590,23 +642,61 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                   child: const Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Icon(Icons.shield_rounded, size: 18, color: Color(0xFFB45309)),
+                                      Icon(Icons.warning_amber_rounded, size: 20, color: Color(0xFFB45309)),
                                       SizedBox(width: 8),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Axis Bank Merchant PG • ID: AXIS_MERCHANT_LAASYA_01',
+                                              'DEMO MODE — NO REAL MONEY WILL BE TRANSFERRED',
                                               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
                                             ),
                                             SizedBox(height: 2),
                                             Text(
-                                              '[DEV MOCK TEST MODE] Official Axis Bank PG credentials pending onboarding. Real student dues are unaffected.',
+                                              'Official Axis Bank PG credentials pending onboarding. Real student dues are unaffected.',
                                               style: TextStyle(fontSize: 10, color: Color(0xFF78350F)),
                                             ),
                                           ],
                                         ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // Interactive Simulation Outcome Selector (For Testing)
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 14),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.grey.shade200),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Row(
+                                        children: [
+                                          Icon(Icons.tune_rounded, size: 14, color: Color(0xFF8A064D)),
+                                          SizedBox(width: 5),
+                                          Text(
+                                            'Test Simulation Outcome:',
+                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 6,
+                                        children: [
+                                          _outcomeChip('SUCCESS', 'Success', selectedOutcome == 'SUCCESS', () => setMState(() => selectedOutcome = 'SUCCESS')),
+                                          _outcomeChip('FAILURE', 'Decline', selectedOutcome == 'FAILURE', () => setMState(() => selectedOutcome = 'FAILURE')),
+                                          _outcomeChip('CANCELLED', 'Cancel', selectedOutcome == 'CANCELLED', () => setMState(() => selectedOutcome = 'CANCELLED')),
+                                          _outcomeChip('TIMEOUT', 'Timeout', selectedOutcome == 'TIMEOUT', () => setMState(() => selectedOutcome = 'TIMEOUT')),
+                                          _outcomeChip('PENDING', 'Pending', selectedOutcome == 'PENDING', () => setMState(() => selectedOutcome = 'PENDING')),
+                                        ],
                                       ),
                                     ],
                                   ),
@@ -972,47 +1062,61 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                     onPressed: () async {
                                       setMState(() {
                                         isProcessing = true;
-                                        processingStage = 'Connecting to banking server...';
+                                        processingStage = 'Connecting to demo banking server...';
                                       });
+                                      await Future.delayed(const Duration(milliseconds: 500));
+                                      setMState(() => processingStage = 'Simulating Axis PG ($selectedOutcome)...');
                                       await Future.delayed(const Duration(milliseconds: 600));
-                                      setMState(() => processingStage = 'Verifying payment authorization...');
-                                      await Future.delayed(const Duration(milliseconds: 600));
-                                      setMState(() => processingStage = 'Generating official tax receipt...');
-                                      await Future.delayed(const Duration(milliseconds: 400));
-                                      
-                                      // Generate payment record
-                                      final now = DateTime.now();
-                                      final dateStr = '${now.day} ${_monthName(now.month)} ${now.year}';
-                                      final newInvNo = 'LCA-INV-2026-${now.millisecondsSinceEpoch.toString().substring(7)}';
-                                      final newRecNo = 'LCA-REC-${now.millisecondsSinceEpoch.toString().substring(8)}';
-                                      final newPayment = {
-                                        'id': 'pay-${now.millisecondsSinceEpoch}',
-                                        'invoice_number': newInvNo,
-                                        'receipt_number': newRecNo,
-                                        'payment_date': dateStr,
-                                        'fee_period': '${_monthName(now.month)} ${now.year}',
-                                        'course_title': courseTitle,
-                                        'batch_name': 'Enrolled Batch',
-                                        'student_name': studentName,
-                                        'roll_number': rollNo,
-                                        'parent_name': widget.studentProfile?['parent_name'] ?? 'Parent',
-                                        'payment_method': selectedTab == 0 ? 'Axis UPI' : selectedTab == 1 ? 'RuPay / Visa' : 'Axis NetBanking',
-                                        'transaction_reference': 'AXIS-TXN-${now.millisecondsSinceEpoch}',
-                                        'receipt_issued_by': 'Axis Bank Payment Gateway (Merchant #AXIS_01)',
-                                        'amount_paid': feeAmount,
-                                        'gross_amount': feeAmount,
-                                        'discount_amount': 0,
-                                        'status': 'paid',
-                                        'is_mock': true,
-                                      };
 
-                                      setState(() {
-                                        _payments.insert(0, newPayment);
-                                      });
+                                      if (selectedOutcome == 'SUCCESS') {
+                                        setMState(() => processingStage = 'Generating simulated tax invoice receipt...');
+                                        await Future.delayed(const Duration(milliseconds: 400));
 
-                                      if (mounted && ctx.mounted) {
-                                        Navigator.pop(ctx);
-                                        _showPaymentSuccessDialog(newPayment);
+                                        final now = DateTime.now();
+                                        final dateStr = '${now.day} ${_monthName(now.month)} ${now.year}';
+                                        final newInvNo = 'LCA-INV-2026-${now.millisecondsSinceEpoch.toString().substring(7)}';
+                                        final newRecNo = 'LCA-REC-${now.millisecondsSinceEpoch.toString().substring(8)}';
+                                        final orderId = 'AXIS-DEMO-ORD-${now.millisecondsSinceEpoch.toString().substring(5)}';
+                                        final demoRef = 'DEMO-REF-${now.millisecondsSinceEpoch.toString().substring(6)}';
+                                        final newPayment = {
+                                          'id': 'pay-${now.millisecondsSinceEpoch}',
+                                          'invoice_number': newInvNo,
+                                          'receipt_number': newRecNo,
+                                          'payment_date': dateStr,
+                                          'fee_period': '${_monthFullName(now.month)} ${now.year}',
+                                          'course_title': courseTitle,
+                                          'batch_name': 'Enrolled Batch',
+                                          'student_name': studentName,
+                                          'roll_number': rollNo,
+                                          'parent_name': widget.studentProfile?['parent_name'] ?? 'Parent',
+                                          'payment_method': selectedTab == 0 ? 'Axis UPI (Demo)' : selectedTab == 1 ? 'RuPay / Visa (Demo)' : 'Axis NetBanking (Demo)',
+                                          'transaction_reference': demoRef,
+                                          'order_id': orderId,
+                                          'receipt_issued_by': 'Axis Bank Payment Gateway [DEMO SIMULATION]',
+                                          'amount_paid': feeAmount,
+                                          'gross_amount': feeAmount,
+                                          'discount_amount': 0,
+                                          'status': 'demo_success',
+                                          'is_mock': true,
+                                          'is_demo': true,
+                                        };
+
+                                        setState(() {
+                                          _payments.insert(0, newPayment);
+                                          _currentMonthDue = 0;
+                                          _isPaidCurrentMonth = true;
+                                        });
+
+                                        if (mounted && ctx.mounted) {
+                                          Navigator.pop(ctx);
+                                          _showPaymentSuccessDialog(newPayment);
+                                        }
+                                      } else {
+                                        await Future.delayed(const Duration(milliseconds: 400));
+                                        if (mounted && ctx.mounted) {
+                                          Navigator.pop(ctx);
+                                          _showPaymentOutcomeDialog(selectedOutcome, feeAmount, courseTitle);
+                                        }
                                       }
                                     },
                                     child: Row(
@@ -1091,6 +1195,52 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
     );
   }
 
+  Widget _outcomeChip(String key, String label, bool isSelected, VoidCallback onTap) {
+    Color activeColor;
+    switch (key) {
+      case 'SUCCESS':
+        activeColor = const Color(0xFF03543F);
+        break;
+      case 'FAILURE':
+        activeColor = const Color(0xFF991B1B);
+        break;
+      case 'CANCELLED':
+        activeColor = const Color(0xFF475569);
+        break;
+      case 'TIMEOUT':
+        activeColor = const Color(0xFFB45309);
+        break;
+      case 'PENDING':
+        activeColor = const Color(0xFF1E40AF);
+        break;
+      default:
+        activeColor = LaasyaColors.primary;
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? activeColor : Colors.grey.shade300,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? Colors.white : Colors.black87,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _bankOption(String bankName, bool isSelected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -1116,6 +1266,171 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
   String _monthName(int m) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return (m >= 1 && m <= 12) ? months[m - 1] : 'Month';
+  }
+
+  void _showPaymentOutcomeDialog(String outcome, int feeAmount, String courseTitle) {
+    IconData icon;
+    Color iconColor;
+    Color iconBgColor;
+    String title;
+    String subtitle;
+    String errorCode;
+    String errorDetail;
+    String buttonText = 'Retry Demo Payment';
+
+    switch (outcome) {
+      case 'FAILURE':
+        icon = Icons.cancel_rounded;
+        iconColor = const Color(0xFF991B1B);
+        iconBgColor = const Color(0xFFFEE2E2);
+        title = 'Payment Declined (Demo)';
+        subtitle = 'Your bank declined the simulated transaction.';
+        errorCode = 'ERR_BANK_DECLINED [CODE: 91]';
+        errorDetail = 'Simulated card/account policy rejection or insufficient limit. No money was transferred.';
+        buttonText = 'Retry Demo Payment';
+        break;
+      case 'CANCELLED':
+        icon = Icons.highlight_off_rounded;
+        iconColor = const Color(0xFF475569);
+        iconBgColor = const Color(0xFFF1F5F9);
+        title = 'Payment Cancelled (Demo)';
+        subtitle = 'You cancelled the simulated checkout.';
+        errorCode = 'USER_ABORTED [CODE: 102]';
+        errorDetail = 'The checkout process was aborted before authorization completed. No charges applied.';
+        buttonText = 'Try Again';
+        break;
+      case 'TIMEOUT':
+        icon = Icons.timer_off_rounded;
+        iconColor = const Color(0xFFB45309);
+        iconBgColor = const Color(0xFFFEF3C7);
+        title = 'Session Timed Out (Demo)';
+        subtitle = 'The 2FA authorization window has expired.';
+        errorCode = 'AUTH_TIMEOUT [CODE: 408]';
+        errorDetail = 'The simulated 180-second OTP verification window expired. Please initiate a new payment.';
+        buttonText = 'Retry Payment';
+        break;
+      case 'PENDING':
+        icon = Icons.hourglass_top_rounded;
+        iconColor = const Color(0xFF1E40AF);
+        iconBgColor = const Color(0xFFDBEAFE);
+        title = 'Payment Pending (Demo)';
+        subtitle = 'Awaiting clearance from the banking network.';
+        errorCode = 'STATUS_PENDING [CODE: 202]';
+        errorDetail = 'Simulated bank settlement queue. Usually clears in 15-30 minutes. Real student dues are unaffected.';
+        buttonText = 'Retry Demo Payment';
+        break;
+      default:
+        icon = Icons.info_outline_rounded;
+        iconColor = Colors.grey;
+        iconBgColor = Colors.grey.shade100;
+        title = 'Simulation Complete';
+        subtitle = 'Demo transaction processed.';
+        errorCode = 'DEMO_PROCESSED';
+        errorDetail = 'Simulated outcome: $outcome';
+    }
+
+    showDialog(
+      context: context,
+      builder: (dCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: iconBgColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: iconColor, size: 48),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFF59E0B)),
+                ),
+                child: const Text(
+                  'DEMO MODE — NO REAL MONEY WILL BE TRANSFERRED',
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Outcome Code:', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                        Text(errorCode, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: iconColor)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      errorDetail,
+                      style: const TextStyle(fontSize: 10.5, color: Colors.black87),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => Navigator.pop(dCtx),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF590231),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(dCtx);
+                        _showPaymentGatewayModal(feeAmount, courseTitle);
+                      },
+                      icon: const Icon(Icons.refresh_rounded, size: 14),
+                      label: Text(buttonText, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _showPaymentSuccessDialog(Map<String, dynamic> newPayment) {
@@ -1144,14 +1459,15 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
               ),
               const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFF59E0B)),
                 ),
                 child: const Text(
-                  '[DEV MOCK MODE] Axis Bank PG Simulated',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                  'DEMO MODE — NO REAL MONEY WILL BE TRANSFERRED',
+                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
                 ),
               ),
               const SizedBox(height: 8),
@@ -1355,12 +1671,10 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
   Widget build(BuildContext context) {
     final studentName = widget.studentProfile?['full_name'] ?? 'Aditi Sundaram';
     final rollNo = widget.studentProfile?['roll_number'] ?? 'LCA-6';
-    final course = widget.studentProfile?['course'] ?? 'Bharathanatyam';
-    final monthlyFee = widget.studentProfile?['total_monthly_fee'] ?? 2000;
-    final dueAmount = widget.studentProfile?['due_amount'] ?? 0;
 
     int totalPaid = 0;
     for (var p in _payments) {
+      if (p['is_mock'] == true || p['is_demo'] == true) continue;
       final a = p['amount_paid'];
       if (a is num) totalPaid += a.toInt();
     }
@@ -1446,42 +1760,96 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFDEF7EC),
+                                  color: (_isPaidCurrentMonth || _currentMonthDue <= 0)
+                                      ? const Color(0xFFDEF7EC)
+                                      : const Color(0xFFFDE8E8),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Row(
+                                child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.verified_rounded, size: 12, color: Color(0xFF03543F)),
-                                    SizedBox(width: 4),
+                                    Icon(
+                                      (_isPaidCurrentMonth || _currentMonthDue <= 0)
+                                          ? Icons.verified_rounded
+                                          : Icons.schedule_rounded,
+                                      size: 13,
+                                      color: (_isPaidCurrentMonth || _currentMonthDue <= 0)
+                                          ? const Color(0xFF03543F)
+                                          : const Color(0xFF9B1C1C),
+                                    ),
+                                    const SizedBox(width: 4),
                                     Text(
-                                      'FEE STATUS: ALL PAID UP',
-                                      style: TextStyle(color: Color(0xFF03543F), fontSize: 10, fontWeight: FontWeight.bold),
+                                      (_isPaidCurrentMonth || _currentMonthDue <= 0)
+                                          ? 'CURRENT MONTH: PAID IN FULL'
+                                          : 'CURRENT MONTH: PAYMENT PENDING',
+                                      style: TextStyle(
+                                        color: (_isPaidCurrentMonth || _currentMonthDue <= 0)
+                                            ? const Color(0xFF03543F)
+                                            : const Color(0xFF9B1C1C),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
-                              Text(
-                                course,
-                                style: const TextStyle(color: LaasyaColors.accentGold, fontSize: 12, fontWeight: FontWeight.bold),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.25),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.4)),
+                                ),
+                                child: Text(
+                                  _currentMonthName.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: LaasyaColors.accentGold,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 16),
                           const Text(
-                            'Total Tuition Paid (All Time)',
-                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                            'Current Month Total Balance',
+                            style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            '₹$totalPaid.00',
-                            style: const TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                (_isPaidCurrentMonth || _currentMonthDue <= 0)
+                                    ? '₹0.00'
+                                    : '₹$_currentMonthDue.00',
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  color: (_isPaidCurrentMonth || _currentMonthDue <= 0)
+                                      ? const Color(0xFFBCF0DA)
+                                      : Colors.white,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              if (_isPaidCurrentMonth || _currentMonthDue <= 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF03543F),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'CLEARED',
+                                    style: TextStyle(fontSize: 9.5, color: Color(0xFFBCF0DA), fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                            ],
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 16),
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
@@ -1495,9 +1863,12 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text('Current Monthly Fee', style: TextStyle(fontSize: 10.5, color: Colors.white70)),
+                                      const Text('Billing Period', style: TextStyle(fontSize: 10.5, color: Colors.white70)),
                                       const SizedBox(height: 2),
-                                      Text('₹$monthlyFee', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+                                      Text(
+                                        _currentMonthName,
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -1507,14 +1878,14 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text('Outstanding Dues', style: TextStyle(fontSize: 10.5, color: Colors.white70)),
+                                      const Text('Tuition Paid (All Time)', style: TextStyle(fontSize: 10.5, color: Colors.white70)),
                                       const SizedBox(height: 2),
                                       Text(
-                                        dueAmount > 0 ? '₹$dueAmount' : '₹0 (Nil)',
-                                        style: TextStyle(
-                                          fontSize: 15,
+                                        '₹$totalPaid',
+                                        style: const TextStyle(
+                                          fontSize: 14,
                                           fontWeight: FontWeight.bold,
-                                          color: dueAmount > 0 ? const Color(0xFFFFD2D2) : const Color(0xFFBCF0DA),
+                                          color: Colors.white,
                                         ),
                                       ),
                                     ],
@@ -1530,100 +1901,160 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                     // =========================================================
                     // 1.5. SELF-SERVICE PAYMENT ACTION CARD
                     // =========================================================
-                    Container(
-                      margin: const EdgeInsets.only(top: 14),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFFF0D5E4)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
+                    if (_isPaidCurrentMonth || _currentMonthDue <= 0)
+                      Container(
+                        margin: const EdgeInsets.only(top: 14),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFBCF0DA), width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF03543F).withOpacity(0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDEF7EC),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.check_circle_rounded, color: Color(0xFF03543F), size: 24),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFF2F8),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(Icons.payment_rounded, color: LaasyaColors.primary, size: 20),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  const Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                  Row(
                                     children: [
-                                      Text(
-                                        'Online Fee Payment',
-                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                                      const Text(
+                                        'Current Month Dues: ₹0',
+                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF03543F)),
                                       ),
-                                      Text(
-                                        'Pay your monthly tuition fee directly',
-                                        style: TextStyle(fontSize: 10.5, color: Colors.grey),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFDEF7EC),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text('PAID IN FULL', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
                                       ),
                                     ],
                                   ),
-                                ],
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFDEF7EC),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text('UPI • CARDS • NETBANKING', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          const Divider(height: 1),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Monthly Tuition Payable', style: TextStyle(fontSize: 10.5, color: Colors.grey)),
-                                  const SizedBox(height: 2),
+                                  const SizedBox(height: 3),
                                   Text(
-                                    '₹$monthlyFee',
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF03543F)),
-                                  ),
-                                  const Text(
-                                    'Incl. 18% GST',
-                                    style: TextStyle(fontSize: 9.5, color: Colors.grey),
+                                    'Tuition fees for $_currentMonthName are completely cleared. No payment is pending.',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600, height: 1.3),
                                   ),
                                 ],
                               ),
-                              ElevatedButton.icon(
-                                onPressed: () => _showPaymentGatewayModal(monthlyFee, course),
-                                icon: const Icon(Icons.lock_rounded, size: 14, color: Colors.white),
-                                label: Text('Pay ₹$monthlyFee Now', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF8A064D),
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Container(
+                        margin: const EdgeInsets.only(top: 14),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFF0D5E4)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFF2F8),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(Icons.payment_rounded, color: LaasyaColors.primary, size: 20),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Online Fee Payment',
+                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
+                                        ),
+                                        Text(
+                                          'Balance due for $_currentMonthName',
+                                          style: const TextStyle(fontSize: 10.5, color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDEF7EC),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text('UPI • CARDS • NETBANKING', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFF03543F))),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            const Divider(height: 1),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Total Balance Payable', style: TextStyle(fontSize: 10.5, color: Colors.grey)),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '₹$_currentMonthDue',
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF8A064D)),
+                                    ),
+                                    const Text(
+                                      'Incl. 18% GST',
+                                      style: TextStyle(fontSize: 9.5, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: () => _showPaymentGatewayModal(_currentMonthDue, 'Monthly Tuition'),
+                                  icon: const Icon(Icons.lock_rounded, size: 14, color: Colors.white),
+                                  label: Text('Pay ₹$_currentMonthDue Now', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF8A064D),
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
 
                     const SizedBox(height: 20),
 
@@ -1727,8 +2158,6 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                           final date = (item['payment_date'] ?? 'Recent').toString();
                           final method = (item['payment_method'] ?? 'UPI').toString();
                           final ref = (item['transaction_reference'] ?? '').toString();
-                          final courseTitle = (item['course_title'] ?? 'Bharathanatyam').toString();
-                          final batchName = (item['batch_name'] ?? 'Batch A').toString();
                           final isAdmission = period.toLowerCase().contains('admission') || period.toLowerCase().contains('academic');
                           final paymentTitle = isAdmission ? 'Academy Registration & Admission Fee' : 'Tuition Fee Payment';
 
@@ -1796,18 +2225,35 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFDEF7EC),
+                                          color: ((item['is_mock'] == true) || (item['is_demo'] == true))
+                                              ? const Color(0xFFFEF3C7)
+                                              : const Color(0xFFDEF7EC),
                                           borderRadius: BorderRadius.circular(6),
+                                          border: ((item['is_mock'] == true) || (item['is_demo'] == true))
+                                              ? Border.all(color: const Color(0xFFF59E0B))
+                                              : null,
                                         ),
-                                        child: const Row(
+                                        child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(Icons.check_circle_rounded, size: 11, color: Color(0xFF03543F)),
-                                            SizedBox(width: 4),
+                                            Icon(
+                                              ((item['is_mock'] == true) || (item['is_demo'] == true))
+                                                  ? Icons.science_rounded
+                                                  : Icons.check_circle_rounded,
+                                              size: 11,
+                                              color: ((item['is_mock'] == true) || (item['is_demo'] == true))
+                                                  ? const Color(0xFFB45309)
+                                                  : const Color(0xFF03543F),
+                                            ),
+                                            const SizedBox(width: 4),
                                             Text(
-                                              'PAID & SETTLED',
+                                              ((item['is_mock'] == true) || (item['is_demo'] == true))
+                                                  ? 'DEMO SIMULATION'
+                                                  : 'PAID & SETTLED',
                                               style: TextStyle(
-                                                color: Color(0xFF03543F),
+                                                color: ((item['is_mock'] == true) || (item['is_demo'] == true))
+                                                    ? const Color(0xFF92400E)
+                                                    : const Color(0xFF03543F),
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.bold,
                                               ),
@@ -1839,7 +2285,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                             ),
                                             const SizedBox(height: 3),
                                             Text(
-                                              '$courseTitle • $batchName',
+                                              'Tuition Fee Payment • $period',
                                               style: const TextStyle(
                                                 fontSize: 11.5,
                                                 fontWeight: FontWeight.w600,

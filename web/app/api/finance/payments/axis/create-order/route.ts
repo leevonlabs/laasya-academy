@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAxisPaymentPayload, AXIS_PG_CONFIG, AxisPaymentOrder } from '@/lib/axisBankPayment';
+import { defaultPaymentGateway, AxisPaymentOrder, DEMO_PAYMENT_DISCLAIMER } from '@/lib/axisBankPayment';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,51 +17,53 @@ export async function POST(req: NextRequest) {
       discountAmount = 0,
       paymentMethod = 'axis_upi',
       bankName,
+      idempotencyKey,
     } = body;
 
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: 'Valid payment amount is required' }, { status: 400 });
+    const parsedAmount = Number(amount);
+    if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      return NextResponse.json({ 
+        error: 'Valid payment amount is required and must be greater than 0' 
+      }, { status: 400 });
     }
 
-    const totalAmount = Math.max(0, Number(amount) - Number(discountAmount));
+    const parsedDiscount = Number(discountAmount) || 0;
+    const totalAmount = Math.max(0, Number((parsedAmount - parsedDiscount).toFixed(2)));
     const baseAmount = Number((totalAmount / 1.18).toFixed(2));
     const gstAmount = Number((totalAmount - baseAmount).toFixed(2));
-    const orderId = `AXIS-ORD-2026-${Date.now().toString().slice(-6)}`;
+    
+    // Idempotency: generate deterministic or unique demo order ID
+    const safeInv = (invoiceNumber || 'INV-DEMO').replace(/[^a-zA-Z0-9-]/g, '');
+    const dateStamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const orderId = `AXIS-DEMO-ORD-${dateStamp}-${safeInv.slice(-5)}`;
 
     const order: AxisPaymentOrder = {
       orderId,
+      idempotencyKey: idempotencyKey || `${safeInv}_${totalAmount}`,
       studentId: studentId || 's-guest',
-      studentName: studentName || 'Student',
+      studentName: studentName || 'Student Disciple',
       rollNumber: rollNumber || 'LCA-0',
       courseTitle: courseTitle || 'Classical Dance',
-      feePeriod: feePeriod || 'October 2026',
+      feePeriod: feePeriod || 'Current Month',
       invoiceNumber: invoiceNumber || `LCA-INV-${Date.now().toString().slice(-6)}`,
       baseAmount,
       gstAmount,
-      discountAmount: Number(discountAmount),
+      discountAmount: parsedDiscount,
       totalAmount,
       paymentMethod,
       bankName,
     };
 
-    const payload = createAxisPaymentPayload(order);
+    const orderResult = await defaultPaymentGateway.createOrder(order);
 
     return NextResponse.json({
-      success: true,
-      orderId,
-      merchantId: AXIS_PG_CONFIG.merchantId,
-      currency: AXIS_PG_CONFIG.currency,
-      totalAmount,
-      baseAmount,
-      gstAmount,
-      discountAmount: Number(discountAmount),
-      isLive: AXIS_PG_CONFIG.isLive,
-      payload,
-      message: AXIS_PG_CONFIG.isLive
-        ? 'Axis Bank PG Session Initialized'
-        : '[DEV MOCK MODE] Official Axis Bank PG credentials pending. Simulated checkout ready.',
+      ...orderResult,
+      message: `${DEMO_PAYMENT_DISCLAIMER}. Official Axis Bank PG credentials pending. Simulated checkout ready.`,
     });
   } catch (err: any) {
-    return NextResponse.json({ error: 'Failed to initialize Axis PG order', details: err?.message }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to initialize Axis PG demo order', 
+      details: err?.message 
+    }, { status: 500 });
   }
 }
