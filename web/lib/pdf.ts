@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { StudentFeeInvoice, GuruSalaryRecord } from './finance';
+import { ACADEMY_CREST_BASE64 } from './academyLogo';
 
 function formatMonthEndDdMmYy(dateStrOrPeriod?: string | null): string {
   let d = new Date();
@@ -46,15 +47,22 @@ export function generateStudentFeeInvoicePdfDoc(invoice: StudentFeeInvoice): jsP
   doc.setFillColor(249, 227, 58);
   doc.rect(0, 28, 210, 2, 'F');
 
-  // Crest Box 'LC'
-  doc.setFillColor(138, 6, 77);
-  doc.setDrawColor(249, 227, 58);
-  doc.setLineWidth(0.6);
-  doc.roundedRect(12, 5, 18, 18, 2, 2, 'FD');
-  doc.setTextColor(249, 227, 58);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(14);
-  doc.text('LC', 21, 17, { align: 'center' });
+  // Academy Official Logo / Crest
+  try {
+    if (ACADEMY_CREST_BASE64) {
+      doc.addImage(ACADEMY_CREST_BASE64, 'PNG', 12, 5, 18, 18);
+    }
+  } catch {
+    // Fallback Crest Box 'LC'
+    doc.setFillColor(138, 6, 77);
+    doc.setDrawColor(249, 227, 58);
+    doc.setLineWidth(0.6);
+    doc.roundedRect(12, 5, 18, 18, 2, 2, 'FD');
+    doc.setTextColor(249, 227, 58);
+    doc.setFont('times', 'bold');
+    doc.setFontSize(14);
+    doc.text('LC', 21, 17, { align: 'center' });
+  }
 
   // Academy Title Header
   doc.setTextColor(255, 255, 255);
@@ -346,15 +354,22 @@ export function generateGuruSalarySlipPdfDoc(slip: GuruSalaryRecord): jsPDF {
   doc.setFillColor(249, 227, 58);
   doc.rect(0, 28, 210, 2, 'F');
 
-  // Crest Box 'LC'
-  doc.setFillColor(138, 6, 77);
-  doc.setDrawColor(249, 227, 58);
-  doc.setLineWidth(0.6);
-  doc.roundedRect(12, 5, 18, 18, 2, 2, 'FD');
-  doc.setTextColor(249, 227, 58);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(14);
-  doc.text('LC', 21, 17, { align: 'center' });
+  // Academy Official Logo / Crest
+  try {
+    if (ACADEMY_CREST_BASE64) {
+      doc.addImage(ACADEMY_CREST_BASE64, 'PNG', 12, 5, 18, 18);
+    }
+  } catch {
+    // Fallback Crest Box 'LC'
+    doc.setFillColor(138, 6, 77);
+    doc.setDrawColor(249, 227, 58);
+    doc.setLineWidth(0.6);
+    doc.roundedRect(12, 5, 18, 18, 2, 2, 'FD');
+    doc.setTextColor(249, 227, 58);
+    doc.setFont('times', 'bold');
+    doc.setFontSize(14);
+    doc.text('LC', 21, 17, { align: 'center' });
+  }
 
   // Academy Title Header
   doc.setTextColor(255, 255, 255);

@@ -116,9 +116,18 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                         ),
                       ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 22),
-                      onPressed: () => Navigator.pop(ctx),
+                    Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Download PDF',
+                          icon: const Icon(Icons.download_rounded, color: LaasyaColors.primary, size: 22),
+                          onPressed: () => _downloadInvoice(invNo, studentName, item: item),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 22),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -412,7 +421,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                         },
                         icon: const Icon(Icons.download_rounded, size: 18, color: LaasyaColors.accentGold),
                         label: const Text(
-                          'Download Invoice (PDF)',
+                          'Download PDF',
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -1712,7 +1721,6 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                         separatorBuilder: (_, __) => const SizedBox(height: 14),
                         itemBuilder: (context, index) {
                           final item = filteredPayments[index];
-                          final invNo = (item['invoice_number'] ?? 'LCA-INV').toString();
                           final recNo = (item['receipt_number'] ?? 'LCA-REC').toString();
                           final period = (item['fee_period'] ?? 'Tuition Fee').toString();
                           final amount = item['amount_paid'] ?? 2000;
@@ -1917,46 +1925,24 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                   const Divider(height: 1),
                                   const SizedBox(height: 10),
 
-                                  // Action Row: View Receipt & Download PDF
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 3,
-                                        child: OutlinedButton.icon(
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor: LaasyaColors.primary,
-                                            side: const BorderSide(color: Color(0xFFF0D5E4)),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            padding: const EdgeInsets.symmetric(vertical: 10),
-                                          ),
-                                          onPressed: () => _showInvoiceModal(item),
-                                          icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                                          label: const Text(
-                                            'View Tax Invoice',
-                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
+                                  // Single Action Button: View Invoice (opens invoice modal with Download PDF option)
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF590231),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        padding: const EdgeInsets.symmetric(vertical: 11),
                                       ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        flex: 2,
-                                        child: ElevatedButton.icon(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF590231),
-                                            foregroundColor: Colors.white,
-                                            elevation: 0,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            padding: const EdgeInsets.symmetric(vertical: 10),
-                                          ),
-                                          onPressed: () => _downloadInvoice(invNo, studentName, item: item),
-                                          icon: const Icon(Icons.download_rounded, size: 16, color: LaasyaColors.accentGold),
-                                          label: const Text(
-                                            'PDF',
-                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
+                                      onPressed: () => _showInvoiceModal(item),
+                                      icon: const Icon(Icons.receipt_long_rounded, size: 16, color: LaasyaColors.accentGold),
+                                      label: const Text(
+                                        'View Invoice',
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 ],
                               ),

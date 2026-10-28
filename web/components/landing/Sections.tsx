@@ -295,36 +295,36 @@ export function Contact({ contactProfile }: { contactProfile?: PublicAcademyProf
   const mapUrl = contactProfile?.map_url || 'https://maps.app.goo.gl/BXwHcSPeUzExxR6V7';
 
   return (
-    <section id="contact" className="scroll-mt-20 py-8 sm:py-20 lg:py-24 bg-[#FAF5F7]">
+    <section id="contact" className="scroll-mt-20 py-6 sm:py-20 lg:py-24 bg-[#FAF5F7]">
       <div className="mx-auto max-w-[1650px] px-3 sm:px-8 lg:px-12 xl:px-16">
         <Reveal>
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.25em] text-[#8A064D]">
               Get In Touch
             </p>
-            <h2 className="mt-2.5 sm:mt-3 font-display text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight text-[#220314]">
+            <h2 className="mt-2 sm:mt-3 font-display text-2xl sm:text-4xl lg:text-5xl font-bold leading-tight text-[#220314]">
               Visit Our Campus
             </h2>
-            <p className="mt-3 sm:mt-4 text-sm sm:text-base text-[#6E3955]">
+            <p className="mt-2 sm:mt-4 text-xs sm:text-base text-[#6E3955]">
               We invite you to tour our academy studio, meet the teachers, and
               choose the perfect art forms for your child.
             </p>
           </div>
         </Reveal>
 
-        {/* Contact Info Cards */}
-        <div className="mt-10 sm:mt-14 grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-3">
+        {/* Contact Info Cards: Compact & mobile-friendly */}
+        <div className="mt-6 sm:mt-14 grid gap-3 sm:gap-6 grid-cols-1 md:grid-cols-3">
           {/* Card 1: Academy Address */}
           <Reveal delay={0}>
-            <div className="h-full rounded-3xl border border-[#D4BAC7]/70 bg-white p-6 sm:p-8 text-center shadow-warm flex flex-col justify-between">
+            <div className="h-full rounded-2xl sm:rounded-3xl border border-[#D4BAC7]/70 bg-white p-4 sm:p-8 text-center shadow-warm flex flex-col justify-between">
               <div>
-                <span className="mx-auto flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gold-gradient shadow-gold">
+                <span className="mx-auto flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gold-gradient shadow-gold">
                   <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-[#220314]" />
                 </span>
-                <h3 className="mt-4 font-display text-lg sm:text-xl font-bold text-[#220314]">
+                <h3 className="mt-3 sm:mt-4 font-display text-base sm:text-xl font-bold text-[#220314]">
                   Academy Address
                 </h3>
-                <div className="mt-2 space-y-1">
+                <div className="mt-1.5 sm:mt-2 space-y-0.5 sm:space-y-1">
                   {addressLines.map((line, idx) => (
                     <p key={idx} className="text-xs sm:text-sm text-[#6E3955]">
                       {line}
@@ -337,22 +337,22 @@ export function Contact({ contactProfile }: { contactProfile?: PublicAcademyProf
 
           {/* Card 2: Phone & WhatsApp */}
           <Reveal delay={100}>
-            <div className="h-full rounded-3xl border border-[#D4BAC7]/70 bg-white p-6 sm:p-8 text-center shadow-warm flex flex-col justify-between">
+            <div className="h-full rounded-2xl sm:rounded-3xl border border-[#D4BAC7]/70 bg-white p-4 sm:p-8 text-center shadow-warm flex flex-col justify-between">
               <div>
-                <span className="mx-auto flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gold-gradient shadow-gold">
+                <span className="mx-auto flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gold-gradient shadow-gold">
                   <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-[#220314]" />
                 </span>
-                <h3 className="mt-4 font-display text-lg sm:text-xl font-bold text-[#220314]">
+                <h3 className="mt-3 sm:mt-4 font-display text-base sm:text-xl font-bold text-[#220314]">
                   Phone &amp; WhatsApp
                 </h3>
-                <div className="mt-3 space-y-2.5">
+                <div className="mt-2.5 sm:mt-3 space-y-2">
                   <a
                     href={`https://wa.me/${cleanWa}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-bold text-xs sm:text-sm transition-colors border border-emerald-300 shadow-xs"
+                    className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 py-1.5 sm:py-2 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-bold text-xs sm:text-sm transition-colors border border-emerald-300 shadow-xs"
                   >
-                    <MessageCircle className="w-4 h-4 text-[#25D366]" />
+                    <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#25D366]" />
                     <span>WhatsApp: {wa}</span>
                   </a>
                   {otherContacts.map((c: any, idx: number) => (
@@ -370,20 +370,20 @@ export function Contact({ contactProfile }: { contactProfile?: PublicAcademyProf
 
           {/* Card 3: Email Inquiries */}
           <Reveal delay={200}>
-            <div className="h-full rounded-3xl border border-[#D4BAC7]/70 bg-white p-6 sm:p-8 text-center shadow-warm flex flex-col justify-between">
+            <div className="h-full rounded-2xl sm:rounded-3xl border border-[#D4BAC7]/70 bg-white p-4 sm:p-8 text-center shadow-warm flex flex-col justify-between">
               <div>
-                <span className="mx-auto flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gold-gradient shadow-gold">
+                <span className="mx-auto flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gold-gradient shadow-gold">
                   <Mail className="h-5 w-5 sm:h-6 sm:w-6 text-[#220314]" />
                 </span>
-                <h3 className="mt-4 font-display text-lg sm:text-xl font-bold text-[#220314]">
+                <h3 className="mt-3 sm:mt-4 font-display text-base sm:text-xl font-bold text-[#220314]">
                   Email Inquiries
                 </h3>
-                <div className="mt-2 space-y-1">
+                <div className="mt-1.5 sm:mt-2 space-y-0.5 sm:space-y-1">
                   {displayEmails.map((emailStr, idx) => (
                     <a
                       key={idx}
                       href={`mailto:${emailStr}`}
-                      className="mt-1 block text-xs sm:text-sm font-medium text-[#8A064D] hover:underline"
+                      className="mt-0.5 sm:mt-1 block text-xs sm:text-sm font-medium text-[#8A064D] hover:underline"
                     >
                       {emailStr}
                     </a>
@@ -396,18 +396,18 @@ export function Contact({ contactProfile }: { contactProfile?: PublicAcademyProf
 
         {/* Interactive Google Maps View Section */}
         <Reveal delay={200}>
-          <div className="mt-8 sm:mt-10 overflow-hidden rounded-3xl border-2 border-[#D4BAC7] bg-white shadow-xl">
+          <div className="mt-5 sm:mt-10 overflow-hidden rounded-2xl sm:rounded-3xl border border-[#D4BAC7] sm:border-2 bg-white shadow-xl">
             {/* Map Header Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-6 bg-[#3d0c34] text-white">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl bg-gold-gradient shadow-gold shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 p-3.5 sm:p-6 bg-[#3d0c34] text-white">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <span className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-2xl bg-gold-gradient shadow-gold shrink-0">
                   <Navigation className="h-4 w-4 sm:h-5 sm:w-5 text-[#220314]" />
                 </span>
                 <div>
-                  <h3 className="font-display text-base sm:text-xl font-bold text-[#fbf0b9]">
+                  <h3 className="font-display text-sm sm:text-xl font-bold text-[#fbf0b9]">
                     Laasya Cultural Academy · Campus Location
                   </h3>
-                  <p className="text-[0.7rem] sm:text-xs text-white/80">
+                  <p className="text-[0.68rem] sm:text-xs text-white/80 line-clamp-1 sm:line-clamp-none">
                     {campusAddress}
                   </p>
                 </div>
@@ -418,15 +418,15 @@ export function Contact({ contactProfile }: { contactProfile?: PublicAcademyProf
                 href={mapUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-gold-gradient px-5 py-2.5 text-xs font-bold text-[#220314] shadow-gold hover:scale-[1.03] transition-transform shrink-0"
+                className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-full bg-gold-gradient px-4 sm:px-5 py-2 sm:py-2.5 text-xs font-bold text-[#220314] shadow-gold hover:scale-[1.03] transition-transform shrink-0 self-start sm:self-auto"
               >
                 <span>Open in Google Maps</span>
-                <ExternalLink className="h-3.5 w-3.5" />
+                <ExternalLink className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               </a>
             </div>
 
             {/* Google Maps Embed Iframe */}
-            <div className="relative aspect-[16/9] sm:aspect-[21/9] w-full min-h-[300px] sm:min-h-[380px] bg-[#FAF5F7]">
+            <div className="relative aspect-[16/9] sm:aspect-[21/9] w-full min-h-[220px] sm:min-h-[380px] bg-[#FAF5F7]">
               <iframe
                 title="Laasya Cultural Academy Campus Google Map"
                 src="https://maps.google.com/maps?q=Laasya+Cultural+Academy,+VV+Maple+Hub,+Kannamangala,+Bangalore+560115&t=&z=16&ie=UTF8&iwloc=&output=embed"
@@ -543,8 +543,8 @@ export function Footer({ contactProfile }: { contactProfile?: PublicAcademyProfi
           </div>
         </div>
 
-        {/* Quick Links */}
-        <div>
+        {/* Quick Links (Hidden on mobile per UI request; displayed on desktop) */}
+        <div className="hidden md:block">
           <h3 className="font-display text-sm sm:text-base font-semibold text-[#fbf0b9] border-b border-white/10 pb-2">
             Quick Links
           </h3>
@@ -569,8 +569,8 @@ export function Footer({ contactProfile }: { contactProfile?: PublicAcademyProfi
           </ul>
         </div>
 
-        {/* Art Disciplines */}
-        <div>
+        {/* Art Disciplines (Hidden on mobile per UI request; displayed on desktop) */}
+        <div className="hidden md:block">
           <h3 className="font-display text-sm sm:text-base font-semibold text-[#fbf0b9] border-b border-white/10 pb-2">
             Art Disciplines
           </h3>
@@ -602,8 +602,8 @@ export function Footer({ contactProfile }: { contactProfile?: PublicAcademyProfi
           </ul>
         </div>
 
-        {/* Timings & WhatsApp Banner */}
-        <div>
+        {/* Timings & WhatsApp Banner (Hidden on mobile per UI request; displayed on desktop) */}
+        <div className="hidden md:block">
           <h3 className="font-display text-sm sm:text-base font-semibold text-[#fbf0b9] border-b border-white/10 pb-2">
             Campus Timings &amp; Visits
           </h3>
