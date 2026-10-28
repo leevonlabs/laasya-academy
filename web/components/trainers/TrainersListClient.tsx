@@ -12,7 +12,7 @@ import {
   Calendar, 
   X, 
   Search, 
-  Sparkles, 
+  Award, 
   Edit3, 
   Clock, 
   MapPin, 
@@ -565,7 +565,7 @@ export default function TrainersListClient({
                 <span className="text-xs text-[#8A064D] font-bold">Laasya Academy of Fine Arts</span>
               </div>
               <h1 className="text-2xl font-black text-[#2D041A] tracking-tight mt-1 flex items-center gap-2">
-                <Sparkles className="w-6 h-6 text-[#EBB128]" />
+                <GraduationCap className="w-6 h-6 text-[#8A064D]" />
                 <span>Register New Guru / Faculty Master</span>
               </h1>
               <p className="text-xs text-[#6E3955] mt-0.5 font-medium">
@@ -588,7 +588,7 @@ export default function TrainersListClient({
               disabled={saving}
               className="px-6 py-2.5 rounded-2xl bg-[#8A064D] hover:bg-[#70043E] active:scale-95 text-white text-xs font-black transition flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
             >
-              <Sparkles className="w-4 h-4 text-[#F9E33A]" />
+              <Plus className="w-4 h-4" />
               <span>{saving ? 'Saving...' : 'Add Revered Guru'}</span>
             </button>
           </div>
@@ -621,7 +621,7 @@ export default function TrainersListClient({
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5 flex items-center justify-between">
                     <span>Guru ID *</span>
                     <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                       <span>Auto</span>
                     </span>
                   </label>
@@ -941,7 +941,7 @@ export default function TrainersListClient({
                 disabled={saving}
                 className="px-6 py-2.5 rounded-2xl bg-[#8A064D] hover:bg-[#70043E] active:scale-95 text-white text-xs font-black transition flex items-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
               >
-                <Sparkles className="w-4 h-4 text-[#F9E33A]" />
+                <Plus className="w-4 h-4" />
                 <span>{saving ? 'Saving...' : 'Add Revered Guru'}</span>
               </button>
             </div>
@@ -1577,7 +1577,7 @@ export default function TrainersListClient({
                     {/* Display name as a distinct mark inside the image */}
                     <div className="mt-2 flex items-center gap-2">
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F9E33A] text-[#2D041A] font-black text-xs uppercase tracking-wider shadow-lg border border-[#F9E33A]">
-                        <Sparkles className="w-3 h-3 text-[#2D041A] fill-[#2D041A]" />
+                        <Award className="w-3.5 h-3.5 text-[#2D041A]" />
                         <span>{t.display_title || 'Guru & Mentor'}</span>
                       </span>
                     </div>
@@ -1786,7 +1786,7 @@ export default function TrainersListClient({
                       </span>
                     )}
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F9E33A] text-[#2D041A] font-black text-xs uppercase tracking-wider shadow-xs border border-[#F9E33A]">
-                      <Sparkles className="w-3 h-3 text-[#2D041A] fill-[#2D041A]" />
+                      <Award className="w-3.5 h-3.5 text-[#2D041A]" />
                       <span>{viewingGuru.display_title || 'Revered Guru & Mentor'}</span>
                     </span>
                   </div>

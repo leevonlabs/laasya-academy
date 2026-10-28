@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, RotateCcw, Loader2, Check } from 'lucide-react';
+import { Wand2, RotateCcw, Loader2, Check } from 'lucide-react';
 
 interface AiEnhanceButtonProps {
   value: string;
@@ -107,7 +107,7 @@ export default function AiEnhanceButton({
           </>
         ) : (
           <>
-            <Sparkles className="w-3 h-3 text-amber-500" />
+            <Wand2 className="w-3 h-3 text-amber-500" />
             <span>Enhance</span>
           </>
         )}

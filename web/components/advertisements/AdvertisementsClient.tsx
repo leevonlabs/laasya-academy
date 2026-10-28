@@ -15,8 +15,7 @@ import {
   Upload,
   ExternalLink,
   Smartphone,
-  Sparkles,
-  Calendar,
+Calendar,
   AlertCircle
 } from 'lucide-react';
 import { Announcement } from '@/lib/announcements';

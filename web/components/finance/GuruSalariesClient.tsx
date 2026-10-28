@@ -22,7 +22,7 @@ import {
   CreditCard, 
   Eye, 
   X, 
-  Sparkles,
+  
   Phone,
   Calendar,
   DollarSign,
@@ -434,7 +434,7 @@ export default function GuruSalariesClient({
       {/* Toast Notification */}
       {notification && (
         <div className="fixed top-6 right-6 z-50 bg-[#2D041A] text-white px-5 py-3 rounded-2xl shadow-xl border border-[#F9E33A] flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-200">
-          <Sparkles className="w-5 h-5 text-[#F9E33A]" />
+          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           <span className="text-xs font-semibold">{notification}</span>
         </div>
       )}

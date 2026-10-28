@@ -5,7 +5,7 @@ import {
   BellRing, 
   Video, 
   Award, 
-  Sparkles, 
+  Bot, 
   Film, 
   Receipt, 
   Smartphone, 
@@ -61,7 +61,7 @@ export function AppShowcase() {
       desc: 'Expert remarks on mudras, laya, aramandi, and shruti accuracy.',
     },
     {
-      icon: Sparkles,
+      icon: Bot,
       color: 'bg-rose-50 text-rose-700 border-rose-200',
       title: '24/7 AI Practice Assistant',
       desc: 'Instant in-app guidance for warm-ups, theory, and batch schedules.',

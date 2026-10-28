@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, X, AlertCircle, ZoomIn, ZoomOut, Move, RotateCcw, Check, Sparkles } from 'lucide-react';
+import { Camera, Upload, X, AlertCircle, ZoomIn, ZoomOut, Move, RotateCcw, Check, Award } from 'lucide-react';
 
 interface GuruPhotoUploadInputProps {
   value?: string | null;
@@ -376,7 +376,7 @@ export default function GuruPhotoUploadInput({
                   </div>
                   <div className="mt-1 flex items-center">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F9E33A] text-[#2D041A] font-black text-[9px] uppercase tracking-wider">
-                      <Sparkles className="w-2.5 h-2.5 fill-[#2D041A]" />
+                      <Award className="w-2.5 h-2.5 text-[#2D041A]" />
                       <span>{displayTitle}</span>
                     </span>
                   </div>

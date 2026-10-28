@@ -29,8 +29,7 @@ import {
   ChevronRight,
   SlidersHorizontal,
   Printer,
-  Sparkles,
-  Check
+Check
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { Course, Batch, Student, Trainer } from '@/lib/academy';

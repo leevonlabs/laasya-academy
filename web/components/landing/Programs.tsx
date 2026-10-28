@@ -9,7 +9,7 @@ import {
   X,
   Search,
   MapPin,
-  Sparkles,
+  
   Clock,
   IndianRupee,
   BookOpen,
@@ -617,7 +617,7 @@ export function Programs({ initialCourses, initialBatches }: ProgramsProps) {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-[#DFC8D7] bg-[#FFF8FB] p-8 text-center text-sm text-[#6E3955]">
-                  <Sparkles className="mx-auto h-7 w-7 text-[#8A064D] mb-2" />
+                  <Calendar className="mx-auto h-7 w-7 text-[#8A064D] mb-2" />
                   <p className="font-semibold text-[#220314]">
                     Batches are forming for {selectedCourse.title}
                   </p>

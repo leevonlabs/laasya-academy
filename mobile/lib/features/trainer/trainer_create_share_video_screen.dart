@@ -906,7 +906,7 @@ class _TrainerCreateShareVideoScreenState
                                   Row(
                                     children: [
                                       Icon(
-                                        Icons.stars_rounded,
+                                        Icons.play_circle_fill_rounded,
                                         size: 18,
                                         color: _videoType == 'performance'
                                             ? const Color(0xFF8A064D)

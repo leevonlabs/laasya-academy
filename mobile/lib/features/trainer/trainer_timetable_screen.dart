@@ -480,7 +480,7 @@ class _TrainerTimetableScreenState extends State<TrainerTimetableScreen> {
         'border': const Color(0xFFE9D5FF),
         'text': const Color(0xFF7E22CE),
         'badgeBg': const Color(0xFFFAF5FF),
-        'icon': Icons.auto_awesome_rounded,
+        'icon': Icons.self_improvement_rounded,
       };
     }
     if (lower.contains('DRAWING') || lower.contains('PAINT') || lower.contains('ART')) {

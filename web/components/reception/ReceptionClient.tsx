@@ -14,7 +14,6 @@ import {
   Edit3, 
   Trash2, 
   X, 
-  Sparkles, 
   ShieldCheck, 
   Phone, 
   Mail, 
@@ -1135,8 +1134,8 @@ export default function ReceptionClient({
                       onClick={generatePassword}
                       className="text-[10px] font-black text-[#590231] hover:underline flex items-center gap-1 cursor-pointer"
                     >
-                      <Sparkles className="w-3 h-3 text-[#590231]" />
-                      <span>Randomize PIN</span>
+                      <KeyRound className="w-3 h-3 text-[#590231]" />
+                      <span>Generate PIN</span>
                     </button>
                   </div>
                   <div className="relative">
@@ -1194,7 +1193,7 @@ export default function ReceptionClient({
                           onClick={generatePassword}
                           className="text-[10px] font-black text-[#590231] hover:underline flex items-center gap-1 cursor-pointer"
                         >
-                          <Sparkles className="w-3 h-3 text-[#590231]" />
+                          <KeyRound className="w-3 h-3 text-[#590231]" />
                           <span>Generate New PIN</span>
                         </button>
                       </div>

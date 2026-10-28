@@ -1215,7 +1215,7 @@ class _StudentMessagesScreenState extends State<StudentMessagesScreen> {
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => CircleAvatar(
                       radius: 17,
-                      backgroundColor: Color(0xFF075E54),
+                      backgroundColor: const Color(0xFF075E54),
                       child: Text(
                         ((msg['sender_role'] ?? '').toString().toLowerCase().contains('reception') ||
                          (msg['created_by'] ?? '').toString().toLowerCase().contains('reception'))

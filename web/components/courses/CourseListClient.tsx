@@ -13,7 +13,6 @@ import {
   Check, 
   X,
   BookOpen,
-  Sparkles,
   AlertCircle,
   Clock,
   Layers,
@@ -1418,7 +1417,7 @@ export default function CourseListClient({ initialCourses, initialCategories, ca
                   <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5 flex items-center justify-between">
                     <span>Course Code *</span>
                     <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                       <span>Auto-Generated</span>
                     </span>
                   </label>

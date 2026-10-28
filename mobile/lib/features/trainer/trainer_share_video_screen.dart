@@ -965,7 +965,7 @@ class _TrainerShareVideoScreenState extends State<TrainerShareVideoScreen> {
                                   color: Colors.white.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: const Icon(Icons.stars_rounded, color: Color(0xFFF9E33A), size: 24),
+                                child: const Icon(Icons.play_circle_fill_rounded, color: Color(0xFFF9E33A), size: 24),
                               ),
                               const SizedBox(width: 10),
                               Expanded(

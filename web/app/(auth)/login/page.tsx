@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Lock, Phone, ArrowRight, Sparkles, AlertCircle, Eye, EyeOff, ShieldCheck, UserCheck } from 'lucide-react';
+import { Lock, Phone, ArrowRight, AlertCircle, Eye, EyeOff, ShieldCheck, UserCheck } from 'lucide-react';
 import Particles from '@/components/react-bits/Particles';
 import SpotlightCard from '@/components/react-bits/SpotlightCard';
 import ShinyText from '@/components/react-bits/ShinyText';
@@ -101,10 +101,10 @@ export default function LoginPage() {
                 priority
               />
 
-              {/* React Bits Shiny Text Animated Badge */}
-              <div className="inline-flex items-center gap-2 mt-2 bg-[#3F0123]/95 px-4 py-1.5 rounded-full text-xs border border-[#F9E33A]/50 shadow-inner">
-                <Sparkles className="w-3.5 h-3.5 text-[#F9E33A] animate-pulse" />
-                <ShinyText text="Director & Staff Management Portal" speed={3.5} className="text-xs tracking-wider uppercase font-extrabold" />
+              {/* Management Badge */}
+              <div className="inline-flex items-center gap-2 mt-2 bg-[#3F0123]/95 px-4 py-1.5 rounded-full text-xs border border-[#D4AF37]/50 shadow-inner">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37]" />
+                <ShinyText text="Director & Staff Management Portal" speed={3.5} className="text-xs tracking-wider uppercase font-extrabold text-[#F5E8C7]" />
               </div>
             </div>
           </div>
@@ -117,7 +117,7 @@ export default function LoginPage() {
               </h1>
               <p className="text-xs font-semibold text-[#8A064D] mt-1.5 flex items-center justify-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-[#8A064D]" />
-                <span>Central Administration & Front Desk Desk</span>
+                <span>Central Administration & Front Desk Management</span>
               </p>
               <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-gray-500 bg-[#FBF7FA] py-1.5 px-3 rounded-xl border border-[#F0D5E4]">
                 <UserCheck className="w-3.5 h-3.5 text-emerald-600" />

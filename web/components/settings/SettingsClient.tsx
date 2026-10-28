@@ -17,7 +17,7 @@ import {
   X, 
   Loader2, 
   ShieldCheck, 
-  Sparkles,
+  
   AlertCircle,
   CheckCircle2,
   Mail,
@@ -1334,7 +1334,7 @@ export default function SettingsClient({
                     onClick={() => setNewPassword('123456')}
                     className="text-[11px] font-bold text-[#8A064D] hover:underline flex items-center gap-1 cursor-pointer"
                   >
-                    <Sparkles className="w-3 h-3" />
+                    <KeyRound className="w-3.5 h-3.5" />
                     <span>Set Default &apos;123456&apos;</span>
                   </button>
                 </div>

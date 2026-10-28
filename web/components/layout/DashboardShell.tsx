@@ -23,7 +23,6 @@ import {
   Menu,
   X,
   Calendar as CalendarIcon,
-  Sparkles,
   BadgePercent,
   Video,
   Image as ImageIcon,
@@ -232,8 +231,8 @@ export default function DashboardShell({ user, children }: Props) {
         {/* Navigation Menu */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden">
           {!isCollapsed && (
-            <div className="px-3 pt-1 pb-2 text-[11px] font-black uppercase tracking-wider text-[#F9E33A]/90 flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3 text-[#F9E33A]" />
+            <div className="px-3 pt-1 pb-2 text-[11px] font-black uppercase tracking-wider text-[#D4AF37]/90 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37]" />
               <span>Academy Management</span>
             </div>
           )}

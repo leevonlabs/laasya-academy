@@ -6,7 +6,7 @@ import CourseMultiSearchSelect from '@/components/common/CourseMultiSearchSelect
 import BatchMultiSearchSelect from '@/components/common/BatchMultiSearchSelect';
 import AiEnhanceButton from '@/components/common/AiEnhanceButton';
 import {
-  Sparkles,
+  
   Plus,
   Search,
   Check,
@@ -323,7 +323,7 @@ export default function SchemesListClient({ initialSchemes, courses, batches }: 
         <div>
           <div className="flex items-center gap-2.5">
             <span className="p-2.5 rounded-2xl bg-[#590231] text-[#F9E33A] shadow-xs">
-              <Sparkles className="w-5 h-5" />
+              <Percent className="w-5 h-5" />
             </span>
             <div>
               <h1 className="text-2xl font-bold text-[#2D041A]">Combo Schemes & Packages</h1>
@@ -399,7 +399,7 @@ export default function SchemesListClient({ initialSchemes, courses, batches }: 
       {filteredSchemes.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-[#F0D5E4] p-12 text-center space-y-3">
           <div className="w-14 h-14 mx-auto rounded-2xl bg-[#FFF2F8] text-[#8A064D] flex items-center justify-center">
-            <Sparkles className="w-7 h-7" />
+            <Percent className="w-7 h-7" />
           </div>
           <h3 className="text-lg font-bold text-gray-800">No schemes found</h3>
           <p className="text-xs text-gray-500 max-w-sm mx-auto">
@@ -600,7 +600,7 @@ export default function SchemesListClient({ initialSchemes, courses, batches }: 
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2.5">
                 <span className="p-2 rounded-xl bg-[#590231] text-[#F9E33A]">
-                  <Sparkles className="w-5 h-5" />
+                  <Percent className="w-5 h-5" />
                 </span>
                 <div>
                   <h3 className="text-lg font-bold text-[#2D041A]">Create New Scheme</h3>

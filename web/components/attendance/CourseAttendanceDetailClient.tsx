@@ -19,8 +19,7 @@ import {
   RefreshCw,
   Building,
   DollarSign,
-  Sparkles,
-  Award
+Award
 } from 'lucide-react';
 import { Course, AttendanceRecord } from '@/lib/academy';
 

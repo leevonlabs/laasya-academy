@@ -8,7 +8,7 @@ import {
   Clock, 
   MapPin, 
   Users, 
-  Sparkles, 
+  CheckCircle2, 
   X,
   Search,
   Check,
@@ -1435,7 +1435,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                 {/* Header: Course Category & Active/Inactive Toggle Badge */}
                 <div className="flex items-center justify-between gap-2 mb-3.5">
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#8A064D] bg-[#FFF2F8] border border-[#F0D5E4] px-3.5 py-1 rounded-full shadow-2xs">
-                    <Sparkles className="w-3.5 h-3.5 text-[#8A064D]" />
+                    <BookOpen className="w-3.5 h-3.5 text-[#8A064D]" />
                     <span>{b.course_category}</span>
                   </span>
                   
@@ -1819,7 +1819,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                   <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
                     <span>Batch Code *</span>
                     <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                       <span>Auto-Derived</span>
                     </span>
                   </label>

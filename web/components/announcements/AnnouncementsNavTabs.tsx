@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Megaphone, CalendarX2, CalendarCheck, Sparkles } from 'lucide-react';
+import { Megaphone, CalendarX2, CalendarCheck } from 'lucide-react';
 
 interface Props {
   activeCount?: {

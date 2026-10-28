@@ -16,7 +16,6 @@ import {
   Printer, 
   Download, 
   Layers, 
-  Sparkles,
   FileText,
   Building,
   User,

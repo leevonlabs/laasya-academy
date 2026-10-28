@@ -22,7 +22,6 @@ import {
   Info,
   CheckSquare,
   Square,
-  Sparkles,
   Link as LinkIcon,
   ArrowLeft,
   Filter,
@@ -1892,7 +1891,7 @@ export default function VideoLibraryClient({ initialCourses, initialItems, initi
           <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-[#F0D5E4] flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#FFF2F8] text-[#8A064D] border border-rose-200 text-[11px] font-bold mb-1">
-                <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                <Video className="w-3.5 h-3.5 text-[#8A064D]" />
                 <span>FACULTY VIDEO LIBRARY &amp; AUDITS</span>
               </div>
               <h3 className="font-bold text-lg text-[#2D041A] flex items-center gap-2">

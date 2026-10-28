@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, CheckCircle2, MessageCircle, Trash2, Calendar, User, Phone, Sparkles } from 'lucide-react';
+import { X, CheckCircle2, MessageCircle, Trash2, Calendar, User, Phone } from 'lucide-react';
 import { useEnquiry } from './EnquiryContext';
 
 interface EnquiryModalProps {

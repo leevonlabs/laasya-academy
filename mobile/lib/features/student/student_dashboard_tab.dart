@@ -865,7 +865,7 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
                         shape: BoxShape.circle,
                         border: Border.all(color: const Color(0xFFFBF0B9), width: 1.2),
                       ),
-                      child: const Icon(Icons.auto_awesome, color: Color(0xFFFBF0B9), size: 18),
+                      child: const Icon(Icons.psychology_rounded, color: Color(0xFFFBF0B9), size: 18),
                     ),
                     const SizedBox(width: 12),
                     const Expanded(

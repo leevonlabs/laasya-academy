@@ -70,7 +70,7 @@ class _AiEnhanceBarState extends State<AiEnhanceBar> {
               const SnackBar(
                 content: Row(
                   children: [
-                    Icon(Icons.auto_awesome, color: Colors.amber, size: 18),
+                    Icon(Icons.edit_note_rounded, color: Colors.amber, size: 18),
                     SizedBox(width: 8),
                     Text('Text polished with AI! Tap Undo to restore.'),
                   ],
@@ -98,7 +98,7 @@ class _AiEnhanceBarState extends State<AiEnhanceBar> {
           const SnackBar(
             content: Row(
               children: [
-                Icon(Icons.auto_awesome, color: Colors.amber, size: 18),
+                Icon(Icons.edit_note_rounded, color: Colors.amber, size: 18),
                 SizedBox(width: 8),
                 Text('Text polished and formatted! Tap Undo to restore.'),
               ],
@@ -181,7 +181,7 @@ class _AiEnhanceBarState extends State<AiEnhanceBar> {
                     ),
                   ] else ...[
                     const Icon(
-                      Icons.auto_awesome_rounded,
+                      Icons.edit_note_rounded,
                       size: 13,
                       color: Color(0xFFD97706),
                     ),

@@ -84,9 +84,14 @@ body {
   transform: translateY(-1.5px);
 }
 
-/* Clean accessible focus ring */
-input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
-  outline: none;
+/* Accessible focus rings */
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid #8A064D;
+  outline-offset: 1px;
+}
+button:focus-visible, a:focus-visible {
+  outline: 2px solid #8A064D;
+  outline-offset: 2px;
 }
 
 /* =========================================================

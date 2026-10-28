@@ -2,8 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Sparkles, 
-  X, 
+X, 
   Send, 
   MessageCircle, 
   Bot, 
@@ -288,7 +287,7 @@ export function AiChatWidget({ whatsappNumber, campusAddress }: AiChatWidgetProp
             <div className="relative flex items-center justify-center">
               <Bot className="h-7 w-7 sm:h-8 sm:w-8 text-[#fbf0b9]" />
               <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#25D366] ring-2 ring-white">
-                <Sparkles className="h-2 w-2 text-white" />
+                <span className="h-1.5 w-1.5 rounded-full bg-white" />
               </span>
             </div>
           )}

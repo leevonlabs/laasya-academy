@@ -182,7 +182,7 @@ class TrainerDataStore {
   IconData _getCourseIcon(String title) {
     final lower = title.toLowerCase();
     if (lower.contains('bharat') || lower.contains('dance')) return Icons.self_improvement_rounded;
-    if (lower.contains('kuchipudi')) return Icons.auto_awesome_rounded;
+    if (lower.contains('kuchipudi')) return Icons.self_improvement_rounded;
     if (lower.contains('carnatic') || lower.contains('vocal') || lower.contains('music')) return Icons.music_note_rounded;
     if (lower.contains('violin')) return Icons.music_video_rounded;
     if (lower.contains('mridangam')) return Icons.album_rounded;

@@ -23,7 +23,7 @@ import {
   Clock,
   MapPin,
   CheckCircle2,
-  Sparkles,
+  Loader2,
   User,
   ShieldCheck,
   Check,
@@ -1157,7 +1157,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
             >
               {savingNew ? (
                 <>
-                  <Sparkles className="w-4 h-4 animate-spin text-[#F9E33A]" />
+                  <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
                   <span>Registering Student...</span>
                 </>
               ) : (
@@ -1648,7 +1648,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
             >
               {savingNew ? (
                 <>
-                  <Sparkles className="w-5 h-5 animate-spin text-[#F9E33A]" />
+                  <Loader2 className="w-5 h-5 animate-spin text-[#D4AF37]" />
                   <span>Registering Student...</span>
                 </>
               ) : (
@@ -1738,7 +1738,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
             >
               {savingEdit ? (
                 <>
-                  <Sparkles className="w-4 h-4 animate-spin text-[#F9E33A]" />
+                  <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
                   <span>Saving Changes...</span>
                 </>
               ) : (
@@ -2232,7 +2232,7 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
             >
               {savingEdit ? (
                 <>
-                  <Sparkles className="w-5 h-5 animate-spin text-[#F9E33A]" />
+                  <Loader2 className="w-5 h-5 animate-spin text-[#D4AF37]" />
                   <span>Saving Changes...</span>
                 </>
               ) : (

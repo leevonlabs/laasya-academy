@@ -395,7 +395,7 @@ class _StudentAiAssistantScreenState extends State<StudentAiAssistantScreen> {
             CircleAvatar(
               radius: 16,
               backgroundColor: Color(0x26FFFFFF),
-              child: Icon(Icons.auto_awesome, color: Color(0xFFFBF0B9), size: 18),
+              child: Icon(Icons.smart_toy_rounded, color: Color(0xFFFBF0B9), size: 18),
             ),
             SizedBox(width: 10),
             Expanded(

@@ -17,7 +17,6 @@ import {
   Clock, 
   CheckCircle2, 
   ArrowUpRight, 
-  Sparkles,
   MapPin,
   Receipt,
   Banknote,
@@ -57,7 +56,7 @@ export default async function OverviewPage() {
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-1.5 bg-[#590231]/90 px-3.5 py-1 rounded-full text-xs font-bold text-[#F9E33A] border border-[#F9E33A]/40 shadow-xs">
-              <Sparkles className="w-3.5 h-3.5 text-[#F9E33A]" />
+              <ShieldCheck className="w-3.5 h-3.5 text-[#F9E33A]" />
               <span>Academy Control Center</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
@@ -455,7 +454,7 @@ export default async function OverviewPage() {
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#F0D5E4]/60">
           <div>
             <div className="inline-flex items-center gap-1.5 bg-[#FFF2F8] text-[#8A064D] px-3 py-0.5 rounded-full text-xs font-bold border border-rose-200 mb-1">
-              <Sparkles className="w-3.5 h-3.5" />
+              <Calendar className="w-3.5 h-3.5" />
               <span>Current Week Live Schedule</span>
             </div>
             <h2 className="text-xl font-black text-[#2D041A]">
