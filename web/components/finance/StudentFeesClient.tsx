@@ -31,11 +31,13 @@ import {
   Layers,
   Check,
   Download,
-  ChevronDown
+  ChevronDown,
+  Shield
 } from 'lucide-react';
 import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
 import MonthPicker from '@/components/common/MonthPicker';
 import { downloadStudentFeeInvoicePdf } from '@/lib/pdf';
+import AxisReconciliationClient from '@/components/finance/AxisReconciliationClient';
 
 interface Props {
   initialInvoices: StudentFeeInvoice[];
@@ -68,9 +70,10 @@ export default function StudentFeesClient({
   students: initialStudents
 }: Props) {
   // -------------------------------------------------------------
-  // 1. TOP TAB STATE: Collections vs Payments
+  // 1. TOP TAB STATE: Collections vs Payments vs Axis PG Recon
   // -------------------------------------------------------------
-  const [activeTab, setActiveTab] = useState<'collections' | 'payments'>('collections');
+  const [activeTab, setActiveTab] = useState<'collections' | 'payments' | 'axis_pg'>('collections');
+  const [invoiceViewTab, setInvoiceViewTab] = useState<'vector_pdf' | 'summary'>('vector_pdf');
 
   // Main Data States
   const [invoices, setInvoices] = useState<StudentFeeInvoice[]>(initialInvoices);
@@ -772,6 +775,23 @@ For queries, contact: +91 8151 998 899`;
               activeTab === 'payments' ? 'bg-white/20 text-white' : 'bg-gray-200/80 text-gray-700'
             }`}>
               {invoices.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('axis_pg')}
+            className={`px-6 py-3 rounded-xl text-sm font-black transition flex items-center gap-2.5 cursor-pointer ${
+              activeTab === 'axis_pg'
+                ? 'bg-[#8A064D] text-white shadow-md ring-2 ring-[#F9E33A]/40'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+            }`}
+          >
+            <Shield className="w-4 h-4 text-[#F9E33A]" />
+            <span>Axis Bank PG</span>
+            <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
+              activeTab === 'axis_pg' ? 'bg-white/20 text-white' : 'bg-gray-200/80 text-gray-700'
+            }`}>
+              Recon
             </span>
           </button>
         </div>
@@ -1489,6 +1509,13 @@ For queries, contact: +91 8151 998 899`;
       )}
 
       {/* ===================================================================== */}
+      {/* 3. TAB CONTENT C: AXIS BANK PG TRANSACTIONS & RECONCILIATION */}
+      {/* ===================================================================== */}
+      {activeTab === 'axis_pg' && (
+        <AxisReconciliationClient />
+      )}
+
+      {/* ===================================================================== */}
       {/* 4. MODAL A: COLLECT STUDENT FEE (FOR COLLECTIONS PAGE) */}
       {/* ===================================================================== */}
       {collectingStudent && (
@@ -1792,27 +1819,44 @@ For queries, contact: +91 8151 998 899`;
       {/* ===================================================================== */}
       {viewingInvoice && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-[#F0D5E4] max-h-[92vh] overflow-y-auto print:p-0 print:border-none print:shadow-none">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 shadow-2xl border border-[#F0D5E4] max-h-[94vh] overflow-y-auto print:p-0 print:border-none print:shadow-none">
             
-            {/* Printable Invoice Container */}
-            <div id="student-fee-invoice-content" className="bg-white p-2 rounded-2xl">
-              {/* Header with Academy Brand */}
-              <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#2D041A] border-2 border-[#F9E33A] flex items-center justify-center text-[#F9E33A] font-serif font-black text-lg shadow-sm">
-                    LC
+            {/* Header with Switcher between Vector PDF and Details */}
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#2D041A] border-2 border-[#F9E33A] flex items-center justify-center text-[#F9E33A] font-serif font-black text-base shadow-sm">
+                  LC
+                </div>
+                <div>
+                  <div className="inline-block bg-[#590231] text-white text-[9.5px] font-bold px-2 py-0.5 rounded-md tracking-wider">
+                    LAASYA CULTURAL ACADEMY
                   </div>
-                  <div>
-                    <div className="inline-block bg-[#590231] text-white text-[10px] font-bold px-2 py-0.5 rounded-md tracking-wider">
-                      LAASYA CULTURAL ACADEMY
-                    </div>
-                    <p className="text-[9.5px] text-gray-500 font-medium mt-0.5">
-                      Society Reg. No: REG/HYD/2018/84920 • Center for Classical Arts, Dance & Music
-                    </p>
-                    <p className="text-[10.5px] text-[#8A064D] font-bold uppercase tracking-wider mt-0.5">
-                      Official Student Fee Receipt & Tax Invoice
-                    </p>
-                  </div>
+                  <h3 className="text-sm font-bold text-[#2D041A] mt-0.5">
+                    Official Fee Invoice • {viewingInvoice.invoice_number}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-bold print:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setInvoiceViewTab('vector_pdf')}
+                    className={`px-3 py-1 rounded-lg transition ${
+                      invoiceViewTab === 'vector_pdf' ? 'bg-[#590231] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Official PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInvoiceViewTab('summary')}
+                    className={`px-3 py-1 rounded-lg transition ${
+                      invoiceViewTab === 'summary' ? 'bg-[#590231] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Details
+                  </button>
                 </div>
 
                 <button
@@ -1823,6 +1867,38 @@ For queries, contact: +91 8151 998 899`;
                   <X className="w-5 h-5" />
                 </button>
               </div>
+            </div>
+
+            {invoiceViewTab === 'vector_pdf' ? (
+              <div className="py-3">
+                <iframe
+                  src={`/api/finance/invoices/pdf?invoiceId=${viewingInvoice.id}&invNo=${encodeURIComponent(viewingInvoice.invoice_number)}&studentName=${encodeURIComponent(viewingInvoice.student_name)}&rollNumber=${encodeURIComponent(viewingInvoice.roll_number)}&courseTitle=${encodeURIComponent(viewingInvoice.course_title)}&feePeriod=${encodeURIComponent(viewingInvoice.fee_period)}&amount=${viewingInvoice.total_amount}`}
+                  className="w-full h-[64vh] rounded-2xl border border-gray-200 shadow-inner"
+                  title="Official Vector PDF Invoice"
+                />
+              </div>
+            ) : (
+              /* Printable Invoice Container */
+              <div id="student-fee-invoice-content" className="bg-white p-2 rounded-2xl">
+                {/* Header with Academy Brand */}
+                <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8A064D] to-[#2D041A] border-2 border-[#F9E33A] flex items-center justify-center text-[#F9E33A] font-serif font-black text-lg shadow-sm">
+                      LC
+                    </div>
+                    <div>
+                      <div className="inline-block bg-[#590231] text-white text-[10px] font-bold px-2 py-0.5 rounded-md tracking-wider">
+                        LAASYA CULTURAL ACADEMY
+                      </div>
+                      <p className="text-[9.5px] text-gray-500 font-medium mt-0.5">
+                        Society Reg. No: REG/HYD/2018/84920 • Center for Classical Arts, Dance & Music
+                      </p>
+                      <p className="text-[10.5px] text-[#8A064D] font-bold uppercase tracking-wider mt-0.5">
+                        Official Student Fee Receipt & Tax Invoice
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
               {/* Receipt Body */}
               <div className="py-4 space-y-4 text-xs">
@@ -1940,6 +2016,7 @@ For queries, contact: +91 8151 998 899`;
 
               </div>
             </div>
+          )}
 
             {/* Actions: Download PDF, Print & Share WhatsApp */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-gray-100 print:hidden">
@@ -1952,6 +2029,16 @@ For queries, contact: +91 8151 998 899`;
               </button>
 
               <div className="flex flex-wrap items-center gap-2">
+                {/* Open in New Window */}
+                <a
+                  href={`/api/finance/invoices/pdf?invoiceId=${viewingInvoice.id}&invNo=${encodeURIComponent(viewingInvoice.invoice_number)}&studentName=${encodeURIComponent(viewingInvoice.student_name)}&rollNumber=${encodeURIComponent(viewingInvoice.roll_number)}&courseTitle=${encodeURIComponent(viewingInvoice.course_title)}&feePeriod=${encodeURIComponent(viewingInvoice.fee_period)}&amount=${viewingInvoice.total_amount}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5 text-gray-600" />
+                  <span>Open PDF in Tab</span>
+                </a>
                 {/* Download PDF Button */}
                 <button
                   type="button"

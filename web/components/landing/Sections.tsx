@@ -152,17 +152,17 @@ export function WhyUs() {
           </div>
         </Reveal>
 
-        <div className="mt-10 sm:mt-14 grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-6 sm:mt-14 grid gap-2.5 sm:gap-6 grid-cols-2 lg:grid-cols-3">
           {pillars.map((pillar, i) => (
             <Reveal key={pillar.title} delay={i * 70}>
-              <div className="h-full rounded-3xl border border-[#D4BAC7]/70 bg-white p-6 sm:p-7 shadow-warm transition-transform hover:-translate-y-1">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gold-gradient text-sm font-bold text-[#220314] shadow-gold">
+              <div className="h-full rounded-2xl sm:rounded-3xl border border-[#D4BAC7]/70 bg-white p-3.5 sm:p-7 shadow-warm transition-transform hover:-translate-y-1">
+                <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gold-gradient text-xs sm:text-sm font-bold text-[#220314] shadow-gold">
                   0{i + 1}
                 </div>
-                <h3 className="mt-4 font-display text-lg sm:text-xl font-bold text-[#220314]">
+                <h3 className="mt-2.5 sm:mt-4 font-display text-xs sm:text-lg lg:text-xl font-bold text-[#220314] leading-snug">
                   {pillar.title}
                 </h3>
-                <p className="mt-2 text-xs sm:text-sm leading-relaxed text-[#59424F]">
+                <p className="mt-1.5 sm:mt-2 text-[10.5px] sm:text-sm leading-relaxed text-[#59424F] line-clamp-3 sm:line-clamp-none">
                   {pillar.desc}
                 </p>
               </div>
@@ -176,28 +176,28 @@ export function WhyUs() {
 
 export function Gallery() {
   return (
-    <section id="gallery" className="scroll-mt-20 py-8 sm:py-20 lg:py-24">
+    <section id="gallery" className="scroll-mt-20 py-6 sm:py-20 lg:py-24">
       <div className="mx-auto max-w-[1650px] px-3 sm:px-8 lg:px-12 xl:px-16">
         <Reveal>
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.25em] text-[#8A064D]">
               Gallery Showcase
             </p>
-            <h2 className="mt-2.5 sm:mt-3 font-display text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight text-[#220314]">
+            <h2 className="mt-2 sm:mt-3 font-display text-2xl sm:text-4xl lg:text-5xl font-bold leading-tight text-[#220314]">
               Moments of Creation &amp; Performance
             </h2>
-            <p className="mt-3 sm:mt-4 text-sm sm:text-base text-[#6E3955]">
+            <p className="mt-2 sm:mt-4 text-xs sm:text-base text-[#6E3955]">
               Where practice meets presentation — glimpses of life at Laasya.
             </p>
           </div>
         </Reveal>
 
-        {/* Bento Grid matching reference screenshot: Left tall card, Top-right 2 side-by-side, Bottom-right wide banner */}
-        <div className="mt-10 sm:mt-14 grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-12 items-stretch">
-          {/* Left tall card */}
+        {/* Bento Grid: Left card on desktop, compact 2-column photos on mobile */}
+        <div className="mt-6 sm:mt-14 grid gap-2.5 sm:gap-6 grid-cols-1 lg:grid-cols-12 items-stretch">
+          {/* Left card */}
           <div className="lg:col-span-5 h-full">
             <Reveal delay={100}>
-              <div className="group relative h-full min-h-[380px] sm:min-h-[460px] lg:min-h-[580px] overflow-hidden rounded-2xl sm:rounded-3xl border border-[#D4BAC7]/70 shadow-warm bg-white">
+              <div className="group relative h-full min-h-[220px] sm:min-h-[460px] lg:min-h-[580px] overflow-hidden rounded-2xl sm:rounded-3xl border border-[#D4BAC7]/70 shadow-warm bg-white">
                 <img
                   src="/images/unr05952.jpg"
                   alt="Classical dance student stretching and posing"
@@ -208,8 +208,8 @@ export function Gallery() {
           </div>
 
           {/* Right column: 2 side-by-side on top + 1 wide banner on bottom */}
-          <div className="lg:col-span-7 flex flex-col gap-4 sm:gap-6 justify-between">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          <div className="lg:col-span-7 flex flex-col gap-2.5 sm:gap-6 justify-between">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-6">
               <Reveal delay={160}>
                 <div className="group relative overflow-hidden rounded-2xl sm:rounded-3xl border border-[#D4BAC7]/70 shadow-warm aspect-[4/3] bg-white">
                   <img
@@ -554,7 +554,7 @@ export function Footer({ contactProfile }: { contactProfile?: PublicAcademyProfi
               { label: 'About Us', href: '/#story' },
               { label: 'Courses & Batches', href: '/#programs' },
               { label: 'Our Gurus', href: '/#faculty' },
-              { label: 'Campus Map & Location', href: '/#contact' },
+              { label: 'Contact & Campus Map', href: '/contact' },
               { label: 'Admin Portal Login', href: '/login' },
             ].map((link) => (
               <li key={link.label}>
@@ -632,8 +632,41 @@ export function Footer({ contactProfile }: { contactProfile?: PublicAcademyProfi
       <div className="mx-auto mt-10 sm:mt-12 max-w-[1650px] px-4 sm:px-8 lg:px-12 xl:px-16 border-t border-white/10 pt-6">
         {/* Dynamic Registered Academy Contacts from Admin Profile */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-y-3 gap-x-6 text-xs text-white/80 pb-4 border-b border-white/10 mb-4">
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2">
+          {/* Mobile Clean Contact Bar (< md) */}
+          <div className="flex md:hidden flex-col items-center gap-3 w-full text-center">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <a
+                href="/contact"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gold-gradient text-[#220314] font-bold text-xs shadow-gold hover:scale-105 transition"
+              >
+                <MapPin className="h-3 w-3" />
+                <span>Contact Us &amp; Campus Info</span>
+              </a>
+              <a
+                href={`https://wa.me/${cleanWa}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#25D366] text-white font-bold text-xs hover:bg-[#20ba59] transition"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                <span>WhatsApp</span>
+              </a>
+            </div>
+            <p className="text-[11px] text-white/70">
+              📍 {campusAddress}
+            </p>
+          </div>
+
+          {/* Desktop Full Contact Row (>= md) */}
+          <div className="hidden md:flex flex-wrap items-center justify-start gap-x-4 gap-y-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#e8c078]">Official Contacts:</span>
+            <a
+              href="/contact"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gold-gradient text-[#220314] font-bold text-[11px] shadow-gold hover:scale-105 transition"
+            >
+              <MapPin className="h-3 w-3" />
+              <span>Contact Page</span>
+            </a>
             <a
               href={`https://wa.me/${cleanWa}`}
               target="_blank"
@@ -662,7 +695,7 @@ export function Footer({ contactProfile }: { contactProfile?: PublicAcademyProfi
               </span>
             ))}
           </div>
-          <div className="text-[11px] text-white/70 text-center md:text-right shrink-0">
+          <div className="hidden md:block text-[11px] text-white/70 text-right shrink-0">
             <span>📍 {campusAddress}</span>
           </div>
         </div>

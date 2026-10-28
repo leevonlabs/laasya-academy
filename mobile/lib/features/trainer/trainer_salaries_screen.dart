@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/utils/pdf_launcher.dart';
 
 class TrainerSalariesScreen extends StatefulWidget {
   final Map<String, dynamic>? trainerProfile;
@@ -38,6 +40,24 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  String _getPdfUrl(Map<String, dynamic> item) {
+    final vNo = (item['voucher_number'] ?? 'LCA-SAL-2026').toString();
+    final month = (item['payroll_month'] ?? 'Current Month').toString();
+    final name = (item['trainer_name'] ?? widget.trainerProfile?['full_name'] ?? 'Smt. Anusha Sumesh').toString();
+    final title = (item['display_title'] ?? widget.trainerProfile?['designation'] ?? 'Founder & Head Guru').toString();
+    final trainerId = (item['trainer_id'] ?? widget.trainerProfile?['id'] ?? '').toString();
+    final net = item['net_salary'] ?? 28000;
+
+    return '${ApiConstants.baseUrl}/api/finance/salaries/pdf?'
+        'voucherId=${Uri.encodeComponent(vNo)}'
+        '&voucherNumber=${Uri.encodeComponent(vNo)}'
+        '&trainerId=${Uri.encodeComponent(trainerId)}'
+        '&guruName=${Uri.encodeComponent(name)}'
+        '&payrollMonth=${Uri.encodeComponent(month)}'
+        '&title=${Uri.encodeComponent(title)}'
+        '&netSalary=$net';
   }
 
   void _showSalarySlipModal(Map<String, dynamic> item) {
@@ -397,26 +417,8 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
                         ),
                         onPressed: () {
                           Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'Pay Slip $vNo successfully downloaded to device storage!',
-                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              backgroundColor: const Color(0xFF03543F),
-                              duration: const Duration(seconds: 4),
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
+                          final pdfUrl = _getPdfUrl(item);
+                          PdfLauncher.openPdf(context, pdfUrl, title: 'Faculty Pay Slip $vNo');
                         },
                         icon: const Icon(Icons.download_rounded, size: 18, color: LaasyaColors.accentGold),
                         label: const Text(
@@ -716,23 +718,40 @@ class _TrainerSalariesScreenState extends State<TrainerSalariesScreen> {
                               const Divider(height: 1),
                               const SizedBox(height: 10),
 
-                              SizedBox(
-                                width: double.infinity,
-                                height: 40,
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFFFF2F8),
-                                    foregroundColor: LaasyaColors.primary,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      side: const BorderSide(color: Color(0xFFF0D5E4)),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: LaasyaColors.primary,
+                                        side: const BorderSide(color: Color(0xFFF0D5E4)),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                      ),
+                                      onPressed: () => _showSalarySlipModal(item),
+                                      icon: const Icon(Icons.receipt_long_rounded, size: 15),
+                                      label: const Text('View Voucher', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                     ),
                                   ),
-                                  onPressed: () => _showSalarySlipModal(item),
-                                  icon: const Icon(Icons.download_rounded, size: 16, color: LaasyaColors.primary),
-                                  label: const Text('Download Pay Slip (PDF)', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF590231),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                      ),
+                                      onPressed: () {
+                                        final pdfUrl = _getPdfUrl(item);
+                                        PdfLauncher.openPdf(context, pdfUrl, title: 'Salary Slip $vNo');
+                                      },
+                                      icon: const Icon(Icons.download_rounded, size: 16, color: LaasyaColors.accentGold),
+                                      label: const Text('Official PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

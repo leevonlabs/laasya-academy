@@ -24,7 +24,7 @@ export function Hero() {
   return (
     <section
       id="home"
-      className="relative flex min-h-[85svh] sm:min-h-[100svh] items-center overflow-hidden"
+      className="relative flex min-h-[70svh] sm:min-h-[100svh] items-center overflow-hidden"
     >
       <div className="absolute inset-0">
         {slides.map((slide, i) => (
@@ -49,11 +49,11 @@ export function Hero() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#4d1544]/75 via-transparent to-[#4d1544]/40" />
       </div>
 
-      <div className="relative mx-auto w-full max-w-[1650px] px-3 pb-12 pt-20 sm:px-8 sm:pb-20 sm:pt-28 lg:px-12 xl:px-16">
+      <div className="relative mx-auto w-full max-w-[1650px] px-3 pb-8 pt-16 sm:px-8 sm:pb-20 sm:pt-28 lg:px-12 xl:px-16">
         <div className="max-w-4xl">
           <Reveal>
             <span className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-[#D4AF37]/50 bg-[#4d1544]/60 px-3 py-1 sm:px-5 sm:py-2 text-[0.65rem] sm:text-xs font-semibold uppercase tracking-[0.18em] sm:tracking-[0.25em] text-[#fbf0b9] backdrop-blur-md">
-              ✦ Nurturing Creativity &amp; Excellence
+              • Nurturing Creativity &amp; Excellence
             </span>
           </Reveal>
           <Reveal delay={150}>
@@ -71,16 +71,16 @@ export function Hero() {
             </p>
           </Reveal>
           <Reveal delay={450}>
-            <div className="mt-5 sm:mt-10 flex flex-row flex-wrap gap-2.5 sm:gap-4">
+            <div className="mt-4 sm:mt-10 flex flex-row flex-wrap gap-2.5 sm:gap-4">
               <a
                 href="#programs"
-                className="inline-flex items-center justify-center rounded-full bg-gold-gradient px-4 py-2.5 sm:px-8 sm:py-3.5 text-xs sm:text-base font-bold text-[#220314] shadow-gold transition-transform hover:scale-[1.04] text-center"
+                className="inline-flex items-center justify-center rounded-full bg-gold-gradient px-4 py-2 sm:px-8 sm:py-3.5 text-xs sm:text-base font-bold text-[#220314] shadow-gold transition-transform hover:scale-[1.04] text-center"
               >
                 Explore Courses
               </a>
               <a
                 href="#faculty"
-                className="inline-flex items-center justify-center rounded-full border border-white/70 bg-black/20 backdrop-blur-xs px-4 py-2.5 sm:px-8 sm:py-3.5 text-xs sm:text-base font-bold text-white transition-colors hover:bg-white hover:text-black text-center"
+                className="inline-flex items-center justify-center rounded-full border border-white/70 bg-black/20 backdrop-blur-xs px-4 py-2 sm:px-8 sm:py-3.5 text-xs sm:text-base font-bold text-white transition-colors hover:bg-white hover:text-black text-center"
               >
                 Meet Gurus
               </a>
@@ -88,16 +88,6 @@ export function Hero() {
           </Reveal>
         </div>
       </div>
-
-      <a
-        href="#story"
-        className="absolute bottom-5 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1 text-white/80 transition-colors hover:text-[#D4AF37]"
-      >
-        <span className="text-[0.6rem] sm:text-[0.65rem] font-medium uppercase tracking-[0.35em]">
-          Scroll Down
-        </span>
-        <span className="animate-scroll-hint text-lg sm:text-xl">⌄</span>
-      </a>
     </section>
   );
 }

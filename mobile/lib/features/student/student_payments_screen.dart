@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/utils/pdf_launcher.dart';
 
 class StudentPaymentsScreen extends StatefulWidget {
   final Map<String, dynamic>? studentProfile;
@@ -406,7 +408,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                         ),
                         onPressed: () {
                           Navigator.pop(ctx);
-                          _downloadInvoice(invNo, studentName);
+                          _downloadInvoice(invNo, studentName, item: item);
                         },
                         icon: const Icon(Icons.download_rounded, size: 18, color: LaasyaColors.accentGold),
                         label: const Text(
@@ -486,7 +488,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Laasya Payment Gateway',
+                                  'Axis Bank Payment Gateway',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -494,7 +496,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '256-Bit SSL Encrypted • PCI DSS Level 1',
+                                  'Axis EasyPay Merchant PG • 256-Bit SSL • PCI DSS Level 1',
                                   style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w500),
                                 ),
                               ],
@@ -567,6 +569,40 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Axis Bank PG Merchant Header & Dev Mock Notice Banner
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 14),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFF59E0B)),
+                                  ),
+                                  child: const Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(Icons.shield_rounded, size: 18, color: Color(0xFFB45309)),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Axis Bank Merchant PG • ID: AXIS_MERCHANT_LAASYA_01',
+                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                                            ),
+                                            SizedBox(height: 2),
+                                            Text(
+                                              '[DEV MOCK TEST MODE] Official Axis Bank PG credentials pending onboarding. Real student dues are unaffected.',
+                                              style: TextStyle(fontSize: 10, color: Color(0xFF78350F)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
                                 // Order Breakdown Card
                                 Container(
                                   padding: const EdgeInsets.all(16),
@@ -660,9 +696,9 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                 const SizedBox(height: 10),
                                 Row(
                                   children: [
-                                    _gatewayTabItem(0, 'UPI / QR', Icons.qr_code_2_rounded, selectedTab, () => setMState(() => selectedTab = 0)),
+                                    _gatewayTabItem(0, 'Axis UPI / QR', Icons.qr_code_2_rounded, selectedTab, () => setMState(() => selectedTab = 0)),
                                     const SizedBox(width: 8),
-                                    _gatewayTabItem(1, 'Card', Icons.credit_card_rounded, selectedTab, () => setMState(() => selectedTab = 1)),
+                                    _gatewayTabItem(1, 'Cards (RuPay)', Icons.credit_card_rounded, selectedTab, () => setMState(() => selectedTab = 1)),
                                     const SizedBox(width: 8),
                                     _gatewayTabItem(2, 'NetBanking', Icons.account_balance_rounded, selectedTab, () => setMState(() => selectedTab = 2)),
                                   ],
@@ -951,13 +987,14 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                         'student_name': studentName,
                                         'roll_number': rollNo,
                                         'parent_name': widget.studentProfile?['parent_name'] ?? 'Parent',
-                                        'payment_method': selectedTab == 0 ? 'UPI / Online' : selectedTab == 1 ? 'Debit Card' : selectedBank,
-                                        'transaction_reference': 'TXN-${now.millisecondsSinceEpoch}',
-                                        'receipt_issued_by': 'Automated Online Payment Gateway',
+                                        'payment_method': selectedTab == 0 ? 'Axis UPI' : selectedTab == 1 ? 'RuPay / Visa' : 'Axis NetBanking',
+                                        'transaction_reference': 'AXIS-TXN-${now.millisecondsSinceEpoch}',
+                                        'receipt_issued_by': 'Axis Bank Payment Gateway (Merchant #AXIS_01)',
                                         'amount_paid': feeAmount,
                                         'gross_amount': feeAmount,
                                         'discount_amount': 0,
                                         'status': 'paid',
+                                        'is_mock': true,
                                       };
 
                                       setState(() {
@@ -975,7 +1012,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                         const Icon(Icons.lock_rounded, size: 16),
                                         const SizedBox(width: 8),
                                         Text(
-                                          'Pay ₹$feeAmount Securely',
+                                          'Pay ₹$feeAmount via Axis Bank PG',
                                           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                                         ),
                                       ],
@@ -1073,6 +1110,8 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
   }
 
   void _showPaymentSuccessDialog(Map<String, dynamic> newPayment) {
+    final invNo = (newPayment['invoice_number'] ?? 'LCA-INV-2026').toString();
+    final recNo = (newPayment['receipt_number'] ?? 'LCA-REC-2026').toString();
     showDialog(
       context: context,
       builder: (dCtx) {
@@ -1091,12 +1130,24 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Payment Successful!',
+                'Payment Authorized',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: LaasyaColors.textDark),
               ),
               const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  '[DEV MOCK MODE] Axis Bank PG Simulated',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                ),
+              ),
+              const SizedBox(height: 8),
               Text(
-                'Tuition fee of ₹${newPayment['amount_paid']} has been processed and credited to Laasya Cultural Academy.',
+                'Tuition fee of ₹${newPayment['amount_paid']} has been authorized via Axis Bank Payment Gateway.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
@@ -1114,7 +1165,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Receipt No:', style: TextStyle(fontSize: 10.5, color: Colors.grey)),
-                        Text(newPayment['receipt_number'] ?? '', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
+                        Text(recNo, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: LaasyaColors.primary)),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -1123,6 +1174,14 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                       children: [
                         const Text('Payment Mode:', style: TextStyle(fontSize: 10.5, color: Colors.grey)),
                         Text(newPayment['payment_method'] ?? '', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Axis PG Ref:', style: TextStyle(fontSize: 10.5, color: Colors.grey)),
+                        Text(newPayment['transaction_reference'] ?? '', style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace', fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ],
@@ -1140,9 +1199,9 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                       child: const Text('Close'),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF590231),
                         foregroundColor: Colors.white,
@@ -1150,9 +1209,10 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                       ),
                       onPressed: () {
                         Navigator.pop(dCtx);
-                        _showInvoiceModal(newPayment);
+                        _downloadInvoice(invNo, newPayment['student_name'] ?? 'Student', item: newPayment);
                       },
-                      child: const Text('View Receipt'),
+                      icon: const Icon(Icons.picture_as_pdf_rounded, size: 14, color: LaasyaColors.accentGold),
+                      label: const Text('Official PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
@@ -1164,27 +1224,29 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
     );
   }
 
-  void _downloadInvoice(String invNo, String studentName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Invoice $invNo successfully downloaded to device storage!',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF03543F),
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+  String _getInvoicePdfUrl(String invNo, {Map<String, dynamic>? item}) {
+    final studentName = (item?['student_name'] ?? widget.studentProfile?['full_name'] ?? 'Aditi Sundaram').toString();
+    final rollNo = (item?['roll_number'] ?? widget.studentProfile?['roll_number'] ?? 'LCA-6').toString();
+    final course = (item?['course_title'] ?? 'Bharatanatyam').toString();
+    final batch = (item?['batch_name'] ?? 'Enrolled Batch').toString();
+    final period = (item?['fee_period'] ?? 'October 2026').toString();
+    final amount = item?['amount_paid'] ?? 2000;
+    final studentId = (item?['student_id'] ?? widget.studentProfile?['id'] ?? '').toString();
+
+    return '${ApiConstants.baseUrl}/api/finance/invoices/pdf?'
+        'invoiceNumber=${Uri.encodeComponent(invNo)}'
+        '&studentId=${Uri.encodeComponent(studentId)}'
+        '&studentName=${Uri.encodeComponent(studentName)}'
+        '&rollNumber=${Uri.encodeComponent(rollNo)}'
+        '&courseTitle=${Uri.encodeComponent(course)}'
+        '&batchName=${Uri.encodeComponent(batch)}'
+        '&feePeriod=${Uri.encodeComponent(period)}'
+        '&amount=$amount';
+  }
+
+  void _downloadInvoice(String invNo, String studentName, {Map<String, dynamic>? item}) {
+    final url = _getInvoicePdfUrl(invNo, item: item);
+    PdfLauncher.openPdf(context, url, title: 'Invoice $invNo');
   }
 
   Widget _invRow(String label, String value) {
@@ -1886,7 +1948,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                             padding: const EdgeInsets.symmetric(vertical: 10),
                                           ),
-                                          onPressed: () => _downloadInvoice(invNo, studentName),
+                                          onPressed: () => _downloadInvoice(invNo, studentName, item: item),
                                           icon: const Icon(Icons.download_rounded, size: 16, color: LaasyaColors.accentGold),
                                           label: const Text(
                                             'PDF',
