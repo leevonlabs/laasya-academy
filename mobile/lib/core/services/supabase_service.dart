@@ -501,6 +501,8 @@ class SupabaseService {
             if (role == 'trainer') {
               final trainer = await _client!.from('trainers').select().eq('profile_id', user.id).maybeSingle();
               if (trainer != null) {
+                profileData['trainer_id'] = trainer['id'];
+                profileData['profile_id'] = user.id;
                 final displayTitle = trainer['display_title'] ?? 'Revered Faculty Guru';
                 profileData['display_title'] = displayTitle;
                 profileData['title_name'] = displayTitle;
@@ -755,7 +757,7 @@ class SupabaseService {
       final prof = _cachedProfile ?? await getCurrentUserProfile();
       final tName = (prof?['full_name'] ?? '').toString().trim();
       final tPhone = (prof?['phone'] ?? '').toString().trim();
-      final tId = (prof?['id'] ?? prof?['trainer_id'] ?? prof?['profile_id'] ?? '').toString().trim();
+      final tId = (prof?['trainer_id'] ?? prof?['id'] ?? prof?['profile_id'] ?? '').toString().trim();
       final nameParam = Uri.encodeComponent(tName);
       final phoneParam = Uri.encodeComponent(tPhone);
       final idParam = Uri.encodeComponent(tId);

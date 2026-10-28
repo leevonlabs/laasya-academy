@@ -33,7 +33,7 @@ class TrainerDataStore {
       final prof = SupabaseService().currentUserProfile;
       final tName = (trainerName ?? prof?['full_name'] ?? '').toString().trim();
       final tPhone = (phone ?? prof?['phone'] ?? '').toString().trim();
-      final tId = (prof?['id'] ?? prof?['trainer_id'] ?? prof?['profile_id'] ?? '').toString().trim();
+      final tId = (prof?['trainer_id'] ?? prof?['id'] ?? prof?['profile_id'] ?? '').toString().trim();
       final nameParam = Uri.encodeComponent(tName);
       final phoneParam = Uri.encodeComponent(tPhone);
       final idParam = Uri.encodeComponent(tId);

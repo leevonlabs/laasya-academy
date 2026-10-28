@@ -1692,8 +1692,8 @@ export async function getGuruAttendanceAuditRecords(options?: {
     FROM public.class_sessions cs
     JOIN public.batches b ON cs.batch_id = b.id
     JOIN public.courses c ON b.course_id = c.id
-    LEFT JOIN public.trainers t ON cs.trainer_id = t.id OR b.trainer_id = t.id
-    LEFT JOIN public.profiles p ON t.profile_id = p.id
+    LEFT JOIN public.trainers t ON (cs.trainer_id = t.id OR cs.trainer_id = t.profile_id OR b.trainer_id = t.id OR b.trainer_id = t.profile_id)
+    LEFT JOIN public.profiles p ON (t.profile_id = p.id OR b.trainer_id = p.id)
     LEFT JOIN LATERAL (
       SELECT 
         count(*)::int as marked_count,
@@ -1728,7 +1728,7 @@ export async function getGuruAttendanceAuditRecords(options?: {
   const params: any[] = [];
   if (options?.trainerId && options.trainerId !== 'all') {
     params.push(options.trainerId);
-    sql += ` AND (t.id = $${params.length} OR t.profile_id = $${params.length})`;
+    sql += ` AND (t.id = $${params.length} OR t.profile_id = $${params.length} OR b.trainer_id = $${params.length} OR cs.trainer_id = $${params.length})`;
   }
   if (options?.courseId && options.courseId !== 'all') {
     params.push(options.courseId);

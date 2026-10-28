@@ -79,8 +79,14 @@ export async function GET(req: Request) {
       const trainerName = searchParams.get('trainerName') || undefined;
       const phone = searchParams.get('phone') || undefined;
 
-      // If mobile app queries with phone or trainerName, resolve trainerId from db
-      if (!trainerId && (phone || trainerName)) {
+      // If mobile app queries with trainerId, ensure it resolves to trainer's id
+      if (trainerId) {
+        const found = await queryOne<{ id: string }>(
+          `SELECT t.id FROM public.trainers t WHERE t.id::text = $1 OR t.profile_id::text = $1 LIMIT 1`,
+          [trainerId]
+        );
+        if (found) trainerId = found.id;
+      } else if (phone || trainerName) {
         const cleanPhone = (phone || '').replace(/\D/g, '');
         const cleanName = (trainerName || '').trim();
         const found = await queryOne<{ id: string }>(
@@ -178,7 +184,7 @@ export async function POST(req: NextRequest) {
     if (!isOwner) {
       const batchCheck = await queryOne<{ id: string }>(`
         SELECT b.id FROM public.batches b
-        JOIN public.trainers t ON b.trainer_id = t.id
+        JOIN public.trainers t ON (b.trainer_id = t.id OR b.trainer_id = t.profile_id)
         WHERE b.id = $1::uuid AND t.is_active = true
         LIMIT 1;
       `, [actualBatchId]);
@@ -203,7 +209,7 @@ export async function POST(req: NextRequest) {
         INSERT INTO public.class_sessions (
           batch_id, trainer_id, session_date, start_time, end_time, status, created_at, updated_at
         ) VALUES (
-          $1::uuid, (SELECT trainer_id FROM public.batches WHERE id = $1::uuid LIMIT 1), CURRENT_DATE, '17:00:00', '18:30:00', 'completed', NOW(), NOW()
+          $1::uuid, (SELECT t.id FROM public.batches b LEFT JOIN public.trainers t ON (b.trainer_id = t.id OR b.trainer_id = t.profile_id) WHERE b.id = $1::uuid LIMIT 1), CURRENT_DATE, '17:00:00', '18:30:00', 'completed', NOW(), NOW()
         )
         RETURNING id;
       `, [actualBatchId]);

@@ -368,15 +368,21 @@ export async function createAnnouncement(data: {
 
   try {
     const isGuru = data.sender_role === 'trainer' || Boolean(data.trainer_id);
-    const senderRoleName = isGuru ? 'Guru' : 'Admin';
-    const senderFullName = isGuru ? (data.trainer_name || 'Guru') : (data.created_by || 'Admin / Director');
+    const isReception = data.sender_role === 'receptionist' || (data.created_by && data.created_by.toLowerCase().includes('reception'));
+    const senderRoleName = isGuru ? 'Guru' : (isReception ? 'Reception' : 'Admin');
+    const senderFullName = isGuru 
+      ? (data.trainer_name || 'Guru') 
+      : (isReception ? (data.created_by || 'Reception Desk') : (data.created_by || 'Admin / Director'));
     const alertCourseTitle = isGuru
       ? `New Announcement from Guru: ${data.title.trim()}`
-      : `New Announcement from Admin: ${data.title.trim()}`;
+      : (isReception 
+          ? `New Message from Reception: ${data.title.trim()}` 
+          : (annType === 'message' ? `New Message from Admin: ${data.title.trim()}` : `New Announcement from Admin: ${data.title.trim()}`));
     const previewMessage = effectiveMessage.length > 140 
       ? `${effectiveMessage.substring(0, 137)}...` 
       : effectiveMessage;
     const alertMessage = `${previewMessage} (Shared by ${senderFullName} [${senderRoleName}])`;
+    const sessionAlertType = (annType === 'message' || !isGuru) ? 'message' : 'announcement';
 
     if (Array.isArray(data.target_students) && data.target_students.length > 0) {
       for (const st of data.target_students) {
@@ -386,13 +392,14 @@ export async function createAnnouncement(data: {
         await query(`
           INSERT INTO public.session_alerts (
             batch_id, batch_name, course_title, trainer_name, message, alert_type, target_student_id, target_roll_number, target_student_name, created_at
-          ) VALUES ($1, $2, $3, $4, $5, 'announcement', $6, $7, $8, NOW());
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW());
         `, [
           validBatchId || 'all',
           data.target_batch_name || 'All Batches',
           alertCourseTitle,
           senderFullName,
           alertMessage,
+          sessionAlertType,
           sId || null,
           sRoll || null,
           sName || null
@@ -402,13 +409,14 @@ export async function createAnnouncement(data: {
       await query(`
         INSERT INTO public.session_alerts (
           batch_id, batch_name, course_title, trainer_name, message, alert_type, created_at
-        ) VALUES ($1, $2, $3, $4, $5, 'announcement', NOW());
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW());
       `, [
         validBatchId || 'all',
         data.target_batch_name || 'All Batches',
         alertCourseTitle,
         senderFullName,
-        alertMessage
+        alertMessage,
+        sessionAlertType
       ]);
     }
   } catch (alertErr) {

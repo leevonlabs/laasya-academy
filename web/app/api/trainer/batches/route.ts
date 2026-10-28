@@ -40,8 +40,8 @@ export async function GET(request: NextRequest) {
         )::int as enrolled_count
       FROM public.batches b
       JOIN public.courses c ON b.course_id = c.id
-      LEFT JOIN public.trainers t ON b.trainer_id = t.id
-      LEFT JOIN public.profiles p ON t.profile_id = p.id
+      LEFT JOIN public.trainers t ON (b.trainer_id = t.id OR b.trainer_id = t.profile_id)
+      LEFT JOIN public.profiles p ON (t.profile_id = p.id OR b.trainer_id = p.id)
     `;
 
     const user = await getCurrentUser();
@@ -62,19 +62,19 @@ export async function GET(request: NextRequest) {
       let verifiedTrainer: any = null;
       if (cleanId && cleanId !== 'null' && cleanId !== 'undefined') {
         verifiedTrainer = await queryOne(
-          `SELECT t.id, t.status FROM public.trainers t WHERE (t.id = $1 OR t.profile_id = $1) AND t.status = 'Active' LIMIT 1`,
+          `SELECT t.id, t.is_active FROM public.trainers t WHERE (t.id = $1 OR t.profile_id = $1) AND t.is_active = true LIMIT 1`,
           [cleanId]
         );
       }
       if (!verifiedTrainer && cleanPhone.length >= 6) {
         verifiedTrainer = await queryOne(
-          `SELECT t.id, t.status FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%' AND t.status = 'Active' LIMIT 1`,
+          `SELECT t.id, t.is_active FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%' AND t.is_active = true LIMIT 1`,
           [cleanPhone]
         );
       }
       if (!verifiedTrainer && cleanName && cleanName !== 'null' && cleanName !== 'undefined') {
         verifiedTrainer = await queryOne(
-          `SELECT t.id, t.status FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE p.full_name ILIKE $1 AND t.status = 'Active' LIMIT 1`,
+          `SELECT t.id, t.is_active FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE p.full_name ILIKE $1 AND t.is_active = true LIMIT 1`,
           [`%${cleanName}%`]
         );
       }
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     // 1. Primary lookup by trainer UUID / profile ID
     if (cleanId && cleanId !== 'null' && cleanId !== 'undefined') {
       batches = await query<any>(
-        `${baseSql} WHERE (t.id = $1 OR t.profile_id = $1) ORDER BY c.title ASC, b.name ASC;`,
+        `${baseSql} WHERE (b.trainer_id = $1 OR t.id = $1 OR t.profile_id = $1) ORDER BY c.title ASC, b.name ASC;`,
         [cleanId]
       );
     }

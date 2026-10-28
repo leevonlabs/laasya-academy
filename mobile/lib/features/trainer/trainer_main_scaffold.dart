@@ -33,6 +33,19 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
   static final Set<String> _globalProcessedAlertIds = {};
   bool _isFirstPoll = true;
   bool _isPolling = false;
+  OverlayEntry? _currentBannerEntry;
+  Timer? _bannerDismissTimer;
+
+  void _dismissCurrentBanner() {
+    _bannerDismissTimer?.cancel();
+    _bannerDismissTimer = null;
+    if (_currentBannerEntry != null) {
+      try {
+        _currentBannerEntry!.remove();
+      } catch (_) {}
+      _currentBannerEntry = null;
+    }
+  }
 
   @override
   void initState() {
@@ -128,6 +141,7 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
 
   @override
   void dispose() {
+    _dismissCurrentBanner();
     if (_realtimeChannel != null) {
       try {
         SupabaseService().client.removeChannel(_realtimeChannel!);
@@ -219,86 +233,183 @@ class _TrainerMainScaffoldState extends State<TrainerMainScaffold> {
   }
 
   void _showTrainerNoticeSnackBar(Map<String, dynamic> alert) {
+    _showTopNotificationBanner(alert);
+  }
+
+  void _showTopNotificationBanner(Map<String, dynamic> alert) {
+    _dismissCurrentBanner();
+
     SystemSound.play(SystemSoundType.alert);
     HapticFeedback.mediumImpact();
 
-    final title = (alert['course_title'] ?? alert['title'] ?? 'Academy Notice').toString();
-    final msg = (alert['message'] ?? 'New administrative circular posted.').toString();
-    final alertType = (alert['alert_type'] ?? alert['type'] ?? alert['type_tag'] ?? '').toString().toLowerCase();
+    final title = (alert['course_title'] ?? alert['title'] ?? 'Academy Message').toString();
+    final msg = (alert['message'] ?? 'New message received from academy.').toString();
     final senderRole = (alert['sender_role'] ?? '').toString().toLowerCase();
-    final titleLower = title.toLowerCase();
-    final isAnnouncement = alertType == 'announcement' ||
-        alertType == 'broadcast' ||
-        titleLower.contains('announcement') ||
-        titleLower.contains('broadcast') ||
-        senderRole.contains('trainer') ||
-        senderRole.contains('guru');
+    final isReception = senderRole.contains('reception') ||
+        title.toLowerCase().contains('reception') ||
+        (alert['created_by'] ?? '').toString().toLowerCase().contains('reception');
+    final senderLabel = isReception ? 'Reception' : 'Admin';
 
+    // Normal phone OS status bar notification with route '/messages'
     AlarmService.showNoticeNotification(
       title: title,
       message: msg,
-      route: isAnnouncement ? '/announcements' : '/messages',
+      route: '/messages',
     );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: LaasyaColors.primaryDark,
-        duration: const Duration(seconds: 6),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: LaasyaColors.accentGold, width: 1.5),
-        ),
-        content: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: LaasyaColors.accentGold.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.campaign_rounded, color: LaasyaColors.accentGold, size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return;
+
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) {
+        final topPadding = MediaQuery.of(ctx).padding.top;
+        return Positioned(
+          top: topPadding + 10,
+          left: 12,
+          right: 12,
+          child: Material(
+            color: Colors.transparent,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: -50.0, end: 0.0),
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              builder: (context, offsetY, child) {
+                return Transform.translate(
+                  offset: Offset(0, offsetY),
+                  child: child,
+                );
+              },
+              child: GestureDetector(
+                onTap: () {
+                  _dismissCurrentBanner();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: true),
+                    ),
+                  );
+                },
+                onVerticalDragUpdate: (details) {
+                  if (details.primaryDelta != null && details.primaryDelta! < -4) {
+                    _dismissCurrentBanner();
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF590231), Color(0xFF8A064D)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: LaasyaColors.accentGold, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.35),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    msg,
-                    style: const TextStyle(fontSize: 11, color: Colors.white70),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: LaasyaColors.accentGold.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isReception ? Icons.support_agent_rounded : Icons.chat_bubble_rounded,
+                          color: LaasyaColors.accentGold,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: LaasyaColors.accentGold.withOpacity(0.25),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'FROM $senderLabel'.toUpperCase(),
+                                    style: const TextStyle(
+                                      color: LaasyaColors.accentGold,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 9.5,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12.5,
+                                      color: Colors.white,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              msg,
+                              style: const TextStyle(fontSize: 11, color: Colors.white70),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: LaasyaColors.accentGold,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'VIEW',
+                          style: TextStyle(
+                            color: Color(0xFF590231),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ],
-        ),
-        action: SnackBarAction(
-          label: isAnnouncement ? 'VIEW ANNOUNCEMENT' : 'VIEW MESSAGE',
-          textColor: LaasyaColors.accentGold,
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => TrainerAnnouncementsScreen(isMessagesMode: !isAnnouncement),
-              ),
-            );
-          },
-        ),
-      ),
+          ),
+        );
+      },
     );
+
+    _currentBannerEntry = entry;
+    overlay.insert(entry);
+
+    _bannerDismissTimer = Timer(const Duration(seconds: 6), () {
+      _dismissCurrentBanner();
+    });
   }
 
   void _handleNotificationOpened(Map<String, dynamic> data) {

@@ -255,7 +255,9 @@ class _TrainerAttendanceReportScreenState extends State<TrainerAttendanceReportS
     } catch (_) {}
 
     final prof = widget.trainerProfile ?? SupabaseService().currentUserProfile;
-    final myId = (prof?['id'] ?? prof?['trainer_id'] ?? prof?['profile_id'] ?? '').toString();
+    final myTrainerId = (prof?['trainer_id'] ?? '').toString();
+    final myProfileId = (prof?['profile_id'] ?? prof?['id'] ?? '').toString();
+    final myId = (prof?['trainer_id'] ?? prof?['id'] ?? prof?['profile_id'] ?? '').toString();
     final myPhone = (prof?['phone'] ?? '').toString();
     final myName = _guruName.toLowerCase().trim();
     final myBatchIds = trainerBatches.map((b) => b['id']?.toString()).whereType<String>().toSet();
@@ -278,7 +280,9 @@ class _TrainerAttendanceReportScreenState extends State<TrainerAttendanceReportS
             final rTrainerId = (r['trainer_id'] ?? '').toString();
             final rTrainerName = (r['trainer_name'] ?? '').toString().toLowerCase().trim();
             final rBatchId = (r['batch_id'] ?? '').toString();
-            return (myId.isNotEmpty && rTrainerId == myId) ||
+            return (myTrainerId.isNotEmpty && rTrainerId == myTrainerId) ||
+                   (myProfileId.isNotEmpty && rTrainerId == myProfileId) ||
+                   (myId.isNotEmpty && rTrainerId == myId) ||
                    (myName.isNotEmpty && rTrainerName.contains(myName)) ||
                    myBatchIds.contains(rBatchId);
           }).map((r) {

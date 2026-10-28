@@ -61,19 +61,27 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
     }
 
     // 4. Announcements / Messages Redirection
-    final isAnnouncementNotice = type == 'announcement' ||
-        title.contains('announcement') ||
-        type == 'broadcast' ||
-        message.contains('announcement') ||
-        title.contains('broadcast');
-    if (isAnnouncementNotice) {
+    // User requirement: Admin/Reception notices & announcements redirect to Guru Messages page
+    final isOwnBroadcast = item['is_my_broadcast'] == true || item['created_by_me'] == true;
+    if (isOwnBroadcast) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: false)),
       );
       return;
     }
-    if (type == 'message' || title.contains('message') || title.contains('notice') || title.contains('holiday') || title.contains('extra class')) {
+    if (type == 'announcement' ||
+        type == 'message' ||
+        type == 'broadcast' ||
+        type == 'admin_alert' ||
+        title.contains('announcement') ||
+        title.contains('message') ||
+        title.contains('notice') ||
+        title.contains('circular') ||
+        title.contains('holiday') ||
+        title.contains('extra class') ||
+        message.contains('announcement') ||
+        title.contains('broadcast')) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: true)),
@@ -253,10 +261,10 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           icon: const Icon(Icons.campaign_rounded, size: 18),
-                          label: const Text('Open Announcements', style: TextStyle(fontWeight: FontWeight.bold)),
+                          label: const Text('Open Message / Notice', style: TextStyle(fontWeight: FontWeight.bold)),
                           onPressed: () {
                             Navigator.pop(ctx);
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: false)));
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const TrainerAnnouncementsScreen(isMessagesMode: true)));
                           },
                         ),
                       ),
