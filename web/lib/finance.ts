@@ -84,6 +84,35 @@ export interface GuruSalaryRecord {
   transaction_reference?: string | null;
   notes?: string | null;
   created_at: string;
+  previous_pending_months?: string | null;
+}
+
+export type GuruPaymentType = 
+  | 'salary_advance' 
+  | 'bonus' 
+  | 'festival_bonus' 
+  | 'monthly_salary' 
+  | 'incentive' 
+  | 'reimbursement' 
+  | 'honorarium' 
+  | 'other';
+
+export interface GuruPayment {
+  id: string;
+  trainer_id: string;
+  guru_name: string;
+  display_title: string;
+  specializations?: string[];
+  phone?: string;
+  payment_type: GuruPaymentType;
+  amount: number;
+  payment_date: string;
+  payment_method: 'bank_transfer' | 'upi' | 'cash' | 'cheque';
+  transaction_reference?: string | null;
+  receipt_number?: string | null;
+  notes?: string | null;
+  payroll_month?: string | null;
+  created_at: string;
 }
 
 export interface GuruSalaryAdvance {
@@ -532,7 +561,9 @@ export async function sendFeeReminderNotification(invoiceId: string, channel: 'w
 // -------------------------------------------------------------
 
 export async function getGuruSalaryRecords(month?: string): Promise<GuruSalaryRecord[]> {
-  const filterMonth = month || 'March 2026';
+  const now = new Date();
+  const currentMonth = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const filterMonth = month || currentMonth;
   const sql = `
     SELECT 
       s.id, s.trainer_id, p.full_name as guru_name, t.display_title,
@@ -540,7 +571,14 @@ export async function getGuruSalaryRecords(month?: string): Promise<GuruSalaryRe
       s.payroll_month, s.base_salary, s.classes_assigned, s.classes_conducted,
       s.bonus_amount, s.bonus_reason, s.deduction_amount, s.deduction_reason,
       s.advance_deducted, s.net_salary, s.status, s.payment_date::text as payment_date,
-      s.payment_method, s.transaction_reference, s.notes, s.created_at::text as created_at
+      s.payment_method, s.transaction_reference, s.notes, s.created_at::text as created_at,
+      (
+        SELECT string_agg(prev.payroll_month, ', ')
+        FROM public.guru_salary_records prev
+        WHERE prev.trainer_id = s.trainer_id
+          AND prev.status != 'paid'
+          AND prev.payroll_month != s.payroll_month
+      ) as previous_pending_months
     FROM public.guru_salary_records s
     JOIN public.trainers t ON t.id = s.trainer_id
     JOIN public.profiles p ON p.id = t.profile_id
@@ -659,4 +697,128 @@ export async function createGuruSalaryAdvance(data: {
     data.payment_method || 'bank_transfer',
     data.transaction_ref || `ADV-${Date.now().toString().slice(-6)}`
   ]);
+}
+
+export async function getGuruPayments(filters?: {
+  startDate?: string;
+  endDate?: string;
+  trainerId?: string;
+  type?: string;
+}): Promise<GuruPayment[]> {
+  // 1. Fetch direct payments from public.guru_payments
+  const directSql = `
+    SELECT 
+      gp.id, gp.trainer_id, p.full_name as guru_name, t.display_title,
+      t.specializations, p.phone,
+      gp.payment_type, gp.amount, gp.payment_date::text as payment_date,
+      gp.payment_method, gp.transaction_reference, gp.receipt_number,
+      gp.notes, NULL as payroll_month, gp.created_at::text as created_at
+    FROM public.guru_payments gp
+    JOIN public.trainers t ON t.id = gp.trainer_id
+    JOIN public.profiles p ON p.id = t.profile_id
+    ORDER BY gp.payment_date DESC, gp.created_at DESC;
+  `;
+  const directPayments = await query<any>(directSql).catch(() => []);
+
+  // 2. Fetch paid salary records to unify salary payment history
+  const salarySql = `
+    SELECT 
+      s.id, s.trainer_id, p.full_name as guru_name, t.display_title,
+      t.specializations, p.phone,
+      'monthly_salary' as payment_type, s.net_salary as amount,
+      COALESCE(s.payment_date::text, s.created_at::text) as payment_date,
+      COALESCE(s.payment_method, 'bank_transfer') as payment_method,
+      COALESCE(s.transaction_reference, CONCAT('SAL-', SUBSTRING(s.id::text, 1, 8))) as transaction_reference,
+      CONCAT('RCP-SAL-', SUBSTRING(s.id::text, 1, 6)) as receipt_number,
+      CONCAT('Monthly Salary for ', s.payroll_month) as notes,
+      s.payroll_month, s.created_at::text as created_at
+    FROM public.guru_salary_records s
+    JOIN public.trainers t ON t.id = s.trainer_id
+    JOIN public.profiles p ON p.id = t.profile_id
+    WHERE s.status = 'paid'
+    ORDER BY s.payment_date DESC;
+  `;
+  const salaryPayments = await query<any>(salarySql).catch(() => []);
+
+  // Combine and sort by payment_date descending
+  const combined = [...directPayments, ...salaryPayments].sort((a, b) => {
+    const da = new Date(a.payment_date || a.created_at).getTime();
+    const db = new Date(b.payment_date || b.created_at).getTime();
+    return db - da;
+  });
+
+  let results = combined;
+  if (filters?.trainerId && filters.trainerId !== 'all') {
+    results = results.filter((p) => p.trainer_id === filters.trainerId);
+  }
+  if (filters?.type && filters.type !== 'all') {
+    results = results.filter((p) => p.payment_type === filters.type);
+  }
+  if (filters?.startDate) {
+    const start = new Date(filters.startDate).getTime();
+    if (!isNaN(start)) {
+      results = results.filter((p) => new Date(p.payment_date).getTime() >= start);
+    }
+  }
+  if (filters?.endDate) {
+    const end = new Date(filters.endDate).getTime();
+    if (!isNaN(end)) {
+      results = results.filter((p) => new Date(p.payment_date).getTime() <= end);
+    }
+  }
+
+  return JSON.parse(JSON.stringify(results));
+}
+
+export async function createGuruPayment(data: {
+  trainer_id: string;
+  payment_type: GuruPaymentType;
+  amount: number;
+  payment_date?: string;
+  payment_method?: 'bank_transfer' | 'upi' | 'cash' | 'cheque';
+  transaction_reference?: string;
+  receipt_number?: string;
+  notes?: string;
+}) {
+  const amt = Number(data.amount);
+  const payDate = data.payment_date || new Date().toISOString().split('T')[0];
+  const ref = data.transaction_reference || `PAY-${Date.now().toString().slice(-8)}`;
+  const receipt = data.receipt_number || `LCA-GP-${Date.now().toString().slice(-6)}`;
+
+  const created = await queryOne<GuruPayment>(`
+    INSERT INTO public.guru_payments (
+      trainer_id, payment_type, amount, payment_date, payment_method,
+      transaction_reference, receipt_number, notes
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING *;
+  `, [
+    data.trainer_id,
+    data.payment_type,
+    amt,
+    payDate,
+    data.payment_method || 'bank_transfer',
+    ref,
+    receipt,
+    data.notes || null
+  ]);
+
+  // If this payment is an advance, also record into guru_salary_advances
+  if (data.payment_type === 'salary_advance') {
+    await query(`
+      INSERT INTO public.guru_salary_advances (
+        trainer_id, amount, request_date, disbursement_date,
+        status, recovered_amount, remaining_balance, reason,
+        payment_method, transaction_ref
+      ) VALUES ($1, $2, $3, $3, 'disbursed', 0, $2, $4, $5, $6)
+    `, [
+      data.trainer_id,
+      amt,
+      payDate,
+      data.notes || 'Salary Advance',
+      data.payment_method || 'bank_transfer',
+      ref
+    ]).catch((e) => console.error('Sync advance error:', e));
+  }
+
+  return created;
 }

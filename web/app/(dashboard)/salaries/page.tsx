@@ -1,7 +1,7 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
-import { getGuruSalaryRecords, getGuruSalaryAdvances, getFinancialSummary } from '@/lib/finance';
+import { getGuruSalaryRecords, getGuruPayments, getFinancialSummary } from '@/lib/finance';
 import { getTrainers } from '@/lib/academy';
 import GuruSalariesClient from '@/components/finance/GuruSalariesClient';
 
@@ -13,9 +13,12 @@ export default async function SalariesPage() {
     redirect('/login');
   }
 
-  const [records, advances, summary, trainers] = await Promise.all([
-    getGuruSalaryRecords('March 2026'),
-    getGuruSalaryAdvances(),
+  const now = new Date();
+  const currentMonth = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const [records, payments, summary, trainers] = await Promise.all([
+    getGuruSalaryRecords(currentMonth),
+    getGuruPayments(),
     getFinancialSummary(),
     getTrainers()
   ]);
@@ -24,7 +27,8 @@ export default async function SalariesPage() {
     <div className="max-w-7xl mx-auto">
       <GuruSalariesClient 
         initialRecords={records}
-        initialAdvances={advances}
+        initialPayments={payments}
+        defaultMonth={currentMonth}
         initialSummary={summary}
         trainers={trainers}
       />

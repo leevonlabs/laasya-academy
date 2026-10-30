@@ -4,13 +4,15 @@ import { getGuruSalaryRecords, updateGuruSalaryRecord } from '@/lib/finance';
 
 export async function GET(req: Request) {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'owner') {
-    return NextResponse.json({ error: 'Unauthorized: Owner access only' }, { status: 403 });
+  if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
+    return NextResponse.json({ error: 'Unauthorized: Staff access only' }, { status: 403 });
   }
 
   try {
     const { searchParams } = new URL(req.url);
-    const month = searchParams.get('month') || 'March 2026';
+    const now = new Date();
+    const currentMonth = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const month = searchParams.get('month') || currentMonth;
     const records = await getGuruSalaryRecords(month);
     return NextResponse.json(records);
   } catch (err: any) {
@@ -21,8 +23,8 @@ export async function GET(req: Request) {
 
 export async function PUT(req: Request) {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'owner') {
-    return NextResponse.json({ error: 'Unauthorized: Owner access only' }, { status: 403 });
+  if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
+    return NextResponse.json({ error: 'Unauthorized: Staff access only' }, { status: 403 });
   }
 
   try {
