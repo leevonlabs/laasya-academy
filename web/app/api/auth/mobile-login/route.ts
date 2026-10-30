@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { createToken } from '@/lib/auth';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,6 +15,14 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const rateCheck = checkRateLimit(`mobile_login_${ip}`, 15, 60000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Too many login attempts. Please wait a minute before trying again.' },
+        { status: 429, headers: corsHeaders }
+      );
+    }
     const body = await request.json();
     const { identifier, password, role } = body;
 

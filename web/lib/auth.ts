@@ -63,15 +63,30 @@ export function verifyToken(token: string): UserSession | null {
   }
 }
 
-export async function getCurrentUser(): Promise<UserSession | null> {
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sessionToken) return null;
+export async function getCurrentUser(req?: Request): Promise<UserSession | null> {
+  // 1. Inspect Authorization Bearer header if a request object is passed
+  if (req) {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.slice(7).trim();
+      const session = verifyToken(token);
+      if (session) return session;
+    }
+  }
 
-  const session = verifyToken(sessionToken);
-  if (!session) return null;
+  // 2. Fallback to HttpOnly session cookie
+  try {
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    if (!sessionToken) return null;
 
-  return session;
+    const session = verifyToken(sessionToken);
+    if (!session) return null;
+
+    return session;
+  } catch {
+    return null;
+  }
 }
 
 export async function authenticateOwner(

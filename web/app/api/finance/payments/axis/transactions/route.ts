@@ -8,6 +8,7 @@ import {
 } from '@/lib/axisBankPayment';
 
 export const dynamic = 'force-dynamic';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
@@ -103,6 +104,10 @@ export async function POST(req: NextRequest) {
     const { action, transactionId, utr, notes, outcome = 'SUCCESS', payment } = body;
 
     if (action === 'reconcile' && transactionId) {
+      const user = await getCurrentUser(req);
+      if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
+        return NextResponse.json({ error: 'Unauthorized. Staff role required to reconcile transactions.' }, { status: 403 });
+      }
       const updated = updateDemoTransaction(transactionId, {
         status: 'demo_success',
         settledAt: new Date().toISOString(),

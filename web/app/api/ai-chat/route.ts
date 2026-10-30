@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { getAiApiKey } from '@/lib/ai';
 import { verifyToken, UserSession } from '@/lib/auth';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -847,6 +848,14 @@ STRICT OPERATIONAL RULES:
 // --------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`ai_chat_${ip}`, 30, 60000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { reply: 'You have sent too many requests. Please wait a moment before sending another inquiry.', hasMore: false },
+        { status: 429, headers: corsHeaders }
+      );
+    }
     const body = await req.json().catch(() => ({}));
     const { messages = [] }: { messages: ChatMessage[] } = body;
 
