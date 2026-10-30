@@ -17,10 +17,22 @@ export default async function SalariesPage() {
   const currentMonth = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const [records, payments, summary, trainers] = await Promise.all([
-    getGuruSalaryRecords(currentMonth),
-    getGuruPayments(),
-    getFinancialSummary(),
-    getTrainers()
+    getGuruSalaryRecords(currentMonth).catch((err) => {
+      console.error('getGuruSalaryRecords error:', err);
+      return [];
+    }),
+    getGuruPayments().catch((err) => {
+      console.error('getGuruPayments error:', err);
+      return [];
+    }),
+    getFinancialSummary().catch((err) => {
+      console.error('getFinancialSummary error:', err);
+      return null;
+    }),
+    getTrainers().catch((err) => {
+      console.error('getTrainers error:', err);
+      return [];
+    })
   ]);
 
   return (

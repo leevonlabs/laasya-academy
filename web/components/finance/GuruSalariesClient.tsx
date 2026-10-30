@@ -38,10 +38,10 @@ import {
 } from 'lucide-react';
 
 interface Props {
-  initialRecords: GuruSalaryRecord[];
+  initialRecords?: GuruSalaryRecord[];
   initialPayments?: GuruPayment[];
-  initialSummary: FinancialSummary;
-  trainers: Trainer[];
+  initialSummary?: FinancialSummary | null;
+  trainers?: Trainer[];
   defaultMonth?: string;
 }
 
@@ -88,19 +88,19 @@ const PAYMENT_TYPE_LABELS: Record<string, { label: string; badgeClass: string }>
 };
 
 export default function GuruSalariesClient({
-  initialRecords,
+  initialRecords = [],
   initialPayments = [],
   initialSummary,
-  trainers,
+  trainers = [],
   defaultMonth
 }: Props) {
   const currentCalMonth = useMemo(() => {
     return defaultMonth || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   }, [defaultMonth]);
 
-  const [records, setRecords] = useState<GuruSalaryRecord[]>(initialRecords);
-  const [payments, setPayments] = useState<GuruPayment[]>(initialPayments);
-  const [summary, setSummary] = useState<FinancialSummary>(initialSummary);
+  const [records, setRecords] = useState<GuruSalaryRecord[]>(initialRecords || []);
+  const [payments, setPayments] = useState<GuruPayment[]>(initialPayments || []);
+  const [summary, setSummary] = useState<FinancialSummary | null | undefined>(initialSummary);
 
   // Active view tab: 'salaries' | 'payments'
   const [activeTab, setActiveTab] = useState<'salaries' | 'payments'>('salaries');
@@ -385,18 +385,19 @@ export default function GuruSalariesClient({
   const isSelectedMonthInPast = isMonthInPast(selectedMonth);
 
   // Computed totals for selected month (Monthly Payroll)
-  const totalBilledSalaries = records.reduce((acc, r) => acc + Number(r.net_salary), 0);
-  const totalPaidSalaries = records
+  const safeRecords = records || [];
+  const totalBilledSalaries = safeRecords.reduce((acc, r) => acc + Number(r.net_salary || 0), 0);
+  const totalPaidSalaries = safeRecords
     .filter((r) => r.status === 'paid')
-    .reduce((acc, r) => acc + Number(r.net_salary), 0);
-  const totalPendingSalaries = records
+    .reduce((acc, r) => acc + Number(r.net_salary || 0), 0);
+  const totalPendingSalaries = safeRecords
     .filter((r) => r.status !== 'paid')
-    .reduce((acc, r) => acc + Number(r.net_salary), 0);
-  const paidCount = records.filter((r) => r.status === 'paid').length;
-  const pendingCount = records.filter((r) => r.status !== 'paid').length;
+    .reduce((acc, r) => acc + Number(r.net_salary || 0), 0);
+  const paidCount = safeRecords.filter((r) => r.status === 'paid').length;
+  const pendingCount = safeRecords.filter((r) => r.status !== 'paid').length;
 
   // Filtered salary records (Monthly Payroll Table)
-  const filteredRecords = records.filter((r) => {
+  const filteredRecords = safeRecords.filter((r) => {
     const q = salarySearchQuery.toLowerCase().trim();
     if (q) {
       const matchesName = r.guru_name.toLowerCase().includes(q);
@@ -414,7 +415,7 @@ export default function GuruSalariesClient({
 
   // Filtered payments (Guru Payments Page)
   const filteredPayments = useMemo(() => {
-    return payments.filter((p) => {
+    return (payments || []).filter((p) => {
       const q = paySearchQuery.toLowerCase().trim();
       if (q) {
         const matchesName = p.guru_name.toLowerCase().includes(q);
@@ -670,10 +671,10 @@ export default function GuruSalariesClient({
               </div>
             </div>
             <div className="text-3xl font-extrabold text-purple-700 tracking-tight tabular-nums">
-              ₹{payments.reduce((acc, p) => acc + Number(p.amount), 0).toLocaleString('en-IN')}
+              ₹{(payments || []).reduce((acc, p) => acc + Number(p.amount || 0), 0).toLocaleString('en-IN')}
             </div>
             <div className="flex items-center gap-1.5 mt-2 text-xs text-purple-600 font-semibold">
-              <span className="tabular-nums">{payments.length} total payments stored</span>
+              <span className="tabular-nums">{(payments || []).length} total payments stored</span>
             </div>
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-500" />
           </div>
