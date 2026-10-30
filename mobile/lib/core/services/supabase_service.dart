@@ -2362,6 +2362,47 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Live API fetch error for student payments: $e');
     }
+    return _cachedPayments;
+  }
+
+  Future<Map<String, dynamic>?> submitStudentPayment({
+    required int amount,
+    required String paymentMethod,
+    String? transactionReference,
+    String? feePeriod,
+    String? remarks,
+  }) async {
+    try {
+      final sId = (_cachedProfile?['student_id'] ?? _cachedProfile?['id'] ?? '').toString();
+      final roll = (_cachedProfile?['roll_number'] ?? _cachedProfile?['roll'] ?? '').toString();
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/student-payments');
+      final res = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'student_id': sId.isNotEmpty ? sId : null,
+          'roll_number': roll.isNotEmpty ? roll : null,
+          'amount_paid': amount,
+          'payment_method': paymentMethod,
+          'transaction_reference': transactionReference,
+          'fee_period': feePeriod,
+          'remarks': remarks ?? 'Mobile App Online Payment',
+        }),
+      ).timeout(const Duration(seconds: 6));
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        final decoded = jsonDecode(res.body);
+        // Refresh live payments in background
+        _fetchLiveStudentPayments();
+        if (decoded is Map && decoded['payment'] is Map) {
+          return Map<String, dynamic>.from(decoded['payment']);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error submitting student payment to backend: $e');
+    }
+    return null;
+  }
 
     if (_cachedPayments.isEmpty) {
       _cachedPayments = [

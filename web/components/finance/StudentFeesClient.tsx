@@ -37,7 +37,6 @@ import {
 import DateRangeQuickFilter from '@/components/common/DateRangeQuickFilter';
 import MonthPicker from '@/components/common/MonthPicker';
 import { downloadStudentFeeInvoicePdf } from '@/lib/pdf';
-import AxisReconciliationClient from '@/components/finance/AxisReconciliationClient';
 
 interface Props {
   initialInvoices: StudentFeeInvoice[];
@@ -70,9 +69,9 @@ export default function StudentFeesClient({
   students: initialStudents
 }: Props) {
   // -------------------------------------------------------------
-  // 1. TOP TAB STATE: Collections vs Payments vs Axis PG Recon
+  // 1. TOP TAB STATE: Collections vs Payments
   // -------------------------------------------------------------
-  const [activeTab, setActiveTab] = useState<'collections' | 'payments' | 'axis_pg'>('collections');
+  const [activeTab, setActiveTab] = useState<'collections' | 'payments'>('collections');
   const [invoiceViewTab, setInvoiceViewTab] = useState<'vector_pdf' | 'summary'>('vector_pdf');
 
   // Main Data States
@@ -775,23 +774,6 @@ For queries, contact: +91 8151 998 899`;
               activeTab === 'payments' ? 'bg-white/20 text-white' : 'bg-gray-200/80 text-gray-700'
             }`}>
               {invoices.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('axis_pg')}
-            className={`px-6 py-3 rounded-xl text-sm font-black transition flex items-center gap-2.5 cursor-pointer ${
-              activeTab === 'axis_pg'
-                ? 'bg-[#8A064D] text-white shadow-md ring-2 ring-[#F9E33A]/40'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-            }`}
-          >
-            <Shield className="w-4 h-4 text-[#F9E33A]" />
-            <span>Axis Bank PG</span>
-            <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
-              activeTab === 'axis_pg' ? 'bg-white/20 text-white' : 'bg-gray-200/80 text-gray-700'
-            }`}>
-              Recon
             </span>
           </button>
         </div>
@@ -1509,14 +1491,7 @@ For queries, contact: +91 8151 998 899`;
       )}
 
       {/* ===================================================================== */}
-      {/* 3. TAB CONTENT C: AXIS BANK PG TRANSACTIONS & RECONCILIATION */}
-      {/* ===================================================================== */}
-      {activeTab === 'axis_pg' && (
-        <AxisReconciliationClient />
-      )}
-
-      {/* ===================================================================== */}
-      {/* 4. MODAL A: COLLECT STUDENT FEE (FOR COLLECTIONS PAGE) */}
+      {/* 3. MODAL A: COLLECT STUDENT FEE (FOR COLLECTIONS PAGE) */}
       {/* ===================================================================== */}
       {collectingStudent && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">

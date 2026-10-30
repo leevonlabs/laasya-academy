@@ -58,10 +58,22 @@ function isMonthInPast(monthStr?: string): boolean {
   return recYear < currentYear || (recYear === currentYear && recMonth < currentMonth);
 }
 
-function generateUniqueInvoiceNumber(prefix: 'PAY' | 'SAL'): string {
+function getNextInvoiceNumber(prefix: 'PAY' | 'SAL', list: Array<{ invoice_number?: string | null }>): string {
   const year = new Date().getFullYear();
-  const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `LCA-${prefix}-${year}-${randomPart}`;
+  let maxSeq = 0;
+  const regex = new RegExp(`^LCA-${prefix}-${year}-(\\d+)$`);
+  for (const item of list) {
+    if (item.invoice_number) {
+      const match = item.invoice_number.match(regex);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    }
+  }
+  return `LCA-${prefix}-${year}-${maxSeq + 1}`;
 }
 
 const PAYMENT_TYPE_LABELS: Record<string, { label: string; badgeClass: string }> = {
@@ -261,7 +273,7 @@ export default function GuruSalariesClient({
 
   // Open Record Guru Payment Modal: Reset form with system-generated invoice number and NO defaults
   const openRecordPaymentModal = () => {
-    setRecordInvoiceNumber(generateUniqueInvoiceNumber('PAY'));
+    setRecordInvoiceNumber(getNextInvoiceNumber('PAY', payments));
     setRecordTrainerId('');
     setRecordPaymentType('');
     setRecordAmount('');
@@ -340,7 +352,7 @@ export default function GuruSalariesClient({
   // Open Pay Modal: Prefilled with current date and read-only system generated invoice number
   const openPaymentModal = (r: GuruSalaryRecord) => {
     setPayingRecord(r);
-    const inv = r.invoice_number || `LCA-SAL-2026-${r.id.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+    const inv = r.invoice_number || getNextInvoiceNumber('SAL', records);
     setPayInvoiceNumber(inv);
     setPayDate(new Date().toISOString().split('T')[0]);
     setPayMethod('');
@@ -354,21 +366,18 @@ export default function GuruSalariesClient({
     window.open(url, '_blank');
   };
 
-  // Share small message on WhatsApp with invoice link that anyone can open
+  // Directly share the PDF invoice link on WhatsApp (per user requirement)
   const handleWhatsAppShare = (r: GuruSalaryRecord | GuruPayment) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const invNo = (r as any).invoice_number || (r as any).transaction_reference || '';
     const month = (r as any).payroll_month || '';
-    const invoiceLink = `${origin}/salaries/slip?id=${encodeURIComponent(r.id)}&month=${encodeURIComponent(month)}&guruName=${encodeURIComponent(r.guru_name)}&vNo=${encodeURIComponent(invNo)}`;
-    
-    // Clean formatted message with double newlines around the link for proper WhatsApp clickable linkification
-    const msg = `Namaste ${r.guru_name} ji,\n\nYour official payment invoice from Laasya Cultural Academy is ready:\n\n${invoiceLink}\n\nInvoice No: ${invNo}\n\n— Laasya Cultural Academy`;
+    const pdfUrl = `${origin}/api/finance/salaries/pdf?voucherId=${encodeURIComponent(r.id)}&month=${encodeURIComponent(month)}&guruName=${encodeURIComponent(r.guru_name)}&voucherNumber=${encodeURIComponent(invNo)}`;
 
     let cleanPhone = (r.phone || '').replace(/\D/g, '');
     if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
     const waUrl = cleanPhone 
-      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
-      : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(pdfUrl)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(pdfUrl)}`;
     window.open(waUrl, '_blank');
   };
 
@@ -1127,7 +1136,7 @@ export default function GuruSalariesClient({
                   ) : (
                     filteredPayments.map((p) => {
                       const typeConfig = PAYMENT_TYPE_LABELS[p.payment_type] || PAYMENT_TYPE_LABELS.other;
-                      const displayInvoiceNo = p.invoice_number || `LCA-PAY-2026-${p.id.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+                      const displayInvoiceNo = p.invoice_number || 'LCA-PAY-2026-1';
 
                       return (
                         <tr key={p.id} className="hover:bg-[#FFFDFC] transition">
@@ -1716,7 +1725,7 @@ export default function GuruSalariesClient({
                   <h3 className="font-bold text-base text-[#2D041A]">Payment Voucher Details</h3>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs font-mono font-bold text-[#8A064D]">
-                      {viewingPayment.invoice_number || `LCA-PAY-2026-${viewingPayment.id.replace(/-/g, '').slice(0, 6).toUpperCase()}`}
+                      {viewingPayment.invoice_number || 'LCA-PAY-2026-1'}
                     </span>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
                       Settled

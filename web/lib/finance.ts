@@ -640,7 +640,18 @@ export async function updateGuruSalaryRecord(id: string, data: {
 
   const status = data.status || current.status;
   const payDate = data.payment_date || (status === 'paid' ? new Date().toISOString().split('T')[0] : current.payment_date);
-  const invoiceNum = data.invoice_number || current.invoice_number || (status === 'paid' ? `LCA-SAL-2026-${id.replace(/-/g, '').slice(0, 6).toUpperCase()}` : null);
+  
+  let invoiceNum = data.invoice_number || current.invoice_number;
+  if (!invoiceNum && status === 'paid') {
+    const year = new Date().getFullYear();
+    const countRow = await queryOne<{ max_num: number }>(`
+      SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 'LCA-SAL-[0-9]+-([0-9]+)') AS INTEGER)), 0) as max_num
+      FROM public.guru_salary_records
+      WHERE invoice_number LIKE $1
+    `, [`LCA-SAL-${year}-%`]);
+    const nextSeq = (Number(countRow?.max_num) || 0) + 1;
+    invoiceNum = `LCA-SAL-${year}-${nextSeq}`;
+  }
 
   return queryOne<GuruSalaryRecord>(`
     UPDATE public.guru_salary_records
@@ -794,7 +805,18 @@ export async function createGuruPayment(data: {
   const payDate = data.payment_date || new Date().toISOString().split('T')[0];
   const ref = data.transaction_reference || `PAY-${Date.now().toString().slice(-8)}`;
   const receipt = data.receipt_number || `LCA-GP-${Date.now().toString().slice(-6)}`;
-  const invoiceNum = data.invoice_number || `LCA-PAY-2026-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  
+  let invoiceNum = data.invoice_number;
+  if (!invoiceNum) {
+    const year = new Date().getFullYear();
+    const countRow = await queryOne<{ max_num: number }>(`
+      SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 'LCA-PAY-[0-9]+-([0-9]+)') AS INTEGER)), 0) as max_num
+      FROM public.guru_payments
+      WHERE invoice_number LIKE $1
+    `, [`LCA-PAY-${year}-%`]);
+    const nextSeq = (Number(countRow?.max_num) || 0) + 1;
+    invoiceNum = `LCA-PAY-${year}-${nextSeq}`;
+  }
 
   const created = await queryOne<GuruPayment>(`
     INSERT INTO public.guru_payments (

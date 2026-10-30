@@ -50,9 +50,8 @@ export default function GuruSalarySlipViewClient({
 
   const handleShareWhatsApp = () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const shareUrl = `${origin}/salaries/slip?id=${encodeURIComponent(voucherId)}&month=${encodeURIComponent(month)}&guruName=${encodeURIComponent(guruName)}&vNo=${encodeURIComponent(vNo)}`;
-    const msg = `Namaste ${guruName || 'Guru'} ji,\n\nYour official salary invoice is ready to view:\n\n${shareUrl}\n\n— Laasya Cultural Academy`;
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    const fullPdfUrl = `${origin}${pdfUrl}`;
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(fullPdfUrl)}`;
     window.open(waUrl, '_blank');
   };
 

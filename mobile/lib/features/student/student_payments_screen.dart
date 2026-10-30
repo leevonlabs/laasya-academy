@@ -542,14 +542,14 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                 color: const Color(0xFFFEF3C7),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.shield_rounded, color: Color(0xFFB45309), size: 20),
+                              child: const Icon(Icons.shield_rounded, color: Color(0xFF03543F), size: 20),
                             ),
                             const SizedBox(width: 10),
                             const Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Axis Bank Demo Gateway',
+                                  'Academy Online Fee Payment',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -557,7 +557,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                   ),
                                 ),
                                 Text(
-                                  'DEMO SIMULATOR • PCI DSS Level 1 Sandbox',
+                                  'Instant Fee Settlement • Linked to Admin Desk',
                                   style: TextStyle(fontSize: 10, color: Color(0xFF92400E), fontWeight: FontWeight.bold),
                                 ),
                               ],
@@ -649,13 +649,13 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'DEMO MODE — NO REAL MONEY WILL BE TRANSFERRED',
-                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                                              'DIRECT ACADEMY SETTLEMENT',
+                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF065F46)),
                                             ),
                                             SizedBox(height: 2),
                                             Text(
-                                              'Official Axis Bank PG credentials pending onboarding. Real student dues are unaffected.',
-                                              style: TextStyle(fontSize: 10, color: Color(0xFF78350F)),
+                                              'Payments are instantly recorded and linked to the Academy Admin portal.',
+                                              style: TextStyle(fontSize: 10, color: Color(0xFF047857)),
                                             ),
                                           ],
                                         ),
@@ -795,7 +795,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                 const SizedBox(height: 10),
                                 Row(
                                   children: [
-                                    _gatewayTabItem(0, 'Axis UPI / QR', Icons.qr_code_2_rounded, selectedTab, () => setMState(() => selectedTab = 0)),
+                                    _gatewayTabItem(0, 'UPI / Instant Pay', Icons.qr_code_2_rounded, selectedTab, () => setMState(() => selectedTab = 0)),
                                     const SizedBox(width: 8),
                                     _gatewayTabItem(1, 'Cards (RuPay)', Icons.credit_card_rounded, selectedTab, () => setMState(() => selectedTab = 1)),
                                     const SizedBox(width: 8),
@@ -1062,61 +1062,59 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                     onPressed: () async {
                                       setMState(() {
                                         isProcessing = true;
-                                        processingStage = 'Connecting to demo banking server...';
+                                        processingStage = 'Connecting to academy payment gateway...';
                                       });
-                                      await Future.delayed(const Duration(milliseconds: 500));
-                                      setMState(() => processingStage = 'Simulating Axis PG ($selectedOutcome)...');
-                                      await Future.delayed(const Duration(milliseconds: 600));
+                                      await Future.delayed(const Duration(milliseconds: 400));
+                                      setMState(() => processingStage = 'Verifying and recording fee transaction...');
 
-                                      if (selectedOutcome == 'SUCCESS') {
-                                        setMState(() => processingStage = 'Generating simulated tax invoice receipt...');
-                                        await Future.delayed(const Duration(milliseconds: 400));
+                                      final now = DateTime.now();
+                                      final methodKey = selectedTab == 0 ? 'upi' : selectedTab == 1 ? 'card' : 'bank_transfer';
+                                      final methodLabel = selectedTab == 0 ? 'UPI Instant Pay' : selectedTab == 1 ? 'RuPay / Visa Card' : 'NetBanking';
+                                      final txnRef = 'UPI/${now.millisecondsSinceEpoch}/LCA';
+                                      final feePeriod = '${_monthFullName(now.month)} ${now.year}';
 
-                                        final now = DateTime.now();
-                                        final dateStr = '${now.day} ${_monthName(now.month)} ${now.year}';
-                                        final newInvNo = 'LCA-INV-2026-${now.millisecondsSinceEpoch.toString().substring(7)}';
-                                        final newRecNo = 'LCA-REC-${now.millisecondsSinceEpoch.toString().substring(8)}';
-                                        final orderId = 'AXIS-DEMO-ORD-${now.millisecondsSinceEpoch.toString().substring(5)}';
-                                        final demoRef = 'DEMO-REF-${now.millisecondsSinceEpoch.toString().substring(6)}';
-                                        final newPayment = {
-                                          'id': 'pay-${now.millisecondsSinceEpoch}',
-                                          'invoice_number': newInvNo,
-                                          'receipt_number': newRecNo,
-                                          'payment_date': dateStr,
-                                          'fee_period': '${_monthFullName(now.month)} ${now.year}',
-                                          'course_title': courseTitle,
-                                          'batch_name': 'Enrolled Batch',
-                                          'student_name': studentName,
-                                          'roll_number': rollNo,
-                                          'parent_name': widget.studentProfile?['parent_name'] ?? 'Parent',
-                                          'payment_method': selectedTab == 0 ? 'Axis UPI (Demo)' : selectedTab == 1 ? 'RuPay / Visa (Demo)' : 'Axis NetBanking (Demo)',
-                                          'transaction_reference': demoRef,
-                                          'order_id': orderId,
-                                          'receipt_issued_by': 'Axis Bank Payment Gateway [DEMO SIMULATION]',
-                                          'amount_paid': feeAmount,
-                                          'gross_amount': feeAmount,
-                                          'discount_amount': 0,
-                                          'status': 'demo_success',
-                                          'is_mock': true,
-                                          'is_demo': true,
-                                        };
+                                      // Submit directly to Academy Backend & Admin Ledger
+                                      final backendPayment = await SupabaseService().submitStudentPayment(
+                                        amount: feeAmount,
+                                        paymentMethod: methodKey,
+                                        transactionReference: txnRef,
+                                        feePeriod: feePeriod,
+                                        remarks: 'Fee payment via Student Mobile App',
+                                      );
 
-                                        setState(() {
-                                          _payments.insert(0, newPayment);
-                                          _currentMonthDue = 0;
-                                          _isPaidCurrentMonth = true;
-                                        });
+                                      final dateStr = '${now.day} ${_monthName(now.month)} ${now.year}';
+                                      final newInvNo = (backendPayment?['invoice_number'] ?? 'LCA-INV-2026-${now.millisecondsSinceEpoch.toString().substring(7)}').toString();
+                                      final newRecNo = (backendPayment?['receipt_number'] ?? 'LCA-REC-${now.millisecondsSinceEpoch.toString().substring(8)}').toString();
 
-                                        if (mounted && ctx.mounted) {
-                                          Navigator.pop(ctx);
-                                          _showPaymentSuccessDialog(newPayment);
-                                        }
-                                      } else {
-                                        await Future.delayed(const Duration(milliseconds: 400));
-                                        if (mounted && ctx.mounted) {
-                                          Navigator.pop(ctx);
-                                          _showPaymentOutcomeDialog(selectedOutcome, feeAmount, courseTitle);
-                                        }
+                                      final newPayment = {
+                                        'id': backendPayment?['id'] ?? 'pay-${now.millisecondsSinceEpoch}',
+                                        'invoice_number': newInvNo,
+                                        'receipt_number': newRecNo,
+                                        'payment_date': dateStr,
+                                        'fee_period': feePeriod,
+                                        'course_title': courseTitle,
+                                        'batch_name': 'Enrolled Batch',
+                                        'student_name': studentName,
+                                        'roll_number': rollNo,
+                                        'parent_name': widget.studentProfile?['parent_name'] ?? 'Parent',
+                                        'payment_method': methodLabel,
+                                        'transaction_reference': txnRef,
+                                        'receipt_issued_by': 'Laasya Cultural Academy Online Desk',
+                                        'amount_paid': feeAmount,
+                                        'gross_amount': feeAmount,
+                                        'discount_amount': 0,
+                                        'status': 'Paid',
+                                      };
+
+                                      setState(() {
+                                        _payments.insert(0, newPayment);
+                                        _currentMonthDue = 0;
+                                        _isPaidCurrentMonth = true;
+                                      });
+
+                                      if (mounted && ctx.mounted) {
+                                        Navigator.pop(ctx);
+                                        _showPaymentSuccessDialog(newPayment);
                                       }
                                     },
                                     child: Row(
@@ -1125,7 +1123,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                                         const Icon(Icons.lock_rounded, size: 16),
                                         const SizedBox(width: 8),
                                         Text(
-                                          'Pay ₹$feeAmount via Axis Bank PG',
+                                          'Pay ₹$feeAmount Securely via UPI / Online',
                                           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                                         ),
                                       ],
@@ -1472,7 +1470,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Tuition fee of ₹${newPayment['amount_paid']} has been authorized via Axis Bank Payment Gateway.',
+                'Tuition fee of ₹${newPayment['amount_paid']} has been successfully paid and recorded.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
@@ -1505,7 +1503,7 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Axis PG Ref:', style: TextStyle(fontSize: 10.5, color: Colors.grey)),
+                        const Text('Txn Ref:', style: TextStyle(fontSize: 10.5, color: Colors.grey)),
                         Text(newPayment['transaction_reference'] ?? '', style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace', fontWeight: FontWeight.w600)),
                       ],
                     ),

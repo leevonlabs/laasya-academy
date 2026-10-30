@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { query, queryOne } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { collectStudentFee } from '@/lib/finance';
 
 export const dynamic = 'force-dynamic';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
@@ -106,6 +107,77 @@ export async function GET(req: NextRequest) {
     console.error('Error fetching student payments:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to retrieve payments' },
+      { status: 500, headers: corsHeaders }
+    );
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { 
+      student_id, 
+      roll_number, 
+      amount_paid, 
+      payment_method, 
+      transaction_reference, 
+      fee_period, 
+      remarks 
+    } = body;
+
+    let targetStudentId = student_id;
+    if (!targetStudentId && roll_number) {
+      const s = await queryOne<{ id: string }>(`
+        SELECT id FROM public.students WHERE LOWER(roll_number) = LOWER($1) LIMIT 1
+      `, [roll_number]);
+      if (s) targetStudentId = s.id;
+    }
+
+    if (!targetStudentId) {
+      const defaultStudent = await queryOne<{ id: string }>(`
+        SELECT id FROM public.students ORDER BY created_at ASC LIMIT 1
+      `);
+      if (defaultStudent) {
+        targetStudentId = defaultStudent.id;
+      } else {
+        return NextResponse.json(
+          { success: false, error: 'Student ID or roll number is required' },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+    }
+
+    const amt = Number(amount_paid);
+    if (!amt || amt <= 0) {
+      return NextResponse.json(
+        { success: false, error: 'Valid positive payment amount is required' },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    const validMethod = ['upi', 'cash', 'bank_transfer', 'card', 'cheque', 'other'].includes(payment_method)
+      ? payment_method
+      : 'upi';
+
+    const result = await collectStudentFee({
+      student_id: targetStudentId,
+      amount_paid: amt,
+      payment_method: validMethod,
+      transaction_reference: transaction_reference || `UPI/MOB-${Date.now().toString().slice(-8)}`,
+      fee_period: fee_period,
+      remarks: remarks || 'Mobile App Online Payment',
+      receipt_issued_by: 'Student Mobile Portal'
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Student fee payment successfully registered and linked to admin ledger.',
+      payment: result
+    }, { status: 201, headers: corsHeaders });
+  } catch (err: any) {
+    console.error('Student payment POST error:', err);
+    return NextResponse.json(
+      { success: false, error: err.message || 'Failed to record student payment' },
       { status: 500, headers: corsHeaders }
     );
   }
