@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { trainer_id, payment_type, amount, payment_date, payment_method, transaction_reference, notes } = body;
+    const { trainer_id, payment_type, amount, payment_date, payment_method, transaction_reference, notes, invoice_number } = body;
 
     if (!trainer_id || !amount || Number(amount) <= 0) {
       return NextResponse.json(
@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
       payment_date,
       payment_method,
       transaction_reference,
+      invoice_number,
       notes,
     });
 

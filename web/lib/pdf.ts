@@ -396,8 +396,8 @@ export function generateGuruSalarySlipPdfDoc(slip: GuruSalaryRecord): jsPDF {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
-  const voucherHash = (slip.id || '2026').slice(-5).toUpperCase();
-  doc.text(`Voucher ID: LCA-PAY-2026-${voucherHash} • Month: ${slip.payroll_month}`, 14, y + 4.5);
+  const invNumber = slip.invoice_number || `LCA-PAY-2026-${(slip.id || '2026').replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+  doc.text(`Invoice / Voucher No: ${invNumber} • Month: ${slip.payroll_month}`, 14, y + 4.5);
 
   // Status Badge
   doc.setFillColor(236, 253, 245);
@@ -422,7 +422,8 @@ export function generateGuruSalarySlipPdfDoc(slip: GuruSalaryRecord): jsPDF {
 
   doc.setTextColor(30, 30, 30);
   doc.setFontSize(9);
-  doc.text(slip.guru_name || 'Guru Faculty', 18, y + 12);
+  const guruHeading = slip.guru_id ? `${slip.guru_name || 'Guru Faculty'} (ID: ${slip.guru_id})` : (slip.guru_name || 'Guru Faculty');
+  doc.text(guruHeading, 18, y + 12);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);

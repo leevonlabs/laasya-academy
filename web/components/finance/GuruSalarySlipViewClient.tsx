@@ -51,8 +51,8 @@ export default function GuruSalarySlipViewClient({
   const handleShareWhatsApp = () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const shareUrl = `${origin}/salaries/slip?id=${encodeURIComponent(voucherId)}&month=${encodeURIComponent(month)}&guruName=${encodeURIComponent(guruName)}&vNo=${encodeURIComponent(vNo)}`;
-    const msg = `Namaste ${guruName || 'Guru'} ji,\nHere is your official salary invoice for ${month || 'your completed session'}:\n${shareUrl}\n\n— Laasya Cultural Academy`;
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    const msg = `Namaste ${guruName || 'Guru'} ji,\n\nYour official salary invoice is ready to view:\n\n${shareUrl}\n\n— Laasya Cultural Academy`;
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
     window.open(waUrl, '_blank');
   };
 

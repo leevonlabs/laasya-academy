@@ -63,6 +63,7 @@ export interface StudentFeeInvoice {
 export interface GuruSalaryRecord {
   id: string;
   trainer_id: string;
+  guru_id?: string;
   guru_name: string;
   display_title: string;
   specializations: string[];
@@ -82,6 +83,7 @@ export interface GuruSalaryRecord {
   payment_date?: string | null;
   payment_method?: 'bank_transfer' | 'upi' | 'cash' | 'cheque' | null;
   transaction_reference?: string | null;
+  invoice_number?: string | null;
   notes?: string | null;
   created_at: string;
   previous_pending_months?: string | null;
@@ -100,6 +102,7 @@ export type GuruPaymentType =
 export interface GuruPayment {
   id: string;
   trainer_id: string;
+  guru_id?: string;
   guru_name: string;
   display_title: string;
   specializations?: string[];
@@ -110,6 +113,7 @@ export interface GuruPayment {
   payment_method: 'bank_transfer' | 'upi' | 'cash' | 'cheque';
   transaction_reference?: string | null;
   receipt_number?: string | null;
+  invoice_number?: string | null;
   notes?: string | null;
   payroll_month?: string | null;
   created_at: string;
@@ -566,12 +570,12 @@ export async function getGuruSalaryRecords(month?: string): Promise<GuruSalaryRe
   const filterMonth = month || currentMonth;
   const sql = `
     SELECT 
-      s.id, s.trainer_id, p.full_name as guru_name, t.display_title,
+      s.id, s.trainer_id, t.guru_id, p.full_name as guru_name, t.display_title,
       t.specializations, p.phone, p.email,
       s.payroll_month, s.base_salary, s.classes_assigned, s.classes_conducted,
       s.bonus_amount, s.bonus_reason, s.deduction_amount, s.deduction_reason,
       s.advance_deducted, s.net_salary, s.status, s.payment_date::text as payment_date,
-      s.payment_method, s.transaction_reference, s.notes, s.created_at::text as created_at,
+      s.payment_method, s.transaction_reference, s.invoice_number, s.notes, s.created_at::text as created_at,
       (
         SELECT string_agg(prev.payroll_month, ', ')
         FROM public.guru_salary_records prev
@@ -620,6 +624,7 @@ export async function updateGuruSalaryRecord(id: string, data: {
   payment_method?: 'bank_transfer' | 'upi' | 'cash' | 'cheque';
   transaction_reference?: string;
   payment_date?: string;
+  invoice_number?: string;
   notes?: string;
 }) {
   const current = await queryOne<GuruSalaryRecord>(`
@@ -635,6 +640,7 @@ export async function updateGuruSalaryRecord(id: string, data: {
 
   const status = data.status || current.status;
   const payDate = data.payment_date || (status === 'paid' ? new Date().toISOString().split('T')[0] : current.payment_date);
+  const invoiceNum = data.invoice_number || current.invoice_number || (status === 'paid' ? `LCA-SAL-2026-${id.replace(/-/g, '').slice(0, 6).toUpperCase()}` : null);
 
   return queryOne<GuruSalaryRecord>(`
     UPDATE public.guru_salary_records
@@ -649,13 +655,14 @@ export async function updateGuruSalaryRecord(id: string, data: {
         payment_date = $10,
         payment_method = COALESCE($11, payment_method),
         transaction_reference = COALESCE($12, transaction_reference),
-        notes = COALESCE($13, notes),
+        invoice_number = COALESCE($13, invoice_number),
+        notes = COALESCE($14, notes),
         updated_at = now()
     WHERE id = $1
     RETURNING *;
   `, [
     id, base, bonus, data.bonus_reason, deduction, data.deduction_reason,
-    advance, net, status, payDate, data.payment_method, data.transaction_reference, data.notes
+    advance, net, status, payDate, data.payment_method, data.transaction_reference, invoiceNum, data.notes
   ]);
 }
 
@@ -708,10 +715,11 @@ export async function getGuruPayments(filters?: {
   // 1. Fetch direct payments from public.guru_payments
   const directSql = `
     SELECT 
-      gp.id, gp.trainer_id, p.full_name as guru_name, t.display_title,
+      gp.id, gp.trainer_id, t.guru_id, p.full_name as guru_name, t.display_title,
       t.specializations, p.phone,
       gp.payment_type, gp.amount, gp.payment_date::text as payment_date,
       gp.payment_method, gp.transaction_reference, gp.receipt_number,
+      COALESCE(gp.invoice_number, CONCAT('LCA-PAY-2026-', UPPER(SUBSTRING(REPLACE(gp.id::text, '-', ''), 1, 6)))) as invoice_number,
       gp.notes, NULL as payroll_month, gp.created_at::text as created_at
     FROM public.guru_payments gp
     JOIN public.trainers t ON t.id = gp.trainer_id
@@ -723,13 +731,14 @@ export async function getGuruPayments(filters?: {
   // 2. Fetch paid salary records to unify salary payment history
   const salarySql = `
     SELECT 
-      s.id, s.trainer_id, p.full_name as guru_name, t.display_title,
+      s.id, s.trainer_id, t.guru_id, p.full_name as guru_name, t.display_title,
       t.specializations, p.phone,
       'monthly_salary' as payment_type, s.net_salary as amount,
       COALESCE(s.payment_date::text, s.created_at::text) as payment_date,
       COALESCE(s.payment_method, 'bank_transfer') as payment_method,
       COALESCE(s.transaction_reference, CONCAT('SAL-', SUBSTRING(s.id::text, 1, 8))) as transaction_reference,
       CONCAT('RCP-SAL-', SUBSTRING(s.id::text, 1, 6)) as receipt_number,
+      COALESCE(s.invoice_number, CONCAT('LCA-SAL-2026-', UPPER(SUBSTRING(REPLACE(s.id::text, '-', ''), 1, 6)))) as invoice_number,
       CONCAT('Monthly Salary for ', s.payroll_month) as notes,
       s.payroll_month, s.created_at::text as created_at
     FROM public.guru_salary_records s
@@ -778,18 +787,20 @@ export async function createGuruPayment(data: {
   payment_method?: 'bank_transfer' | 'upi' | 'cash' | 'cheque';
   transaction_reference?: string;
   receipt_number?: string;
+  invoice_number?: string;
   notes?: string;
 }) {
   const amt = Number(data.amount);
   const payDate = data.payment_date || new Date().toISOString().split('T')[0];
   const ref = data.transaction_reference || `PAY-${Date.now().toString().slice(-8)}`;
   const receipt = data.receipt_number || `LCA-GP-${Date.now().toString().slice(-6)}`;
+  const invoiceNum = data.invoice_number || `LCA-PAY-2026-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
   const created = await queryOne<GuruPayment>(`
     INSERT INTO public.guru_payments (
       trainer_id, payment_type, amount, payment_date, payment_method,
-      transaction_reference, receipt_number, notes
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      transaction_reference, receipt_number, invoice_number, notes
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *;
   `, [
     data.trainer_id,
@@ -799,6 +810,7 @@ export async function createGuruPayment(data: {
     data.payment_method || 'bank_transfer',
     ref,
     receipt,
+    invoiceNum,
     data.notes || null
   ]);
 

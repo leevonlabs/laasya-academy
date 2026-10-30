@@ -24,7 +24,7 @@ export default async function SalariesPage() {
   ]);
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="w-full">
       <GuruSalariesClient 
         initialRecords={records}
         initialPayments={payments}
