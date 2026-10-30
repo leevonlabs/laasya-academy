@@ -2527,12 +2527,19 @@ class SupabaseService {
   // ---------------------------------------------------------------------------
   List<Map<String, dynamic>> _cachedSalaries = [];
 
+  List<Map<String, dynamic>> _cachedSalaries = [];
+  Map<String, dynamic>? _cachedSalarySummary;
+
   List<Map<String, dynamic>> getCachedSalaries() => List<Map<String, dynamic>>.from(_cachedSalaries);
+  Map<String, dynamic>? getCachedSalarySummary() => _cachedSalarySummary;
 
   Future<void> _saveSalariesToPrefs(List<Map<String, dynamic>> salaries) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('laasya_cached_trainer_salaries', jsonEncode(salaries));
+      if (_cachedSalarySummary != null) {
+        await prefs.setString('laasya_cached_trainer_salary_summary', jsonEncode(_cachedSalarySummary));
+      }
     } catch (_) {}
   }
 
@@ -2555,16 +2562,28 @@ class SupabaseService {
     try {
       final prof = _cachedProfile ?? await getCurrentUserProfile();
       final id = (trainerId ?? prof?['id'] ?? prof?['trainer_id'] ?? prof?['profile_id'] ?? '').toString().trim();
-      final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/trainer-salaries${id.isNotEmpty ? "?trainerId=${Uri.encodeComponent(id)}" : ""}');
+      final phone = (prof?['phone'] ?? '').toString().trim();
+      final name = (prof?['full_name'] ?? '').toString().trim();
+
+      final qParams = <String>[];
+      if (id.isNotEmpty) qParams.add('trainerId=${Uri.encodeComponent(id)}');
+      if (phone.isNotEmpty) qParams.add('phone=${Uri.encodeComponent(phone)}');
+      if (name.isNotEmpty) qParams.add('name=${Uri.encodeComponent(name)}');
+
+      final queryString = qParams.isNotEmpty ? '?${qParams.join('&')}' : '';
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/finance/trainer-salaries$queryString');
       final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
-        if (decoded is Map && decoded['success'] == true && decoded['salaries'] is List) {
-          final liveSalaries = List<Map<String, dynamic>>.from(decoded['salaries']);
-          if (liveSalaries.isNotEmpty) {
-            _cachedSalaries = liveSalaries;
-            _saveSalariesToPrefs(liveSalaries);
-            return liveSalaries;
+        if (decoded is Map && decoded['success'] == true) {
+          final list = decoded['payments'] ?? decoded['salaries'];
+          if (list is List) {
+            _cachedSalaries = List<Map<String, dynamic>>.from(list);
+            if (decoded['summary'] is Map) {
+              _cachedSalarySummary = Map<String, dynamic>.from(decoded['summary']);
+            }
+            _saveSalariesToPrefs(_cachedSalaries);
+            return _cachedSalaries;
           }
         }
       }

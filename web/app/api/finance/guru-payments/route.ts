@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGuruPayments, createGuruPayment, GuruPaymentType } from '@/lib/finance';
 import { getCurrentUser } from '@/lib/auth';
+import { query } from '@/lib/db';
+import { sendFcmToRole } from '@/lib/fcm';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,6 +69,26 @@ export async function POST(req: NextRequest) {
       invoice_number,
       notes,
     });
+
+    if (newPayment) {
+      const invNo = newPayment.invoice_number || 'LCA-PAY-2026';
+      const formattedAmt = Number(amount).toLocaleString('en-IN');
+      const typeLabel = chosenType.replace('_', ' ').toUpperCase();
+      const title = `Guru Payment Disbursed: ₹${formattedAmt} (${typeLabel})`;
+      const message = `Namaste ${(newPayment as any).guru_name || 'Guru'} ji, a payment of ₹${formattedAmt} has been disbursed under Invoice ${invNo}.`;
+
+      query(`
+        INSERT INTO public.announcements (
+          title, message, announcement_type, priority, target_audience, is_active, publish_date
+        ) VALUES ($1, $2, 'notification', 'high', 'trainers', true, CURRENT_DATE);
+      `, [title, message]).catch(() => {});
+
+      sendFcmToRole('trainer', {
+        title,
+        body: message,
+        data: { type: 'salary', invoice: invNo, id: newPayment.id }
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ success: true, payment: newPayment }, { status: 201 });
   } catch (err: any) {

@@ -824,7 +824,7 @@ export default function GuruSalariesClient({
             <select
               value={payTypeFilter}
               onChange={(e: any) => setPayTypeFilter(e.target.value)}
-              className="px-3 py-2 bg-[#FFF9FB] border border-[#F0D5E4] rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8A064D]"
+              className="px-4 py-3 min-h-[48px] bg-white border border-[#F0D5E4] rounded-2xl text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8A064D] hover:border-[#8A064D] transition shadow-2xs"
             >
               <option value="all">All Payment Types</option>
               <option value="monthly_salary">Monthly Salary</option>
@@ -837,8 +837,8 @@ export default function GuruSalariesClient({
               <option value="other">Other Payment</option>
             </select>
 
-            {/* Searchable Multi-colored Guru Filter */}
-            <div className="min-w-[220px]">
+            {/* Searchable Multi-colored Guru Filter (Enlarged) */}
+            <div className="min-w-[280px] sm:min-w-[340px] flex-1 sm:flex-initial">
               <SearchableGuruSelect
                 trainers={trainers}
                 value={payTrainerFilter}
@@ -846,6 +846,7 @@ export default function GuruSalariesClient({
                 includeAllOption={true}
                 allOptionLabel="All Gurus"
                 placeholder="Filter by Guru"
+                align="right"
               />
             </div>
           </div>
@@ -1143,53 +1144,53 @@ export default function GuruSalariesClient({
                         <tr key={p.id} className="hover:bg-[#FFFDFC] transition">
                           
                           {/* Col 1: Payment Date & Invoice Number */}
-                          <td className="py-4.5 px-6">
-                            <div className="font-bold text-gray-900 text-sm">{p.payment_date}</div>
-                            <div className="text-xs font-mono font-bold text-[#8A064D] bg-[#FCE7F3] px-2.5 py-0.5 rounded-md inline-flex items-center gap-1.5 mt-1 border border-[#F0D5E4]">
-                              <Hash className="w-3 h-3 text-[#8A064D]" />
+                          <td className="py-5 px-6">
+                            <div className="font-extrabold text-gray-900 text-sm sm:text-base">{p.payment_date}</div>
+                            <div className="text-xs sm:text-sm font-mono font-bold text-[#8A064D] bg-[#FCE7F3] px-3 py-1 rounded-lg inline-flex items-center gap-1.5 mt-1 border border-[#F0D5E4]">
+                              <Hash className="w-3.5 h-3.5 text-[#8A064D]" />
                               <span>{displayInvoiceNo}</span>
                             </div>
                           </td>
 
                           {/* Col 2: Only Guru Name and ID Below */}
-                          <td className="py-4.5 px-6">
-                            <div className="font-bold text-gray-900 text-base">{p.guru_name}</div>
-                            <div className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-md inline-block mt-1 border border-blue-200 font-mono">
+                          <td className="py-5 px-6">
+                            <div className="font-black text-gray-900 text-base">{p.guru_name}</div>
+                            <div className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md inline-block mt-1 border border-blue-200 font-mono">
                               {p.guru_id ? `ID: ${p.guru_id}` : `ID: GURU-${p.trainer_id.slice(0, 4).toUpperCase()}`}
                             </div>
                           </td>
 
                           {/* Col 3: Payment Type */}
-                          <td className="py-4.5 px-6">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${typeConfig.badgeClass}`}>
+                          <td className="py-5 px-6">
+                            <span className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-bold border ${typeConfig.badgeClass}`}>
                               {typeConfig.label}
                             </span>
                           </td>
 
                           {/* Col 4: Amount Paid */}
-                          <td className="py-4.5 px-6">
-                            <span className="font-extrabold text-base text-[#2D041A] tabular-nums">
+                          <td className="py-5 px-6">
+                            <span className="font-black text-lg sm:text-xl text-[#2D041A] tabular-nums">
                               ₹{Number(p.amount).toLocaleString('en-IN')}
                             </span>
                           </td>
 
                           {/* Col 5: Payment Mode */}
-                          <td className="py-4.5 px-6">
-                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200 uppercase tracking-wide">
+                          <td className="py-5 px-6">
+                            <span className="px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-gray-100 text-gray-800 border border-gray-200 uppercase tracking-wide">
                               {(p.payment_method || 'other').replace('_', ' ')}
                             </span>
                           </td>
 
                           {/* Col 6: Actions: Details button and Slip button */}
-                          <td className="py-4.5 px-6 text-right">
-                            <div className="flex items-center justify-end gap-2">
+                          <td className="py-5 px-6 text-right">
+                            <div className="flex items-center justify-end gap-2.5">
                               {/* Details button: Opens subpage modal with all details */}
                               <button
                                 onClick={() => setViewingPayment(p)}
-                                className="px-3.5 py-2 rounded-xl border border-[#E8BFD5] bg-[#FFF5F9] hover:bg-[#FCE7F3] text-[#8A064D] font-bold text-xs transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                                className="px-4 py-2.5 rounded-xl border border-[#E8BFD5] bg-[#FFF5F9] hover:bg-[#FCE7F3] text-[#8A064D] font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
                                 title="View All Details of this Payment"
                               >
-                                <Info className="w-3.5 h-3.5 text-[#8A064D]" />
+                                <Info className="w-4 h-4 text-[#8A064D]" />
                                 <span>Details</span>
                               </button>
 
@@ -1199,10 +1200,10 @@ export default function GuruSalariesClient({
                                   const url = `/salaries/slip?id=${encodeURIComponent(p.id)}&month=${encodeURIComponent(p.payroll_month || '')}&guruName=${encodeURIComponent(p.guru_name)}&vNo=${encodeURIComponent(p.transaction_reference || displayInvoiceNo)}`;
                                   window.open(url, '_blank');
                                 }}
-                                className="px-3.5 py-2 rounded-xl bg-[#8A064D] hover:bg-[#70043E] text-white font-bold text-xs transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                                className="px-4 py-2.5 rounded-xl bg-[#8A064D] hover:bg-[#70043E] text-white font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
                                 title="View Official Vector PDF Payslip"
                               >
-                                <FileText className="w-3.5 h-3.5 text-[#F9E33A]" />
+                                <FileText className="w-4 h-4 text-[#F9E33A]" />
                                 <span>Slip</span>
                               </button>
                             </div>
@@ -1224,45 +1225,52 @@ export default function GuruSalariesClient({
       {/* ===================================================================== */}
       {payingRecord && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-[#F0D5E4] overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-[#F0D5E4] overflow-hidden animate-in zoom-in-95 duration-200">
             
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-[#8A064D] to-[#430928] p-5 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur-sm">
-                  <CreditCard className="w-5 h-5 text-[#F9E33A]" />
+            <div className="bg-gradient-to-r from-[#8A064D] to-[#430928] p-6 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-sm shadow-inner">
+                  <CreditCard className="w-6 h-6 text-[#F9E33A]" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base leading-tight">Record Salary Payment</h3>
-                  <p className="text-white/70 text-xs">Disburse monthly honorarium to faculty</p>
+                  <h3 className="font-black text-xl leading-tight">Record Salary Payment</h3>
+                  <p className="text-white/80 text-xs sm:text-sm mt-0.5">Disburse monthly honorarium to faculty guru</p>
                 </div>
               </div>
               <button
                 onClick={() => setPayingRecord(null)}
-                className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
+                className="p-2 rounded-2xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleProcessPayment} className="p-6 space-y-4">
+            <form onSubmit={handleProcessPayment} className="p-6 sm:p-7 space-y-5">
               
               {/* Beneficiary & Amount Summary Card */}
-              <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]">
-                <div className="flex justify-between items-start">
+              <div className="bg-[#FFF9FB] p-5 rounded-3xl border border-[#F0D5E4] shadow-xs">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                   <div>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Faculty Beneficiary</span>
-                    <span className="text-base font-extrabold text-[#2D041A] block">{payingRecord.guru_name}</span>
-                    <span className="text-xs text-blue-700 font-mono font-bold">
-                      {payingRecord.guru_id ? `ID: ${payingRecord.guru_id}` : `ID: GURU-${payingRecord.trainer_id.slice(0, 4).toUpperCase()}`}
-                    </span>
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Faculty Beneficiary</span>
+                    <span className="text-xl font-black text-[#2D041A] block mt-0.5">{payingRecord.guru_name}</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-blue-700 font-mono font-bold bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-200">
+                        {payingRecord.guru_id ? `ID: ${payingRecord.guru_id}` : `ID: GURU-${payingRecord.trainer_id.slice(0, 4).toUpperCase()}`}
+                      </span>
+                      {payingRecord.display_title && (
+                        <span className="text-xs font-medium text-gray-600">
+                          {payingRecord.display_title}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Net Payable</span>
-                    <span className="text-2xl font-black text-emerald-700 block tabular-nums">
+                  <div className="sm:text-right">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Net Payable</span>
+                    <span className="text-3xl font-black text-emerald-700 block tabular-nums mt-0.5">
                       ₹{Number(payingRecord.net_salary).toLocaleString('en-IN')}
                     </span>
-                    <span className="text-[10px] font-semibold text-[#8A064D] bg-[#FCE7F3] px-2 py-0.5 rounded-md inline-block mt-0.5">
+                    <span className="text-xs font-bold text-[#8A064D] bg-[#FCE7F3] px-3 py-1 rounded-lg inline-block mt-1 border border-[#F0D5E4]">
                       {payingRecord.payroll_month}
                     </span>
                   </div>
@@ -1270,10 +1278,10 @@ export default function GuruSalariesClient({
               </div>
 
               {/* Top Row: Payment Date & Invoice Number (System Generated, Read-only) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
+                  <label className="block text-sm font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-[#8A064D]" />
                     <span>Payment Date <span className="text-rose-500">*</span></span>
                   </label>
                   <input
@@ -1281,13 +1289,13 @@ export default function GuruSalariesClient({
                     value={payDate}
                     onChange={(e) => setPayDate(e.target.value)}
                     required
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                    <Hash className="w-3.5 h-3.5 text-[#8A064D]" />
+                  <label className="block text-sm font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
+                    <Hash className="w-4 h-4 text-[#8A064D]" />
                     <span>Invoice Number (System Generated)</span>
                   </label>
                   <input
@@ -1295,22 +1303,22 @@ export default function GuruSalariesClient({
                     value={payInvoiceNumber}
                     readOnly
                     disabled
-                    className="w-full px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] cursor-not-allowed select-all"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-2xl text-sm font-mono font-bold text-[#8A064D] cursor-not-allowed select-all"
                   />
                 </div>
               </div>
 
               {/* Payment Mode: NO default prefilled - user must actively select */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                  <CreditCard className="w-3.5 h-3.5 text-[#8A064D]" />
+                <label className="block text-sm font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
+                  <CreditCard className="w-4 h-4 text-[#8A064D]" />
                   <span>Payment Mode <span className="text-rose-500">*</span></span>
                 </label>
                 <select
                   value={payMethod}
                   onChange={(e: any) => setPayMethod(e.target.value)}
                   required
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                 >
                   <option value="" disabled>-- Select Payment Mode --</option>
                   <option value="bank_transfer">Direct Bank Transfer (NEFT / IMPS / RTGS)</option>
@@ -1322,8 +1330,8 @@ export default function GuruSalariesClient({
 
               {/* Transaction Ref: NO default prefilled */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                  <Hash className="w-3.5 h-3.5 text-[#8A064D]" />
+                <label className="block text-sm font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
+                  <Hash className="w-4 h-4 text-[#8A064D]" />
                   <span>Transaction Reference / UTR Number</span>
                 </label>
                 <input
@@ -1331,14 +1339,14 @@ export default function GuruSalariesClient({
                   placeholder="Enter UTR, Cheque No, or IMPS Ref (Optional)"
                   value={payRef}
                   onChange={(e) => setPayRef(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-medium focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-mono font-medium focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                 />
               </div>
 
               {/* Remarks / Notes */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-[#8A064D]" />
+                <label className="block text-sm font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[#8A064D]" />
                   <span>Disbursal Remarks</span>
                 </label>
                 <input
@@ -1346,25 +1354,25 @@ export default function GuruSalariesClient({
                   placeholder="Add any remarks or notes (Optional)"
                   value={payNotes}
                   onChange={(e) => setPayNotes(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                 />
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setPayingRecord(null)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                  className="px-5 py-3 rounded-2xl text-sm font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingPay || !payMethod}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                  className="px-6 py-3 rounded-2xl text-sm font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-2"
                 >
-                  <Check className="w-3.5 h-3.5" />
+                  <Check className="w-4 h-4" />
                   <span>{submittingPay ? 'Recording...' : 'Confirm Disbursal'}</span>
                 </button>
               </div>
@@ -1527,35 +1535,35 @@ export default function GuruSalariesClient({
       {/* MODAL 3: RECORD GURU PAYMENT (Advance, Bonus, or Any Other Payout) */}
       {/* ===================================================================== */}
       {isRecordPaymentModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-[#F0D5E4] animate-in zoom-in-95 duration-200">
             
             {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-[#FCE7F3] flex items-center justify-center text-[#8A064D]">
-                  <Receipt className="w-5 h-5 text-[#8A064D]" />
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-6">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-[#FCE7F3] flex items-center justify-center text-[#8A064D] shadow-inner">
+                  <Receipt className="w-6 h-6 text-[#8A064D]" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-[#2D041A]">Store Payment Done to Guru</h3>
-                  <p className="text-xs text-gray-500">Record advance, bonus, incentive, or direct payments</p>
+                  <h3 className="font-black text-xl text-[#2D041A]">Store Payment Done to Guru</h3>
+                  <p className="text-sm text-gray-500 mt-0.5">Record advance, performance bonus, incentive, or direct payments</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsRecordPaymentModalOpen(false)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 cursor-pointer"
+                className="p-2 rounded-2xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleRecordPayment} className="space-y-4">
+            <form onSubmit={handleRecordPayment} className="space-y-5">
               
               {/* TOP ROW: Payment Date (default = today) & System-Generated Unique Invoice Number (Read-only) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 bg-[#FFF9FB] p-3.5 rounded-2xl border border-[#F0D5E4]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#FFF9FB] p-5 rounded-3xl border border-[#F0D5E4] shadow-xs">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#8A064D]" />
+                  <label className="block text-sm font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-[#8A064D]" />
                     <span>Payment Date <span className="text-rose-500">*</span></span>
                   </label>
                   <input
@@ -1563,13 +1571,13 @@ export default function GuruSalariesClient({
                     value={recordDate}
                     onChange={(e) => setRecordDate(e.target.value)}
                     required
-                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#8A064D]"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-[#8A064D] shadow-2xs"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                    <Hash className="w-3.5 h-3.5 text-[#8A064D]" />
+                  <label className="block text-sm font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
+                    <Hash className="w-4 h-4 text-[#8A064D]" />
                     <span>Invoice Number (System Generated)</span>
                   </label>
                   <input
@@ -1577,7 +1585,7 @@ export default function GuruSalariesClient({
                     value={recordInvoiceNumber}
                     readOnly
                     disabled
-                    className="w-full px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-mono font-bold text-[#8A064D] cursor-not-allowed select-all"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-2xl text-sm font-mono font-bold text-[#8A064D] cursor-not-allowed select-all"
                   />
                 </div>
               </div>
@@ -1596,55 +1604,58 @@ export default function GuruSalariesClient({
 
               {/* PAYMENT TYPE: NO default selected */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                  <Banknote className="w-3.5 h-3.5 text-[#8A064D]" />
+                <label className="block text-sm font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
+                  <Banknote className="w-4 h-4 text-[#8A064D]" />
                   <span>Payment Type <span className="text-rose-500">*</span></span>
                 </label>
                 <select
                   value={recordPaymentType}
                   onChange={(e) => setRecordPaymentType(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                   required
                 >
                   <option value="" disabled>-- Select Payment Type --</option>
-                  <option value="salary_advance">Salary Advance (Recoverable)</option>
+                  <option value="salary_advance">Salary Advance (Recoverable from Payroll)</option>
                   <option value="bonus">Performance Bonus</option>
                   <option value="festival_bonus">Festival / Special Bonus</option>
                   <option value="monthly_salary">Monthly Salary / Honorarium</option>
                   <option value="incentive">Class / Workshop Incentive</option>
                   <option value="reimbursement">Travel / Conveyance Reimbursement</option>
                   <option value="honorarium">Guest Lecture / Event Honorarium</option>
-                  <option value="other">Other Payment</option>
+                  <option value="other">Other Direct Payment</option>
                 </select>
               </div>
 
               {/* AMOUNT & DISBURSEMENT MODE: NO default prefilled */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  <label className="block text-sm font-bold text-gray-800 mb-1.5">
                     Amount Paid (₹) <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={recordAmount}
-                    onChange={(e) => setRecordAmount(e.target.value)}
-                    required
-                    placeholder="Enter amount in ₹"
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 text-base">₹</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={recordAmount}
+                      onChange={(e) => setRecordAmount(e.target.value)}
+                      required
+                      placeholder="Enter amount"
+                      className="w-full pl-8 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-base font-black text-gray-900 focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  <label className="block text-sm font-bold text-gray-800 mb-1.5">
                     Payment Mode <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={recordMethod}
                     onChange={(e: any) => setRecordMethod(e.target.value)}
                     required
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                    className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                   >
                     <option value="" disabled>-- Select Payment Mode --</option>
                     <option value="bank_transfer">Direct Bank Transfer (NEFT / IMPS / RTGS)</option>
@@ -1657,8 +1668,8 @@ export default function GuruSalariesClient({
 
               {/* Transaction Ref: NO default */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                  <Hash className="w-3.5 h-3.5 text-[#8A064D]" />
+                <label className="block text-sm font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
+                  <Hash className="w-4 h-4 text-[#8A064D]" />
                   <span>Transaction Ref / UTR / Cheque Number</span>
                 </label>
                 <input
@@ -1666,14 +1677,14 @@ export default function GuruSalariesClient({
                   placeholder="Enter UTR / Cheque / IMPS Ref (Optional)"
                   value={recordRef}
                   onChange={(e) => setRecordRef(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-medium focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-mono font-medium focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                 />
               </div>
 
               {/* Purpose / Remarks: NO default */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-[#8A064D]" />
+                <label className="block text-sm font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[#8A064D]" />
                   <span>Remarks / Purpose</span>
                 </label>
                 <input
@@ -1681,25 +1692,25 @@ export default function GuruSalariesClient({
                   placeholder="Enter payment purpose or remarks (Optional)"
                   value={recordNotes}
                   onChange={(e) => setRecordNotes(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#8A064D] focus:bg-white"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                 />
               </div>
 
               {/* Footer Actions */}
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
+              <div className="flex justify-end gap-3 pt-5 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setIsRecordPaymentModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                  className="px-5 py-3 rounded-2xl text-sm font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingPayment}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                  className="px-7 py-3 rounded-2xl text-sm font-bold bg-[#8A064D] hover:bg-[#70043E] text-white shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-2"
                 >
-                  <Check className="w-3.5 h-3.5 text-[#F9E33A]" />
+                  <Check className="w-4 h-4 text-[#F9E33A]" />
                   <span>{submittingPayment ? 'Storing...' : 'Save Payment'}</span>
                 </button>
               </div>
@@ -1713,8 +1724,8 @@ export default function GuruSalariesClient({
       {/* MODAL 4: PAYMENT DETAILS SUBPAGE / MODAL */}
       {/* ===================================================================== */}
       {viewingPayment && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-[#F0D5E4] animate-in zoom-in-95 duration-150">
             
             {/* Header */}
             <div className="flex items-center justify-between pb-4 border-b border-gray-100">
