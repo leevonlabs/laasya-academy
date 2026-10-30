@@ -10,7 +10,6 @@ import {
 import { Trainer } from '@/lib/academy';
 import MonthPicker from '@/components/common/MonthPicker';
 import DateRangeQuickFilter, { DateRangeResult } from '@/components/common/DateRangeQuickFilter';
-import { downloadGuruSalarySlipPdf } from '@/lib/pdf';
 import { 
   Banknote, 
   Plus, 
@@ -19,7 +18,6 @@ import {
   CheckCircle2, 
   Clock, 
   AlertCircle, 
-  Printer, 
   CreditCard, 
   X, 
   Calendar, 
@@ -29,9 +27,8 @@ import {
   FileText, 
   Check, 
   MessageCircle,
-  ExternalLink,
   Receipt,
-  DollarSign
+  Hash
 } from 'lucide-react';
 
 interface Props {
@@ -40,29 +37,6 @@ interface Props {
   initialSummary: FinancialSummary;
   trainers: Trainer[];
   defaultMonth?: string;
-}
-
-// Convert numbers to Indian Rupees in words
-function numberToIndianWords(num: number): string {
-  if (num === 0) return 'Rupees Zero Only';
-  const a = [
-    '', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ',
-    'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '
-  ];
-  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-
-  function inWords(n: number): string {
-    if (n < 20) return a[n];
-    const digit = n % 10;
-    if (n < 100) return b[Math.floor(n / 10)] + (digit ? ' ' + a[digit] : '');
-    if (n < 1000) return inWords(Math.floor(n / 100)) + 'Hundred ' + (n % 100 === 0 ? '' : 'and ' + inWords(n % 100));
-    if (n < 100000) return inWords(Math.floor(n / 1000)) + 'Thousand ' + (n % 1000 !== 0 ? inWords(n % 1000) : '');
-    if (n < 10000000) return inWords(Math.floor(n / 100000)) + 'Lakh ' + (n % 100000 !== 0 ? inWords(n % 100000) : '');
-    return inWords(Math.floor(n / 10000000)) + 'Crore ' + (n % 10000000 !== 0 ? inWords(n % 10000000) : '');
-  }
-
-  const rounded = Math.round(num);
-  return `Rupees ${inWords(rounded).trim()} Only`;
 }
 
 // Helper to determine if a payroll month string is earlier than the current month
@@ -104,7 +78,7 @@ export default function GuruSalariesClient({
   const [payments, setPayments] = useState<GuruPayment[]>(initialPayments);
   const [summary, setSummary] = useState<FinancialSummary>(initialSummary);
 
-  // Active view tab: 'salaries' | 'payments' (Salary Advance page completely replaced by Payments)
+  // Active view tab: 'salaries' | 'payments'
   const [activeTab, setActiveTab] = useState<'salaries' | 'payments'>('salaries');
 
   // Month selector for Monthly Payroll (defaults to current month)
@@ -113,7 +87,7 @@ export default function GuruSalariesClient({
 
   // Filters for Monthly Payroll
   const [salarySearchQuery, setSalarySearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'processing' | 'paid'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'paid'>('all');
 
   // Filters for Payments Page
   const [paySearchQuery, setPaySearchQuery] = useState('');
@@ -123,10 +97,10 @@ export default function GuruSalariesClient({
   const [payEndDate, setPayEndDate] = useState('');
 
   // Modals state
-  // 1. Process Monthly Salary Modal
+  // 1. Process Monthly Salary Modal (Clean UI/UX)
   const [payingRecord, setPayingRecord] = useState<GuruSalaryRecord | null>(null);
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
-  const [payMethod, setPayMethod] = useState<'bank_transfer' | 'upi' | 'cash' | 'cheque'>('bank_transfer');
+  const [payMethod, setPayMethod] = useState<'bank_transfer' | 'upi' | 'cash' | 'cheque' | ''>('');
   const [payRef, setPayRef] = useState('');
   const [payNotes, setPayNotes] = useState('');
   const [submittingPay, setSubmittingPay] = useState(false);
@@ -141,10 +115,7 @@ export default function GuruSalariesClient({
   const [adjAdvanceDeducted, setAdjAdvanceDeducted] = useState('');
   const [submittingAdjustment, setSubmittingAdjustment] = useState(false);
 
-  // 3. Official Printable Salary Slip Modal (In addition to opening in dedicated new page)
-  const [slipRecord, setSlipRecord] = useState<GuruSalaryRecord | null>(null);
-
-  // 4. Record Payment Modal (Replaces Advance modal: stores advance, bonus, or any other payment)
+  // 3. Record Payment Modal
   const [isRecordPaymentModalOpen, setIsRecordPaymentModalOpen] = useState(false);
   const [recordTrainerId, setRecordTrainerId] = useState(trainers[0]?.id || '');
   const [recordPaymentType, setRecordPaymentType] = useState<GuruPaymentType>('salary_advance');
@@ -196,6 +167,10 @@ export default function GuruSalariesClient({
   const handleProcessPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!payingRecord) return;
+    if (!payMethod) {
+      alert('Please select a payment mode.');
+      return;
+    }
     setSubmittingPay(true);
 
     try {
@@ -207,8 +182,8 @@ export default function GuruSalariesClient({
           status: 'paid',
           payment_date: payDate,
           payment_method: payMethod,
-          transaction_reference: payRef || `SAL-${payingRecord.payroll_month.replace(' ', '')}-${Date.now().toString().slice(-4)}`,
-          notes: payNotes
+          transaction_reference: payRef.trim() || undefined,
+          notes: payNotes.trim() || undefined
         })
       });
 
@@ -285,8 +260,8 @@ export default function GuruSalariesClient({
           amount: Number(recordAmount),
           payment_date: recordDate,
           payment_method: recordMethod,
-          transaction_reference: recordRef || `TXN-${Date.now().toString().slice(-8)}`,
-          notes: recordNotes
+          transaction_reference: recordRef.trim() || undefined,
+          notes: recordNotes.trim() || undefined
         })
       });
 
@@ -295,7 +270,6 @@ export default function GuruSalariesClient({
         throw new Error(err.error || 'Failed to record payment');
       }
 
-      const result = await res.json();
       const trainer = trainers.find((t) => t.id === recordTrainerId);
       showToast(`Payment of ₹${Number(recordAmount).toLocaleString('en-IN')} (${PAYMENT_TYPE_LABELS[recordPaymentType]?.label}) stored for ${trainer?.full_name || 'Guru'}!`);
       setIsRecordPaymentModalOpen(false);
@@ -320,13 +294,13 @@ export default function GuruSalariesClient({
     setAdjAdvanceDeducted(r.advance_deducted.toString());
   };
 
-  // Open Payment Modal for a monthly salary row
+  // Open Pay Modal: Improved UI/UX, prefilled with current date, no default payment mode or fake ref!
   const openPaymentModal = (r: GuruSalaryRecord) => {
     setPayingRecord(r);
     setPayDate(new Date().toISOString().split('T')[0]);
-    setPayMethod('bank_transfer');
-    setPayRef(`NEFT/AXIS/${r.payroll_month.replace(' ', '')}/${Date.now().toString().slice(-4)}`);
-    setPayNotes(`Monthly salary disbursement for ${r.payroll_month}`);
+    setPayMethod(''); // No default payment mode prefilled - user actively selects
+    setPayRef('');    // No default reference prefilled - empty by default
+    setPayNotes('');  // No default notes prefilled
   };
 
   // Open Official Salary Slip Page in new tab with download option
@@ -334,6 +308,23 @@ export default function GuruSalariesClient({
     const url = `/salaries/slip?id=${encodeURIComponent(r.id)}&month=${encodeURIComponent(r.payroll_month)}&guruName=${encodeURIComponent(r.guru_name)}&vNo=${encodeURIComponent(r.transaction_reference || '')}`;
     window.open(url, '_blank');
   };
+
+  // Share small message on WhatsApp with invoice link that anyone can open
+  const handleWhatsAppShare = (r: GuruSalaryRecord) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const invoiceLink = `${origin}/salaries/slip?id=${encodeURIComponent(r.id)}&month=${encodeURIComponent(r.payroll_month)}&guruName=${encodeURIComponent(r.guru_name)}&vNo=${encodeURIComponent(r.transaction_reference || '')}`;
+    const msg = `Namaste ${r.guru_name} ji,\nHere is your official salary invoice for ${r.payroll_month}:\n${invoiceLink}\n\n— Laasya Cultural Academy`;
+
+    let cleanPhone = (r.phone || '').replace(/\D/g, '');
+    if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
+    const waUrl = cleanPhone 
+      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank');
+  };
+
+  // Check if current selected month is in the past
+  const isSelectedMonthInPast = isMonthInPast(selectedMonth);
 
   // Computed totals for selected month (Monthly Payroll)
   const totalBilledSalaries = records.reduce((acc, r) => acc + Number(r.net_salary), 0);
@@ -362,7 +353,6 @@ export default function GuruSalariesClient({
   // Filtered payments (Guru Payments Page)
   const filteredPayments = useMemo(() => {
     return payments.filter((p) => {
-      // Search filter
       const q = paySearchQuery.toLowerCase().trim();
       if (q) {
         const matchesName = p.guru_name.toLowerCase().includes(q);
@@ -376,17 +366,14 @@ export default function GuruSalariesClient({
         }
       }
 
-      // Type filter
       if (payTypeFilter !== 'all' && p.payment_type !== payTypeFilter) {
         return false;
       }
 
-      // Trainer filter
       if (payTrainerFilter !== 'all' && p.trainer_id !== payTrainerFilter) {
         return false;
       }
 
-      // Date range filter
       if (payStartDate) {
         const start = new Date(payStartDate).getTime();
         const pDate = new Date(p.payment_date).getTime();
@@ -508,7 +495,7 @@ export default function GuruSalariesClient({
         </div>
       )}
 
-      {/* TOP HEADER */}
+      {/* TOP HEADER: MonthPicker removed from here as requested! */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#F0D5E4] shadow-xs">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -524,20 +511,11 @@ export default function GuruSalariesClient({
             Guru Salary & Payments Management
           </h1>
           <p className="text-xs text-gray-500 mt-1 max-w-2xl">
-            Track current monthly compensation, conduct logs, bonuses, deductions, and record any advances, incentives, and payments done to Gurus with official downloadable payslips.
+            Track monthly compensation, conduct logs, bonuses, deductions, and record any advances, incentives, and payments done to Gurus with official downloadable payslips.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Month Picker: ONLY for Monthly Payroll tab */}
-          {activeTab === 'salaries' && (
-            <MonthPicker
-              value={selectedMonth}
-              onChange={(monthLabel) => handleMonthChange(monthLabel)}
-              disabled={loadingMonth}
-            />
-          )}
-
           {/* Export CSV */}
           <button
             onClick={handleExportCSV}
@@ -547,7 +525,7 @@ export default function GuruSalariesClient({
             <span>Export CSV</span>
           </button>
 
-          {/* Record Guru Payment Button (Replaces Issue Advance) */}
+          {/* Record Guru Payment Button */}
           <button
             onClick={() => setIsRecordPaymentModalOpen(true)}
             className="px-5 py-2.5 rounded-2xl bg-[#8A064D] hover:bg-[#70043E] text-white text-sm font-bold transition flex items-center gap-2 shadow-md cursor-pointer"
@@ -666,7 +644,7 @@ export default function GuruSalariesClient({
         </div>
       )}
 
-      {/* VIEW SELECTOR & SEARCH BAR */}
+      {/* VIEW SELECTOR & TOOLBAR */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-4.5 rounded-3xl border border-[#F0D5E4]">
         
         {/* Navigation Tabs */}
@@ -697,23 +675,30 @@ export default function GuruSalariesClient({
 
         {/* Filters specific to active tab */}
         {activeTab === 'salaries' ? (
-          /* Monthly Payroll Filters: NO Date Range filter as requested! */
+          /* Monthly Payroll Filters: MonthPicker placed directly BESIDE search bar as requested! */
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="relative min-w-[240px] flex-1 sm:flex-initial">
+            {/* Month Year Selector placed BESIDE Search Bar */}
+            <MonthPicker
+              value={selectedMonth}
+              onChange={(monthLabel) => handleMonthChange(monthLabel)}
+              disabled={loadingMonth}
+            />
+
+            <div className="relative min-w-[220px] flex-1 sm:flex-initial">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search Guru, title, style..."
                 value={salarySearchQuery}
                 onChange={(e) => setSalarySearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-[#FFF9FB] border border-[#F0D5E4] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8A064D] font-medium"
+                className="w-full pl-10 pr-4 py-2 bg-[#FFF9FB] border border-[#F0D5E4] rounded-2xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#8A064D] font-medium"
               />
             </div>
 
             <div className="flex items-center gap-1 bg-[#FFF9FB] p-1 rounded-2xl border border-[#F0D5E4]">
               <button
                 onClick={() => setStatusFilter('all')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                   statusFilter === 'all'
                     ? 'bg-white text-gray-900 shadow-2xs border border-[#F0D5E4]'
                     : 'text-gray-500 hover:text-gray-800'
@@ -723,7 +708,7 @@ export default function GuruSalariesClient({
               </button>
               <button
                 onClick={() => setStatusFilter('pending')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                   statusFilter === 'pending'
                     ? 'bg-amber-100 text-amber-800 shadow-2xs border border-amber-200'
                     : 'text-gray-500 hover:text-gray-800'
@@ -733,7 +718,7 @@ export default function GuruSalariesClient({
               </button>
               <button
                 onClick={() => setStatusFilter('paid')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                   statusFilter === 'paid'
                     ? 'bg-emerald-100 text-emerald-800 shadow-2xs border border-emerald-200'
                     : 'text-gray-500 hover:text-gray-800'
@@ -746,14 +731,14 @@ export default function GuruSalariesClient({
         ) : (
           /* Payments Tab Filters: Search bar and STANDARD DATE RANGE FILTER */
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="relative min-w-[220px] flex-1 sm:flex-initial">
+            <div className="relative min-w-[200px] flex-1 sm:flex-initial">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search Guru, ref, notes..."
                 value={paySearchQuery}
                 onChange={(e) => setPaySearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-[#FFF9FB] border border-[#F0D5E4] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8A064D] font-medium"
+                className="w-full pl-10 pr-4 py-2 bg-[#FFF9FB] border border-[#F0D5E4] rounded-2xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#8A064D] font-medium"
               />
             </div>
 
@@ -772,7 +757,7 @@ export default function GuruSalariesClient({
             <select
               value={payTypeFilter}
               onChange={(e: any) => setPayTypeFilter(e.target.value)}
-              className="px-3.5 py-2.5 bg-[#FFF9FB] border border-[#F0D5E4] rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8A064D]"
+              className="px-3 py-2 bg-[#FFF9FB] border border-[#F0D5E4] rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8A064D]"
             >
               <option value="all">All Payment Types</option>
               <option value="monthly_salary">Monthly Salary</option>
@@ -788,7 +773,7 @@ export default function GuruSalariesClient({
             <select
               value={payTrainerFilter}
               onChange={(e) => setPayTrainerFilter(e.target.value)}
-              className="px-3.5 py-2.5 bg-[#FFF9FB] border border-[#F0D5E4] rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8A064D]"
+              className="px-3 py-2 bg-[#FFF9FB] border border-[#F0D5E4] rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8A064D]"
             >
               <option value="all">All Gurus</option>
               {trainers.map((t) => (
@@ -811,12 +796,12 @@ export default function GuruSalariesClient({
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-[#FFF9FB] border-b border-[#F0D5E4] text-[#590231] font-bold text-xs uppercase tracking-wider">
-                  <th className="py-4 px-5">Guru / Faculty</th>
-                  <th className="py-4 px-5">Base Salary</th>
-                  <th className="py-4 px-5">Adjustments (Bonus / Deductions)</th>
-                  <th className="py-4 px-5">Net Salary</th>
-                  <th className="py-4 px-5">Status</th>
-                  <th className="py-4 px-5 text-right">Actions</th>
+                  <th className="py-4 px-5">GURU / FACULTY</th>
+                  <th className="py-4 px-5">BASE SALARY</th>
+                  <th className="py-4 px-5">ADJUSTMENTS (BONUS / DEDUCTIONS)</th>
+                  <th className="py-4 px-5">NET SALARY</th>
+                  <th className="py-4 px-5">STATUS</th>
+                  <th className="py-4 px-5 text-right">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F0D5E4]/60 text-sm">
@@ -840,14 +825,15 @@ export default function GuruSalariesClient({
                     const hasDeduction = Number(r.deduction_amount) > 0;
                     const hasAdvanceDeduction = Number(r.advance_deducted) > 0;
 
-                    // Condition: If a month changes with pending status of salaries, or previous month salary is pending
-                    const isPrevMonthPending = !isPaid && (Boolean(r.previous_pending_months) || isMonthInPast(r.payroll_month));
+                    // Condition: ONLY highlight in red if the user has selected a PREVIOUS month and salary is pending!
+                    // Current month defaults to normal display.
+                    const isPreviousMonthUnpaid = isSelectedMonthInPast && !isPaid;
 
                     return (
                       <tr 
                         key={r.id} 
                         className={`transition group ${
-                          isPrevMonthPending 
+                          isPreviousMonthUnpaid 
                             ? 'bg-rose-50/85 hover:bg-rose-100/90 border-l-4 border-l-rose-600' 
                             : 'hover:bg-[#FFF9FB]'
                         }`}
@@ -930,7 +916,7 @@ export default function GuruSalariesClient({
                           </span>
                         </td>
 
-                        {/* Status (with Red Highlight warning if previous month is pending) */}
+                        {/* Status (with Red Highlight ONLY if looking at an unpaid previous month) */}
                         <td className="py-4 px-5">
                           {isPaid ? (
                             <div>
@@ -942,23 +928,19 @@ export default function GuruSalariesClient({
                                 {r.payment_date} • {r.payment_method?.toUpperCase()}
                               </div>
                             </div>
-                          ) : isPrevMonthPending ? (
-                            /* RED HIGHLIGHT WARNING: Previous month payment not done */
+                          ) : isPreviousMonthUnpaid ? (
+                            /* Red Highlight ONLY when user checks a previous month whose payment is pending */
                             <div className="space-y-1">
                               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-200 text-rose-900 border border-rose-300 shadow-2xs">
-                                <AlertCircle className="w-3.5 h-3.5 text-rose-700" />
-                                <span>Payment Not Done</span>
+                                <Clock className="w-3.5 h-3.5 text-rose-700" />
+                                <span>Pending</span>
                               </span>
                               <div className="text-[11px] font-bold text-rose-700">
-                                ⚠️ Previous month payment not done {r.previous_pending_months ? `(${r.previous_pending_months})` : `(${r.payroll_month})`}
+                                Payment not done
                               </div>
                             </div>
-                          ) : r.status === 'processing' ? (
-                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
-                              <Clock className="w-3.5 h-3.5 text-blue-600" />
-                              <span>Processing</span>
-                            </span>
                           ) : (
+                            /* Default Current Month Status: Normal clean amber pill */
                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
                               <Clock className="w-3.5 h-3.5 text-amber-600" />
                               <span>Pending</span>
@@ -994,14 +976,26 @@ export default function GuruSalariesClient({
 
                             {/* SLIP BUTTON: Only appears when payment is done! Opens in dedicated page with download option */}
                             {isPaid && (
-                              <button
-                                onClick={() => openSlipPage(r)}
-                                className="px-3 py-1.5 rounded-xl bg-[#2D041A] hover:bg-[#430928] text-white font-bold text-xs transition flex items-center gap-1.5 shadow-2xs border border-[#48082B] cursor-pointer"
-                                title="Open Official Salary Slip PDF in New Tab"
-                              >
-                                <FileText className="w-3.5 h-3.5 text-[#F9E33A]" />
-                                <span>Slip</span>
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => openSlipPage(r)}
+                                  className="px-3 py-1.5 rounded-xl bg-[#2D041A] hover:bg-[#430928] text-white font-bold text-xs transition flex items-center gap-1.5 shadow-2xs border border-[#48082B] cursor-pointer"
+                                  title="Open Official Salary Slip PDF in New Page"
+                                >
+                                  <FileText className="w-3.5 h-3.5 text-[#F9E33A]" />
+                                  <span>Slip</span>
+                                </button>
+
+                                {/* WhatsApp Share Button: Small message with invoice link */}
+                                <button
+                                  onClick={() => handleWhatsAppShare(r)}
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200 transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                  title="Share Invoice Link on WhatsApp"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>WhatsApp</span>
+                                </button>
+                              </>
                             )}
 
                           </div>
@@ -1107,17 +1101,19 @@ export default function GuruSalariesClient({
 
                           {/* Receipt / Slip */}
                           <td className="py-3.5 px-4 text-right">
-                            <button
-                              onClick={() => {
-                                const url = `/salaries/slip?id=${encodeURIComponent(p.id)}&month=${encodeURIComponent(p.payroll_month || '')}&guruName=${encodeURIComponent(p.guru_name)}&vNo=${encodeURIComponent(p.transaction_reference || '')}`;
-                                window.open(url, '_blank');
-                              }}
-                              className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-bold text-[11px] transition inline-flex items-center gap-1 shadow-2xs cursor-pointer"
-                              title="View and Download Payment Voucher"
-                            >
-                              <FileText className="w-3.5 h-3.5 text-[#8A064D]" />
-                              <span>Voucher</span>
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  const url = `/salaries/slip?id=${encodeURIComponent(p.id)}&month=${encodeURIComponent(p.payroll_month || '')}&guruName=${encodeURIComponent(p.guru_name)}&vNo=${encodeURIComponent(p.transaction_reference || '')}`;
+                                  window.open(url, '_blank');
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-bold text-[11px] transition inline-flex items-center gap-1 shadow-2xs cursor-pointer"
+                                title="View and Download Payment Voucher"
+                              >
+                                <FileText className="w-3.5 h-3.5 text-[#8A064D]" />
+                                <span>Voucher</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1131,60 +1127,81 @@ export default function GuruSalariesClient({
       )}
 
       {/* ===================================================================== */}
-      {/* MODAL 1: PROCESS SALARY PAYMENT */}
+      {/* MODAL 1: PROCESS SALARY PAYMENT (High Quality UI/UX) */}
       {/* ===================================================================== */}
       {payingRecord && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#F0D5E4] animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
-              <div className="flex items-center gap-2">
-                <Banknote className="w-5 h-5 text-emerald-600" />
-                <h3 className="font-bold text-base text-[#2D041A]">Disburse Guru Salary</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-[#F0D5E4] overflow-hidden animate-in zoom-in-95 duration-200">
+            
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-[#8A064D] to-[#430928] p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur-sm">
+                  <CreditCard className="w-5 h-5 text-[#F9E33A]" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base leading-tight">Record Salary Payment</h3>
+                  <p className="text-white/70 text-xs">Disburse monthly honorarium to faculty</p>
+                </div>
               </div>
               <button
                 onClick={() => setPayingRecord(null)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleProcessPayment} className="space-y-4">
+            <form onSubmit={handleProcessPayment} className="p-6 space-y-4">
+              
+              {/* Beneficiary & Amount Summary Card */}
               <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]">
                 <div className="flex justify-between items-start">
                   <div>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Guru Beneficiary</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Faculty Beneficiary</span>
                     <span className="text-sm font-extrabold text-[#2D041A] block">{payingRecord.guru_name}</span>
                     <span className="text-xs text-gray-500">{payingRecord.display_title}</span>
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Net Payable</span>
-                    <span className="text-xl font-black text-emerald-700">
+                    <span className="text-xl font-black text-emerald-700 block">
                       ₹{Number(payingRecord.net_salary).toLocaleString('en-IN')}
                     </span>
-                    <span className="text-[10px] text-gray-500 block">{payingRecord.payroll_month}</span>
+                    <span className="text-[10px] font-semibold text-[#8A064D] bg-[#FCE7F3] px-2 py-0.5 rounded-md inline-block mt-0.5">
+                      {payingRecord.payroll_month}
+                    </span>
                   </div>
                 </div>
               </div>
 
+              {/* Payment Date: prefilled with current date */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Payment Date</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                  <span>Payment Date <span className="text-rose-500">*</span></span>
+                </label>
                 <input
                   type="date"
                   value={payDate}
                   onChange={(e) => setPayDate(e.target.value)}
                   required
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#8A064D]"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                 />
               </div>
 
+              {/* Payment Mode: NO default prefilled - user must actively select */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Disbursement Mode</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-gray-400" />
+                  <span>Payment Mode <span className="text-rose-500">*</span></span>
+                </label>
                 <select
                   value={payMethod}
                   onChange={(e: any) => setPayMethod(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#8A064D]"
+                  required
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                 >
+                  <option value="" disabled>-- Select Payment Mode --</option>
                   <option value="bank_transfer">Direct Bank Transfer (NEFT / IMPS / RTGS)</option>
                   <option value="upi">UPI (GPay / PhonePe / Paytm)</option>
                   <option value="cheque">Bank Cheque</option>
@@ -1192,47 +1209,55 @@ export default function GuruSalariesClient({
                 </select>
               </div>
 
+              {/* Transaction Ref: NO default prefilled - empty by default */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Bank Reference / UTR / Cheque Number
+                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                  <Hash className="w-3.5 h-3.5 text-gray-400" />
+                  <span>Transaction Reference / UTR Number</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. HDFC202603309812 / UPI-394821"
+                  placeholder="Enter UTR, Cheque No, or IMPS Ref (Optional)"
                   value={payRef}
                   onChange={(e) => setPayRef(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-medium focus:ring-2 focus:ring-[#8A064D]"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-medium focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                 />
               </div>
 
+              {/* Remarks / Notes: empty by default */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Notes / Disbursal Remarks</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-gray-400" />
+                  <span>Disbursal Remarks</span>
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. Cleared via corporate online banking portal"
+                  placeholder="Add any remarks or notes (Optional)"
                   value={payNotes}
                   onChange={(e) => setPayNotes(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#8A064D]"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#8A064D] focus:bg-white transition"
                 />
               </div>
 
+              {/* Actions */}
               <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setPayingRecord(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
+                  className="px-4 py-2.5 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={submittingPay}
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                  disabled={submittingPay || !payMethod}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                 >
                   <Check className="w-3.5 h-3.5" />
                   <span>{submittingPay ? 'Recording...' : 'Confirm Disbursal'}</span>
                 </button>
               </div>
+
             </form>
           </div>
         </div>

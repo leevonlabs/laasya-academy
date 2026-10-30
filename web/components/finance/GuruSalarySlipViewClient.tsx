@@ -11,7 +11,8 @@ import {
   Building, 
   Phone, 
   Mail, 
-  ExternalLink 
+  ExternalLink,
+  MessageCircle
 } from 'lucide-react';
 
 interface Props {
@@ -45,6 +46,14 @@ export default function GuruSalarySlipViewClient({
     } finally {
       setTimeout(() => setDownloading(false), 800);
     }
+  };
+
+  const handleShareWhatsApp = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const shareUrl = `${origin}/salaries/slip?id=${encodeURIComponent(voucherId)}&month=${encodeURIComponent(month)}&guruName=${encodeURIComponent(guruName)}&vNo=${encodeURIComponent(vNo)}`;
+    const msg = `Namaste ${guruName || 'Guru'} ji,\nHere is your official salary invoice for ${month || 'your completed session'}:\n${shareUrl}\n\n— Laasya Cultural Academy`;
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank');
   };
 
   return (
@@ -86,6 +95,16 @@ export default function GuruSalarySlipViewClient({
           >
             <Download className="w-4 h-4 text-[#F9E33A]" />
             <span>{downloading ? 'Preparing PDF...' : 'Download PDF'}</span>
+          </button>
+
+          {/* WhatsApp Share Button */}
+          <button
+            onClick={handleShareWhatsApp}
+            className="px-4 py-2.5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer"
+            title="Share Short Invoice Link on WhatsApp"
+          >
+            <MessageCircle className="w-4 h-4 text-[#F9E33A]" />
+            <span>WhatsApp</span>
           </button>
 
           {/* Print Button */}
