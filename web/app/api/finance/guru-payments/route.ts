@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       sendFcmToRole('trainer', {
         title,
         body: message,
-        data: { type: 'salary', invoice: invNo, id: newPayment.id }
+        data: { type: 'payment', invoice: invNo, id: newPayment.id }
       }).catch(() => {});
     }
 

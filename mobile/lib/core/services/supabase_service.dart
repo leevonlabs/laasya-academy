@@ -2137,6 +2137,41 @@ class SupabaseService {
         });
       }
 
+      // 5. Guru / Faculty Salary & Payment Notifications
+      try {
+        final trainerPayouts = await getTrainerSalaryPayouts();
+        for (var p in trainerPayouts) {
+          final id = (p['id'] ?? '').toString();
+          final isSalary = p['record_kind'] == 'salary' || p['payment_type'] == 'monthly_salary';
+          final invNo = (p['invoice_number'] ?? p['voucher_number'] ?? (isSalary ? 'LCA-SAL-2026' : 'LCA-PAY-2026')).toString();
+          final amount = p['amount'] ?? p['net_salary'] ?? 0;
+          final payDate = (p['display_date'] ?? p['payment_date'] ?? 'Recent').toString();
+          final month = p['payroll_month']?.toString();
+          final badgeLabel = (p['badge_label'] ?? (isSalary ? 'Salary' : 'Payment')).toString();
+          final method = (p['payment_method'] ?? 'Bank Transfer').toString().toUpperCase().replaceAll('_', ' ');
+
+          final notifTitle = isSalary
+              ? 'Salary Disbursed: ₹$amount (${month ?? 'Monthly'})'
+              : 'Payment Disbursed: ₹$amount ($badgeLabel)';
+          final notifMsg = isSalary
+              ? 'Monthly salary honorarium disbursed under Invoice #$invNo on $payDate via $method.'
+              : 'Payment of ₹$amount ($badgeLabel) disbursed under Invoice #$invNo on $payDate via $method.';
+
+          notifs.add({
+            'id': 'salary-notif-$id',
+            'title': notifTitle,
+            'message': notifMsg,
+            'type': isSalary ? 'salary' : 'payment',
+            'date': payDate,
+            'is_read': _readNotifIds.contains('salary-notif-$id'),
+            'amount': amount,
+            'invoice_number': invNo,
+          });
+        }
+      } catch (err) {
+        debugPrint('Trainer payouts notification notice: $err');
+      }
+
       // Deduplicate notifications by content fingerprint so identical notifications never repeat
       final seenNotifFingerprints = <String>{};
       final dedupedNotifs = <Map<String, dynamic>>[];
@@ -2404,129 +2439,11 @@ class SupabaseService {
     return null;
   }
 
-    if (_cachedPayments.isEmpty) {
-      _cachedPayments = [
-        {
-          'id': 'pay-2026-10-01',
-          'invoice_number': 'LCA-INV-2026-10-006',
-          'receipt_number': 'LCA-REC-2026-10-006',
-          'fee_period': 'October 2026',
-          'course_title': 'Bharathanatyam',
-          'batch_name': 'Batch A (Beginners)',
-          'amount_paid': 2000,
-          'gross_amount': 2000,
-          'discount_amount': 0,
-          'balance_due': 0,
-          'payment_date': '02 Oct 2026',
-          'payment_date_iso': '2026-10-02',
-          'payment_method': 'UPI',
-          'transaction_reference': 'UPI/627581920391/HDFC',
-          'status': 'Paid',
-          'receipt_issued_by': 'Sri Ramesh Rao (Director)',
-          'student_name': 'Aditi Sundaram',
-          'roll_number': 'LCA-6',
-          'parent_name': 'Sri Sundaram V.',
-          'remarks': 'Tuition fee for October 2026 received via UPI QR',
-        },
-        {
-          'id': 'pay-2026-09-01',
-          'invoice_number': 'LCA-INV-2026-09-006',
-          'receipt_number': 'LCA-REC-2026-09-006',
-          'fee_period': 'September 2026',
-          'course_title': 'Bharathanatyam',
-          'batch_name': 'Batch A (Beginners)',
-          'amount_paid': 2000,
-          'gross_amount': 2000,
-          'discount_amount': 0,
-          'balance_due': 0,
-          'payment_date': '04 Sep 2026',
-          'payment_date_iso': '2026-09-04',
-          'payment_method': 'UPI',
-          'transaction_reference': 'UPI/592837190281/ICICI',
-          'status': 'Paid',
-          'receipt_issued_by': 'Sri Ramesh Rao (Director)',
-          'student_name': 'Aditi Sundaram',
-          'roll_number': 'LCA-6',
-          'parent_name': 'Sri Sundaram V.',
-          'remarks': 'Tuition fee for September 2026 received via UPI',
-        },
-        {
-          'id': 'pay-2026-08-01',
-          'invoice_number': 'LCA-INV-2026-08-006',
-          'receipt_number': 'LCA-REC-2026-08-006',
-          'fee_period': 'August 2026',
-          'course_title': 'Bharathanatyam',
-          'batch_name': 'Batch A (Beginners)',
-          'amount_paid': 2000,
-          'gross_amount': 2000,
-          'discount_amount': 0,
-          'balance_due': 0,
-          'payment_date': '02 Aug 2026',
-          'payment_date_iso': '2026-08-02',
-          'payment_method': 'UPI',
-          'transaction_reference': 'UPI/549102847291/SBI',
-          'status': 'Paid',
-          'receipt_issued_by': 'Sri Ramesh Rao (Director)',
-          'student_name': 'Aditi Sundaram',
-          'roll_number': 'LCA-6',
-          'parent_name': 'Sri Sundaram V.',
-          'remarks': 'Tuition fee for August 2026 received via UPI',
-        },
-        {
-          'id': 'pay-2026-07-01',
-          'invoice_number': 'LCA-INV-2026-07-006',
-          'receipt_number': 'LCA-REC-2026-07-006',
-          'fee_period': 'July 2026',
-          'course_title': 'Bharathanatyam',
-          'batch_name': 'Batch A (Beginners)',
-          'amount_paid': 2000,
-          'gross_amount': 2000,
-          'discount_amount': 0,
-          'balance_due': 0,
-          'payment_date': '05 Jul 2026',
-          'payment_date_iso': '2026-07-05',
-          'payment_method': 'Bank Transfer',
-          'transaction_reference': 'NEFT/AXIS/291827401',
-          'status': 'Paid',
-          'receipt_issued_by': 'Sri Ramesh Rao (Director)',
-          'student_name': 'Aditi Sundaram',
-          'roll_number': 'LCA-6',
-          'parent_name': 'Sri Sundaram V.',
-          'remarks': 'Tuition fee for July 2026 received via NEFT',
-        },
-        {
-          'id': 'pay-2026-06-REG',
-          'invoice_number': 'LCA-INV-2026-06-REG',
-          'receipt_number': 'LCA-REC-2026-06-REG',
-          'fee_period': 'Academic Year 2026-27 Admission',
-          'course_title': 'Bharathanatyam',
-          'batch_name': 'Batch A (Beginners)',
-          'amount_paid': 1500,
-          'gross_amount': 1500,
-          'discount_amount': 0,
-          'balance_due': 0,
-          'payment_date': '15 Jun 2026',
-          'payment_date_iso': '2026-06-15',
-          'payment_method': 'UPI',
-          'transaction_reference': 'UPI/492817293810/HDFC',
-          'status': 'Paid',
-          'receipt_issued_by': 'Sri Ramesh Rao (Director)',
-          'student_name': 'Aditi Sundaram',
-          'roll_number': 'LCA-6',
-          'parent_name': 'Sri Sundaram V.',
-          'remarks': 'Annual Academy Enrollment, ID Card & Practice Ghungroo kit',
-        },
-      ];
-    }
 
-    return List<Map<String, dynamic>>.from(_cachedPayments);
-  }
 
   // ---------------------------------------------------------------------------
   // TRAINER / GURU SALARY PAYOUTS & VOUCHERS
   // ---------------------------------------------------------------------------
-  List<Map<String, dynamic>> _cachedSalaries = [];
-
   List<Map<String, dynamic>> _cachedSalaries = [];
   Map<String, dynamic>? _cachedSalarySummary;
 
@@ -2543,10 +2460,9 @@ class SupabaseService {
     } catch (_) {}
   }
 
-  Future<List<Map<String, dynamic>>> getTrainerSalaryPayouts({String? trainerId}) async {
-    // Return cached immediately (<1ms) to eliminate loading spinners and freeze
-    if (_cachedSalaries.isNotEmpty) {
-      _refreshSalariesInBackground(trainerId);
+  Future<List<Map<String, dynamic>>> getTrainerSalaryPayouts({String? trainerId, bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedSalaries.isNotEmpty) {
+      _fetchLiveSalaries(trainerId);
       return List<Map<String, dynamic>>.from(_cachedSalaries);
     }
 

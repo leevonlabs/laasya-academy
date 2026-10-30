@@ -98,8 +98,12 @@ class _TrainerNotificationsScreenState extends State<TrainerNotificationsScreen>
       return;
     }
 
-    // 6. Salaries Redirection
-    if (type == 'salary' || type == 'salaries' || title.contains('salary') || message.contains('salary') || message.contains('stipend')) {
+    // 6. Salaries & Payments Redirection
+    if (type == 'salary' || type == 'salaries' || type == 'payment' || type == 'guru_payment' ||
+        title.contains('salary') || message.contains('salary') ||
+        title.contains('payment') || message.contains('payment') ||
+        title.contains('honorarium') || message.contains('honorarium') ||
+        title.contains('disbursed') || message.contains('disbursed')) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const TrainerSalariesScreen()),

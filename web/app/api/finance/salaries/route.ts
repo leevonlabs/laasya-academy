@@ -37,11 +37,16 @@ export async function PUT(req: Request) {
     }
     const updated = await updateGuruSalaryRecord(id, data);
 
-    if (data.status === 'paid' && updated) {
+    if (updated) {
       const invNo = updated.invoice_number || 'LCA-SAL-2026';
       const net = Number(updated.net_salary || 0).toLocaleString('en-IN');
-      const title = `Salary Disbursed: ₹${net} (${updated.payroll_month})`;
-      const message = `Namaste ${updated.guru_name || 'Guru'} ji, your salary honorarium for ${updated.payroll_month} has been disbursed under Invoice ${invNo}.`;
+      const isDisbursal = data.status === 'paid';
+      const title = isDisbursal
+        ? `Salary Disbursed: ₹${net} (${updated.payroll_month})`
+        : `Salary Update: ₹${net} (${updated.payroll_month})`;
+      const message = isDisbursal
+        ? `Namaste ${updated.guru_name || 'Guru'} ji, your salary honorarium for ${updated.payroll_month} has been disbursed under Invoice ${invNo}.`
+        : `Namaste ${updated.guru_name || 'Guru'} ji, your payroll honorarium details for ${updated.payroll_month} have been updated by admin.`;
 
       query(`
         INSERT INTO public.announcements (

@@ -117,6 +117,7 @@ export async function GET(req: NextRequest) {
         'monthly_salary' as payment_type,
         'Salary' as type_label,
         'Monthly Salary' as badge_label,
+        'Salary [Admin updated through payroll]' as source_description,
         COALESCE(sr.invoice_number, CONCAT('LCA-SAL-2026-', UPPER(SUBSTRING(REPLACE(sr.id::text, '-', ''), 1, 6)))) as invoice_number,
         COALESCE(sr.invoice_number, sr.transaction_reference) as voucher_number,
         CONCAT('RCP-SAL-', SUBSTRING(sr.id::text, 1, 6)) as receipt_number,
@@ -164,6 +165,7 @@ export async function GET(req: NextRequest) {
           WHEN gp.payment_type = 'honorarium' THEN 'Honorarium'
           ELSE 'Direct Payment'
         END as badge_label,
+        'Payment [Added from payments page]' as source_description,
         COALESCE(gp.invoice_number, CONCAT('LCA-PAY-2026-', UPPER(SUBSTRING(REPLACE(gp.id::text, '-', ''), 1, 6)))) as invoice_number,
         COALESCE(gp.invoice_number, gp.transaction_reference) as voucher_number,
         COALESCE(gp.receipt_number, CONCAT('RCP-PAY-', SUBSTRING(gp.id::text, 1, 6))) as receipt_number,
@@ -214,17 +216,18 @@ export async function GET(req: NextRequest) {
     }>(`
       SELECT 
         payroll_month,
-        status,
-        base_salary::numeric,
-        net_salary::numeric,
-        payment_date::text,
-        invoice_number
+        CASE WHEN bool_or(LOWER(status) = 'paid') THEN 'paid' ELSE 'pending' END as status,
+        MAX(base_salary::numeric) as base_salary,
+        MAX(COALESCE(net_salary, base_salary)::numeric) as net_salary,
+        MAX(payment_date::text) as payment_date,
+        MAX(invoice_number) as invoice_number
       FROM public.guru_salary_records
       WHERE trainer_id = $1
-      ORDER BY created_at DESC;
+      GROUP BY payroll_month
+      ORDER BY MAX(created_at) DESC;
     `, [tId]);
 
-    const currentMonthRecord = allPayrollMonths.find(m => m.payroll_month === currentCalMonth);
+    const currentMonthRecord = allPayrollMonths.find(m => m.payroll_month.trim().toLowerCase() === currentCalMonth.trim().toLowerCase());
     const currentMonthStatus = currentMonthRecord?.status === 'paid' ? 'Paid' : 'Pending';
 
     const summary = {

@@ -507,13 +507,13 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                   ),
                   const Divider(height: 1, indent: 64),
 
-                  // 5. Pay Slips
+                  // 5. Pay Slips & Payment History
                   _settingsTile(
                     icon: Icons.receipt_long_rounded,
                     iconBg: const Color(0xFFDEF7EC),
                     iconColor: const Color(0xFF03543F),
-                    title: 'Pay Slips',
-                    subtitle: 'Monthly salary disbursements & downloadable pay slips (PDF)',
+                    title: 'Pay Slips & Payment History',
+                    subtitle: 'Salary payouts, direct disbursements & official vouchers',
                     badgeText: null,
                     onTap: () {
                       Navigator.push(

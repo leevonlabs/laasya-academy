@@ -751,7 +751,7 @@ export async function getGuruPayments(filters?: {
       t.specializations, p.phone,
       gp.payment_type, gp.amount, gp.payment_date::text as payment_date,
       gp.payment_method, gp.transaction_reference, gp.receipt_number,
-      COALESCE(gp.invoice_number, CONCAT('LCA-PAY-2026-', UPPER(SUBSTRING(REPLACE(gp.id::text, '-', ''), 1, 6)))) as invoice_number,
+      COALESCE(gp.invoice_number, CONCAT('LCA-PAY-2026-1')) as invoice_number,
       gp.notes, NULL as payroll_month, gp.created_at::text as created_at
     FROM public.guru_payments gp
     JOIN public.trainers t ON t.id = gp.trainer_id
@@ -770,7 +770,7 @@ export async function getGuruPayments(filters?: {
       COALESCE(s.payment_method, 'bank_transfer') as payment_method,
       COALESCE(s.transaction_reference, CONCAT('SAL-', SUBSTRING(s.id::text, 1, 8))) as transaction_reference,
       CONCAT('RCP-SAL-', SUBSTRING(s.id::text, 1, 6)) as receipt_number,
-      COALESCE(s.invoice_number, CONCAT('LCA-SAL-2026-', UPPER(SUBSTRING(REPLACE(s.id::text, '-', ''), 1, 6)))) as invoice_number,
+      COALESCE(s.invoice_number, CONCAT('LCA-SAL-2026-1')) as invoice_number,
       CONCAT('Monthly Salary for ', s.payroll_month) as notes,
       s.payroll_month, s.created_at::text as created_at
     FROM public.guru_salary_records s

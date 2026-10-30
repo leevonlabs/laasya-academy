@@ -996,27 +996,42 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
                   // Header Row with Title & View Report Button on Top
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.verified_rounded, color: Color(0xFF8A064D), size: 17),
-                            const SizedBox(width: 6),
-                            Expanded(
+                            Row(
+                              children: const [
+                                Icon(Icons.verified_rounded, color: Color(0xFF8A064D), size: 16),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Attendance Overview',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF2D041A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 22),
                               child: Text(
-                                'Attendance Overview • ${_getCurrentMonthYearLabel()}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2D041A),
+                                _getCurrentMonthYearLabel(),
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
                                 ),
                               ),
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed: () {
