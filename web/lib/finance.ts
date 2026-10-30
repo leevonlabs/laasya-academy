@@ -653,7 +653,7 @@ export async function updateGuruSalaryRecord(id: string, data: {
     invoiceNum = `LCA-SAL-${year}-${nextSeq}`;
   }
 
-  return queryOne<GuruSalaryRecord>(`
+  await query(`
     UPDATE public.guru_salary_records
     SET base_salary = $2,
         bonus_amount = $3,
@@ -669,12 +669,33 @@ export async function updateGuruSalaryRecord(id: string, data: {
         invoice_number = COALESCE($13, invoice_number),
         notes = COALESCE($14, notes),
         updated_at = now()
-    WHERE id = $1
-    RETURNING *;
+    WHERE id = $1;
   `, [
     id, base, bonus, data.bonus_reason, deduction, data.deduction_reason,
     advance, net, status, payDate, data.payment_method, data.transaction_reference, invoiceNum, data.notes
   ]);
+
+  return queryOne<GuruSalaryRecord>(`
+    SELECT 
+      s.id, s.trainer_id, t.guru_id, p.full_name as guru_name, t.display_title,
+      t.specializations, p.phone, p.email,
+      s.payroll_month, s.base_salary, s.classes_assigned, s.classes_conducted,
+      s.bonus_amount, s.bonus_reason, s.deduction_amount, s.deduction_reason,
+      s.advance_deducted, s.net_salary, s.status, s.payment_date::text as payment_date,
+      s.payment_method, s.transaction_reference, s.invoice_number, s.notes, s.created_at::text as created_at,
+      (
+        SELECT string_agg(prev.payroll_month, ', ')
+        FROM public.guru_salary_records prev
+        WHERE prev.trainer_id = s.trainer_id
+          AND prev.status != 'paid'
+          AND prev.payroll_month != s.payroll_month
+      ) as previous_pending_months
+    FROM public.guru_salary_records s
+    JOIN public.trainers t ON t.id = s.trainer_id
+    JOIN public.profiles p ON p.id = t.profile_id
+    WHERE s.id = $1
+    LIMIT 1;
+  `, [id]);
 }
 
 export async function getGuruSalaryAdvances(): Promise<GuruSalaryAdvance[]> {
@@ -852,6 +873,23 @@ export async function createGuruPayment(data: {
       data.payment_method || 'bank_transfer',
       ref
     ]).catch((e) => console.error('Sync advance error:', e));
+  }
+
+  if (created?.id) {
+    const full = await queryOne<GuruPayment>(`
+      SELECT 
+        gp.id, gp.trainer_id, t.guru_id, p.full_name as guru_name, t.display_title,
+        t.specializations, p.phone,
+        gp.payment_type, gp.amount, gp.payment_date::text as payment_date,
+        gp.payment_method, gp.transaction_reference, gp.receipt_number,
+        gp.invoice_number, gp.notes, NULL as payroll_month, gp.created_at::text as created_at
+      FROM public.guru_payments gp
+      JOIN public.trainers t ON t.id = gp.trainer_id
+      JOIN public.profiles p ON p.id = t.profile_id
+      WHERE gp.id = $1
+      LIMIT 1;
+    `, [created.id]);
+    if (full) return full;
   }
 
   return created;

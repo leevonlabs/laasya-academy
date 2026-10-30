@@ -223,7 +223,7 @@ export default function GuruSalariesClient({
       }
 
       const updated = await res.json();
-      setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      setRecords((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)));
       showToast(`Salary payment of ₹${Number(updated.net_salary).toLocaleString('en-IN')} recorded with Invoice ${payInvoiceNumber}!`);
       setPayingRecord(null);
       refreshPayments();
@@ -261,8 +261,8 @@ export default function GuruSalariesClient({
       }
 
       const updated = await res.json();
-      setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-      showToast(`Payroll adjustments updated for ${updated.guru_name}!`);
+      setRecords((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)));
+      showToast(`Payroll adjustments updated for ${updated.guru_name || 'Guru'}!`);
       setAdjustingRecord(null);
     } catch (err: any) {
       alert(err.message || 'Error updating adjustments');
@@ -879,12 +879,13 @@ export default function GuruSalariesClient({
                   </tr>
                 ) : (
                   filteredRecords.map((r) => {
-                    const initials = r.guru_name
+                    const initials = (r.guru_name || 'Guru')
                       .split(' ')
+                      .filter(Boolean)
                       .map((n) => n[0])
                       .slice(0, 2)
                       .join('')
-                      .toUpperCase();
+                      .toUpperCase() || 'G';
 
                     const isPaid = r.status === 'paid';
                     const hasBonus = Number(r.bonus_amount) > 0;
@@ -1175,7 +1176,7 @@ export default function GuruSalariesClient({
                           {/* Col 5: Payment Mode */}
                           <td className="py-4.5 px-6">
                             <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200 uppercase tracking-wide">
-                              {p.payment_method.replace('_', ' ')}
+                              {(p.payment_method || 'other').replace('_', ' ')}
                             </span>
                           </td>
 
@@ -1787,7 +1788,7 @@ export default function GuruSalariesClient({
                 <div className="p-3 rounded-xl border border-gray-100 bg-gray-50">
                   <span className="text-[10px] font-bold text-gray-400 uppercase block mb-0.5">Payment Mode</span>
                   <span className="font-bold text-gray-900 uppercase">
-                    {viewingPayment.payment_method.replace('_', ' ')}
+                    {(viewingPayment.payment_method || 'other').replace('_', ' ')}
                   </span>
                 </div>
 
