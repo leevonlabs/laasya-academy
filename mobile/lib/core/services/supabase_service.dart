@@ -209,10 +209,22 @@ class SupabaseService {
     // 1. Immediately restore persistent login profile from device storage so app NEVER logs out on close
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedJson = prefs.getString('saved_user_profile');
-      if (savedJson != null && savedJson.isNotEmpty) {
-        _cachedProfile = Map<String, dynamic>.from(jsonDecode(savedJson));
-        debugPrint('Restored persistent login for ${_cachedProfile?['full_name']} (${_cachedProfile?['role']})');
+      final savedRaw = prefs.get('saved_user_profile');
+      if (savedRaw is Map) {
+        _cachedProfile = Map<String, dynamic>.from(savedRaw);
+      } else if (savedRaw is String && savedRaw.isNotEmpty) {
+        try {
+          var decoded = jsonDecode(savedRaw);
+          if (decoded is String) {
+            decoded = jsonDecode(decoded);
+          }
+          if (decoded is Map) {
+            _cachedProfile = Map<String, dynamic>.from(decoded);
+          }
+        } catch (_) {}
+      }
+      if (_cachedProfile != null) {
+        debugPrint('Restored persistent login for ' + (_cachedProfile?['full_name']?.toString() ?? '') + ' (' + (_cachedProfile?['role']?.toString() ?? '') + ')');
       }
 
       final savedBannersJson = prefs.getString('laasya_cached_banners');
@@ -478,9 +490,21 @@ class SupabaseService {
     // Check device persistent storage first so user stays logged in across app restarts
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedJson = prefs.getString('saved_user_profile');
-      if (savedJson != null && savedJson.isNotEmpty) {
-        _cachedProfile = Map<String, dynamic>.from(jsonDecode(savedJson));
+      final savedRaw = prefs.get('saved_user_profile');
+      if (savedRaw is Map) {
+        _cachedProfile = Map<String, dynamic>.from(savedRaw);
+      } else if (savedRaw is String && savedRaw.isNotEmpty) {
+        try {
+          var decoded = jsonDecode(savedRaw);
+          if (decoded is String) {
+            decoded = jsonDecode(decoded);
+          }
+          if (decoded is Map) {
+            _cachedProfile = Map<String, dynamic>.from(decoded);
+          }
+        } catch (_) {}
+      }
+      if (_cachedProfile != null) {
         return _cachedProfile;
       }
     } catch (e) {

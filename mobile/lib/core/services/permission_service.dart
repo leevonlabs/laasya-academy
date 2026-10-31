@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +13,7 @@ class PermissionService {
   /// Respects the user's choice: if denied or dismissed, does not repeatedly prompt.
   /// Does NOT force background execution or battery-optimization exemptions.
   static Future<void> promptRequiredPermissions(BuildContext context, {required String role}) async {
+    if (kIsWeb) return;
     try {
       final isStudent = role.toLowerCase() == 'student';
       final prefKey = isStudent ? _prefStudentNotifPrompted : _prefTrainerNotifPrompted;

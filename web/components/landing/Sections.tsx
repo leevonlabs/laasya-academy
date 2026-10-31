@@ -555,7 +555,7 @@ export function Footer({ contactProfile }: { contactProfile?: PublicAcademyProfi
               { label: 'Courses & Batches', href: '/#programs' },
               { label: 'Our Gurus', href: '/#faculty' },
               { label: 'Contact & Campus Map', href: '/contact' },
-              { label: 'Admin Portal Login', href: '/login' },
+              { label: 'Portals & App Login', href: '/login' },
             ].map((link) => (
               <li key={link.label}>
                 <a

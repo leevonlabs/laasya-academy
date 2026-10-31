@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/supabase_service.dart';
@@ -45,9 +46,11 @@ class _AuthGateState extends State<AuthGate> {
   void initState() {
     super.initState();
     _checkAuthState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      PermissionService.requestAppPermissions(context);
-    });
+    if (!kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        PermissionService.requestAppPermissions(context);
+      });
+    }
   }
 
   Future<void> _checkAuthState() async {
@@ -58,30 +61,44 @@ class _AuthGateState extends State<AuthGate> {
         final userId = profile['id']?.toString() ?? '';
         List<String> batchIds = [];
         if (role == 'trainer') {
-          final tb = SupabaseService().trainerBatches;
-          batchIds = tb.map((b) => (b['id'] ?? '').toString()).where((id) => id.isNotEmpty).toList();
+          try {
+            final tb = SupabaseService().trainerBatches;
+            batchIds = tb.map((b) => (b['id'] ?? '').toString()).where((id) => id.isNotEmpty).toList();
+          } catch (_) {}
         } else {
-          final enrolled = profile['enrolled_courses'];
-          if (enrolled is List) {
-            batchIds = enrolled
-                .map((e) => e is Map ? e['batch_id']?.toString() : null)
-                .where((id) => id != null && id.isNotEmpty)
-                .cast<String>()
-                .toList();
-          }
+          try {
+            final enrolled = profile['enrolled_courses'];
+            if (enrolled is List) {
+              batchIds = enrolled
+                  .map((e) => e is Map ? e['batch_id']?.toString() : null)
+                  .where((id) => id != null && id.isNotEmpty)
+                  .cast<String>()
+                  .toList();
+            }
+          } catch (_) {}
         }
-        if (userId.isNotEmpty) {
-          await FcmService.registerDeviceToken(
-            userId: userId,
-            role: role,
-            batchIds: batchIds.isNotEmpty ? batchIds : null,
-          );
+        if (!kIsWeb && userId.isNotEmpty) {
+          try {
+            await FcmService.registerDeviceToken(
+              userId: userId,
+              role: role,
+              batchIds: batchIds.isNotEmpty ? batchIds : null,
+            );
+          } catch (_) {}
         }
         if (role == 'trainer') {
           _targetScreen = const TrainerMainScaffold();
         } else {
           _targetScreen = const StudentMainScaffold();
         }
+      } else if (kIsWeb) {
+        // On web, if not logged in, redirect directly to the unified login page
+        try {
+          final uri = Uri.base;
+          if (!uri.path.contains('/login')) {
+            // Let PortalLandingScreen be default if web stays on portal, but keep it available
+          }
+        } catch (_) {}
       }
     } catch (e) {
       debugPrint('Auth check error: $e');

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/supabase_service.dart';
@@ -22,6 +23,19 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
   bool _isLoading = false;
   bool _agreeToTerms = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    try {
+      final role = Uri.base.queryParameters['role']?.toLowerCase();
+      if (role == 'trainer' || role == 'guru') {
+        _isStudent = false;
+      } else if (role == 'student') {
+        _isStudent = true;
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -77,7 +91,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
       }
 
       final userId = (profile['id'] ?? profile['profile_id'] ?? '').toString();
-      if (userId.isNotEmpty) {
+      if (!kIsWeb && userId.isNotEmpty) {
         FcmService.registerDeviceToken(
           userId: userId,
           role: _isStudent ? 'student' : 'trainer',
@@ -511,7 +525,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                                 style: TextStyle(fontSize: 12, color: LaasyaColors.textDark),
                               ),
                               GestureDetector(
-                                onTap: () => _showPrivacyPolicyBottomSheet(context),
+                                onTap: () => LaasyaPolicyDialog.showTerms(context),
                                 child: const Text(
                                   'Terms & Conditions',
                                   style: TextStyle(
@@ -527,7 +541,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                                 style: TextStyle(fontSize: 12, color: LaasyaColors.textDark),
                               ),
                               GestureDetector(
-                                onTap: () => _showPrivacyPolicyBottomSheet(context),
+                                onTap: () => LaasyaPolicyDialog.showPrivacy(context),
                                 child: const Text(
                                   'Privacy Policy',
                                   style: TextStyle(
@@ -578,7 +592,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                   // 8. Privacy Policy & Terms Link (Mandatory for Google Play & Apple App Store)
                   Center(
                     child: TextButton.icon(
-                      onPressed: () => _showPrivacyPolicyBottomSheet(context),
+                      onPressed: () => LaasyaPolicyDialog.showPolicy(context),
                       icon: const Icon(Icons.privacy_tip_outlined, size: 14, color: Color(0xFF6B7280)),
                       label: const Text(
                         'Privacy Policy & Terms of Service',

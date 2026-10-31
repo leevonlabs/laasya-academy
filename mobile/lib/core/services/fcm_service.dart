@@ -186,6 +186,7 @@ class FcmService {
     required String role,
     List<String>? batchIds,
   }) async {
+    if (kIsWeb) return;
     String? token = await getToken();
     if (token == null || token.isEmpty) {
       try {
