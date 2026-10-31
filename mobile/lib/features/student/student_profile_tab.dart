@@ -232,6 +232,7 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
                       // Avatar
                       LaasyaAvatar(
                         avatarUrl: avatarUrl,
+                        name: name,
                         size: 72,
                         borderWidth: 2.2,
                         showShadow: false,

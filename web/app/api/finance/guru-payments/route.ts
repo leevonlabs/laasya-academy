@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGuruPayments, createGuruPayment, GuruPaymentType } from '@/lib/finance';
 import { getCurrentUser } from '@/lib/auth';
-import { query } from '@/lib/db';
+import { query, queryOne } from '@/lib/db';
 import { sendFcmToRole } from '@/lib/fcm';
 
 export const dynamic = 'force-dynamic';
@@ -9,15 +9,25 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser(req);
-    if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required.' }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate') || undefined;
     const endDate = searchParams.get('endDate') || undefined;
-    const trainerId = searchParams.get('trainerId') || undefined;
+    let trainerId = searchParams.get('trainerId') || undefined;
     const type = searchParams.get('type') || undefined;
+
+    if (user.role === 'trainer') {
+      const found = await queryOne<{ id: string }>(
+        `SELECT id FROM public.trainers WHERE id::text = $1 OR profile_id::text = $1 LIMIT 1`,
+        [user.userId]
+      );
+      trainerId = found ? found.id : user.userId;
+    } else if (user.role !== 'owner' && user.role !== 'receptionist') {
+      return NextResponse.json({ error: 'Access denied: Staff or Faculty credentials required.' }, { status: 403 });
+    }
 
     const payments = await getGuruPayments({ startDate, endDate, trainerId, type });
     return NextResponse.json(payments);

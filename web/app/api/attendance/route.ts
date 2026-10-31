@@ -116,7 +116,7 @@ export async function GET(req: Request) {
     }
 
     // 3. Guru Attendance Audit for admin portal & Guru mobile app
-    const isGuruAudit = searchParams.get('guruAudit') === 'true' || searchParams.get('type') === 'guru';
+    const isGuruAudit = searchParams.get('guruAudit') === 'true' || searchParams.get('type') === 'guru' || user.role === 'trainer';
     if (isGuruAudit) {
       if (user.role === 'student') {
         return NextResponse.json(

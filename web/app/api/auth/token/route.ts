@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
       SELECT 
         p.id as profile_id,
         s.id as student_id,
+        t.id as trainer_id,
         s.roll_number,
         p.full_name,
         p.email,
@@ -38,8 +39,9 @@ export async function POST(req: NextRequest) {
         p.role
       FROM public.profiles p
       LEFT JOIN public.students s ON s.profile_id = p.id
+      LEFT JOIN public.trainers t ON t.profile_id = p.id
       WHERE (
-        (LENGTH($1) > 0 AND (p.id::text = $1 OR s.id::text = $1))
+        (LENGTH($1) > 0 AND (p.id::text = $1 OR s.id::text = $1 OR t.id::text = $1))
         OR (LENGTH($3) > 0 AND (LOWER(s.roll_number) = $3 OR LOWER(s.roll_number) = 'lca-' || $3))
       )
       AND (
@@ -57,10 +59,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized profile' }, { status: 401, headers: corsHeaders });
     }
 
-    const tokenRole = user.role || role || 'student';
+    const tokenRole = user.role || role || (user.trainer_id ? 'trainer' : 'student');
     const token = createToken({
       userId: user.profile_id,
-      email: user.email || `${user.roll_number || cleanPhone || 'student'}@laasyaacademy.com`,
+      email: user.email || `${user.roll_number || cleanPhone || (user.trainer_id ? 'trainer' : 'student')}@laasyaacademy.com`,
       fullName: user.full_name,
       role: tokenRole === 'trainer' ? 'trainer' : 'student',
     });

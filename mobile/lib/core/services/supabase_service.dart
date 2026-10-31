@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/supabase_constants.dart';
 import '../constants/api_constants.dart';
+import '../../features/trainer/trainer_data_store.dart';
 import 'fcm_service.dart';
 
 class SupabaseService {
@@ -473,6 +474,10 @@ class SupabaseService {
 
   Future<void> signOut() async {
     _cachedProfile = null;
+    _cachedTrainerBatches = [];
+    try {
+      TrainerDataStore().courses.clear();
+    } catch (_) {}
     await _clearProfileFromPrefs();
     try {
       await FcmService.unregisterDeviceToken();
@@ -484,31 +489,63 @@ class SupabaseService {
     }
   }
 
-  Future<Map<String, dynamic>?> getCurrentUserProfile() async {
-    if (_cachedProfile != null) return _cachedProfile;
+  Future<Map<String, dynamic>?> getCurrentUserProfile({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedProfile != null) return _cachedProfile;
 
     // Check device persistent storage first so user stays logged in across app restarts
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedRaw = prefs.get('saved_user_profile');
-      if (savedRaw is Map) {
-        _cachedProfile = Map<String, dynamic>.from(savedRaw);
-      } else if (savedRaw is String && savedRaw.isNotEmpty) {
-        try {
-          var decoded = jsonDecode(savedRaw);
-          if (decoded is String) {
-            decoded = jsonDecode(decoded);
-          }
-          if (decoded is Map) {
-            _cachedProfile = Map<String, dynamic>.from(decoded);
-          }
-        } catch (_) {}
+    if (!forceRefresh) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final savedRaw = prefs.get('saved_user_profile');
+        if (savedRaw is Map) {
+          _cachedProfile = Map<String, dynamic>.from(savedRaw);
+        } else if (savedRaw is String && savedRaw.isNotEmpty) {
+          try {
+            var decoded = jsonDecode(savedRaw);
+            if (decoded is String) {
+              decoded = jsonDecode(decoded);
+            }
+            if (decoded is Map) {
+              _cachedProfile = Map<String, dynamic>.from(decoded);
+            }
+          } catch (_) {}
+        }
+        if (_cachedProfile != null) {
+          return _cachedProfile;
+        }
+      } catch (e) {
+        debugPrint('Error restoring profile from preferences: $e');
       }
-      if (_cachedProfile != null) {
-        return _cachedProfile;
+    }
+
+    // Refresh from backend API /api/user/profile for rich, live ERP sync
+    try {
+      final token = await getAuthToken();
+      if (token != null && token.isNotEmpty) {
+        final res = await http.get(
+          Uri.parse('${ApiConstants.baseUrl}/api/user/profile'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        ).timeout(const Duration(seconds: 8));
+
+        if (res.statusCode == 200) {
+          final decoded = jsonDecode(res.body);
+          if (decoded is Map && decoded['success'] == true && decoded['profile'] is Map) {
+            final fresh = Map<String, dynamic>.from(decoded['profile']);
+            if (_cachedProfile != null) {
+              fresh['token'] = _cachedProfile!['token'] ?? fresh['token'];
+              fresh['id'] = _cachedProfile!['id'] ?? fresh['id'];
+            }
+            _cachedProfile = fresh;
+            await _saveProfileToPrefs(fresh);
+            return _cachedProfile;
+          }
+        }
       }
     } catch (e) {
-      debugPrint('Error restoring profile from preferences: $e');
+      debugPrint('Error refreshing user profile from API: $e');
     }
 
     if (_isInitialized && _client != null) {
@@ -917,6 +954,7 @@ class SupabaseService {
         if (decoded is Map && decoded['success'] == true && decoded['batches'] is List) {
           final liveBatches = List<Map<String, dynamic>>.from(decoded['batches']);
           _cachedTrainerBatches = liveBatches;
+          TrainerDataStore().setLiveBatches(liveBatches);
           return liveBatches;
         }
       }

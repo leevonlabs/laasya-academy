@@ -147,6 +147,7 @@ class _TrainerProfileDetailsScreenState extends State<TrainerProfileDetailsScree
                     children: [
                       LaasyaAvatar(
                         avatarUrl: avatarUrl,
+                        name: name,
                         size: 72,
                         borderWidth: 2.2,
                         showShadow: false,

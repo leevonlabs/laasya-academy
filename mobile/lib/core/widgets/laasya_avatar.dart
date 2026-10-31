@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/api_constants.dart';
@@ -11,9 +12,12 @@ import '../constants/colors.dart';
 /// Key stability features:
 /// 1. Decoded Base64 bytes are statically cached so images are never re-decoded on rebuilds.
 /// 2. [gaplessPlayback] is enabled so frames do not blank out between frame paints.
-/// 3. Wrapped in a [RepaintBoundary] so parent repaint cycles do not force the avatar to repaint.
+/// 3. On Flutter Web, leverages native browser image pipeline for instant zero-latency caching.
+/// 4. Provides elegant initials badges matching Admin ERP when photo is absent.
+/// 5. Wrapped in a [RepaintBoundary] so parent repaint cycles do not force the avatar to repaint.
 class LaasyaAvatar extends StatelessWidget {
   final String? avatarUrl;
+  final String? name;
   final double size;
   final VoidCallback? onTap;
   final Color borderColor;
@@ -27,6 +31,7 @@ class LaasyaAvatar extends StatelessWidget {
   const LaasyaAvatar({
     super.key,
     required this.avatarUrl,
+    this.name,
     this.size = 58,
     this.onTap,
     this.borderColor = LaasyaColors.accentGold,
@@ -66,7 +71,7 @@ class LaasyaAvatar extends StatelessWidget {
   }
 
   Widget _buildImageContent() {
-    if (avatarUrl == null || avatarUrl!.trim().isEmpty) {
+    if (avatarUrl == null || avatarUrl!.trim().isEmpty || avatarUrl!.trim() == 'null') {
       return _buildFallback();
     }
 
@@ -101,15 +106,23 @@ class LaasyaAvatar extends StatelessWidget {
       }
     }
 
-    // 2. HTTP / HTTPS Network Image (Persistent Disk Caching)
+    // 2. HTTP / HTTPS Network Image (Persistent Browser & Disk Caching)
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      if (kIsWeb) {
+        return Image.network(
+          trimmed,
+          fit: BoxFit.cover,
+          width: size,
+          height: size,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => _buildFallback(),
+        );
+      }
       return CachedNetworkImage(
         imageUrl: trimmed,
         fit: BoxFit.cover,
         width: size,
         height: size,
-        memCacheWidth: (size * 2).round(),
-        memCacheHeight: (size * 2).round(),
         placeholder: (_, __) => _buildFallback(),
         errorWidget: (_, __, ___) => _buildFallback(),
       );
@@ -117,13 +130,22 @@ class LaasyaAvatar extends StatelessWidget {
 
     // 2b. Relative backend URL (e.g. /uploads/avatars/...)
     if (trimmed.startsWith('/')) {
+      final fullUrl = '${ApiConstants.baseUrl}$trimmed';
+      if (kIsWeb) {
+        return Image.network(
+          fullUrl,
+          fit: BoxFit.cover,
+          width: size,
+          height: size,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => _buildFallback(),
+        );
+      }
       return CachedNetworkImage(
-        imageUrl: '${ApiConstants.baseUrl}$trimmed',
+        imageUrl: fullUrl,
         fit: BoxFit.cover,
         width: size,
         height: size,
-        memCacheWidth: (size * 2).round(),
-        memCacheHeight: (size * 2).round(),
         placeholder: (_, __) => _buildFallback(),
         errorWidget: (_, __, ___) => _buildFallback(),
       );
@@ -146,16 +168,38 @@ class LaasyaAvatar extends StatelessWidget {
 
   Widget _buildFallback() {
     if (fallback != null) return fallback!;
+
+    // Extract 1-2 uppercase initials from name if available (matches Admin ERP)
+    String initials = '';
+    if (name != null && name!.trim().isNotEmpty) {
+      final parts = name!.trim().split(RegExp(r'\s+'));
+      if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+        initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      } else if (parts.isNotEmpty && parts[0].isNotEmpty) {
+        initials = parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+      }
+    }
+
     return Container(
       width: size,
       height: size,
       color: const Color(0xFF590231),
       child: Center(
-        child: Icon(
-          Icons.person_rounded,
-          color: LaasyaColors.accentGold,
-          size: size * 0.58,
-        ),
+        child: initials.isNotEmpty
+            ? Text(
+                initials,
+                style: TextStyle(
+                  color: LaasyaColors.accentGold,
+                  fontSize: size * 0.40,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              )
+            : Icon(
+                Icons.person_rounded,
+                color: LaasyaColors.accentGold,
+                size: size * 0.58,
+              ),
       ),
     );
   }

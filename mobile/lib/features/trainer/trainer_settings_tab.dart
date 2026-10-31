@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants/colors.dart';
@@ -157,9 +158,10 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
     }
   }
 
-  Widget _buildAvatarWidget(String? avatarUrl, {double size = 60, VoidCallback? onTap}) {
+  Widget _buildAvatarWidget(String? avatarUrl, {String? name, double size = 60, VoidCallback? onTap}) {
     return LaasyaAvatar(
       avatarUrl: avatarUrl,
+      name: name,
       size: size,
       onTap: onTap,
     );
@@ -262,6 +264,9 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
         } catch (_) {}
       } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
         final fullUrl = trimmed.startsWith('/') ? '${ApiConstants.baseUrl}$trimmed' : trimmed;
+        if (kIsWeb) {
+          return Image.network(fullUrl, fit: BoxFit.contain, gaplessPlayback: true, errorBuilder: (_, __, ___) => _buildPlaceholderPhoto());
+        }
         return CachedNetworkImage(
           imageUrl: fullUrl,
           fit: BoxFit.contain,
@@ -341,6 +346,7 @@ class _TrainerSettingsTabState extends State<TrainerSettingsTab> {
                   // Avatar with golden border (Tap to view full length photo)
                   _buildAvatarWidget(
                     avatarUrl,
+                    name: name,
                     onTap: () => _showFullPhotoDialog(context, avatarUrl, name, '$designation • $specialization'),
                   ),
                   const SizedBox(width: 14),

@@ -73,13 +73,20 @@ export async function POST(request: NextRequest) {
             RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)
             OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $1
           ))
+          OR LOWER(TRIM(t.guru_id)) = LOWER(TRIM($2))
+          OR LOWER(TRIM(t.code)) = LOWER(TRIM($2))
           OR LOWER(TRIM(p.full_name)) = LOWER(TRIM($2))
+          OR p.full_name ILIKE '%' || $2 || '%'
+          OR LOWER(TRIM(p.email)) = LOWER(TRIM($2))
         )
         ORDER BY
           CASE 
             WHEN (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)) THEN 1
-            WHEN LOWER(TRIM(p.full_name)) = LOWER(TRIM($2)) THEN 2
-            ELSE 3
+            WHEN LOWER(TRIM(t.guru_id)) = LOWER(TRIM($2)) THEN 2
+            WHEN LOWER(TRIM(t.code)) = LOWER(TRIM($2)) THEN 3
+            WHEN LOWER(TRIM(p.full_name)) = LOWER(TRIM($2)) THEN 4
+            WHEN LOWER(TRIM(p.email)) = LOWER(TRIM($2)) THEN 5
+            ELSE 6
           END ASC
         LIMIT 1
       `;
@@ -192,7 +199,7 @@ export async function POST(request: NextRequest) {
           p.full_name,
           p.phone,
           p.email,
-          p.avatar_url,
+          COALESCE(s.avatar_url, p.avatar_url) as avatar_url,
           p.age,
           p.gender,
           u.encrypted_password

@@ -230,6 +230,7 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
                     children: [
                       LaasyaAvatar(
                         avatarUrl: avatarUrl,
+                        name: name,
                         size: 74,
                         borderWidth: 2.5,
                         showShadow: false,
