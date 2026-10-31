@@ -2,22 +2,14 @@ import 'package:flutter/foundation.dart';
 
 class SupabaseConstants {
   static const String devSupabaseUrl = 'https://bhpqzrcohjigkkpmcdsy.supabase.co';
-  static const String prodSupabaseUrl = 'https://kumbtvmjpmjtmoefddux.supabase.co';
+  static const String prodSupabaseUrl = 'https://bhpqzrcohjigkkpmcdsy.supabase.co';
 
-  /// Dynamically resolves development Supabase (bhpqzrcohjigkkpmcdsy) for local dev
-  /// and production Supabase (kumbtvmjpmjtmoefddux) for production release APKs.
+  /// Dynamically resolves production Supabase (bhpqzrcohjigkkpmcdsy).
   static String get supabaseUrl {
     const fromEnv = String.fromEnvironment('SUPABASE_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
 
-    if (kIsWeb) {
-      final host = Uri.base.host;
-      if (host.isEmpty || host == 'localhost' || host == '127.0.0.1') {
-        return devSupabaseUrl;
-      }
-    }
-
-    return kDebugMode ? devSupabaseUrl : prodSupabaseUrl;
+    return prodSupabaseUrl;
   }
 
   // Set your Supabase anon public key here (or pass via environment)

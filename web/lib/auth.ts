@@ -3,11 +3,12 @@ import crypto from 'crypto';
 import { query, queryOne } from './db';
 
 const SESSION_COOKIE_NAME = 'laasya_owner_session';
-const SECRET_KEY = process.env.SESSION_SECRET || (
-  process.env.NODE_ENV === 'production'
-    ? 'laasya-prod-session-fallback-secret-2026-secure'
-    : 'laasya-dev-session-secret-2026-auth-session'
-);
+const SECRET_KEY = process.env.SESSION_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL SECURITY CONFIGURATION: SESSION_SECRET environment variable is missing in production environment.');
+  }
+  return 'laasya-dev-session-secret-2026-auth-session';
+})();
 
 export interface UserSession {
   userId: string;
@@ -16,6 +17,7 @@ export interface UserSession {
   role: 'owner' | 'trainer' | 'student' | 'receptionist';
   allowedPages?: string[];
   canDelete?: boolean;
+  rollNumber?: string;
   exp?: number;
 }
 
@@ -66,15 +68,30 @@ export function verifyToken(token: string): UserSession | null {
 export async function getCurrentUser(req?: Request): Promise<UserSession | null> {
   // 1. Inspect Authorization Bearer header if a request object is passed
   if (req) {
-    const authHeader = req.headers.get('authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.slice(7).trim();
-      const session = verifyToken(token);
-      if (session) return session;
-    }
+    try {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.slice(7).trim();
+        const session = verifyToken(token);
+        if (session) return session;
+      }
+
+      // Strictly accept token only from Authorization Bearer header or HttpOnly cookie
+      // Query parameters (?token=) are rejected to prevent leakage in URLs, access logs, and browser history
+
+      // Check cookie header directly on request
+      const cookieHeader = req.headers.get('cookie');
+      if (cookieHeader) {
+        const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE_NAME}=([^;]*)`));
+        if (match && match[1]) {
+          const session = verifyToken(decodeURIComponent(match[1]));
+          if (session) return session;
+        }
+      }
+    } catch (_) {}
   }
 
-  // 2. Fallback to HttpOnly session cookie
+  // 2. Fallback to HttpOnly session cookie via next/headers
   try {
     const cookieStore = await cookies();
     const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -142,18 +159,29 @@ export async function authenticateOwner(
       );
 
       if (receptionist) {
-        // Securely verify password using crypt or stored hash without hardcoded fallbacks
-        const passCheck = await queryOne<{ match: boolean }>(
-          `SELECT (
-             password_hash = crypt($1, password_hash)
-             OR password_hash = $1
-           ) as match
+        // Securely verify password using crypt; automatically upgrade legacy plaintext passwords to bcrypt
+        const passCheck = await queryOne<{ match_crypt: boolean; match_plain: boolean }>(
+          `SELECT 
+             (password_hash = crypt($1, password_hash)) as match_crypt,
+             (password_hash = $1) as match_plain
            FROM public.receptionists
            WHERE id = $2`,
           [trimmedPass, receptionist.id]
         );
 
-        if (passCheck?.match) {
+        if (passCheck?.match_crypt || passCheck?.match_plain) {
+          if (passCheck.match_plain && !passCheck.match_crypt) {
+            // Migrate legacy plaintext password to bcrypt hash immediately
+            query(`
+              UPDATE public.receptionists
+              SET password_hash = crypt($1, gen_salt('bf')),
+                  updated_at = NOW()
+              WHERE id = $2
+            `, [trimmedPass, receptionist.id]).catch((err) => {
+              console.error('Failed to auto-upgrade receptionist password hash:', err);
+            });
+          }
+
           let pages: string[] = [];
           if (Array.isArray(receptionist.allowed_pages)) {
             pages = receptionist.allowed_pages;

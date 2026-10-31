@@ -583,6 +583,7 @@ class SupabaseService {
     String? gender,
     String? avatarUrl,
   }) async {
+    // 1. Update local cached profile
     if (_cachedProfile != null) {
       _cachedProfile!['full_name'] = fullName;
       _cachedProfile!['phone'] = phone;
@@ -592,16 +593,133 @@ class SupabaseService {
       if (age != null) _cachedProfile!['age'] = age;
       if (gender != null) _cachedProfile!['gender'] = gender;
       if (avatarUrl != null) _cachedProfile!['avatar_url'] = avatarUrl;
+      await _saveProfileToPrefs(_cachedProfile!);
     }
-    return true;
+
+    // 2. Persist to backend database API
+    try {
+      final token = await getAuthToken();
+      final res = await http.put(
+        Uri.parse('${ApiConstants.baseUrl}/api/user/profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'fullName': fullName,
+          'phone': phone,
+          'emergencyContact': emergencyContact,
+          'address': address,
+          'bio': bio,
+          'age': age,
+          'gender': gender,
+          'avatarUrl': avatarUrl,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['profile'] != null) {
+          final serverProf = Map<String, dynamic>.from(decoded['profile']);
+          _cachedProfile?.addAll(serverProf);
+          if (_cachedProfile != null) {
+            await _saveProfileToPrefs(_cachedProfile!);
+          }
+        }
+        return true;
+      } else {
+        final decoded = jsonDecode(res.body);
+        final errMsg = decoded is Map ? decoded['error'] ?? 'Profile update failed' : 'Profile update failed';
+        debugPrint('[SupabaseService] Profile update API error: $errMsg');
+        throw Exception(errMsg);
+      }
+    } catch (e) {
+      debugPrint('[SupabaseService] Profile update error: $e');
+      if (e.toString().contains('Exception:')) rethrow;
+      return true;
+    }
   }
 
   Future<bool> changePassword({
     required String currentPassword,
     required String newPassword,
   }) async {
-    // In live cloud mode, calls client.auth.updateUser(UserAttributes(password: newPassword))
-    return true;
+    try {
+      final token = await getAuthToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('You are not logged in. Please log in again.');
+      }
+
+      final res = await http.post(
+        Uri.parse('${ApiConstants.baseUrl}/api/user/change-password'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'current_password': currentPassword.trim(),
+          'new_password': newPassword.trim(),
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      final decoded = jsonDecode(res.body);
+      if (res.statusCode == 200 && decoded is Map && decoded['success'] == true) {
+        return true;
+      }
+
+      final errMsg = decoded is Map && decoded['error'] != null
+          ? decoded['error'].toString()
+          : 'Failed to change password. Please check your existing password.';
+      throw Exception(errMsg);
+    } catch (e) {
+      debugPrint('[SupabaseService] Change password error: $e');
+      if (e.toString().contains('Exception:')) rethrow;
+      throw Exception('Unable to reach the academy server. Please check your connection.');
+    }
+  }
+
+  Future<Map<String, dynamic>?> validateSession() async {
+    try {
+      final token = await getAuthToken();
+      if (token == null || token.isEmpty) {
+        await signOut();
+        return null;
+      }
+
+      final res = await http.get(
+        Uri.parse('${ApiConstants.baseUrl}/api/auth/session'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 6));
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['authenticated'] == true && decoded['user'] is Map) {
+          final serverUser = Map<String, dynamic>.from(decoded['user']);
+          if (_cachedProfile != null) {
+            _cachedProfile!['role'] = serverUser['role'];
+            _cachedProfile!['id'] = serverUser['userId'] ?? _cachedProfile!['id'];
+            if (serverUser['fullName'] != null && serverUser['fullName'].toString().isNotEmpty) {
+              _cachedProfile!['full_name'] = serverUser['fullName'];
+            }
+            await _saveProfileToPrefs(_cachedProfile!);
+          }
+          return serverUser;
+        }
+      } else if (res.statusCode == 401 || res.statusCode == 403) {
+        debugPrint('[SupabaseService] Session token rejected (HTTP ' + res.statusCode.toString() + '). Revoking cached session.');
+        await signOut();
+        return null;
+      }
+    } catch (e) {
+      debugPrint('[SupabaseService] validateSession notice: $e');
+      if (_cachedProfile != null) {
+        return _cachedProfile;
+      }
+    }
+    return null;
   }
 
   Future<String?> getAuthToken() async {
@@ -785,8 +903,15 @@ class SupabaseService {
       final nameParam = Uri.encodeComponent(tName);
       final phoneParam = Uri.encodeComponent(tPhone);
       final idParam = Uri.encodeComponent(tId);
+      final token = await getAuthToken();
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/trainer/batches?trainerId=$idParam&trainerName=$nameParam&phone=$phoneParam');
-      final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      final res = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['success'] == true && decoded['batches'] is List) {
@@ -1141,8 +1266,15 @@ class SupabaseService {
       final roll = (prof?['roll_number'] ?? '').toString();
       final idParam = studentId.isNotEmpty ? studentId : roll;
       if (idParam.isNotEmpty) {
+        final token = await getAuthToken();
         final uri = Uri.parse('${ApiConstants.baseUrl}/api/attendance?studentId=${Uri.encodeComponent(idParam)}');
-        final res = await http.get(uri).timeout(const Duration(seconds: 10));
+        final res = await http.get(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+          },
+        ).timeout(const Duration(seconds: 10));
         if (res.statusCode == 200) {
           final decoded = jsonDecode(res.body);
           if (decoded is Map && decoded['success'] == true && decoded['history'] is List) {

@@ -270,7 +270,14 @@ class _TrainerAttendanceReportScreenState extends State<TrainerAttendanceReportS
         '&trainerName=${Uri.encodeComponent(myName)}'
         '&t=${DateTime.now().millisecondsSinceEpoch}',
       );
-      final res = await http.get(uri).timeout(const Duration(seconds: 12));
+      final token = await SupabaseService().getAuthToken();
+      final res = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['records'] is List) {

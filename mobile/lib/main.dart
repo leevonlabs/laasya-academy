@@ -57,8 +57,18 @@ class _AuthGateState extends State<AuthGate> {
     try {
       final profile = await SupabaseService().getCurrentUserProfile();
       if (profile != null) {
-        final role = profile['role'] ?? 'student';
-        final userId = profile['id']?.toString() ?? '';
+        // Cryptographic session validation against backend server
+        final serverUser = await SupabaseService().validateSession();
+        if (serverUser == null) {
+          // Token is missing, expired, or invalid
+          _targetScreen = const PortalLandingScreen();
+          return;
+        }
+
+        // Strictly enforce role verified by server HMAC signature
+        final role = (serverUser['role'] ?? profile['role'] ?? 'student').toString();
+        final userId = (serverUser['userId'] ?? profile['id'] ?? '').toString();
+
         List<String> batchIds = [];
         if (role == 'trainer') {
           try {
@@ -91,17 +101,12 @@ class _AuthGateState extends State<AuthGate> {
         } else {
           _targetScreen = const StudentMainScaffold();
         }
-      } else if (kIsWeb) {
-        // On web, if not logged in, redirect directly to the unified login page
-        try {
-          final uri = Uri.base;
-          if (!uri.path.contains('/login')) {
-            // Let PortalLandingScreen be default if web stays on portal, but keep it available
-          }
-        } catch (_) {}
+      } else {
+        _targetScreen = const PortalLandingScreen();
       }
     } catch (e) {
       debugPrint('Auth check error: $e');
+      _targetScreen = const PortalLandingScreen();
     } finally {
       if (mounted) setState(() => _checking = false);
     }

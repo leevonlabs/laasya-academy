@@ -25,10 +25,76 @@ function normalizeAvatarUrl(url?: string | null): string | null {
 
 export async function GET(request: NextRequest) {
   try {
+    // 1. Authenticate user from session cookie or Authorization Bearer header
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required. Please sign in to access batch information.' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
+    // 2. Reject students - students are not authorized to query trainer batch rosters
+    if (user.role === 'student') {
+      return NextResponse.json(
+        { success: false, error: 'Access denied: Student accounts are not permitted to inspect faculty batch rosters.' },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
+    const isStaff = user.role === 'owner' || user.role === 'receptionist';
     const { searchParams } = new URL(request.url);
     const trainerId = searchParams.get('trainerId');
     const trainerName = searchParams.get('trainerName');
     const phone = searchParams.get('phone');
+
+    let targetTrainerId: string | null = null;
+
+    if (isStaff) {
+      // Staff (Owner / Receptionist) can filter by trainerId, phone, or name, or view all
+      const cleanId = (trainerId || '').trim();
+      const cleanPhone = (phone || '').replace(/\D/g, '');
+      const cleanName = (trainerName || '').trim();
+
+      if (cleanId && cleanId !== 'null' && cleanId !== 'undefined') {
+        const found = await queryOne<{ id: string }>(
+          `SELECT t.id FROM public.trainers t WHERE t.id::text = $1 OR t.profile_id::text = $1 LIMIT 1`,
+          [cleanId]
+        );
+        if (found) targetTrainerId = found.id;
+      } else if (cleanPhone.length >= 6) {
+        const found = await queryOne<{ id: string }>(
+          `SELECT t.id FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%' LIMIT 1`,
+          [cleanPhone]
+        );
+        if (found) targetTrainerId = found.id;
+      } else if (cleanName && cleanName !== 'null' && cleanName !== 'undefined') {
+        const found = await queryOne<{ id: string }>(
+          `SELECT t.id FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE p.full_name ILIKE $1 LIMIT 1`,
+          [`%${cleanName}%`]
+        );
+        if (found) targetTrainerId = found.id;
+      }
+    } else if (user.role === 'trainer') {
+      // Revered Gurus can STRICTLY only inspect their own assigned batches
+      const verifiedTrainer = await queryOne<{ id: string; is_active: boolean }>(
+        `SELECT t.id, t.is_active FROM public.trainers t WHERE (t.id::text = $1 OR t.profile_id::text = $1) LIMIT 1`,
+        [user.userId]
+      );
+
+      if (!verifiedTrainer || !verifiedTrainer.is_active) {
+        return NextResponse.json(
+          { success: false, error: 'Access denied: Active faculty credentials required.' },
+          { status: 403, headers: corsHeaders }
+        );
+      }
+      targetTrainerId = verifiedTrainer.id;
+    } else {
+      return NextResponse.json(
+        { success: false, error: 'Access denied: Unauthorized role.' },
+        { status: 403, headers: corsHeaders }
+      );
+    }
 
     const baseSql = `
       SELECT 
@@ -55,73 +121,15 @@ export async function GET(request: NextRequest) {
       LEFT JOIN public.profiles p ON (t.profile_id = p.id OR b.trainer_id = p.id)
     `;
 
-    const user = await getCurrentUser();
-    const isStaff = user && (user.role === 'owner' || user.role === 'receptionist');
-
-    const cleanId = (trainerId || '').trim();
-    const cleanPhone = (phone || '').replace(/\D/g, '');
-    const cleanName = (trainerName || '').trim();
-
-    if (!isStaff) {
-      if (!cleanId && cleanPhone.length < 6 && !cleanName) {
-        return NextResponse.json(
-          { success: false, error: 'Authentication required: Active faculty credentials must be provided.' },
-          { status: 401, headers: corsHeaders }
-        );
-      }
-
-      let verifiedTrainer: any = null;
-      if (cleanId && cleanId !== 'null' && cleanId !== 'undefined') {
-        verifiedTrainer = await queryOne(
-          `SELECT t.id, t.is_active FROM public.trainers t WHERE (t.id = $1 OR t.profile_id = $1) AND t.is_active = true LIMIT 1`,
-          [cleanId]
-        );
-      }
-      if (!verifiedTrainer && cleanPhone.length >= 6) {
-        verifiedTrainer = await queryOne(
-          `SELECT t.id, t.is_active FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%' AND t.is_active = true LIMIT 1`,
-          [cleanPhone]
-        );
-      }
-      if (!verifiedTrainer && cleanName && cleanName !== 'null' && cleanName !== 'undefined') {
-        verifiedTrainer = await queryOne(
-          `SELECT t.id, t.is_active FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE p.full_name ILIKE $1 AND t.is_active = true LIMIT 1`,
-          [`%${cleanName}%`]
-        );
-      }
-
-      if (!verifiedTrainer) {
-        return NextResponse.json(
-          { success: false, error: 'Access denied: Active faculty account required.' },
-          { status: 403, headers: corsHeaders }
-        );
-      }
-    }
-
     let batches: any[] = [];
-
-    // 1. Primary lookup by trainer UUID / profile ID
-    if (cleanId && cleanId !== 'null' && cleanId !== 'undefined') {
+    if (targetTrainerId) {
       batches = await query<any>(
-        `${baseSql} WHERE (b.trainer_id = $1 OR t.id = $1 OR t.profile_id = $1) ORDER BY c.title ASC, b.name ASC;`,
-        [cleanId]
+        `${baseSql} WHERE (b.trainer_id = $1::uuid OR t.id = $1::uuid OR t.profile_id = $1::uuid) ORDER BY c.title ASC, b.name ASC;`,
+        [targetTrainerId]
       );
-    }
-
-    // 2. Secondary lookup by registered phone number digits
-    if (batches.length === 0 && cleanPhone.length >= 6) {
-      batches = await query<any>(
-        `${baseSql} WHERE regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%' ORDER BY c.title ASC, b.name ASC;`,
-        [cleanPhone]
-      );
-    }
-
-    // 3. Tertiary lookup by faculty full name
-    if (batches.length === 0 && cleanName && cleanName !== 'null' && cleanName !== 'undefined') {
-      batches = await query<any>(
-        `${baseSql} WHERE p.full_name ILIKE $1 ORDER BY c.title ASC, b.name ASC;`,
-        [`%${cleanName}%`]
-      );
+    } else if (isStaff) {
+      // Staff viewing all batches when no trainer filter provided
+      batches = await query<any>(`${baseSql} ORDER BY c.title ASC, b.name ASC;`);
     }
 
     // Fetch enrolled disciples for these batches
@@ -191,7 +199,7 @@ export async function GET(request: NextRequest) {
       `, [batchIds]);
     }
 
-    // Attach students array to each batch (contact numbers strictly omitted for Guru login)
+    // Attach students array to each batch (personal mobile numbers omitted to guard child privacy)
     const batchesWithStudents = batches.map(b => ({
       ...b,
       students: enrollments

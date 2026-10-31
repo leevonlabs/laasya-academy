@@ -16,12 +16,58 @@ export async function OPTIONS() {
 
 export async function GET(req: Request) {
   try {
+    // 1. Mandatory authentication check
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required: Please sign in to access attendance records.' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const studentId = searchParams.get('studentId') || searchParams.get('student_id');
 
-    // 1. If fetching attendance history for a specific student
+    // 2. If fetching attendance history for a specific disciple
     if (studentId) {
       const cleanId = studentId.trim();
+
+      // Authorization checks for studentId query:
+      if (user.role === 'student') {
+        // Students may strictly only query their own attendance
+        const ownStudent = await queryOne<{ id: string }>(`
+          SELECT s.id FROM public.students s 
+          WHERE (s.id::text = $1 OR s.profile_id::text = $1 OR LOWER(s.roll_number) = LOWER($1))
+            AND s.profile_id::text = $2
+          LIMIT 1;
+        `, [cleanId, user.userId]);
+
+        if (!ownStudent) {
+          return NextResponse.json(
+            { success: false, error: 'Access denied: You are only permitted to inspect your own attendance history.' },
+            { status: 403, headers: corsHeaders }
+          );
+        }
+      } else if (user.role === 'trainer') {
+        // Revered Gurus may only inspect disciples enrolled in their own batches
+        const trainerTeachingDisciple = await queryOne<{ id: string }>(`
+          SELECT be.id FROM public.batch_enrollments be
+          JOIN public.batches b ON be.batch_id = b.id
+          JOIN public.trainers t ON (b.trainer_id = t.id OR b.trainer_id = t.profile_id)
+          JOIN public.students s ON be.student_id = s.id
+          WHERE (t.id::text = $1 OR t.profile_id::text = $1)
+            AND (s.id::text = $2 OR s.profile_id::text = $2 OR LOWER(s.roll_number) = LOWER($2))
+          LIMIT 1;
+        `, [user.userId, cleanId]);
+
+        if (!trainerTeachingDisciple) {
+          return NextResponse.json(
+            { success: false, error: 'Access denied: You may only inspect attendance for disciples enrolled in your assigned classes.' },
+            { status: 403, headers: corsHeaders }
+          );
+        }
+      }
+
       const historySql = `
         SELECT 
           a.id,
@@ -69,18 +115,29 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, history: formatted }, { headers: corsHeaders });
     }
 
-    // 2. Guru Attendance Audit for admin portal & Guru mobile app
+    // 3. Guru Attendance Audit for admin portal & Guru mobile app
     const isGuruAudit = searchParams.get('guruAudit') === 'true' || searchParams.get('type') === 'guru';
     if (isGuruAudit) {
-      const user = await getCurrentUser();
-      const isStaff = user && (user.role === 'owner' || user.role === 'receptionist');
+      if (user.role === 'student') {
+        return NextResponse.json(
+          { success: false, error: 'Access denied: Student accounts cannot access faculty attendance audits.' },
+          { status: 403, headers: corsHeaders }
+        );
+      }
 
       let trainerId = searchParams.get('trainerId') || undefined;
       const trainerName = searchParams.get('trainerName') || undefined;
       const phone = searchParams.get('phone') || undefined;
 
-      // If mobile app queries with trainerId, ensure it resolves to trainer's id
-      if (trainerId) {
+      // If user is a trainer, strictly bind trainerId to their verified userId
+      if (user.role === 'trainer') {
+        const found = await queryOne<{ id: string }>(
+          `SELECT t.id FROM public.trainers t WHERE t.id::text = $1 OR t.profile_id::text = $1 LIMIT 1`,
+          [user.userId]
+        );
+        trainerId = found ? found.id : user.userId;
+      } else if (trainerId) {
+        // Staff lookup
         const found = await queryOne<{ id: string }>(
           `SELECT t.id FROM public.trainers t WHERE t.id::text = $1 OR t.profile_id::text = $1 LIMIT 1`,
           [trainerId]
@@ -118,9 +175,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, records: guruRecords }, { headers: corsHeaders });
     }
 
-    // 3. Default student audit view for admin portal
-    const user = await getCurrentUser();
-    if (!user || (user.role !== 'owner' && user.role !== 'receptionist')) {
+    // 4. Default student audit view for admin portal
+    if (user.role !== 'owner' && user.role !== 'receptionist') {
       return NextResponse.json({ error: 'Unauthorized: Staff access required' }, { status: 403, headers: corsHeaders });
     }
 
@@ -146,8 +202,25 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    const isOwner = user?.role === 'owner';
+    // 1. Mandatory authentication check
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required: Please sign in to record class attendance.' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
+    // 2. Reject students from submitting attendance
+    if (user.role === 'student') {
+      return NextResponse.json(
+        { success: false, error: 'Access denied: Disciple / student accounts cannot record class attendance.' },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
+    const isOwner = user.role === 'owner';
+    const isTrainer = user.role === 'trainer';
 
     const body = await req.json();
     const { batch_id, batch_name, course_title, trainer_name, records } = body;
@@ -160,11 +233,11 @@ export async function POST(req: NextRequest) {
     }
 
     const todayStr = new Date().toISOString().split('T')[0];
-    const guruName = trainer_name || 'Assigned Guru';
+    const guruName = trainer_name || user.fullName || 'Assigned Guru';
     const cTitle = course_title || 'Classical Arts';
     const bName = batch_name || 'Class Session';
 
-    // 1. Resolve batch_id to a valid UUID if mock ID provided
+    // Resolve batch_id to a valid UUID if mock ID provided
     let actualBatchId = batch_id;
     if (!uuidRegex.test(actualBatchId)) {
       const batchRow = await queryOne<{ id: string }>(`
@@ -180,24 +253,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Verify batch authorization if not owner
-    if (!isOwner) {
-      const batchCheck = await queryOne<{ id: string }>(`
+    // 3. Verify batch authorization
+    if (isTrainer) {
+      // Revered Gurus may strictly ONLY submit attendance for their own assigned batches
+      const trainerBatchCheck = await queryOne<{ id: string }>(`
         SELECT b.id FROM public.batches b
         JOIN public.trainers t ON (b.trainer_id = t.id OR b.trainer_id = t.profile_id)
-        WHERE b.id = $1::uuid AND t.is_active = true
+        WHERE b.id = $1::uuid 
+          AND (t.id::text = $2 OR t.profile_id::text = $2)
+          AND t.is_active = true
         LIMIT 1;
-      `, [actualBatchId]);
+      `, [actualBatchId, user.userId]);
 
-      if (!batchCheck) {
+      if (!trainerBatchCheck) {
         return NextResponse.json(
-          { success: false, error: 'Unauthorized: Valid faculty assignment required for this batch.' },
+          { success: false, error: 'Access denied: You are not assigned as the active faculty for this batch.' },
           { status: 403, headers: corsHeaders }
         );
       }
+    } else if (!isOwner && user.role !== 'receptionist') {
+      return NextResponse.json(
+        { success: false, error: 'Access denied: Unauthorized role for attendance recording.' },
+        { status: 403, headers: corsHeaders }
+      );
     }
 
-    // 2. Get or create today's class_session for this batch
+    // 4. Get or create today's class_session for this batch
     let session = await queryOne<{ id: string }>(`
       SELECT id FROM public.class_sessions
       WHERE batch_id = $1::uuid AND session_date = CURRENT_DATE
@@ -221,7 +302,7 @@ export async function POST(req: NextRequest) {
 
     const sessionId = session.id;
 
-    // 3. Resolve student records to valid database UUIDs
+    // 5. Resolve student records to valid database UUIDs
     const resolvedRecords: { student_id: string; status: string; roll: string; name: string }[] = [];
 
     for (const rec of records) {
@@ -249,19 +330,19 @@ export async function POST(req: NextRequest) {
     if (resolvedRecords.length > 0) {
       const studentUuids = resolvedRecords.map(r => r.student_id);
 
-      // 3a. Single batch delete of previous attendance records for this session
+      // Single batch delete of previous attendance records for this session
       await query(`
         DELETE FROM public.attendance 
         WHERE session_id = $1::uuid AND student_id::text = ANY($2::text[]);
       `, [sessionId, studentUuids]);
 
-      // 3b. Clean up prior attendance alerts for this batch today
+      // Clean up prior attendance alerts for this batch today
       await query(`
         DELETE FROM public.session_alerts 
         WHERE batch_id = $1 AND alert_type = 'attendance_marked' AND created_at >= CURRENT_DATE;
       `, [batch_id]);
 
-      // 3c. Multi-row batch insert into public.attendance
+      // Multi-row batch insert into public.attendance
       const attParams: any[] = [sessionId, `Marked by Guru ${guruName}`];
       const attValuesSql: string[] = [];
       let pIdx = 3;
@@ -277,7 +358,7 @@ export async function POST(req: NextRequest) {
         ) VALUES ${attValuesSql.join(', ')};
       `, attParams);
 
-      // 3d. Multi-row batch insert into public.session_alerts for real-time mobile push
+      // Multi-row batch insert into public.session_alerts for real-time mobile push
       const alertParams: any[] = [batch_id, bName, cTitle, guruName];
       const alertValuesSql: string[] = [];
       let aIdx = 5;
@@ -314,7 +395,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Single consolidated session announcement for Notifications feed
+    // Consolidated session announcement for Notifications feed
     const presentCount = resolvedRecords.filter(r => r.status !== 'absent').length;
     const absentCount = resolvedRecords.length - presentCount;
     try {

@@ -87,10 +87,14 @@ class _TrainerTakeAttendanceScreenState extends State<TrainerTakeAttendanceScree
         };
       }).toList();
 
+      final token = await SupabaseService().getAuthToken();
       final uri = Uri.parse('${ApiConstants.baseUrl}/api/attendance');
       final resp = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+        },
         body: jsonEncode({
           'batch_id': _batchId,
           'batch_name': widget.classInfo['batch_name'] ?? 'Batch',

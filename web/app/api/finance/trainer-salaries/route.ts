@@ -21,32 +21,28 @@ export async function GET(req: NextRequest) {
     const phoneParam = searchParams.get('phone');
     const nameParam = searchParams.get('name');
 
-    // Authenticate via user session if present, or fallback to mobile query identification
+    // 1. Mandatory authentication check
     const user = await getCurrentUser(req);
-    let resolvedTrainerId = trainerIdParam;
-
-    if (user && user.role === 'trainer') {
-      resolvedTrainerId = user.userId;
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required: Please sign in to access salary and payment records.' },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
-    // Lookup Trainer record
+    // 2. Students cannot access faculty salary details
+    if (user.role === 'student') {
+      return NextResponse.json(
+        { success: false, error: 'Access denied: Disciple / student accounts cannot access faculty salary records.' },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
+    const isStaff = user.role === 'owner' || user.role === 'receptionist';
     let trainer: any = null;
-    if (resolvedTrainerId && resolvedTrainerId.trim() && resolvedTrainerId !== 'null' && resolvedTrainerId !== 'undefined') {
-      trainer = await queryOne(`
-        SELECT 
-          t.id as trainer_id, t.profile_id, t.guru_id, COALESCE(t.guru_id, t.code) as code,
-          p.full_name as trainer_name, p.phone, p.email,
-          COALESCE(t.display_title, 'Faculty Guru') as display_title,
-          COALESCE(array_to_string(t.specializations, ', '), 'Classical Arts') as specialization,
-          COALESCE(t.monthly_salary, 25000)::numeric as monthly_salary
-        FROM public.trainers t
-        JOIN public.profiles p ON t.profile_id = p.id
-        WHERE t.id::text = $1 OR t.profile_id::text = $1 OR p.phone = $1
-        LIMIT 1;
-      `, [resolvedTrainerId.trim()]);
-    }
 
-    if (!trainer && phoneParam && phoneParam.trim()) {
+    if (user.role === 'trainer') {
+      // Gurus strictly only view their own salary payouts
       trainer = await queryOne(`
         SELECT 
           t.id as trainer_id, t.profile_id, t.guru_id, COALESCE(t.guru_id, t.code) as code,
@@ -56,40 +52,63 @@ export async function GET(req: NextRequest) {
           COALESCE(t.monthly_salary, 25000)::numeric as monthly_salary
         FROM public.trainers t
         JOIN public.profiles p ON t.profile_id = p.id
-        WHERE p.phone LIKE $1
+        WHERE t.id::text = $1 OR t.profile_id::text = $1
         LIMIT 1;
-      `, [`%${phoneParam.replace(/\D/g, '').slice(-10)}%`]);
-    }
+      `, [user.userId]);
 
-    if (!trainer && nameParam && nameParam.trim()) {
-      trainer = await queryOne(`
-        SELECT 
-          t.id as trainer_id, t.profile_id, t.guru_id, COALESCE(t.guru_id, t.code) as code,
-          p.full_name as trainer_name, p.phone, p.email,
-          COALESCE(t.display_title, 'Faculty Guru') as display_title,
-          COALESCE(array_to_string(t.specializations, ', '), 'Classical Arts') as specialization,
-          COALESCE(t.monthly_salary, 25000)::numeric as monthly_salary
-        FROM public.trainers t
-        JOIN public.profiles p ON t.profile_id = p.id
-        WHERE LOWER(p.full_name) ILIKE LOWER($1)
-        LIMIT 1;
-      `, [`%${nameParam.trim()}%`]);
-    }
+      if (!trainer) {
+        return NextResponse.json(
+          { success: false, error: 'Faculty account not found for current session.' },
+          { status: 404, headers: corsHeaders }
+        );
+      }
+    } else if (isStaff) {
+      // Staff (Owner / Receptionist) lookup by specified trainer ID, phone, or name
+      const cleanParamId = (trainerIdParam || '').trim();
+      if (cleanParamId && cleanParamId !== 'null' && cleanParamId !== 'undefined') {
+        trainer = await queryOne(`
+          SELECT 
+            t.id as trainer_id, t.profile_id, t.guru_id, COALESCE(t.guru_id, t.code) as code,
+            p.full_name as trainer_name, p.phone, p.email,
+            COALESCE(t.display_title, 'Faculty Guru') as display_title,
+            COALESCE(array_to_string(t.specializations, ', '), 'Classical Arts') as specialization,
+            COALESCE(t.monthly_salary, 25000)::numeric as monthly_salary
+          FROM public.trainers t
+          JOIN public.profiles p ON t.profile_id = p.id
+          WHERE t.id::text = $1 OR t.profile_id::text = $1
+          LIMIT 1;
+        `, [cleanParamId]);
+      }
 
-    // Default to first trainer if not explicitly specified (for dev/demo access)
-    if (!trainer) {
-      trainer = await queryOne(`
-        SELECT 
-          t.id as trainer_id, t.profile_id, t.guru_id, COALESCE(t.guru_id, t.code) as code,
-          p.full_name as trainer_name, p.phone, p.email,
-          COALESCE(t.display_title, 'Faculty Guru') as display_title,
-          COALESCE(array_to_string(t.specializations, ', '), 'Classical Arts') as specialization,
-          COALESCE(t.monthly_salary, 25000)::numeric as monthly_salary
-        FROM public.trainers t
-        JOIN public.profiles p ON t.profile_id = p.id
-        ORDER BY t.created_at ASC
-        LIMIT 1;
-      `);
+      if (!trainer && phoneParam && phoneParam.trim()) {
+        trainer = await queryOne(`
+          SELECT 
+            t.id as trainer_id, t.profile_id, t.guru_id, COALESCE(t.guru_id, t.code) as code,
+            p.full_name as trainer_name, p.phone, p.email,
+            COALESCE(t.display_title, 'Faculty Guru') as display_title,
+            COALESCE(array_to_string(t.specializations, ', '), 'Classical Arts') as specialization,
+            COALESCE(t.monthly_salary, 25000)::numeric as monthly_salary
+          FROM public.trainers t
+          JOIN public.profiles p ON t.profile_id = p.id
+          WHERE regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%'
+          LIMIT 1;
+        `, [phoneParam.replace(/\D/g, '').slice(-10)]);
+      }
+
+      if (!trainer && nameParam && nameParam.trim()) {
+        trainer = await queryOne(`
+          SELECT 
+            t.id as trainer_id, t.profile_id, t.guru_id, COALESCE(t.guru_id, t.code) as code,
+            p.full_name as trainer_name, p.phone, p.email,
+            COALESCE(t.display_title, 'Faculty Guru') as display_title,
+            COALESCE(array_to_string(t.specializations, ', '), 'Classical Arts') as specialization,
+            COALESCE(t.monthly_salary, 25000)::numeric as monthly_salary
+          FROM public.trainers t
+          JOIN public.profiles p ON t.profile_id = p.id
+          WHERE LOWER(p.full_name) ILIKE LOWER($1)
+          LIMIT 1;
+        `, [`%${nameParam.trim()}%`]);
+      }
     }
 
     if (!trainer) {

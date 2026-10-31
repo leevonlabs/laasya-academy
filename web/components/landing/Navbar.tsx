@@ -116,7 +116,7 @@ export function Navbar() {
         </nav>
 
         {/* Action Buttons: Login (Desktop + Mobile top-right) & Enquiry & Menu */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* Universal Login Button with Dropdown (Visible on Desktop AND Mobile top-right) */}
           <div ref={loginMenuRef} className="relative">
             <button
@@ -124,13 +124,13 @@ export function Navbar() {
               onClick={() => setLoginMenuOpen((v) => !v)}
               aria-expanded={loginMenuOpen}
               aria-haspopup="true"
-              className="inline-flex items-center gap-0.5 sm:gap-1.5 rounded-full bg-gold-gradient px-2 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs md:text-sm font-bold text-[#220314] shadow-gold transition-all hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap cursor-pointer"
+              className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full bg-gold-gradient px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-xs md:text-sm font-bold text-[#220314] shadow-gold transition-all hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap cursor-pointer"
             >
-              <LogIn className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+              <LogIn className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
               <span>Login</span>
               <ChevronDown
                 className={cn(
-                  'h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0 transition-transform duration-200',
+                  'h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 transition-transform duration-200',
                   loginMenuOpen && 'rotate-180'
                 )}
               />
@@ -236,13 +236,13 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Send Enquiry Button - Compact on mobile */}
+          {/* Send Enquiry Button */}
           <button
             type="button"
             onClick={openEnquiryModal}
-            className="inline-flex items-center gap-1 rounded-full border border-[#D4AF37]/80 bg-[#3d0c34]/70 px-2 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs md:text-sm font-semibold text-[#fbf0b9] transition-all hover:bg-[#D4AF37] hover:text-[#220314] hover:shadow-gold whitespace-nowrap cursor-pointer shrink-0"
+            className="inline-flex items-center justify-center gap-1.5 rounded-full border border-[#D4AF37]/80 bg-[#3d0c34]/70 h-8 sm:h-auto px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-xs md:text-sm font-semibold text-[#fbf0b9] transition-all hover:bg-[#D4AF37] hover:text-[#220314] hover:shadow-gold whitespace-nowrap cursor-pointer shrink-0"
           >
-            <Send className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             <span className="hidden xs:inline sm:inline">Enquire</span>
             {selectedBatchesCount > 0 && (
               <span className="ml-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-gold-gradient px-1 text-[0.6rem] font-extrabold text-[#220314] shadow">
@@ -257,7 +257,7 @@ export function Navbar() {
             aria-label="Toggle menu"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className="inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10 lg:hidden text-xs sm:text-sm shrink-0"
+            className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10 lg:hidden text-sm sm:text-base font-bold shrink-0"
           >
             {open ? '✕' : '☰'}
           </button>

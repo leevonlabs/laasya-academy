@@ -613,8 +613,13 @@ class _TrainerDashboardTabState extends State<TrainerDashboardTab> {
       final tId = (prof?['id'] ?? prof?['trainer_id'] ?? prof?['profile_id'] ?? '').toString();
       final tName = (prof?['full_name'] ?? '').toString().trim().toLowerCase();
 
+      final token = await SupabaseService().getAuthToken();
       final res = await http.get(
         Uri.parse('${ApiConstants.baseUrl}/api/attendance?guruAudit=true'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+        },
       ).timeout(const Duration(seconds: 4));
 
       if (res.statusCode == 200) {
