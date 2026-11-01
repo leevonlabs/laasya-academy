@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/widgets/laasya_avatar.dart';
@@ -120,10 +122,14 @@ class _StudentProfileTabState extends State<StudentProfileTab> {
     if (confirm == true) {
       await SupabaseService().signOut();
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const PortalLandingScreen()),
-        (route) => false,
-      );
+      if (kIsWeb) {
+        await launchUrl(Uri.parse('/login?logout=true'), webOnlyWindowName: '_self');
+      } else {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PortalLandingScreen()),
+          (route) => false,
+        );
+      }
     }
   }
 

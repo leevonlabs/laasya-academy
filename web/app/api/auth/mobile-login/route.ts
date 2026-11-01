@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { createToken } from '@/lib/auth';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { recordActiveSession } from '@/lib/active-sessions';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -146,7 +147,17 @@ export async function POST(request: NextRequest) {
             role: 'trainer',
           });
 
-          return NextResponse.json({ success: true, profile: { ...profile, token }, token }, { headers: corsHeaders });
+          const sessionId = await recordActiveSession({
+            userId: trainer.profile_id,
+            profileId: trainer.profile_id,
+            userName: trainer.full_name,
+            identifier: cleanDigits || rawInput,
+            role: 'trainer',
+            req: request,
+            token,
+          });
+
+          return NextResponse.json({ success: true, profile: { ...profile, token, session_id: sessionId }, token }, { headers: corsHeaders });
         } else if (targetRole === 'trainer') {
           return NextResponse.json(
             { success: false, error: 'Incorrect faculty password. Please verify your credentials or contact admin.' },
@@ -359,7 +370,17 @@ export async function POST(request: NextRequest) {
             role: 'student',
           });
 
-          return NextResponse.json({ success: true, profile: { ...profile, token }, token }, { headers: corsHeaders });
+          const sessionId = await recordActiveSession({
+            userId: student.profile_id,
+            profileId: student.profile_id,
+            userName: student.full_name,
+            identifier: student.roll_number || cleanDigits || rawInput,
+            role: 'student',
+            req: request,
+            token,
+          });
+
+          return NextResponse.json({ success: true, profile: { ...profile, token, session_id: sessionId }, token }, { headers: corsHeaders });
         } else {
           return NextResponse.json(
             { success: false, error: 'Incorrect password. Please verify your credentials or contact admin if forgotten.' },

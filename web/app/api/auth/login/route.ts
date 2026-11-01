@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authenticateOwner, setSessionCookie } from '@/lib/auth';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { recordActiveSession } from '@/lib/active-sessions';
 
 export async function POST(req: Request) {
   try {
@@ -28,7 +29,16 @@ export async function POST(req: Request) {
 
     await setSessionCookie(res.user);
 
-    return NextResponse.json({ success: true, user: res.user });
+    const sessionId = await recordActiveSession({
+      userId: res.user.userId,
+      profileId: res.user.userId,
+      userName: res.user.fullName,
+      identifier: identifier,
+      role: res.user.role,
+      req,
+    });
+
+    return NextResponse.json({ success: true, user: { ...res.user, session_id: sessionId } });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }

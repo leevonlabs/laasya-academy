@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
+  ChevronLeft,
   Lock,
   Smartphone,
   Eye,
@@ -57,6 +58,7 @@ function LoginContent() {
 
   // Shared UI state
   const [loading, setLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
   // Contact Admin Modal state for "Forgot Password" and "New Registration" (Student & Guru only)
@@ -77,8 +79,49 @@ function LoginContent() {
     tab: 'privacy',
   });
 
-  // Sync if query param changes
+  // Sync if query param changes & prefetch Flutter web assets
   useEffect(() => {
+    const isLogout = searchParams.get('logout') === 'true';
+    if (isLogout) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('saved_user_profile');
+        localStorage.removeItem('flutter.saved_user_profile');
+        localStorage.removeItem('laasya_cached_user');
+        localStorage.removeItem('flutter.fcm_user_role');
+        localStorage.removeItem('flutter.fcm_user_id');
+      }
+      return;
+    }
+
+    // Auto-redirect if already logged in so browser back navigation does not trigger premature logout
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('saved_user_profile');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && (parsed.id || parsed.profile_id)) {
+            window.location.replace('/portal/');
+            return;
+          }
+        } catch (_) {}
+      }
+    }
+
+    // Prefetch Flutter assets in background so portal launches instantly on login
+    if (typeof window !== 'undefined') {
+      try {
+        const link1 = document.createElement('link');
+        link1.rel = 'prefetch';
+        link1.href = '/portal/flutter_bootstrap.js';
+        document.head.appendChild(link1);
+
+        const link2 = document.createElement('link');
+        link2.rel = 'prefetch';
+        link2.href = '/portal/main.dart.js';
+        document.head.appendChild(link2);
+      } catch (_) {}
+    }
+
     const role = searchParams.get('role') || searchParams.get('tab');
     if (role === 'admin') setActiveTab('admin');
     else if (role === 'guru' || role === 'trainer') setActiveTab('guru');
@@ -103,13 +146,14 @@ function LoginContent() {
       localStorage.setItem('flutter.fcm_user_id', JSON.stringify(String(profile.id || profile.profile_id)));
     }
     // Direct browser redirect into portal - loads directly into Student/Trainer dashboard
-    window.location.href = '/portal/';
+    window.location.replace('/portal/');
   };
 
   // 1. Student / Parent Submit
   const handleStudentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setLoadingStatus('Verifying credentials...');
     setError(null);
 
     try {
@@ -128,6 +172,7 @@ function LoginContent() {
         throw new Error(data.error || 'Invalid credentials. Please verify your mobile number or roll number.');
       }
 
+      setLoadingStatus('Launching Academy Portal...');
       persistSessionAndLaunchPortal(data.profile);
     } catch (err: any) {
       setError(err.message);
@@ -157,6 +202,7 @@ function LoginContent() {
         throw new Error(data.error || 'Invalid credentials. Please check your registered mobile number or password.');
       }
 
+      setLoadingStatus('Launching Academy Portal...');
       persistSessionAndLaunchPortal(data.profile);
     } catch (err: any) {
       setError(err.message);
@@ -200,7 +246,7 @@ function LoginContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EFE3EB] flex flex-col justify-center items-center px-3 sm:px-6 lg:px-8 py-6 sm:py-10 select-none">
+    <div className="min-h-screen bg-[#EFE3EB] flex flex-col justify-center items-center px-3 sm:px-6 lg:px-8 py-3 sm:py-6 lg:py-10 select-none">
       {/* Main Responsive Wrapper:
           - On mobile (< lg): centered 390px card
           - On desktop (>= lg): expansive, elegant 2-column academy portal container
@@ -303,8 +349,19 @@ function LoginContent() {
         {/* ========================================================================= */}
         {/* AUTHENTICATION FORM COLUMN (Mobile: standalone / Desktop: right column)    */}
         {/* ========================================================================= */}
-        <div className="lg:col-span-6 xl:col-span-6 flex flex-col justify-center px-4 sm:px-8 lg:px-10 xl:px-12 py-6 sm:py-8 lg:py-12 bg-transparent lg:bg-[#FAF5F8]">
+        <div className="lg:col-span-6 xl:col-span-6 flex flex-col justify-center px-4 sm:px-8 lg:px-10 xl:px-12 py-3 sm:py-6 lg:py-10 bg-transparent lg:bg-[#FAF5F8]">
           
+          {/* Top Left Navigation Link: Back to Laasya Home */}
+          <div className="w-full mb-2 flex items-center justify-between">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1 text-xs font-bold text-[#800040] hover:text-[#590231] hover:underline transition-colors py-1 px-2 -ml-2 rounded-lg active:bg-black/5"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Back to Laasya Home</span>
+            </Link>
+          </div>
+
           {/* Mobile-Only Header Logo & Title (Hidden on desktop because left banner displays it) */}
           <div className="lg:hidden text-center mb-3.5">
             <Link href="/" className="inline-block transition-transform active:scale-95">
@@ -374,7 +431,7 @@ function LoginContent() {
               )}
             >
               <UserCheck className="w-4 h-4 shrink-0" />
-              <span>Guru / Faculty</span>
+              <span>Guru</span>
             </button>
 
             <button
@@ -388,7 +445,7 @@ function LoginContent() {
               )}
             >
               <ShieldCheck className="w-4 h-4 shrink-0" />
-              <span>Admin ERP</span>
+              <span>Admin</span>
             </button>
           </div>
 
@@ -500,7 +557,10 @@ function LoginContent() {
                 className="w-full mt-2 bg-[#800040] hover:bg-[#6B0036] active:scale-[0.99] text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all text-sm disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
               >
                 {loading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>{loadingStatus || 'Signing In...'}</span>
+                  </>
                 ) : (
                   <span>Sign In as Student</span>
                 )}
@@ -620,7 +680,10 @@ function LoginContent() {
                 className="w-full mt-2 bg-[#800040] hover:bg-[#6B0036] active:scale-[0.99] text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all text-sm disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
               >
                 {loading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>{loadingStatus || 'Signing In...'}</span>
+                  </>
                 ) : (
                   <span>Sign In as Guru</span>
                 )}
@@ -712,7 +775,7 @@ function LoginContent() {
                 {loading ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
-                  <span>Sign In to ERP Dashboard &rarr;</span>
+                  <span>Sign In as Admin</span>
                 )}
               </button>
             </form>
@@ -721,7 +784,7 @@ function LoginContent() {
           {/* ======================================================================= */}
           {/* CLEAR, PROMINENT PRIVACY POLICY & TERMS FOOTER                          */}
           {/* ======================================================================= */}
-          <div className="mt-6 pt-4 border-t border-[#E8DCE4] flex flex-col items-center gap-2.5 text-xs text-[#705263]">
+          <div className="mt-3.5 pt-3 border-t border-[#E8DCE4] flex flex-col items-center gap-2 text-xs text-[#705263]">
             {/* Prominent clickable policy buttons */}
             <div className="flex items-center flex-wrap justify-center gap-x-3 gap-y-1 text-xs">
               <button
@@ -757,12 +820,6 @@ function LoginContent() {
               </Link>
             </div>
 
-            <Link
-              href="/"
-              className="text-xs font-bold text-[#800040] hover:underline mt-1 transition-colors"
-            >
-              &larr; Back to Laasya Cultural Academy Home
-            </Link>
           </div>
 
         </div>

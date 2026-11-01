@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/api_constants.dart';
@@ -42,6 +44,9 @@ ImageProvider? getAvatarImageProvider(dynamic rawUrl) {
 
     final resolved = resolveImageUrl(s);
     if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
+      if (kIsWeb) {
+        return NetworkImage(resolved);
+      }
       return CachedNetworkImageProvider(resolved);
     }
 
@@ -69,6 +74,9 @@ class AppAvatar extends StatelessWidget {
   final Border? border;
   final VoidCallback? onTap;
 
+  // Statically cache base64 decoded bytes to eliminate stutter on re-renders
+  static final Map<String, Uint8List> _bytesCache = {};
+
   const AppAvatar({
     super.key,
     required this.avatarUrl,
@@ -83,9 +91,10 @@ class AppAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 1. Build initial fallback badge
     final initials = (name ?? '')
         .trim()
-        .split(' ')
+        .split(RegExp(r'\s+'))
         .where((p) => p.isNotEmpty)
         .map((p) => p[0])
         .take(2)
@@ -104,66 +113,103 @@ class AppAvatar extends StatelessWidget {
           ? Text(
               initials,
               style: TextStyle(
-                fontSize: radius * 0.75,
+                fontSize: radius * 0.72,
                 fontWeight: FontWeight.bold,
                 color: textColor ?? const Color(0xFF8A064D),
+                letterSpacing: 0.5,
               ),
             )
           : (fallbackIcon ?? Icon(Icons.person_rounded, size: radius * 1.1, color: textColor ?? const Color(0xFF8A064D))),
     );
 
-    final resolved = resolveImageUrl(avatarUrl);
-    final isDataUri = (avatarUrl != null && avatarUrl.toString().contains(';base64,'));
+    // 2. Check if avatarUrl is actually present
+    if (avatarUrl == null) {
+      return _wrapAvatar(fallbackWidget);
+    }
+    final rawStr = avatarUrl.toString().trim();
+    if (rawStr.isEmpty || rawStr == 'null') {
+      return _wrapAvatar(fallbackWidget);
+    }
+
+    final resolved = resolveImageUrl(rawStr);
+    final isDataUri = rawStr.contains(';base64,') || rawStr.startsWith('data:image');
     final isNetwork = resolved.startsWith('http://') || resolved.startsWith('https://');
 
     Widget avatar;
-    if (isNetwork) {
-      avatar = ClipOval(
-        child: CachedNetworkImage(
-          imageUrl: resolved,
-          width: radius * 2,
-          height: radius * 2,
-          fit: BoxFit.cover,
-          placeholder: (_, __) => fallbackWidget,
-          errorWidget: (_, __, ___) => fallbackWidget,
-        ),
-      );
-    } else if (isDataUri) {
-      final imgProvider = getAvatarImageProvider(avatarUrl);
-      if (imgProvider != null) {
+    if (isDataUri) {
+      try {
+        final commaIdx = rawStr.indexOf(',');
+        final b64 = commaIdx != -1 ? rawStr.substring(commaIdx + 1).trim() : rawStr;
+        Uint8List? cached = _bytesCache[b64];
+        if (cached == null) {
+          cached = base64Decode(b64.replaceAll(RegExp(r'\s+'), ''));
+          if (_bytesCache.length > 50) _bytesCache.remove(_bytesCache.keys.first);
+          _bytesCache[b64] = cached;
+        }
         avatar = ClipOval(
-          child: Image(
-            image: imgProvider,
+          child: Image.memory(
+            cached,
             width: radius * 2,
             height: radius * 2,
             fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => fallbackWidget,
+          ),
+        );
+      } catch (_) {
+        avatar = fallbackWidget;
+      }
+    } else if (isNetwork) {
+      if (kIsWeb) {
+        avatar = ClipOval(
+          child: Image.network(
+            resolved,
+            width: radius * 2,
+            height: radius * 2,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
             errorBuilder: (_, __, ___) => fallbackWidget,
           ),
         );
       } else {
-        avatar = fallbackWidget;
+        avatar = ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: resolved,
+            width: radius * 2,
+            height: radius * 2,
+            fit: BoxFit.cover,
+            placeholder: (_, __) => fallbackWidget,
+            errorWidget: (_, __, ___) => fallbackWidget,
+          ),
+        );
       }
     } else {
       avatar = fallbackWidget;
     }
 
+    return _wrapAvatar(avatar);
+  }
+
+  Widget _wrapAvatar(Widget avatar) {
+    Widget res = avatar;
     if (border != null) {
-      avatar = Container(
+      res = Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: border,
         ),
-        child: avatar,
+        child: res,
       );
     }
 
     if (onTap != null) {
-      return GestureDetector(
+      res = GestureDetector(
         onTap: onTap,
-        child: avatar,
+        behavior: HitTestBehavior.opaque,
+        child: res,
       );
     }
 
-    return avatar;
+    return RepaintBoundary(child: res);
   }
 }

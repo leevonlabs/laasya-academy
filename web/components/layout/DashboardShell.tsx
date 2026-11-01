@@ -30,6 +30,7 @@ import {
   KeyRound,
   CalendarCheck,
   UserCheck,
+  Smartphone,
   Bell
 } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
@@ -121,6 +122,7 @@ export default function DashboardShell({ user, children }: Props) {
     { label: 'Advertisements', href: '/advertisements', icon: ImageIcon },
     { label: 'Expenses', href: '/expenses', icon: TrendingDown },
     { label: 'Password Management', href: '/password-management', icon: KeyRound },
+    { label: 'Active Logins', href: '/active-logins', icon: Smartphone },
     { label: 'Reception', href: '/reception', icon: UserCheck },
     { label: 'Admin Profile', href: '/admin-profile', icon: ShieldCheck },
   ];

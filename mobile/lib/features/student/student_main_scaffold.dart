@@ -744,7 +744,15 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
       'Settings',
     ];
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_currentIndex != 0) {
+          setState(() => _currentIndex = 0);
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         titleSpacing: 16,
         leadingWidth: 0,
@@ -900,6 +908,7 @@ class _StudentMainScaffoldState extends State<StudentMainScaffold> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }

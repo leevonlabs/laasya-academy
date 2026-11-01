@@ -1,3 +1,5 @@
+import 'package:url_launcher/url_launcher.dart';
+import '../settings/active_sessions_screen.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -150,10 +152,14 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
       await AlarmService.stopBackgroundAlertService();
       await SupabaseService().signOut();
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const PortalLandingScreen()),
-        (route) => false,
-      );
+      if (kIsWeb) {
+        await launchUrl(Uri.parse('/login?logout=true'), webOnlyWindowName: '_self');
+      } else {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PortalLandingScreen()),
+          (route) => false,
+        );
+      }
     }
   }
 
@@ -601,6 +607,25 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
                     title: 'Privacy Policy & Terms of Service',
                     subtitle: 'Child safety, data protection, academy rules & student guidelines',
                     onTap: () => LaasyaPolicyDialog.showPolicy(context),
+                  ),
+                  const Divider(height: 1, indent: 64),
+
+                  // Active Logins & Devices
+                  _settingsTile(
+                    icon: Icons.devices_rounded,
+                    iconBg: const Color(0xFFE0F2FE),
+                    iconColor: const Color(0xFF0369A1),
+                    title: 'Active Logins & Devices',
+                    subtitle: 'Manage devices and remove old active logins',
+                    badgeText: 'SECURITY',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ActiveSessionsScreen(userProfile: _profile),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
