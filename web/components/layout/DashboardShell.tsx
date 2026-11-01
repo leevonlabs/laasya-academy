@@ -59,7 +59,7 @@ export default function DashboardShell({ user, children }: Props) {
       description: 'Monthly tuition fees are due for 3 enrolled disciples.',
       time: 'Just now',
       unread: true,
-      href: '/finance/student-fees',
+      href: '/fees',
     },
     {
       id: 'n2',
@@ -67,7 +67,7 @@ export default function DashboardShell({ user, children }: Props) {
       description: 'Scheduled holiday circular dispatched to parents and gurus.',
       time: 'Today',
       unread: true,
-      href: '/holiday-alerts',
+      href: '/announcements/holiday-alerts',
     },
     {
       id: 'n3',
@@ -75,7 +75,7 @@ export default function DashboardShell({ user, children }: Props) {
       description: 'Weekly sessions verified across all classical art batches.',
       time: 'Yesterday',
       unread: false,
-      href: '/attendance/audit',
+      href: '/attendance',
     }
   ]);
 

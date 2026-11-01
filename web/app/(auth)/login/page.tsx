@@ -93,15 +93,45 @@ function LoginContent() {
       return;
     }
 
-    // Auto-redirect if already logged in so browser back navigation does not trigger premature logout
+    const roleParam = searchParams.get('role') || searchParams.get('tab');
+    if (roleParam === 'admin') {
+      setActiveTab('admin');
+      // If user already has an active Admin ERP session, route to /overview
+      fetch('/api/auth/session')
+        .then(r => r.json())
+        .then(d => {
+          if (d?.authenticated && (d?.user?.role === 'owner' || d?.user?.role === 'receptionist')) {
+            router.replace('/overview');
+          }
+        })
+        .catch(() => {});
+      setError(null);
+      return;
+    } else if (roleParam === 'guru' || roleParam === 'trainer') {
+      setActiveTab('guru');
+      setError(null);
+      return;
+    } else if (roleParam === 'student') {
+      setActiveTab('student');
+      setError(null);
+      return;
+    }
+
+    // Direct /login visit without specific role parameter:
+    // Check if an existing session is present
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('saved_user_profile');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
           if (parsed && (parsed.id || parsed.profile_id)) {
-            window.location.replace('/portal/');
-            return;
+            if (parsed.role === 'owner' || parsed.role === 'receptionist') {
+              router.replace('/overview');
+              return;
+            } else if (parsed.role === 'trainer' || parsed.role === 'student') {
+              window.location.replace('/portal/');
+              return;
+            }
           }
         } catch (_) {}
       }
@@ -122,12 +152,8 @@ function LoginContent() {
       } catch (_) {}
     }
 
-    const role = searchParams.get('role') || searchParams.get('tab');
-    if (role === 'admin') setActiveTab('admin');
-    else if (role === 'guru' || role === 'trainer') setActiveTab('guru');
-    else if (role === 'student') setActiveTab('student');
     setError(null);
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const switchTab = (tab: 'student' | 'guru' | 'admin') => {
     setActiveTab(tab);

@@ -1355,9 +1355,9 @@ export async function createBatch(data: {
     INSERT INTO public.batches (
       course_id, trainer_id, name, code, days_of_week, 
       start_time, end_time, room_or_hall, max_capacity, 
-      monthly_fee, description, is_active, schedules
+      monthly_fee, gst_percent, description, is_active, schedules
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     RETURNING *;
   `, [
     data.course_id, data.trainer_id, data.name, batchCode, data.days_of_week,
@@ -1398,10 +1398,11 @@ export async function updateBatch(id: string, data: {
         room_or_hall = COALESCE($8, room_or_hall),
         max_capacity = COALESCE($9, max_capacity),
         monthly_fee = COALESCE($10, monthly_fee),
-        description = COALESCE($11, description),
-        is_active = COALESCE($12, is_active),
-        schedules = COALESCE($13::jsonb, schedules),
-        code = COALESCE($14, code),
+        gst_percent = COALESCE($11, gst_percent),
+        description = COALESCE($12, description),
+        is_active = COALESCE($13, is_active),
+        schedules = COALESCE($14::jsonb, schedules),
+        code = COALESCE($15, code),
         updated_at = now()
     WHERE id = $1
     RETURNING *;

@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   compress: true,
+  skipTrailingSlashRedirect: true,
   turbopack: {},
   webpack: (config, { dev }) => {
     if (dev) {
@@ -22,22 +23,36 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  async rewrites() {
+  async redirects() {
     return [
       {
         source: '/portal',
-        destination: '/portal/index.html',
+        destination: '/portal/',
+        permanent: false,
       },
+      {
+        source: '/app',
+        destination: '/portal/',
+        permanent: false,
+      },
+    ];
+  },
+  async rewrites() {
+    return [
       {
         source: '/portal/',
         destination: '/portal/index.html',
       },
       {
-        source: '/app',
+        source: '/portal',
         destination: '/portal/index.html',
       },
       {
         source: '/app/',
+        destination: '/portal/index.html',
+      },
+      {
+        source: '/app',
         destination: '/portal/index.html',
       },
     ];
