@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 
 class SupabaseConstants {
-  static const String devSupabaseUrl = 'https://bhpqzrcohjigkkpmcdsy.supabase.co';
-  static const String prodSupabaseUrl = 'https://bhpqzrcohjigkkpmcdsy.supabase.co';
+  static const String devSupabaseUrl = 'https://kumbtvmjpmjtmoefddux.supabase.co';
+  static const String prodSupabaseUrl = 'https://kumbtvmjpmjtmoefddux.supabase.co';
 
-  /// Dynamically resolves production Supabase (bhpqzrcohjigkkpmcdsy).
+  /// Dynamically resolves production Supabase (kumbtvmjpmjtmoefddux Mumbai).
   static String get supabaseUrl {
     const fromEnv = String.fromEnvironment('SUPABASE_URL');
     if (fromEnv.isNotEmpty) return fromEnv;

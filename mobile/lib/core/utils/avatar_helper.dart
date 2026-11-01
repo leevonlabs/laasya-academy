@@ -124,11 +124,11 @@ class AppAvatar extends StatelessWidget {
 
     // 2. Check if avatarUrl is actually present
     if (avatarUrl == null) {
-      return _wrapAvatar(fallbackWidget);
+      return _wrapAvatar(fallbackWidget, fallbackWidget);
     }
     final rawStr = avatarUrl.toString().trim();
     if (rawStr.isEmpty || rawStr == 'null') {
-      return _wrapAvatar(fallbackWidget);
+      return _wrapAvatar(fallbackWidget, fallbackWidget);
     }
 
     final resolved = resolveImageUrl(rawStr);
@@ -168,6 +168,10 @@ class AppAvatar extends StatelessWidget {
             height: radius * 2,
             fit: BoxFit.cover,
             gaplessPlayback: true,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return fallbackWidget;
+            },
             errorBuilder: (_, __, ___) => fallbackWidget,
           ),
         );
@@ -187,20 +191,22 @@ class AppAvatar extends StatelessWidget {
       avatar = fallbackWidget;
     }
 
-    return _wrapAvatar(avatar);
+    return _wrapAvatar(avatar, fallbackWidget);
   }
 
-  Widget _wrapAvatar(Widget avatar) {
-    Widget res = avatar;
-    if (border != null) {
-      res = Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: border,
-        ),
-        child: res,
-      );
-    }
+  Widget _wrapAvatar(Widget avatar, Widget fallbackWidget) {
+    Widget res = Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        color: backgroundColor ?? const Color(0xFFFFF2F8),
+        shape: BoxShape.circle,
+        border: border,
+      ),
+      clipBehavior: Clip.antiAlias,
+      alignment: Alignment.center,
+      child: avatar,
+    );
 
     if (onTap != null) {
       res = GestureDetector(

@@ -23,7 +23,7 @@ async function exportFullBackup() {
   const backup = {
     metadata: {
       timestamp: new Date().toISOString(),
-      source_project: 'bhpqzrcohjigkkpmcdsy',
+      source_project: 'kumbtvmjpmjtmoefddux',
       version: 'PostgreSQL 17.6'
     },
     schema: {},

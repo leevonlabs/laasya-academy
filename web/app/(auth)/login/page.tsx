@@ -54,7 +54,7 @@ function LoginContent() {
   const [adminPhone, setAdminPhone] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [showAdminPassword, setShowAdminPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
 
   // Shared UI state
   const [loading, setLoading] = useState(false);
@@ -90,7 +90,33 @@ function LoginContent() {
         localStorage.removeItem('flutter.fcm_user_role');
         localStorage.removeItem('flutter.fcm_user_id');
       }
+      fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
       return;
+    }
+
+    // Direct visit or navigation back: If already logged in, keep session active
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('saved_user_profile');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && (parsed.id || parsed.profile_id)) {
+            if (parsed.role === 'owner' || parsed.role === 'receptionist') {
+              router.replace('/overview');
+              return;
+            } else if (parsed.role === 'trainer' || parsed.role === 'student') {
+              window.location.replace('/portal/');
+              return;
+            }
+          }
+        } catch (_) {}
+      }
+
+      const remPhone = localStorage.getItem('remembered_admin_phone');
+      if (remPhone) {
+        setAdminPhone(remPhone);
+        setRememberMe(true);
+      }
     }
 
     const roleParam = searchParams.get('role') || searchParams.get('tab');
@@ -115,26 +141,6 @@ function LoginContent() {
       setActiveTab('student');
       setError(null);
       return;
-    }
-
-    // Direct /login visit without specific role parameter:
-    // Check if an existing session is present
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('saved_user_profile');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (parsed && (parsed.id || parsed.profile_id)) {
-            if (parsed.role === 'owner' || parsed.role === 'receptionist') {
-              router.replace('/overview');
-              return;
-            } else if (parsed.role === 'trainer' || parsed.role === 'student') {
-              window.location.replace('/portal/');
-              return;
-            }
-          }
-        } catch (_) {}
-      }
     }
 
     // Prefetch Flutter assets in background so portal launches instantly on login
@@ -249,12 +255,21 @@ function LoginContent() {
         body: JSON.stringify({
           phone: adminPhone.trim(),
           password: adminPassword.trim(),
+          rememberMe,
         }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Failed to sign in. Please verify your credentials.');
+      }
+
+      if (typeof window !== 'undefined') {
+        if (rememberMe) {
+          localStorage.setItem('remembered_admin_phone', adminPhone.trim());
+        } else {
+          localStorage.removeItem('remembered_admin_phone');
+        }
       }
 
       if (data.user?.role === 'receptionist') {

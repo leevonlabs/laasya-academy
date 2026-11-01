@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const identifier = body.phone || body.identifier || body.email;
-    const { password } = body;
+    const { password, rememberMe } = body;
 
     if (!identifier || !password) {
       return NextResponse.json({ success: false, error: 'Phone number and password are required.' }, { status: 400 });
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: res.error || 'Authentication failed.' }, { status: 401 });
     }
 
-    await setSessionCookie(res.user);
+    await setSessionCookie(res.user, !!rememberMe);
 
     const sessionId = await recordActiveSession({
       userId: res.user.userId,

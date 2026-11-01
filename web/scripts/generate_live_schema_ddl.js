@@ -19,7 +19,7 @@ async function generateDDL() {
 -- LAASYA CULTURAL ACADEMY (లాస్య సాంస్కృతిక అకాడమి)
 -- COMPLETE DATABASE LIVE SCHEMA DDL
 -- Generated: ${new Date().toISOString()}
--- Source Project: bhpqzrcohjigkkpmcdsy
+-- Source Project: kumbtvmjpmjtmoefddux
 -- Target: New Supabase Project Migration
 -- ==============================================================================
 

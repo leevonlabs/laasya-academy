@@ -153,7 +153,7 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
       await SupabaseService().signOut();
       if (!mounted) return;
       if (kIsWeb) {
-        await launchUrl(Uri.parse('/login?logout=true'), webOnlyWindowName: '_self');
+        await launchUrl(Uri.parse('${ApiConstants.baseUrl}/login?logout=true'), webOnlyWindowName: '_self');
       } else {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const PortalLandingScreen()),

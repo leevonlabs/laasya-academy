@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/fcm_service.dart';
 import '../../core/widgets/laasya_policy_dialog.dart';
@@ -27,6 +29,12 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
   @override
   void initState() {
     super.initState();
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        launchUrl(Uri.parse('${ApiConstants.baseUrl}/login'), webOnlyWindowName: '_self');
+      });
+      return;
+    }
     try {
       final role = Uri.base.queryParameters['role']?.toLowerCase();
       if (role == 'trainer' || role == 'guru') {

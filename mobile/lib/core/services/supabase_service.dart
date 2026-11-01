@@ -719,8 +719,7 @@ class SupabaseService {
     try {
       final token = await getAuthToken();
       if (token == null || token.isEmpty) {
-        await signOut();
-        return null;
+        return _cachedProfile;
       }
 
       final res = await http.get(

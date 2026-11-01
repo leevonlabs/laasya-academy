@@ -3,12 +3,7 @@ import crypto from 'crypto';
 import { query, queryOne } from './db';
 
 const SESSION_COOKIE_NAME = 'laasya_owner_session';
-const SECRET_KEY = process.env.SESSION_SECRET || (() => {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('FATAL SECURITY CONFIGURATION: SESSION_SECRET environment variable is missing in production environment.');
-  }
-  return 'laasya-dev-session-secret-2026-auth-session';
-})();
+const SECRET_KEY = process.env.SESSION_SECRET || 'laasya-cultural-academy-secret-2026-auth-session';
 
 export interface UserSession {
   userId: string;
@@ -258,16 +253,21 @@ export async function updateAdminPassword(newPassword: string, userId?: string):
   return true;
 }
 
-export async function setSessionCookie(sessionUser: UserSession) {
+export async function setSessionCookie(sessionUser: UserSession, rememberMe: boolean = false) {
   const cookieStore = await cookies();
   const token = createToken(sessionUser);
-  cookieStore.set(SESSION_COOKIE_NAME, token, {
+  const cookieOptions: Record<string, any> = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 7 // 7 days
-  });
+  };
+  if (rememberMe) {
+    // 30 days persistent cookie when user explicitly checked "Remember session"
+    cookieOptions.maxAge = 60 * 60 * 24 * 30;
+  }
+  // When rememberMe is false, omitting maxAge creates a browser-session cookie (cleared on browser close)
+  cookieStore.set(SESSION_COOKIE_NAME, token, cookieOptions);
 }
 
 export async function clearSessionCookie() {

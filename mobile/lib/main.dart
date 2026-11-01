@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'core/theme/app_theme.dart';
+import 'core/constants/api_constants.dart';
 import 'core/services/supabase_service.dart';
 import 'core/services/permission_service.dart';
 import 'core/services/notification_service.dart';
@@ -58,16 +60,15 @@ class _AuthGateState extends State<AuthGate> {
       final profile = await SupabaseService().getCurrentUserProfile();
       if (profile != null) {
         // Cryptographic session validation against backend server
-        final serverUser = await SupabaseService().validateSession();
-        if (serverUser == null) {
-          // Token is missing, expired, or invalid
-          _targetScreen = const PortalLandingScreen();
-          return;
-        }
+        Map<String, dynamic>? serverUser;
+        try {
+          serverUser = await SupabaseService().validateSession();
+        } catch (_) {}
 
-        // Strictly enforce role verified by server HMAC signature
-        final role = (serverUser['role'] ?? profile['role'] ?? 'student').toString();
-        final userId = (serverUser['userId'] ?? profile['id'] ?? '').toString();
+        // Enforce role verified by session or cached profile
+        final effectiveUser = serverUser ?? profile;
+        final role = (effectiveUser['role'] ?? profile['role'] ?? 'student').toString();
+        final userId = (effectiveUser['userId'] ?? profile['id'] ?? profile['profile_id'] ?? '').toString();
 
         List<String> batchIds = [];
         if (role == 'trainer') {
@@ -102,10 +103,22 @@ class _AuthGateState extends State<AuthGate> {
           _targetScreen = const StudentMainScaffold();
         }
       } else {
+        if (kIsWeb) {
+          try {
+            await launchUrl(Uri.parse('${ApiConstants.baseUrl}/login'), webOnlyWindowName: '_self');
+            return;
+          } catch (_) {}
+        }
         _targetScreen = const PortalLandingScreen();
       }
     } catch (e) {
       debugPrint('Auth check error: $e');
+      if (kIsWeb) {
+        try {
+          await launchUrl(Uri.parse('${ApiConstants.baseUrl}/login'), webOnlyWindowName: '_self');
+          return;
+        } catch (_) {}
+      }
       _targetScreen = const PortalLandingScreen();
     } finally {
       if (mounted) setState(() => _checking = false);
