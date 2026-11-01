@@ -23,36 +23,22 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  async redirects() {
+  async rewrites() {
     return [
       {
         source: '/portal',
-        destination: '/portal/',
-        permanent: false,
+        destination: '/portal/index.html',
       },
-      {
-        source: '/app',
-        destination: '/portal/',
-        permanent: false,
-      },
-    ];
-  },
-  async rewrites() {
-    return [
       {
         source: '/portal/',
         destination: '/portal/index.html',
       },
       {
-        source: '/portal',
+        source: '/app',
         destination: '/portal/index.html',
       },
       {
         source: '/app/',
-        destination: '/portal/index.html',
-      },
-      {
-        source: '/app',
         destination: '/portal/index.html',
       },
     ];
