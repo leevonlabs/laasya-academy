@@ -146,15 +146,30 @@ export async function GET(req: NextRequest) {
           trainer_name: primaryTrainer,
           total_monthly_fee: totalMonthlyFee,
           net_monthly_fee: netMonthlyFee,
-          enrolled_courses: enrollments.map((e: any) => ({
-            id: e.course_id,
-            title: e.course_title,
-            batch: e.batch_name,
-            timings: (e.start_time && e.end_time) ? `${e.start_time} - ${e.end_time}` : '04:00 PM - 05:30 PM',
-            room: e.room_or_hall || 'Room 101',
-            trainer: e.trainer_name || 'Faculty Master',
-            monthly_fee: e.monthly_fee || 2000,
-          })),
+          enrolled_courses: enrollments.map((e: any) => {
+            const daysList = Array.isArray(e.days_of_week)
+              ? e.days_of_week
+              : (typeof e.days_of_week === 'string' ? e.days_of_week.split(',').map((s: string) => s.trim()) : ['Monday', 'Wednesday', 'Friday']);
+            const days = daysList.join(', ');
+            const times = (e.start_time && e.end_time) ? ` • ${e.start_time} - ${e.end_time}` : '';
+            return {
+              id: e.course_id,
+              course_id: e.course_id,
+              title: e.course_title,
+              category: e.course_category || 'Classical Arts',
+              batch: e.batch_name,
+              batch_id: e.batch_id,
+              batch_name: e.batch_name,
+              days_of_week: daysList,
+              start_time: e.start_time || '',
+              end_time: e.end_time || '',
+              timings: `${days}${times}`,
+              room: e.room_or_hall || 'Room 101',
+              trainer: e.trainer_name || 'Faculty Master',
+              trainer_name: e.trainer_name || 'Faculty Master',
+              monthly_fee: e.monthly_fee || 2000,
+            };
+          }),
         };
       }
     }

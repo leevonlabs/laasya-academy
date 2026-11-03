@@ -594,18 +594,21 @@ export async function getGuruSalaryRecords(month?: string): Promise<GuruSalaryRe
   let records = await query<GuruSalaryRecord>(sql, [filterMonth]);
 
   if (records.length === 0) {
-    const trainers = await query<{ id: string; monthly_salary: number }>(
-      'SELECT id, COALESCE(monthly_salary, 25000)::numeric as monthly_salary FROM public.trainers WHERE is_active = true'
+    const trainers = await query<{ id: string; guru_id: string; monthly_salary: number }>(
+      'SELECT id, guru_id, COALESCE(monthly_salary, 25000)::numeric as monthly_salary FROM public.trainers WHERE is_active = true'
     );
+    const monthCode = filterMonth.replace(/\s+/g, '-').toUpperCase();
     for (const t of trainers) {
       const sal = Number(t.monthly_salary) || 25000;
+      const gCode = (t.guru_id || 'GURU').replace(/[^a-zA-Z0-9]/g, '');
+      const invNo = `LCA-SAL-${monthCode}-${gCode}`;
       await query(`
         INSERT INTO public.guru_salary_records (
           trainer_id, payroll_month, base_salary, classes_assigned, classes_conducted,
-          bonus_amount, deduction_amount, advance_deducted, net_salary, status
-        ) VALUES ($1, $2, $3, 16, 16, 0, 0, 0, $3, 'pending')
+          bonus_amount, deduction_amount, advance_deducted, net_salary, status, invoice_number
+        ) VALUES ($1, $2, $3, 16, 16, 0, 0, 0, $3, 'pending', $4)
         ON CONFLICT (trainer_id, payroll_month) DO NOTHING;
-      `, [t.id, filterMonth, sal]);
+      `, [t.id, filterMonth, sal, invNo]);
     }
     records = await query<GuruSalaryRecord>(sql, [filterMonth]);
   }

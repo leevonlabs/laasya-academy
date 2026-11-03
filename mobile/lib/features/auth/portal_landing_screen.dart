@@ -215,6 +215,31 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Top Left Navigation: Back to Laasya Home
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        launchUrl(Uri.parse('${ApiConstants.baseUrl}/'), webOnlyWindowName: '_self');
+                      },
+                      icon: const Icon(Icons.arrow_back_rounded, size: 16, color: LaasyaColors.primary),
+                      label: const Text(
+                        'Back to Laasya Home',
+                        style: TextStyle(
+                          color: LaasyaColors.primary,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
                   // 1. Academy Brand Header
                   Center(
                     child: Image.asset(
@@ -271,7 +296,7 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
 
                   const SizedBox(height: 18),
 
-                  // 2. Clean Segmented Role Selector
+                  // 2. Clean Segmented Role Selector (Student | Guru | Admin)
                   Container(
                     height: 46,
                     padding: const EdgeInsets.all(4),
@@ -304,15 +329,15 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                                   children: [
                                     Icon(
                                       Icons.school_rounded,
-                                      size: 17,
+                                      size: 16,
                                       color: _isStudent ? Colors.white : LaasyaColors.textDark,
                                     ),
-                                    const SizedBox(width: 6),
+                                    const SizedBox(width: 5),
                                     Text(
                                       'Student',
                                       style: TextStyle(
                                         color: _isStudent ? Colors.white : LaasyaColors.textDark,
-                                        fontSize: 13.5,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -345,15 +370,49 @@ class _PortalLandingScreenState extends State<PortalLandingScreen> {
                                   children: [
                                     Icon(
                                       Icons.person_rounded,
-                                      size: 17,
+                                      size: 16,
                                       color: !_isStudent ? Colors.white : LaasyaColors.textDark,
                                     ),
-                                    const SizedBox(width: 6),
+                                    const SizedBox(width: 5),
                                     Text(
-                                      'Guru / Faculty',
+                                      'Guru',
                                       style: TextStyle(
                                         color: !_isStudent ? Colors.white : LaasyaColors.textDark,
-                                        fontSize: 13.5,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              launchUrl(Uri.parse('${ApiConstants.baseUrl}/login?role=admin'), webOnlyWindowName: '_self');
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Center(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.shield_rounded,
+                                      size: 16,
+                                      color: LaasyaColors.textDark,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    const Text(
+                                      'Admin',
+                                      style: TextStyle(
+                                        color: LaasyaColors.textDark,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),

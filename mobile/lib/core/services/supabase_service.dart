@@ -215,8 +215,8 @@ class SupabaseService {
         _cachedProfile = Map<String, dynamic>.from(savedRaw);
       } else if (savedRaw is String && savedRaw.isNotEmpty) {
         try {
-          var decoded = jsonDecode(savedRaw);
-          if (decoded is String) {
+          dynamic decoded = jsonDecode(savedRaw);
+          while (decoded is String) {
             decoded = jsonDecode(decoded);
           }
           if (decoded is Map) {
@@ -501,8 +501,8 @@ class SupabaseService {
           _cachedProfile = Map<String, dynamic>.from(savedRaw);
         } else if (savedRaw is String && savedRaw.isNotEmpty) {
           try {
-            var decoded = jsonDecode(savedRaw);
-            if (decoded is String) {
+            dynamic decoded = jsonDecode(savedRaw);
+            while (decoded is String) {
               decoded = jsonDecode(decoded);
             }
             if (decoded is Map) {

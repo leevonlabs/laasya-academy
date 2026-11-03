@@ -60,6 +60,7 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [activeLoggedInUser, setActiveLoggedInUser] = useState<any>(null);
 
   // Contact Admin Modal state for "Forgot Password" and "New Registration" (Student & Guru only)
   const [contactModal, setContactModal] = useState<{
@@ -101,13 +102,7 @@ function LoginContent() {
         try {
           const parsed = JSON.parse(saved);
           if (parsed && (parsed.id || parsed.profile_id)) {
-            if (parsed.role === 'owner' || parsed.role === 'receptionist') {
-              router.replace('/overview');
-              return;
-            } else if (parsed.role === 'trainer' || parsed.role === 'student') {
-              window.location.replace('/portal/');
-              return;
-            }
+            setActiveLoggedInUser(parsed);
           }
         } catch (_) {}
       }
@@ -444,6 +439,45 @@ function LoginContent() {
               Select your role to access your personalized learning dashboard or administrative workspace.
             </p>
           </div>
+
+          {/* Active Session Resumption Banner */}
+          {activeLoggedInUser && (
+            <div className="mb-3.5 bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-xs">
+              <div className="flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  Signed in as <strong>{activeLoggedInUser.full_name || 'Active User'}</strong> ({activeLoggedInUser.role === 'trainer' ? 'Guru' : activeLoggedInUser.role === 'owner' ? 'Admin' : 'Student'})
+                </span>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeLoggedInUser.role === 'owner' || activeLoggedInUser.role === 'receptionist') {
+                      router.push('/overview');
+                    } else {
+                      window.location.replace('/portal/');
+                    }
+                  }}
+                  className="px-3 py-1 bg-emerald-700 text-white font-bold rounded-lg text-xs hover:bg-emerald-800 transition cursor-pointer"
+                >
+                  Go to {activeLoggedInUser.role === 'owner' ? 'Admin ERP' : 'Portal'} &rarr;
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem('saved_user_profile');
+                    localStorage.removeItem('flutter.saved_user_profile');
+                    localStorage.removeItem('laasya_cached_user');
+                    setActiveLoggedInUser(null);
+                  }}
+                  className="text-[11px] text-gray-500 hover:text-rose-600 underline cursor-pointer"
+                >
+                  Switch
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Segmented Role Selector Pill (Student | Guru | Admin) */}
           <div className="bg-[#E4D2DC] p-1 rounded-2xl flex items-center gap-1 mb-4 shadow-inner">

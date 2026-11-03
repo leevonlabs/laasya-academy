@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
+import '../../core/constants/api_constants.dart';
 import '../../core/widgets/laasya_avatar.dart';
 import '../../core/services/supabase_service.dart';
 import '../auth/portal_landing_screen.dart';
@@ -122,7 +123,7 @@ class _TrainerProfileTabState extends State<TrainerProfileTab> {
       await SupabaseService().signOut();
       if (!mounted) return;
       if (kIsWeb) {
-        await launchUrl(Uri.parse('/login?logout=true'), webOnlyWindowName: '_self');
+        await launchUrl(Uri.parse(`${ApiConstants.baseUrl}/login?logout=true`), webOnlyWindowName: '_self');
       } else {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const PortalLandingScreen()),

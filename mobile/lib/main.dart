@@ -105,6 +105,7 @@ class _AuthGateState extends State<AuthGate> {
       } else {
         if (kIsWeb) {
           try {
+            await SupabaseService().signOut();
             await launchUrl(Uri.parse('${ApiConstants.baseUrl}/login'), webOnlyWindowName: '_self');
             return;
           } catch (_) {}
@@ -115,6 +116,7 @@ class _AuthGateState extends State<AuthGate> {
       debugPrint('Auth check error: $e');
       if (kIsWeb) {
         try {
+          await SupabaseService().signOut();
           await launchUrl(Uri.parse('${ApiConstants.baseUrl}/login'), webOnlyWindowName: '_self');
           return;
         } catch (_) {}

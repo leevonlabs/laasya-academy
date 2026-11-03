@@ -1479,7 +1479,44 @@ export async function getSessions(dateFilter?: string, startDate?: string, endDa
     GROUP BY s.id, s.batch_id, b.name, c.title, b.room_or_hall, p.full_name, tc_check.is_rescheduled
     ORDER BY s.session_date ASC, s.start_time ASC;
   `;
-  const sessions = await query<ClassSession>(sql, params);
+  let sessions = await query<ClassSession>(sql, params);
+
+  // If 0 sessions exist for a specific calendar targetDate, auto-populate from active batches matching that day of week
+  if (sessions.length === 0 && targetDate && !startDate) {
+    try {
+      const dateObj = new Date(targetDate + 'T12:00:00Z');
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const targetDay = dayNames[dateObj.getUTCDay()];
+
+      const matchingBatches = await query<any>(`
+        SELECT b.id, b.trainer_id, b.start_time, b.end_time, b.days_of_week
+        FROM public.batches b
+        WHERE b.is_active = true
+      `);
+
+      const toInsert = matchingBatches.filter(b => {
+        const days = Array.isArray(b.days_of_week)
+          ? b.days_of_week
+          : (typeof b.days_of_week === 'string' ? b.days_of_week.split(',').map((s: string) => s.trim()) : []);
+        return days.some((d: string) => d.toLowerCase().startsWith(targetDay.toLowerCase().substring(0, 3)));
+      });
+
+      for (const b of toInsert) {
+        await query(`
+          INSERT INTO public.class_sessions (
+            batch_id, trainer_id, session_date, start_time, end_time, status, check_in_code
+          ) VALUES ($1, $2, $3, $4, $5, 'scheduled', LPAD(FLOOR(RANDOM()*9000 + 1000)::text, 4, '0'))
+          ON CONFLICT DO NOTHING
+        `, [b.id, b.trainer_id, targetDate, b.start_time || '16:00:00', b.end_time || '17:30:00']);
+      }
+
+      if (toInsert.length > 0) {
+        sessions = await query<ClassSession>(sql, params);
+      }
+    } catch (autoErr) {
+      console.warn('Error auto-populating sessions for date:', autoErr);
+    }
+  }
 
   // Also include any active scheduled tally classes for this date
   try {

@@ -146,45 +146,40 @@ class AppAvatar extends StatelessWidget {
           if (_bytesCache.length > 50) _bytesCache.remove(_bytesCache.keys.first);
           _bytesCache[b64] = cached;
         }
-        avatar = ClipOval(
-          child: Image.memory(
-            cached,
-            width: radius * 2,
-            height: radius * 2,
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
-            errorBuilder: (_, __, ___) => fallbackWidget,
-          ),
+        avatar = Image.memory(
+          cached,
+          width: radius * 2,
+          height: radius * 2,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => fallbackWidget,
         );
       } catch (_) {
         avatar = fallbackWidget;
       }
     } else if (isNetwork) {
       if (kIsWeb) {
-        avatar = ClipOval(
-          child: Image.network(
-            resolved,
-            width: radius * 2,
-            height: radius * 2,
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return fallbackWidget;
-            },
-            errorBuilder: (_, __, ___) => fallbackWidget,
-          ),
+        avatar = Image.network(
+          resolved,
+          width: radius * 2,
+          height: radius * 2,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.medium,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return fallbackWidget;
+          },
+          errorBuilder: (_, __, ___) => fallbackWidget,
         );
       } else {
-        avatar = ClipOval(
-          child: CachedNetworkImage(
-            imageUrl: resolved,
-            width: radius * 2,
-            height: radius * 2,
-            fit: BoxFit.cover,
-            placeholder: (_, __) => fallbackWidget,
-            errorWidget: (_, __, ___) => fallbackWidget,
-          ),
+        avatar = CachedNetworkImage(
+          imageUrl: resolved,
+          width: radius * 2,
+          height: radius * 2,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => fallbackWidget,
+          errorWidget: (_, __, ___) => fallbackWidget,
         );
       }
     } else {
@@ -195,17 +190,18 @@ class AppAvatar extends StatelessWidget {
   }
 
   Widget _wrapAvatar(Widget avatar, Widget fallbackWidget) {
-    Widget res = Container(
-      width: radius * 2,
-      height: radius * 2,
-      decoration: BoxDecoration(
-        color: backgroundColor ?? const Color(0xFFFFF2F8),
-        shape: BoxShape.circle,
-        border: border,
+    Widget res = ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: Container(
+        width: radius * 2,
+        height: radius * 2,
+        decoration: BoxDecoration(
+          color: backgroundColor ?? const Color(0xFFFFF2F8),
+          border: border,
+        ),
+        alignment: Alignment.center,
+        child: avatar,
       ),
-      clipBehavior: Clip.antiAlias,
-      alignment: Alignment.center,
-      child: avatar,
     );
 
     if (onTap != null) {
