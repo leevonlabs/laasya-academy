@@ -35,6 +35,12 @@ export function getDbPool(): Pool {
       keepAliveInitialDelayMillis: 10000
     });
 
+    globalThis._pgPool.on('connect', (client) => {
+      client.query("SET timezone = 'Asia/Kolkata'").catch((err) => {
+        console.warn('Failed to set Asia/Kolkata timezone on client connection:', err);
+      });
+    });
+
     globalThis._pgPool.on('error', (err) => {
       console.error('Unexpected idle client error in PostgreSQL pool:', err);
     });
