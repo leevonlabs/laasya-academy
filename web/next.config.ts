@@ -27,23 +27,17 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  async rewrites() {
+  async redirects() {
     return [
       {
-        source: '/portal',
-        destination: '/portal/index.html',
-      },
-      {
-        source: '/portal/',
-        destination: '/portal/index.html',
-      },
-      {
         source: '/app',
-        destination: '/portal/index.html',
+        destination: '/portal/',
+        permanent: false,
       },
       {
         source: '/app/',
-        destination: '/portal/index.html',
+        destination: '/portal/',
+        permanent: false,
       },
     ];
   },

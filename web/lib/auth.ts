@@ -108,15 +108,19 @@ export async function authenticateOwner(
   try {
     const raw = identifier.trim();
     const cleanDigits = raw.replace(/\D/g, '');
+    const phone10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
     const trimmedPass = password.trim();
 
-    // Find admin user by phone in profiles or email in auth.users/profiles
+    // Find admin user by phone (last 10 digits handles +91, 0, or spaces) or email
     const row = await queryOne<{ id: string; email: string; full_name: string; role: string; phone: string }>(
       `SELECT u.id, u.email, p.full_name, p.role, p.phone
        FROM auth.users u
        JOIN public.profiles p ON u.id = p.id
        WHERE (
-         (LENGTH($1) >= 8 AND regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
+         (LENGTH($1) >= 8 AND (
+           RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)
+           OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $1
+         ))
          OR LOWER(u.email) = LOWER($2)
          OR LOWER(p.email) = LOWER($2)
        )

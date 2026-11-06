@@ -1977,6 +1977,29 @@ class _StudentPaymentsScreenState extends State<StudentPaymentsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Official Payment Policy Notice (Full Balance Online • Partials at Admin Desk)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFFBEB),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.info_outline_rounded, color: Color(0xFFB45309), size: 16),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Online fee payments through mobile require full balance settlement. For split or partial installment payments, please contact the Academy Administration Desk (+91 77807 63121). Admin will collect and record your partial payment, and your digital receipt & updated invoice balance will be instantly generated here.',
+                                      style: TextStyle(fontSize: 10, color: Colors.amber.shade900, height: 1.35, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [

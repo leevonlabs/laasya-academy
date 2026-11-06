@@ -110,7 +110,17 @@ function LoginContent() {
       const remPhone = localStorage.getItem('remembered_admin_phone');
       if (remPhone) {
         setAdminPhone(remPhone);
-        setRememberMe(true);
+        // Kept unchecked by default as per security policy; user may opt-in to save session
+      }
+
+      const remStudent = localStorage.getItem('remembered_student_id');
+      if (remStudent) {
+        setStudentId(remStudent);
+      }
+
+      const remGuru = localStorage.getItem('remembered_guru_phone');
+      if (remGuru) {
+        setGuruPhone(remGuru);
       }
     }
 
@@ -199,6 +209,9 @@ function LoginContent() {
         throw new Error(data.error || 'Invalid credentials. Please verify your mobile number or roll number.');
       }
 
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('remembered_student_id', studentId.trim());
+      }
       setLoadingStatus('Launching Academy Portal...');
       persistSessionAndLaunchPortal(data.profile);
     } catch (err: any) {
@@ -229,6 +242,9 @@ function LoginContent() {
         throw new Error(data.error || 'Invalid credentials. Please check your registered mobile number or password.');
       }
 
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('remembered_guru_phone', guruPhone.trim());
+      }
       setLoadingStatus('Launching Academy Portal...');
       persistSessionAndLaunchPortal(data.profile);
     } catch (err: any) {

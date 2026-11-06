@@ -42,5 +42,18 @@ _flutter.buildConfig = {"engineRevision":"af7e796e161ae0bb1ff0758c71a7105418bd9d
 
 _flutter.loader.load({
   serviceWorkerSettings: null,
-  entryPointBaseUrl: '/portal/'
+  entryPointBaseUrl: '/portal/',
+  config: {
+    useLocalCanvasKit: true,
+    canvasKitBaseUrl: '/portal/canvaskit/'
+  },
+  onEntrypointLoaded: async function(engineInitializer) {
+    const appRunner = await engineInitializer.initializeEngine({
+      useLocalCanvasKit: true,
+      canvasKitBaseUrl: '/portal/canvaskit/'
+    });
+    const loader = document.getElementById('laasya-loading');
+    if (loader) loader.remove();
+    await appRunner.runApp();
+  }
 });

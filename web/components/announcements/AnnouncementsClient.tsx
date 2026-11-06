@@ -688,6 +688,11 @@ export default function AnnouncementsClient({
       return;
     }
 
+    if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
+      alert('HEIC format from iPhone is not supported directly by web browsers. Please select a JPG, PNG, or WebP photo.');
+      e.target.value = '';
+      return;
+    }
     if (!file.type.startsWith('image/')) {
       alert('Invalid file format. Please select a valid image file (JPG, PNG, WEBP).');
       e.target.value = '';
@@ -1982,7 +1987,7 @@ export default function AnnouncementsClient({
                         <span>Upload Message Image</span>
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/jpeg,image/png,image/webp,image/jpg"
                           className="hidden"
                           onChange={handleFileSelect}
                         />

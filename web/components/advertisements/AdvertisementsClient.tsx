@@ -156,6 +156,11 @@ export default function AdvertisementsClient({ initialAnnouncements, courses, ba
       return;
     }
 
+    if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
+      alert('HEIC format from iPhone is not supported directly by web browsers. Please select a JPG, PNG, or WebP photo.');
+      e.target.value = '';
+      return;
+    }
     if (!file.type.startsWith('image/')) {
       alert('Invalid file format. Please select a valid image file (JPG, PNG, WEBP).');
       e.target.value = '';
@@ -900,7 +905,7 @@ export default function AdvertisementsClient({ initialAnnouncements, courses, ba
                         <span>Upload Flyer & Auto-Fit</span>
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/jpeg,image/png,image/webp,image/jpg"
                           className="hidden"
                           onChange={handleFileSelect}
                         />

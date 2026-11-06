@@ -1351,6 +1351,26 @@ export async function createBatch(data: {
     batchCode = `${crsCode}-${maxNum + 1}`;
   }
 
+  // Validate room schedule conflict before creating batch
+  if (data.room_or_hall && data.days_of_week && data.days_of_week.length > 0 && data.start_time && data.end_time) {
+    const conflictSql = `
+      SELECT b.id, b.name, b.start_time, b.end_time, b.room_or_hall, c.title as course_title
+      FROM public.batches b
+      JOIN public.courses c ON c.id = b.course_id
+      WHERE b.is_active = true
+        AND TRIM(LOWER(b.room_or_hall)) = TRIM(LOWER($1))
+        AND b.days_of_week && $2::text[]
+        AND (
+          ($3::time < b.end_time::time) AND ($4::time > b.start_time::time)
+        )
+      LIMIT 1;
+    `;
+    const clash = await queryOne<any>(conflictSql, [data.room_or_hall, data.days_of_week, data.start_time, data.end_time]);
+    if (clash) {
+      throw new Error(`Room Schedule Conflict: Room "${data.room_or_hall}" is already occupied by batch "${clash.name}" (${clash.course_title}) from ${clash.start_time.substring(0, 5)} to ${clash.end_time.substring(0, 5)}.`);
+    }
+  }
+
   return queryOne<Batch>(`
     INSERT INTO public.batches (
       course_id, trainer_id, name, code, days_of_week, 

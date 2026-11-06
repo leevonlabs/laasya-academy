@@ -805,7 +805,7 @@ export default function HolidayAlertClient({
                       </div>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/jpeg,image/png,image/webp,image/jpg"
                         onChange={handleImageFileChange}
                         className="hidden"
                       />
@@ -1439,7 +1439,7 @@ export default function HolidayAlertClient({
                       </div>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/jpeg,image/png,image/webp,image/jpg"
                         onChange={handleImageFileChange}
                         className="hidden"
                       />

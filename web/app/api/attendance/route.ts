@@ -292,6 +292,8 @@ export async function POST(req: NextRequest) {
         ) VALUES (
           $1::uuid, (SELECT t.id FROM public.batches b LEFT JOIN public.trainers t ON (b.trainer_id = t.id OR b.trainer_id = t.profile_id) WHERE b.id = $1::uuid LIMIT 1), CURRENT_DATE, '17:00:00', '18:30:00', 'completed', NOW(), NOW()
         )
+        ON CONFLICT (batch_id, session_date, start_time)
+        DO UPDATE SET status = 'completed', updated_at = NOW()
         RETURNING id;
       `, [actualBatchId]);
     }
