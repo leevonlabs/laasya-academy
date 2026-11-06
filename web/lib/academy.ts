@@ -413,10 +413,22 @@ export async function updateCourse(id: string, data: {
 }
 
 export async function deleteCourse(id: string) {
-  // Cascading cleanup of sessions and enrollments for any batches under this course
-  await query(`DELETE FROM public.batch_enrollments WHERE batch_id IN (SELECT id FROM public.batches WHERE course_id = $1)`, [id]);
-  await query(`DELETE FROM public.class_sessions WHERE batch_id IN (SELECT id FROM public.batches WHERE course_id = $1)`, [id]);
-  await query(`DELETE FROM public.batches WHERE course_id = $1`, [id]);
+  // Check if course has active batches or historical student fee invoices
+  const [batches] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.batches WHERE course_id = $1`, [id]);
+  const [inv] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.student_fee_invoices WHERE course_id = $1`, [id]);
+  const hasHistory = (parseInt(batches?.count || '0', 10) > 0) || (parseInt(inv?.count || '0', 10) > 0);
+
+  if (hasHistory) {
+    // Soft-delete to preserve all historical student invoices, past batch rosters, and financial records
+    return queryOne<Course>(`
+      UPDATE public.courses
+      SET is_active = false, updated_at = now()
+      WHERE id = $1
+      RETURNING *;
+    `, [id]);
+  }
+
+  // Safe to hard-delete only if zero historical invoices and zero batches
   return queryOne<Course>(`
     DELETE FROM public.courses WHERE id = $1 RETURNING *;
   `, [id]);
@@ -668,11 +680,23 @@ export async function updateTrainer(id: string, data: {
 }
 
 export async function deleteTrainer(id: string) {
-  // Cascading cleanup of dependencies
-  await query(`DELETE FROM public.guru_salary_advances WHERE trainer_id = $1`, [id]);
-  await query(`DELETE FROM public.guru_salary_records WHERE trainer_id = $1`, [id]);
-  await query(`DELETE FROM public.class_sessions WHERE trainer_id = $1`, [id]);
-  await query(`DELETE FROM public.batches WHERE trainer_id = $1`, [id]);
+  // Check if trainer has historical salary records, sessions, or assigned batches
+  const [sal] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.guru_salary_records WHERE trainer_id = $1`, [id]);
+  const [ses] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.class_sessions WHERE trainer_id = $1`, [id]);
+  const [bat] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.batches WHERE trainer_id = $1`, [id]);
+  const hasHistory = (parseInt(sal?.count || '0', 10) > 0) || (parseInt(ses?.count || '0', 10) > 0) || (parseInt(bat?.count || '0', 10) > 0);
+
+  if (hasHistory) {
+    // Soft-delete: deactivate guru so all past payroll, attendance logs, and student records are preserved
+    return queryOne<Trainer>(`
+      UPDATE public.trainers
+      SET is_active = false, updated_at = now()
+      WHERE id = $1
+      RETURNING *;
+    `, [id]);
+  }
+
+  // Safe to hard-delete only if zero historical transactions
   const trainer = await queryOne<{ profile_id: string }>(`SELECT profile_id FROM public.trainers WHERE id = $1`, [id]);
   const deleted = await queryOne<Trainer>(`DELETE FROM public.trainers WHERE id = $1 RETURNING *;`, [id]);
   if (trainer?.profile_id) {
@@ -1440,8 +1464,23 @@ export async function updateBatch(id: string, data: {
 
 
 export async function deleteBatch(id: string) {
+  // Check if batch has historical class sessions (attendance) or enrollments
+  const [ses] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.class_sessions WHERE batch_id = $1`, [id]);
+  const [enr] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.batch_enrollments WHERE batch_id = $1`, [id]);
+  const hasHistory = (parseInt(ses?.count || '0', 10) > 0) || (parseInt(enr?.count || '0', 10) > 0);
+
+  if (hasHistory) {
+    // Soft-delete: mark batch as inactive so past attendance and student records are preserved
+    return queryOne<Batch>(`
+      UPDATE public.batches
+      SET is_active = false, updated_at = now()
+      WHERE id = $1
+      RETURNING *;
+    `, [id]);
+  }
+
+  // Safe to delete if brand new with zero attendance history
   await query(`DELETE FROM public.batch_enrollments WHERE batch_id = $1`, [id]);
-  await query(`DELETE FROM public.class_sessions WHERE batch_id = $1`, [id]);
   return queryOne<Batch>(`
     DELETE FROM public.batches WHERE id = $1 RETURNING *;
   `, [id]);

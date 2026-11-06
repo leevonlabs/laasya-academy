@@ -73,3 +73,36 @@ export async function saveBase64Media(
     return null;
   }
 }
+
+/**
+ * Automatically reclaims storage space in Supabase Free plan by purging
+ * media_assets that are no longer referenced in profiles, courses, or announcements.
+ */
+export async function pruneOrphanedMedia(): Promise<number> {
+  try {
+    const res = await query<{ count: string }>(`
+      WITH deleted AS (
+        DELETE FROM public.media_assets
+        WHERE id NOT IN (
+          SELECT regexp_replace(COALESCE(avatar_url, ''), '^.*/', '') FROM public.profiles WHERE avatar_url IS NOT NULL
+          UNION
+          SELECT regexp_replace(COALESCE(image_url, ''), '^.*/', '') FROM public.courses WHERE image_url IS NOT NULL
+          UNION
+          SELECT regexp_replace(COALESCE(image_url, ''), '^.*/', '') FROM public.announcements WHERE image_url IS NOT NULL
+          UNION
+          SELECT regexp_replace(COALESCE(avatar_url, ''), '^.*/', '') FROM public.trainers WHERE avatar_url IS NOT NULL
+          UNION
+          SELECT regexp_replace(COALESCE(avatar_url, ''), '^.*/', '') FROM public.students WHERE avatar_url IS NOT NULL
+        )
+        AND created_at < NOW() - INTERVAL '1 day'
+        RETURNING id
+      )
+      SELECT COUNT(*)::text as count FROM deleted;
+    `);
+    const count = parseInt(res[0]?.count || '0', 10);
+    return count;
+  } catch (err) {
+    console.error('Failed to prune orphaned media:', err);
+    return 0;
+  }
+}
