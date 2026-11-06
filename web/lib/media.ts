@@ -25,6 +25,11 @@ export async function saveBase64Media(
     const mime = match[1];
     const base64Data = match[2].replace(/\s+/g, '');
     const buffer = Buffer.from(base64Data, 'base64');
+    // Safety guard: reject oversized payloads exceeding 5 MB to prevent database bloat
+    if (buffer.length > 5 * 1024 * 1024) {
+      console.warn('Rejected oversized media upload: ' + buffer.length + ' bytes exceeds 5 MB limit');
+      return null;
+    }
     const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
     const hash = crypto.createHash('md5').update(buffer).digest('hex').substring(0, 12);
     const prefix = folder === 'avatars' ? 'avatar' : folder === 'courses' ? 'course' : folder === 'holidays' ? 'holiday' : 'notice';

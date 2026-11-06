@@ -72,6 +72,29 @@ export async function recordActiveSession(params: {
     const device = parseDeviceDetails(userAgent, ip);
     const tokenHash = params.token ? hashToken(params.token) : null;
 
+    // Concurrent session cap per role to prevent credential sharing and DB bloat
+    const maxAllowedSessions = ['owner', 'admin'].includes(params.role?.toLowerCase()) ? 3 : 2;
+
+    // Automatically deactivate older active sessions exceeding the device limit
+    await query(`
+      UPDATE public.active_sessions
+      SET is_active = false
+      WHERE (user_id = $1 OR profile_id = $1)
+        AND is_active = true
+        AND id NOT IN (
+          SELECT id FROM public.active_sessions
+          WHERE (user_id = $1 OR profile_id = $1) AND is_active = true
+          ORDER BY last_active_at DESC
+          LIMIT $2
+        );
+    `, [params.userId, maxAllowedSessions - 1]).catch(() => {});
+
+    // Opportunistic cleanup: purge stale inactive sessions older than 30 days
+    await query(`
+      DELETE FROM public.active_sessions
+      WHERE is_active = false AND last_active_at < NOW() - INTERVAL '30 days';
+    `).catch(() => {});
+
     const row = await queryOne<{ id: string }>(
       `INSERT INTO public.active_sessions (
         user_id, profile_id, user_name, identifier, role,

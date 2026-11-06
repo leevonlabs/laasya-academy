@@ -146,6 +146,22 @@ export default function AdvertisementsClient({ initialAnnouncements, courses, ba
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Strict raw file size & MIME type validation
+    const MAX_RAW_SIZE_MB = 5;
+    const MAX_RAW_BYTES = MAX_RAW_SIZE_MB * 1024 * 1024;
+    if (file.size > MAX_RAW_BYTES) {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      alert(`Selected flyer (${sizeMB} MB) exceeds the ${MAX_RAW_SIZE_MB} MB limit. Please select an image under ${MAX_RAW_SIZE_MB} MB.`);
+      e.target.value = '';
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      alert('Invalid file format. Please select a valid image file (JPG, PNG, WEBP).');
+      e.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
