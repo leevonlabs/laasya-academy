@@ -45,8 +45,43 @@ const COURSES_THEME: Record<string, {
     text: 'text-[#9D174D]',
     badgeBg: 'bg-[#FDF2F8]'
   },
+  'KUCHIPUDI': {
+    label: 'KUCHIPUDI',
+    bg: 'bg-[#F3E8FF]',
+    border: 'border-[#E9D5FF]',
+    text: 'text-[#7E22CE]',
+    badgeBg: 'bg-[#FAF5FF]'
+  },
+  'KUCHUPUDI': {
+    label: 'KUCHUPUDI',
+    bg: 'bg-[#F3E8FF]',
+    border: 'border-[#E9D5FF]',
+    text: 'text-[#7E22CE]',
+    badgeBg: 'bg-[#FAF5FF]'
+  },
+  'MOHINIYATTAM': {
+    label: 'MOHINIYATTAM',
+    bg: 'bg-[#F5F3FF]',
+    border: 'border-[#DDD6FE]',
+    text: 'text-[#6D28D9]',
+    badgeBg: 'bg-[#FAF5FF]'
+  },
+  'MOHINIYATAM': {
+    label: 'MOHINIYATAM',
+    bg: 'bg-[#F5F3FF]',
+    border: 'border-[#DDD6FE]',
+    text: 'text-[#6D28D9]',
+    badgeBg: 'bg-[#FAF5FF]'
+  },
+  'SEMI CLASSICAL': {
+    label: 'SEMI CLASSICAL',
+    bg: 'bg-[#FFF1F2]',
+    border: 'border-[#FECDD3]',
+    text: 'text-[#BE123C]',
+    badgeBg: 'bg-[#FFF5F5]'
+  },
   'INSTRUMENT CLASSES': {
-    label: 'INSTRUMENT CLASSES',
+    label: 'INSTRUMENTS',
     bg: 'bg-[#E0F2FE]',
     border: 'border-[#BAE6FD]',
     text: 'text-[#0369A1]',
@@ -59,12 +94,61 @@ const COURSES_THEME: Record<string, {
     text: 'text-[#B45309]',
     badgeBg: 'bg-[#FFFBEB]'
   },
+  'HINDUSTANI CLASSICAL VOCAL': {
+    label: 'HINDUSTANI MUSIC',
+    bg: 'bg-[#FEF3C7]',
+    border: 'border-[#FDE68A]',
+    text: 'text-[#92400E]',
+    badgeBg: 'bg-[#FFFBEB]'
+  },
+  'KEYBOARD': {
+    label: 'KEYBOARD',
+    bg: 'bg-[#E0F2FE]',
+    border: 'border-[#BAE6FD]',
+    text: 'text-[#0284C7]',
+    badgeBg: 'bg-[#F0F9FF]'
+  },
+  'GUITAR': {
+    label: 'GUITAR',
+    bg: 'bg-[#E0E7FF]',
+    border: 'border-[#C7D2FE]',
+    text: 'text-[#4338CA]',
+    badgeBg: 'bg-[#EEF2FF]'
+  },
+  'VIOLIN': {
+    label: 'VIOLIN',
+    bg: 'bg-[#CFFAFE]',
+    border: 'border-[#A5F3FC]',
+    text: 'text-[#0E7490]',
+    badgeBg: 'bg-[#ECFEFF]'
+  },
+  'UKULELE': {
+    label: 'UKULELE',
+    bg: 'bg-[#D1FAE5]',
+    border: 'border-[#A7F3D0]',
+    text: 'text-[#047857]',
+    badgeBg: 'bg-[#ECFDF5]'
+  },
   'DRAWING': {
     label: 'DRAWING',
     bg: 'bg-[#DCFCE7]',
     border: 'border-[#BBF7D0]',
     text: 'text-[#15803D]',
     badgeBg: 'bg-[#F0FDF4]'
+  },
+  'ART AND CRAFT': {
+    label: 'ART & CRAFT',
+    bg: 'bg-[#DCFCE7]',
+    border: 'border-[#BBF7D0]',
+    text: 'text-[#15803D]',
+    badgeBg: 'bg-[#F0FDF4]'
+  },
+  'CHESS': {
+    label: 'CHESS',
+    bg: 'bg-[#F1F5F9]',
+    border: 'border-[#CBD5E1]',
+    text: 'text-[#334155]',
+    badgeBg: 'bg-[#F8FAFC]'
   },
   'WESTERN DANCE': {
     label: 'WESTERN DANCE',
@@ -93,8 +177,56 @@ const COURSES_THEME: Record<string, {
     border: 'border-[#FEF08A]',
     text: 'text-[#A16207]',
     badgeBg: 'bg-[#FEFCE8]'
+  },
+  'GYMNASTIC': {
+    label: 'GYMNASTICS',
+    bg: 'bg-[#FEE2E2]',
+    border: 'border-[#FECACA]',
+    text: 'text-[#B91C1C]',
+    badgeBg: 'bg-[#FEF2F2]'
+  },
+  'ZUMBA': {
+    label: 'ZUMBA',
+    bg: 'bg-[#FDF2F8]',
+    border: 'border-[#FBCFE8]',
+    text: 'text-[#BE185D]',
+    badgeBg: 'bg-[#FFF1F2]'
   }
 };
+
+const getCourseTheme = (courseName: string) => {
+  const upper = (courseName || '').toUpperCase().trim();
+  if (COURSES_THEME[upper]) return COURSES_THEME[upper];
+  for (const [key, val] of Object.entries(COURSES_THEME)) {
+    if (upper.includes(key) || key.includes(upper)) return val;
+  }
+  return {
+    label: courseName,
+    bg: 'bg-[#F3E8EE]',
+    border: 'border-[#F0D5E4]',
+    text: 'text-[#8A064D]',
+    badgeBg: 'bg-[#FFF2F8]'
+  };
+};
+
+function formatTime12(timeStr?: string): string {
+  if (!timeStr) return '';
+  const clean = timeStr.trim();
+  if (clean.includes('AM') || clean.includes('PM') || clean.includes('am') || clean.includes('pm')) {
+    return clean;
+  }
+  const parts = clean.split(':');
+  if (parts.length >= 2) {
+    let h = parseInt(parts[0], 10);
+    const m = parts[1];
+    if (isNaN(h)) return clean;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    let h12 = h % 12;
+    if (h12 === 0) h12 = 12;
+    return `${h12}:${m} ${ampm}`;
+  }
+  return clean;
+}
 
 const TIME_ROWS: Array<{
   time: string;
@@ -347,22 +479,159 @@ const TIME_ROWS: Array<{
   }
 ];
 
-const getSlotRoom = (slot: TimetableSlot): string => {
-  if (slot.room && slot.room.trim().length > 0) return slot.room;
-  const courseUpper = slot.course.toUpperCase();
-  if (courseUpper.includes('YOGA')) return 'Room 1 (Yoga Shala)';
-  if (courseUpper.includes('WESTERN')) return 'Room 1 (Dance Studio)';
-  if (courseUpper.includes('BHARATANATYAM') || courseUpper.includes('KALARI') || courseUpper.includes('KUCHIPUDI') || courseUpper.includes('MOHINI')) return 'Room 2 (Natya Mandapam)';
-  if (courseUpper.includes('MUSIC') || courseUpper.includes('INSTRUMENT') || courseUpper.includes('VIOLIN') || courseUpper.includes('KEYBOARD') || courseUpper.includes('GUITAR')) return 'Room 3 (Sangeetha Hall)';
-  if (courseUpper.includes('DRAWING') || courseUpper.includes('ART') || courseUpper.includes('CHESS') || courseUpper.includes('KARATE')) return 'Room 4 (Chitrakala Studio)';
-  return 'Room 2 (Main Hall)';
-};
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function TimetableView({ onBack, batches, tallyClasses: initialTallyClasses, showBackLink = true }: Props) {
   const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('ALL');
   const [liveTallyClasses, setLiveTallyClasses] = useState<any[]>(initialTallyClasses || []);
+  const [liveBatches, setLiveBatches] = useState<Batch[]>(batches || []);
+
+  // Sync or fetch live batches from API so any change to room name or schedule is reactive immediately
+  React.useEffect(() => {
+    if (batches && batches.length > 0) {
+      setLiveBatches(batches);
+      return;
+    }
+    fetch('/api/batches')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setLiveBatches(data);
+        }
+      })
+      .catch(err => {
+        console.error('Notice: Could not fetch live batches for timetable:', err);
+      });
+  }, [batches]);
+
+  // Dynamic batch matching helper
+  const findMatchingBatch = (slotBatch: string, slotCourse?: string): Batch | undefined => {
+    const normSlot = (slotBatch || '').toLowerCase().trim();
+    if (!normSlot) return undefined;
+
+    // 1. Exact batch name match
+    let match = liveBatches.find(b => b.name?.toLowerCase().trim() === normSlot);
+    if (match) return match;
+
+    // 2. Substring match (e.g. "Alapadma" matching "Alapadma (Kids Foundation)" or "Junior Batch")
+    match = liveBatches.find(b => {
+      const bName = (b.name || '').toLowerCase().trim();
+      return bName.includes(normSlot) || normSlot.includes(bName);
+    });
+    if (match) return match;
+
+    // 3. Combined course title + batch match
+    if (slotCourse) {
+      const normCourse = slotCourse.toLowerCase().trim();
+      match = liveBatches.find(b => {
+        const bCourse = (b.course_title || '').toLowerCase().trim();
+        const bName = (b.name || '').toLowerCase().trim();
+        return (bCourse.includes(normCourse) || normCourse.includes(bCourse)) &&
+               (bName.includes(normSlot) || normSlot.includes(bName));
+      });
+      if (match) return match;
+    }
+
+    return undefined;
+  };
+
+  // Dynamic room resolution: Reads live database room_or_hall
+  const getSlotRoom = (slot: TimetableSlot): string => {
+    // A. Explicit room from slot (e.g. rescheduled tally classes)
+    if (slot.room && slot.room.trim().length > 0) return slot.room.trim();
+
+    // B. Match with live batches in database
+    const match = findMatchingBatch(slot.batch, slot.course);
+    if (match && (match.room_or_hall || match.room)) {
+      return (match.room_or_hall || match.room || '').trim();
+    }
+
+    // C. Fallback room based on course category
+    const courseUpper = (slot.course || '').toUpperCase();
+    if (courseUpper.includes('YOGA')) return 'Room 1 (Yoga Shala)';
+    if (courseUpper.includes('WESTERN')) return 'Room 1 (Dance Studio)';
+    if (courseUpper.includes('BHARATANATYAM') || courseUpper.includes('KALARI') || courseUpper.includes('KUCHIPUDI') || courseUpper.includes('MOHINI')) return 'Room 2 (Natya Mandapam)';
+    if (courseUpper.includes('MUSIC') || courseUpper.includes('INSTRUMENT') || courseUpper.includes('VIOLIN') || courseUpper.includes('KEYBOARD') || courseUpper.includes('GUITAR') || courseUpper.includes('UKULELE')) return 'Room 3 (Sangeetha Hall)';
+    if (courseUpper.includes('DRAWING') || courseUpper.includes('ART') || courseUpper.includes('CHESS') || courseUpper.includes('KARATE')) return 'Room 4 (Chitrakala Studio)';
+    return 'Room 2 (Main Hall)';
+  };
+
+  // Dynamic trainer resolution: Reads live database faculty assignment
+  const getSlotTrainer = (slot: TimetableSlot): string => {
+    if (slot.isRescheduled && slot.trainer) return slot.trainer;
+    const match = findMatchingBatch(slot.batch, slot.course);
+    if (match && match.trainer_name && match.trainer_name.trim().length > 0) {
+      return match.trainer_name.trim();
+    }
+    return slot.trainer;
+  };
+
+  // Synthesize dynamic time rows from TIME_ROWS + any active live batches
+  const dynamicTimeRows = useMemo(() => {
+    const rows = TIME_ROWS.map(r => ({
+      time: r.time,
+      slots: Object.fromEntries(
+        DAYS.map(day => [day, [...(r.slots[day] || [])]])
+      ) as Record<string, TimetableSlot[]>
+    }));
+
+    if (!liveBatches || liveBatches.length === 0) return rows;
+
+    const placedBatchNames = new Set<string>();
+    rows.forEach(r => {
+      DAYS.forEach(day => {
+        r.slots[day]?.forEach(s => {
+          placedBatchNames.add(s.batch.toLowerCase().trim());
+        });
+      });
+    });
+
+    const activeBatches = liveBatches.filter(b => b.is_active !== false);
+
+    activeBatches.forEach(b => {
+      const bNameLower = (b.name || '').toLowerCase().trim();
+      if (!bNameLower || placedBatchNames.has(bNameLower)) return;
+
+      const start12 = formatTime12(b.start_time);
+      const end12 = formatTime12(b.end_time);
+      const timeLabel = (start12 && end12) ? `${start12} – ${end12}` : '5:00 PM – 6:00 PM';
+      const days = Array.isArray(b.days_of_week) && b.days_of_week.length > 0
+        ? b.days_of_week
+        : ['Monday', 'Wednesday'];
+
+      let targetRow = rows.find(r => {
+        const rNorm = r.time.replace(/[-–]/g, '–').replace(/\s+/g, ' ').trim().toLowerCase();
+        const tNorm = timeLabel.replace(/[-–]/g, '–').replace(/\s+/g, ' ').trim().toLowerCase();
+        return rNorm === tNorm || (start12 && rNorm.startsWith(start12.toLowerCase()));
+      });
+
+      if (!targetRow) {
+        targetRow = {
+          time: timeLabel,
+          slots: Object.fromEntries(DAYS.map(day => [day, []])) as Record<string, TimetableSlot[]>
+        };
+        rows.push(targetRow);
+      }
+
+      days.forEach(day => {
+        const cleanDay = day.trim();
+        if (targetRow && targetRow.slots[cleanDay]) {
+          const alreadyInCell = targetRow.slots[cleanDay].some(s => s.batch.toLowerCase().trim() === bNameLower);
+          if (!alreadyInCell) {
+            targetRow.slots[cleanDay].push({
+              course: (b.course_title || 'CLASSICAL').toUpperCase().trim(),
+              batch: b.name.trim(),
+              trainer: b.trainer_name || 'Assigned Guru',
+              room: (b.room_or_hall || b.room || '').trim()
+            });
+          }
+        }
+      });
+    });
+
+    return rows;
+  }, [liveBatches]);
 
   // Fetch rescheduled tally classes if not passed in props
   React.useEffect(() => {
@@ -379,9 +648,7 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
           setLiveTallyClasses(data);
         }
       })
-      .catch(() => {
-        // Quiet fallback to mock sample if API route unavailable in some environment
-      });
+      .catch(() => {});
   }, [initialTallyClasses]);
 
   // Dynamic current week dates & Month/Year calculation
@@ -389,8 +656,7 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
     const now = new Date();
     const currentMonthYear = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-    // Calculate Monday to Sunday of the current week
-    const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday...
+    const dayOfWeek = now.getDay();
     const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     const monday = new Date(now);
     monday.setDate(now.getDate() + diffToMonday);
@@ -413,11 +679,26 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
 
   const inactiveBatchNames = useMemo(() => {
     return new Set(
-      (batches || [])
+      liveBatches
         .filter(b => b.is_active === false)
-        .map(b => b.name.toLowerCase().trim())
+        .map(b => (b.name || '').toLowerCase().trim())
     );
-  }, [batches]);
+  }, [liveBatches]);
+
+  const activeBatchesCount = useMemo(() => {
+    if (liveBatches && liveBatches.length > 0) {
+      return liveBatches.filter(b => b.is_active !== false).length;
+    }
+    return 33;
+  }, [liveBatches]);
+
+  const availableCourseFilters = useMemo(() => {
+    const list: string[] = [];
+    Object.keys(COURSES_THEME).forEach(k => {
+      if (!list.includes(k)) list.push(k);
+    });
+    return list;
+  }, []);
 
   const [isExporting, setIsExporting] = useState(false);
   const timetableRef = useRef<HTMLDivElement>(null);
@@ -531,9 +812,10 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
               : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
           }`}
         >
-          All Courses (33 Batches)
+          All Courses (${activeBatchesCount} Batches)
         </button>
-        {Object.entries(COURSES_THEME).map(([name, theme]) => {
+        {availableCourseFilters.map(name => {
+          const theme = getCourseTheme(name);
           const isSelected = selectedCourseFilter === name;
           return (
             <button
@@ -590,7 +872,7 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F0D5E4]/80">
-              {TIME_ROWS.map((row, idx) => (
+              {dynamicTimeRows.map((row, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/50 transition">
                   {/* Time Column */}
                   <td className="py-3 px-2 text-center text-[10px] font-bold text-gray-700 bg-[#FDFBFB] border-r border-[#F0D5E4] whitespace-nowrap align-middle">
@@ -631,12 +913,7 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
                       <td key={day} className="p-1.5 border-r border-[#F0D5E4]/80 last:border-r-0 align-top min-w-[130px]">
                         <div className="space-y-1.5">
                           {filteredSlots.map((slot, sIdx) => {
-                            const theme = COURSES_THEME[slot.course] || {
-                              bg: 'bg-rose-50',
-                              border: 'border-rose-200',
-                              text: 'text-rose-900',
-                              badgeBg: 'bg-white'
-                            };
+                            const theme = getCourseTheme(slot.course);
 
                             return (
                               <div
@@ -664,7 +941,7 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
                                 </div>
                                 <div className={`text-[9.5px] font-medium leading-tight mt-0.5 text-gray-600 flex items-center gap-1`}>
                                   <User className="w-2.5 h-2.5 text-gray-400 shrink-0" />
-                                  <span>{slot.trainer}</span>
+                                  <span>{getSlotTrainer(slot)}</span>
                                 </div>
                                 <div className="flex items-center gap-1 text-[9px] font-bold text-gray-700 mt-1 bg-white/80 px-1.5 py-0.5 rounded border border-gray-200/80 w-fit">
                                   <DoorOpen className="w-2.5 h-2.5 text-[#8A064D] shrink-0" />
