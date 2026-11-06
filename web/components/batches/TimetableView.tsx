@@ -567,32 +567,26 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
     return slot.trainer;
   };
 
-  // Synthesize dynamic time rows from TIME_ROWS + any active live batches
+  // Synthesize dynamic time rows strictly from live database batches
   const dynamicTimeRows = useMemo(() => {
-    const rows = TIME_ROWS.map(r => ({
-      time: r.time,
-      slots: Object.fromEntries(
-        DAYS.map(day => [day, [...(r.slots[day] || [])]])
-      ) as Record<string, TimetableSlot[]>
-    }));
-
-    if (!liveBatches || liveBatches.length === 0) return rows;
-
-    const placedBatchNames = new Set<string>();
-    rows.forEach(r => {
-      DAYS.forEach(day => {
-        r.slots[day]?.forEach(s => {
-          placedBatchNames.add(s.batch.toLowerCase().trim());
-        });
-      });
-    });
+    if (!liveBatches || liveBatches.length === 0) {
+      return TIME_ROWS.map(r => ({
+        time: r.time,
+        slots: Object.fromEntries(
+          DAYS.map(day => [day, [...(r.slots[day] || [])]])
+        ) as Record<string, TimetableSlot[]>
+      }));
+    }
 
     const activeBatches = liveBatches.filter(b => b.is_active !== false);
+    if (activeBatches.length === 0) {
+      return [];
+    }
+
+    // Group batches by their formatted time slot
+    const timeSlotMap = new Map<string, Record<string, TimetableSlot[]>>();
 
     activeBatches.forEach(b => {
-      const bNameLower = (b.name || '').toLowerCase().trim();
-      if (!bNameLower || placedBatchNames.has(bNameLower)) return;
-
       const start12 = formatTime12(b.start_time);
       const end12 = formatTime12(b.end_time);
       const timeLabel = (start12 && end12) ? `${start12} – ${end12}` : '5:00 PM – 6:00 PM';
@@ -600,37 +594,43 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
         ? b.days_of_week
         : ['Monday', 'Wednesday'];
 
-      let targetRow = rows.find(r => {
-        const rNorm = r.time.replace(/[-–]/g, '–').replace(/\s+/g, ' ').trim().toLowerCase();
-        const tNorm = timeLabel.replace(/[-–]/g, '–').replace(/\s+/g, ' ').trim().toLowerCase();
-        return rNorm === tNorm || (start12 && rNorm.startsWith(start12.toLowerCase()));
-      });
-
-      if (!targetRow) {
-        targetRow = {
-          time: timeLabel,
-          slots: Object.fromEntries(DAYS.map(day => [day, []])) as Record<string, TimetableSlot[]>
-        };
-        rows.push(targetRow);
+      if (!timeSlotMap.has(timeLabel)) {
+        timeSlotMap.set(timeLabel, Object.fromEntries(DAYS.map(day => [day, []])) as Record<string, TimetableSlot[]>);
       }
 
+      const dayRecord = timeSlotMap.get(timeLabel)!;
       days.forEach(day => {
         const cleanDay = day.trim();
-        if (targetRow && targetRow.slots[cleanDay]) {
-          const alreadyInCell = targetRow.slots[cleanDay].some(s => s.batch.toLowerCase().trim() === bNameLower);
-          if (!alreadyInCell) {
-            targetRow.slots[cleanDay].push({
-              course: (b.course_title || 'CLASSICAL').toUpperCase().trim(),
-              batch: b.name.trim(),
-              trainer: b.trainer_name || 'Assigned Guru',
-              room: (b.room_or_hall || b.room || '').trim()
-            });
-          }
+        const matchedDay = DAYS.find(d => d.toLowerCase() === cleanDay.toLowerCase());
+        if (matchedDay && dayRecord[matchedDay]) {
+          dayRecord[matchedDay].push({
+            course: (b.course_title || 'CLASSICAL').toUpperCase().trim(),
+            batch: (b.name || 'Batch').trim(),
+            trainer: (b.trainer_name || 'Assigned Guru').trim(),
+            room: (b.room_or_hall || b.room || 'Room 1').trim()
+          });
         }
       });
     });
 
-    return rows;
+    // Sort time rows chronologically by starting time
+    const parseMinutes = (str: string) => {
+      const m = str.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!m) return 0;
+      let hours = parseInt(m[1], 10);
+      const mins = parseInt(m[2], 10);
+      const isPM = m[3].toUpperCase() === 'PM';
+      if (isPM && hours !== 12) hours += 12;
+      if (!isPM && hours === 12) hours = 0;
+      return hours * 60 + mins;
+    };
+
+    const sortedTimes = Array.from(timeSlotMap.keys()).sort((a, b) => parseMinutes(a) - parseMinutes(b));
+
+    return sortedTimes.map(time => ({
+      time,
+      slots: timeSlotMap.get(time)!
+    }));
   }, [liveBatches]);
 
   // Fetch rescheduled tally classes if not passed in props
