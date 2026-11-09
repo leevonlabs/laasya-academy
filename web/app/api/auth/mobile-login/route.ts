@@ -3,6 +3,7 @@ import { query, queryOne } from '@/lib/db';
 import { createToken } from '@/lib/auth';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { recordActiveSession } from '@/lib/active-sessions';
+import { logSecurityAudit } from '@/lib/audit';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,138 @@ const corsHeaders = {
 
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
+}
+
+function formatTime12(timeStr?: string): string {
+  if (!timeStr) return '';
+  const parts = timeStr.trim().split(':');
+  if (parts.length < 2) return timeStr;
+  let hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+  if (isNaN(hours)) return timeStr;
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${hours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+}
+
+async function buildStudentProfile(student: any, cleanDigits: string, rawInput: string, trimmedPass: string, request: NextRequest) {
+  const enrollments = await query<any>(`
+    SELECT 
+      c.id as course_id,
+      c.title as course_title,
+      c.category as course_category,
+      c.monthly_fee,
+      b.id as batch_id,
+      b.name as batch_name,
+      b.room_or_hall,
+      b.days_of_week,
+      b.start_time,
+      b.end_time,
+      b.schedules,
+      p_tr.full_name as trainer_name
+    FROM public.batch_enrollments be
+    JOIN public.batches b ON be.batch_id = b.id
+    JOIN public.courses c ON b.course_id = c.id
+    LEFT JOIN public.trainers t ON b.trainer_id = t.id
+    LEFT JOIN public.profiles p_tr ON t.profile_id = p_tr.id
+    WHERE be.student_id = $1 AND be.status = 'active'
+    ORDER BY be.enrolled_at ASC
+  `, [student.student_id]);
+
+  const enrollment = enrollments[0];
+  const standardFee = Number(enrollment?.monthly_fee) || 2000;
+  const discount = Number(student.fixed_discount) || 0;
+  const advance = Number(student.advance_paid) || 0;
+  const netMonthly = Math.max(0, standardFee - discount);
+  const due = Math.max(0, netMonthly - advance);
+
+  const formattedEnrollments = enrollments.map(e => {
+    const daysList = Array.isArray(e.days_of_week)
+      ? e.days_of_week
+      : (typeof e.days_of_week === 'string' ? e.days_of_week.split(',').map((s: string) => s.trim()) : ['Weekly']);
+    const days = daysList.join(', ');
+    const startTime12 = formatTime12(e.start_time);
+    const endTime12 = formatTime12(e.end_time);
+    const times = startTime12 && endTime12 ? ` • ${startTime12} - ${endTime12}` : '';
+    return {
+      id: e.course_id,
+      title: e.course_title,
+      telugu_name: e.course_category || 'Classical Arts',
+      category: e.course_category || 'Classical Arts',
+      trainer_name: e.trainer_name || 'Assigned Guru',
+      batch_name: e.batch_name || 'Batch',
+      batch_id: e.batch_id,
+      days_of_week: daysList,
+      start_time: startTime12 || e.start_time,
+      end_time: endTime12 || e.end_time,
+      timings: `${days}${times}`,
+      room: e.room_or_hall || 'Natya Mandapam (Room 101)',
+      start_date: '01 Jan 2026',
+      status: 'Active',
+      fee: `₹${e.monthly_fee || standardFee} / month`,
+      attendance_rate: 92,
+      month_attendance: '92% (11/12 classes)',
+      month_attended: 11,
+      month_total: 12,
+      syllabus_covered: 'Classical technique, adavu mudras, & foundational practice',
+      dress_code: 'Standard academy attire and ghungroos',
+    };
+  });
+
+  const isDefaultPass = trimmedPass === 'Student@123' || trimmedPass === cleanDigits || trimmedPass === '123456';
+
+  const profile = {
+    id: student.student_id,
+    profile_id: student.profile_id,
+    roll_number: student.roll_number,
+    full_name: student.full_name,
+    phone: student.phone,
+    email: student.email,
+    role: 'student',
+    avatar_url: student.avatar_url,
+    age: student.age || 15,
+    gender: student.gender || 'Not specified',
+    parent_name: student.parent_name || 'Guardian',
+    parent_phone: student.parent_contact || student.phone,
+    address: student.address || 'Bangalore',
+    course: enrollment?.course_title || 'Bharathanatyam',
+    course_category: enrollment?.course_category || 'Classical Arts',
+    batch: enrollment?.batch_name || 'Batch A',
+    room_or_hall: enrollment?.room_or_hall || 'Natya Mandapam (Room 101)',
+    trainer_name: enrollment?.trainer_name || 'Assigned Guru',
+    timings: formattedEnrollments[0]?.timings || 'Mon, Wed, Fri • 17:00 - 18:30',
+    total_monthly_fee: standardFee,
+    fixed_discount: discount,
+    scheme_id: null,
+    net_monthly_fee: netMonthly,
+    advance_paid: advance,
+    due_amount: due,
+    due_status: due > 0 ? 'red' : 'green',
+    due_date: '5th of this month',
+    next_due_date: '5th of next month',
+    enrolled_courses: formattedEnrollments,
+    must_change_password: isDefaultPass,
+    is_default_password: isDefaultPass,
+  };
+
+  const token = createToken({
+    userId: student.profile_id,
+    email: student.email || `${student.roll_number || cleanDigits}@laasyaacademy.com`,
+    fullName: student.full_name,
+    role: 'student',
+  });
+
+  const sessionId = await recordActiveSession({
+    userId: student.profile_id,
+    profileId: student.profile_id,
+    userName: student.full_name,
+    identifier: student.roll_number || cleanDigits || rawInput,
+    role: 'student',
+    req: request,
+    token,
+  });
+
+  return { profile: { ...profile, token, session_id: sessionId }, token };
 }
 
 export async function POST(request: NextRequest) {
@@ -52,6 +185,7 @@ export async function POST(request: NextRequest) {
     // 1. ATTEMPT GURU / TRAINER AUTHENTICATION
     // -------------------------------------------------------------
     if (targetRole === 'trainer' || !targetRole) {
+      // Hardened Query: Strict lookup by phone, guru_id, code, or email. Disallow loose full_name matching.
       const guruSql = `
         SELECT 
           t.id as trainer_id,
@@ -76,8 +210,6 @@ export async function POST(request: NextRequest) {
           ))
           OR LOWER(TRIM(t.guru_id)) = LOWER(TRIM($2))
           OR LOWER(TRIM(t.code)) = LOWER(TRIM($2))
-          OR LOWER(TRIM(p.full_name)) = LOWER(TRIM($2))
-          OR p.full_name ILIKE '%' || $2 || '%'
           OR LOWER(TRIM(p.email)) = LOWER(TRIM($2))
         )
         ORDER BY
@@ -85,15 +217,21 @@ export async function POST(request: NextRequest) {
             WHEN (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)) THEN 1
             WHEN LOWER(TRIM(t.guru_id)) = LOWER(TRIM($2)) THEN 2
             WHEN LOWER(TRIM(t.code)) = LOWER(TRIM($2)) THEN 3
-            WHEN LOWER(TRIM(p.full_name)) = LOWER(TRIM($2)) THEN 4
-            WHEN LOWER(TRIM(p.email)) = LOWER(TRIM($2)) THEN 5
-            ELSE 6
+            WHEN LOWER(TRIM(p.email)) = LOWER(TRIM($2)) THEN 4
+            ELSE 5
           END ASC
         LIMIT 1
       `;
       const trainer = await queryOne<any>(guruSql, [cleanDigits, rawInput]);
 
       if (trainer) {
+        if (trainer.is_active === false) {
+          return NextResponse.json(
+            { success: false, error: 'Faculty account has been deactivated. Please contact administration.' },
+            { status: 403, headers: corsHeaders }
+          );
+        }
+
         let isPasswordValid = false;
         if (trainer.encrypted_password) {
           const passCheck = await queryOne<{ match: boolean }>(
@@ -104,7 +242,6 @@ export async function POST(request: NextRequest) {
         }
 
         if (isPasswordValid) {
-          // Fetch trainer batches count, student count, and primary course title
           const batchStats = await queryOne<any>(`
             SELECT 
               count(distinct b.id)::int as assigned_batches_count,
@@ -119,6 +256,7 @@ export async function POST(request: NextRequest) {
 
           const guruDisplayTitle = trainer.display_title || 'Revered Faculty Guru';
           const guruCourseName = batchStats?.primary_course_title || (Array.isArray(trainer.specializations) && trainer.specializations.length > 0 ? trainer.specializations[0] : 'Classical Arts');
+          const isDefaultGuruPass = trimmedPass === 'Guru@123' || trimmedPass === cleanDigits || trimmedPass === '123456';
 
           const profile = {
             id: trainer.trainer_id,
@@ -138,6 +276,8 @@ export async function POST(request: NextRequest) {
             assigned_room: batchStats?.assigned_room || 'Natya Mandapam',
             assigned_batches_count: Number(batchStats?.assigned_batches_count ?? 0),
             total_students_count: Number(batchStats?.total_students_count ?? 0),
+            must_change_password: isDefaultGuruPass,
+            is_default_password: isDefaultGuruPass,
           };
 
           const token = createToken({
@@ -157,15 +297,30 @@ export async function POST(request: NextRequest) {
             token,
           });
 
+          await logSecurityAudit({
+            userId: trainer.profile_id,
+            userName: trainer.full_name,
+            role: 'trainer',
+            action: 'GURU_LOGIN_SUCCESS',
+            targetType: 'trainer',
+            targetId: trainer.trainer_id,
+            req: request,
+          });
+
           return NextResponse.json({ success: true, profile: { ...profile, token, session_id: sessionId }, token }, { headers: corsHeaders });
         } else if (targetRole === 'trainer') {
+          await logSecurityAudit({
+            role: 'trainer',
+            action: 'GURU_LOGIN_FAILED_PASSWORD',
+            details: { identifier: rawInput },
+            req: request,
+          });
           return NextResponse.json(
             { success: false, error: 'Incorrect faculty password. Please verify your credentials or contact admin.' },
             { status: 401, headers: corsHeaders }
           );
         }
       } else if (targetRole === 'trainer') {
-        // Check if user is actually a student trying to log into Guru portal
         const studentCheck = await queryOne<any>(`
           SELECT s.id, p.full_name FROM public.students s
           JOIN public.profiles p ON s.profile_id = p.id
@@ -174,7 +329,6 @@ export async function POST(request: NextRequest) {
             OR (LENGTH($1) >= 8 AND regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
             OR LOWER(s.roll_number) = LOWER($2)
             OR LOWER(s.roll_number) = 'lca-' || LOWER($2)
-            OR LOWER(p.full_name) = LOWER($2)
           ) LIMIT 1
         `, [cleanDigits, rawInput]);
 
@@ -196,6 +350,7 @@ export async function POST(request: NextRequest) {
     // 2. ATTEMPT STUDENT AUTHENTICATION
     // -------------------------------------------------------------
     if (targetRole === 'student' || !targetRole) {
+      // Hardened Query: Strict lookup by phone, parent contact, or roll number. Disallow loose name matching.
       const studentSql = `
         SELECT 
           s.id as student_id,
@@ -229,7 +384,6 @@ export async function POST(request: NextRequest) {
           OR LOWER(TRIM(s.roll_number)) = LOWER(TRIM($2))
           OR LOWER(TRIM(s.roll_number)) = 'lca-' || LOWER(TRIM($2))
           OR (LENGTH($1) > 0 AND regexp_replace(LOWER(s.roll_number), '[^0-9]', '', 'g') = $1)
-          OR LOWER(TRIM(p.full_name)) = LOWER(TRIM($2))
         )
         ORDER BY
           CASE 
@@ -237,164 +391,83 @@ export async function POST(request: NextRequest) {
             WHEN LOWER(TRIM(s.roll_number)) = 'lca-' || LOWER(TRIM($2)) THEN 2
             WHEN (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)) THEN 3
             WHEN (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)) THEN 4
-            WHEN LOWER(TRIM(p.full_name)) = LOWER(TRIM($2)) THEN 5
-            ELSE 6
+            ELSE 5
           END ASC
-        LIMIT 1
       `;
-      const student = await queryOne<any>(studentSql, [cleanDigits, rawInput]);
+      const candidateStudents = await query<any>(studentSql, [cleanDigits, rawInput]);
 
-      if (student) {
-        let isPasswordValid = false;
-        if (student.encrypted_password) {
-          const passCheck = await queryOne<{ match: boolean }>(
-            `SELECT (u.encrypted_password = crypt($1, u.encrypted_password)) as match FROM auth.users u WHERE u.id = $2`,
-            [trimmedPass, student.profile_id]
-          );
-          if (passCheck?.match) isPasswordValid = true;
+      if (candidateStudents && candidateStudents.length > 0) {
+        // Multi-child disambiguation: verify password across candidates
+        const validCandidates: any[] = [];
+        for (const candidate of candidateStudents) {
+          if (candidate.student_status === 'inactive') continue;
+          if (candidate.encrypted_password) {
+            const passCheck = await queryOne<{ match: boolean }>(
+              `SELECT (u.encrypted_password = crypt($1, u.encrypted_password)) as match FROM auth.users u WHERE u.id = $2`,
+              [trimmedPass, candidate.profile_id]
+            );
+            if (passCheck?.match) {
+              validCandidates.push(candidate);
+            }
+          }
         }
 
-        if (isPasswordValid) {
-          // Fetch all student course & batch details including assigned Guru and timings
-          const enrollments = await query<any>(`
-            SELECT 
-              c.id as course_id,
-              c.title as course_title,
-              c.category as course_category,
-              c.monthly_fee,
-              b.id as batch_id,
-              b.name as batch_name,
-              b.room_or_hall,
-              b.days_of_week,
-              b.start_time,
-              b.end_time,
-              b.schedules,
-              p_tr.full_name as trainer_name
-            FROM public.batch_enrollments be
-            JOIN public.batches b ON be.batch_id = b.id
-            JOIN public.courses c ON b.course_id = c.id
-            LEFT JOIN public.trainers t ON b.trainer_id = t.id
-            LEFT JOIN public.profiles p_tr ON t.profile_id = p_tr.id
-            WHERE be.student_id = $1 AND be.status = 'active'
-            ORDER BY be.enrolled_at ASC
-          `, [student.student_id]);
+        if (validCandidates.length > 0) {
+          const primaryCandidate = validCandidates[0];
+          const result = await buildStudentProfile(primaryCandidate, cleanDigits, rawInput, trimmedPass, request);
 
-          const enrollment = enrollments[0];
-          const standardFee = Number(enrollment?.monthly_fee) || 2000;
-          const discount = Number(student.fixed_discount) || 0;
-          const advance = Number(student.advance_paid) || 0;
-          const netMonthly = Math.max(0, standardFee - discount);
-          const due = Math.max(0, netMonthly - advance);
-
-          function formatTime12(timeStr?: string): string {
-            if (!timeStr) return '';
-            const parts = timeStr.trim().split(':');
-            if (parts.length < 2) return timeStr;
-            let hours = parseInt(parts[0], 10);
-            const minutes = parts[1];
-            if (isNaN(hours)) return timeStr;
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12 || 12;
-            return `${hours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+          // If multiple siblings share the contact & password, provide sibling list
+          const formattedSiblings: any[] = [];
+          if (validCandidates.length > 1) {
+            for (const c of validCandidates) {
+              formattedSiblings.push({
+                student_id: c.student_id,
+                profile_id: c.profile_id,
+                full_name: c.full_name,
+                roll_number: c.roll_number,
+                avatar_url: c.avatar_url,
+              });
+            }
           }
 
-          const formattedEnrollments = enrollments.map(e => {
-            const daysList = Array.isArray(e.days_of_week)
-              ? e.days_of_week
-              : (typeof e.days_of_week === 'string' ? e.days_of_week.split(',').map((s: string) => s.trim()) : ['Weekly']);
-            const days = daysList.join(', ');
-            const startTime12 = formatTime12(e.start_time);
-            const endTime12 = formatTime12(e.end_time);
-            const times = startTime12 && endTime12 ? ` • ${startTime12} - ${endTime12}` : '';
-            return {
-              id: e.course_id,
-              title: e.course_title,
-              telugu_name: e.course_category || 'Classical Arts',
-              category: e.course_category || 'Classical Arts',
-              trainer_name: e.trainer_name || 'Assigned Guru',
-              batch_name: e.batch_name || 'Batch',
-              batch_id: e.batch_id,
-              days_of_week: daysList,
-              start_time: startTime12 || e.start_time,
-              end_time: endTime12 || e.end_time,
-              timings: `${days}${times}`,
-              room: e.room_or_hall || 'Natya Mandapam (Room 101)',
-              start_date: '01 Jan 2026',
-              status: 'Active',
-              fee: `₹${e.monthly_fee || standardFee} / month`,
-              attendance_rate: 92,
-              month_attendance: '92% (11/12 classes)',
-              month_attended: 11,
-              month_total: 12,
-              syllabus_covered: 'Classical technique, adavu mudras, & foundational practice',
-              dress_code: 'Standard academy attire and ghungroos',
-            };
-          });
-
-          const profile = {
-            id: student.student_id,
-            profile_id: student.profile_id,
-            roll_number: student.roll_number,
-            full_name: student.full_name,
-            phone: student.phone,
-            email: student.email,
+          await logSecurityAudit({
+            userId: primaryCandidate.profile_id,
+            userName: primaryCandidate.full_name,
             role: 'student',
-            avatar_url: student.avatar_url,
-            age: student.age || 15,
-            gender: student.gender || 'Not specified',
-            parent_name: student.parent_name || 'Guardian',
-            parent_phone: student.parent_contact || student.phone,
-            address: student.address || 'Bangalore',
-            course: enrollment?.course_title || 'Bharathanatyam',
-            course_category: enrollment?.course_category || 'Classical Arts',
-            batch: enrollment?.batch_name || 'Batch A',
-            room_or_hall: enrollment?.room_or_hall || 'Natya Mandapam (Room 101)',
-            trainer_name: enrollment?.trainer_name || 'Assigned Guru',
-            timings: formattedEnrollments[0]?.timings || 'Mon, Wed, Fri • 17:00 - 18:30',
-            total_monthly_fee: standardFee,
-            fixed_discount: discount,
-            scheme_id: null,
-            net_monthly_fee: netMonthly,
-            advance_paid: advance,
-            due_amount: due,
-            due_status: due > 0 ? 'red' : 'green',
-            due_date: '5th of this month',
-            next_due_date: '5th of next month',
-            enrolled_courses: formattedEnrollments,
-          };
-
-          const token = createToken({
-            userId: student.profile_id,
-            email: student.email || `${student.roll_number || cleanDigits}@laasyaacademy.com`,
-            fullName: student.full_name,
-            role: 'student',
-          });
-
-          const sessionId = await recordActiveSession({
-            userId: student.profile_id,
-            profileId: student.profile_id,
-            userName: student.full_name,
-            identifier: student.roll_number || cleanDigits || rawInput,
-            role: 'student',
+            action: 'STUDENT_LOGIN_SUCCESS',
+            targetType: 'student',
+            targetId: primaryCandidate.student_id,
+            details: { rollNumber: primaryCandidate.roll_number, siblingCount: validCandidates.length },
             req: request,
-            token,
           });
 
-          return NextResponse.json({ success: true, profile: { ...profile, token, session_id: sessionId }, token }, { headers: corsHeaders });
+          return NextResponse.json({
+            success: true,
+            profile: result.profile,
+            token: result.token,
+            multiple_students: validCandidates.length > 1,
+            sibling_profiles: formattedSiblings.length > 0 ? formattedSiblings : undefined,
+          }, { headers: corsHeaders });
         } else {
+          await logSecurityAudit({
+            role: 'student',
+            action: 'STUDENT_LOGIN_FAILED_PASSWORD',
+            details: { identifier: rawInput },
+            req: request,
+          });
           return NextResponse.json(
             { success: false, error: 'Incorrect password. Please verify your credentials or contact admin if forgotten.' },
             { status: 401, headers: corsHeaders }
           );
         }
       } else if (targetRole === 'student') {
-        // Check if user is actually a Guru trying to log into Student portal
         const guruCheck = await queryOne<any>(`
           SELECT t.id, p.full_name FROM public.trainers t
           JOIN public.profiles p ON t.profile_id = p.id
           WHERE (
             (LENGTH($1) >= 8 AND regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
-            OR LOWER(p.full_name) = LOWER($2)
+            OR LOWER(TRIM(t.guru_id)) = LOWER(TRIM($2))
+            OR LOWER(TRIM(t.code)) = LOWER(TRIM($2))
           ) LIMIT 1
         `, [cleanDigits, rawInput]);
 
@@ -413,7 +486,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: false, error: 'No account found matching this identifier. Please verify your registered contact number.' },
+      { success: false, error: 'No account found matching this identifier. Please verify your registered contact number or Roll Number.' },
       { status: 404, headers: corsHeaders }
     );
   } catch (error: any) {

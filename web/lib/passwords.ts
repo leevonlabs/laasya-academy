@@ -90,6 +90,12 @@ export async function updateUserPassword(profileId: string, newPassword: string)
     [trimmed, profileId]
   );
 
+  // Invalidate any active sessions on other devices for security
+  await query(
+    `UPDATE public.active_sessions SET is_active = false WHERE profile_id = $1 OR user_id = $1`,
+    [profileId]
+  ).catch(() => {});
+
   return true;
 }
 
@@ -99,9 +105,15 @@ export async function resetAllPasswordsToDefault(): Promise<number> {
      SET encrypted_password = crypt('123456', gen_salt('bf')),
          updated_at = NOW()
      WHERE id IN (
-       SELECT id FROM public.profiles WHERE role IN ('student', 'trainer')
+       SELECT id FROM public.profiles WHERE role IN ('trainer', 'student')
      )
      RETURNING id`
   );
+
+  // Invalidate active sessions for all reset accounts
+  await query(
+    `UPDATE public.active_sessions SET is_active = false WHERE role IN ('trainer', 'student')`
+  ).catch(() => {});
+
   return res.length;
 }

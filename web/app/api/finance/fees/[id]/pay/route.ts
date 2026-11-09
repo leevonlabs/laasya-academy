@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { recordStudentFeePayment } from '@/lib/finance';
+import { logSecurityAudit } from '@/lib/audit';
 
 export async function POST(
   req: Request,
@@ -21,6 +22,17 @@ export async function POST(
       transaction_reference: body.transaction_reference,
       remarks: body.remarks,
       receipt_issued_by: user.fullName || 'Academy Director'
+    });
+
+    await logSecurityAudit({
+      userId: user.userId,
+      userName: user.fullName,
+      role: user.role,
+      action: 'FEE_PAYMENT_RECORDED',
+      targetType: 'invoice',
+      targetId: id,
+      details: { amount_paid: Number(body.amount_paid), payment_method: body.payment_method || 'upi' },
+      req,
     });
 
     return NextResponse.json(result);

@@ -646,7 +646,7 @@ export async function updateTrainer(id: string, data: {
     gender !== undefined ? gender : null
   ]);
 
-  return queryOne<Trainer>(`
+  const updated = await queryOne<Trainer>(`
     UPDATE public.trainers
     SET display_title = COALESCE($2, display_title),
         specializations = COALESCE($3, specializations),
@@ -677,6 +677,16 @@ export async function updateTrainer(id: string, data: {
     cleanGuruId,
     data.experience !== undefined ? data.experience : null
   ]);
+
+  // If faculty is deactivated, immediately terminate all active sessions
+  if (data.is_active === false) {
+    const prof = await queryOne<{ profile_id: string }>(`SELECT profile_id FROM public.trainers WHERE id = $1`, [id]);
+    if (prof?.profile_id) {
+      await query(`UPDATE public.active_sessions SET is_active = false WHERE profile_id = $1 OR user_id = $1`, [prof.profile_id]).catch(() => {});
+    }
+  }
+
+  return updated;
 }
 
 export async function deleteTrainer(id: string) {
@@ -685,6 +695,12 @@ export async function deleteTrainer(id: string) {
   const [ses] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.class_sessions WHERE trainer_id = $1`, [id]);
   const [bat] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.batches WHERE trainer_id = $1`, [id]);
   const hasHistory = (parseInt(sal?.count || '0', 10) > 0) || (parseInt(ses?.count || '0', 10) > 0) || (parseInt(bat?.count || '0', 10) > 0);
+
+  // Invalidate any active sessions immediately upon deletion/deactivation
+  const trainerProf = await queryOne<{ profile_id: string }>(`SELECT profile_id FROM public.trainers WHERE id = $1`, [id]);
+  if (trainerProf?.profile_id) {
+    await query(`UPDATE public.active_sessions SET is_active = false WHERE profile_id = $1 OR user_id = $1`, [trainerProf.profile_id]).catch(() => {});
+  }
 
   if (hasHistory) {
     // Soft-delete: deactivate guru so all past payroll, attendance logs, and student records are preserved
@@ -1272,6 +1288,11 @@ export async function updateStudent(id: string, data: {
     [current.profile_id]
   );
 
+  // If student is marked inactive, immediately terminate all active sessions
+  if (data.status === 'inactive') {
+    await query(`UPDATE public.active_sessions SET is_active = false WHERE profile_id = $1 OR user_id = $1`, [current.profile_id]).catch(() => {});
+  }
+
   return {
     ...updated,
     full_name: prof?.full_name || data.full_name,
@@ -1282,6 +1303,12 @@ export async function updateStudent(id: string, data: {
 }
 
 export async function deleteStudent(id: string) {
+  // Look up student profile_id before deletion or deactivation
+  const studentProf = await queryOne<{ profile_id: string }>(`SELECT profile_id FROM public.students WHERE id = $1`, [id]);
+  if (studentProf?.profile_id) {
+    await query(`UPDATE public.active_sessions SET is_active = false WHERE profile_id = $1 OR user_id = $1`, [studentProf.profile_id]).catch(() => {});
+  }
+
   // Check if student has historical payment or attendance records
   const [att] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.attendance WHERE student_id = $1`, [id]);
   const [inv] = await query<{ count: string }>(`SELECT COUNT(*) as count FROM public.student_fee_invoices WHERE student_id = $1`, [id]);

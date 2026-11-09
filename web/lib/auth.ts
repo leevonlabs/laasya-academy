@@ -3,7 +3,12 @@ import crypto from 'crypto';
 import { query, queryOne } from './db';
 
 const SESSION_COOKIE_NAME = 'laasya_owner_session';
-const SECRET_KEY = process.env.SESSION_SECRET || 'laasya-cultural-academy-secret-2026-auth-session';
+const DEFAULT_SECRET_FALLBACK = 'laasya-cultural-academy-secret-2026-auth-session';
+const SECRET_KEY = process.env.SESSION_SECRET || DEFAULT_SECRET_FALLBACK;
+
+if (process.env.NODE_ENV === 'production' && SECRET_KEY === DEFAULT_SECRET_FALLBACK) {
+  console.warn('[SECURITY WARNING] Production environment is using fallback SESSION_SECRET. Configure SESSION_SECRET in Vercel environment variables.');
+}
 
 export interface UserSession {
   userId: string;
@@ -23,9 +28,14 @@ function signPayload(data: string): string {
 }
 
 export function createToken(payload: UserSession): string {
+  // Staff accounts (owner, receptionist) default to 24 hours to prevent unauthorized access from abandoned devices.
+  // Gurus and Students receive 7 days for mobile convenience.
+  const isStaff = payload.role === 'owner' || payload.role === 'receptionist';
+  const defaultDuration = isStaff ? (24 * 60 * 60) : (7 * 24 * 60 * 60);
+
   const tokenPayload: UserSession = {
     ...payload,
-    exp: payload.exp || Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days expiration
+    exp: payload.exp || Math.floor(Date.now() / 1000) + defaultDuration,
   };
   const data = JSON.stringify(tokenPayload);
   const base64 = Buffer.from(data).toString('base64url');
@@ -267,10 +277,12 @@ export async function setSessionCookie(sessionUser: UserSession, rememberMe: boo
     path: '/',
   };
   if (rememberMe) {
-    // 30 days persistent cookie when user explicitly checked "Remember session"
-    cookieOptions.maxAge = 60 * 60 * 24 * 30;
+    // 7 days persistent cookie when user explicitly checked "Remember session" (hardened from 30 days)
+    cookieOptions.maxAge = 60 * 60 * 24 * 7;
+  } else {
+    // 24 hours maxAge for standard session
+    cookieOptions.maxAge = 60 * 60 * 24;
   }
-  // When rememberMe is false, omitting maxAge creates a browser-session cookie (cleared on browser close)
   cookieStore.set(SESSION_COOKIE_NAME, token, cookieOptions);
 }
 

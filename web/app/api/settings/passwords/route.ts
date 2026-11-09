@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { getStudentPasswords, getGuruPasswords, updateUserPassword, resetAllPasswordsToDefault } from '@/lib/passwords';
+import { logSecurityAudit } from '@/lib/audit';
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -31,9 +32,17 @@ export async function POST(req: Request) {
 
     if (action === 'reset_all') {
       const count = await resetAllPasswordsToDefault();
+      await logSecurityAudit({
+        userId: user.userId,
+        userName: user.fullName,
+        role: user.role,
+        action: 'ADMIN_RESET_ALL_PASSWORDS',
+        details: { reset_count: count },
+        req,
+      });
       return NextResponse.json({ 
         success: true, 
-        message: `Successfully reset all ${count} student and guru accounts to default password '123456'.` 
+        message: `Successfully reset all ${count} student and guru accounts to default password '123456'. All active sessions have been invalidated.` 
       });
     }
 
@@ -46,9 +55,19 @@ export async function POST(req: Request) {
     }
 
     await updateUserPassword(profile_id, new_password.trim());
+    await logSecurityAudit({
+      userId: user.userId,
+      userName: user.fullName,
+      role: user.role,
+      action: 'ADMIN_UPDATED_USER_PASSWORD',
+      targetType: 'profile',
+      targetId: profile_id,
+      req,
+    });
+
     return NextResponse.json({ 
       success: true, 
-      message: 'Password updated successfully' 
+      message: 'Password updated successfully. User sessions have been invalidated across devices.' 
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db';
-import { createToken } from '@/lib/auth';
+import { createToken, getCurrentUser } from '@/lib/auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +25,17 @@ export async function POST(req: NextRequest) {
     const cleanRoll = String(rollNumber || '').trim().toLowerCase();
     const targetId = String(profileId || '').trim();
 
+    // If only profileId was provided without phone/rollNumber, verify existing bearer token
+    if (!cleanPhone && !cleanRoll && targetId) {
+      const existingUser = await getCurrentUser(req);
+      if (!existingUser || existingUser.userId !== targetId) {
+        return NextResponse.json(
+          { error: 'Valid existing session or contact verification required to renew credentials' },
+          { status: 401, headers: corsHeaders }
+        );
+      }
+    }
+
     // Flexible & secure lookup across profiles, students, and trainers
     const user = await queryOne<any>(`
       SELECT 
@@ -32,6 +43,8 @@ export async function POST(req: NextRequest) {
         s.id as student_id,
         t.id as trainer_id,
         s.roll_number,
+        s.status as student_status,
+        t.is_active as trainer_active,
         p.full_name,
         p.email,
         p.phone as profile_phone,
@@ -50,13 +63,20 @@ export async function POST(req: NextRequest) {
           OR RIGHT(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), 10) = RIGHT($2, 10)
         ))
         OR (LENGTH($3) > 0 AND (LOWER(s.roll_number) = $3 OR LOWER(s.roll_number) = 'lca-' || $3))
-        OR ($2 = '' AND $3 = '' AND LENGTH($1) > 0)
       )
       LIMIT 1
     `, [targetId, cleanPhone, cleanRoll]);
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized profile' }, { status: 401, headers: corsHeaders });
+      return NextResponse.json({ error: 'Unauthorized profile or credentials mismatch' }, { status: 401, headers: corsHeaders });
+    }
+
+    // Reject inactive students or deactivated faculty
+    if (user.student_status === 'inactive') {
+      return NextResponse.json({ error: 'Student enrollment is currently inactive' }, { status: 403, headers: corsHeaders });
+    }
+    if (user.trainer_active === false) {
+      return NextResponse.json({ error: 'Faculty account is deactivated' }, { status: 403, headers: corsHeaders });
     }
 
     const tokenRole = user.role || role || (user.trainer_id ? 'trainer' : 'student');

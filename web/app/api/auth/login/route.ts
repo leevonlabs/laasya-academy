@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { authenticateOwner, setSessionCookie } from '@/lib/auth';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { recordActiveSession } from '@/lib/active-sessions';
+import { logSecurityAudit } from '@/lib/audit';
 
 export async function POST(req: Request) {
   try {
@@ -24,6 +25,12 @@ export async function POST(req: Request) {
 
     const res = await authenticateOwner(identifier, password);
     if (!res.success || !res.user) {
+      await logSecurityAudit({
+        role: 'owner',
+        action: 'ADMIN_LOGIN_FAILED',
+        details: { identifier },
+        req,
+      });
       return NextResponse.json({ success: false, error: res.error || 'Authentication failed.' }, { status: 401 });
     }
 
@@ -35,6 +42,17 @@ export async function POST(req: Request) {
       userName: res.user.fullName,
       identifier: identifier,
       role: res.user.role,
+      req,
+    });
+
+    await logSecurityAudit({
+      userId: res.user.userId,
+      userName: res.user.fullName,
+      role: res.user.role,
+      action: 'ADMIN_LOGIN_SUCCESS',
+      targetType: 'user',
+      targetId: res.user.userId,
+      details: { identifier, rememberMe: !!rememberMe },
       req,
     });
 
