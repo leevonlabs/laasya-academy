@@ -279,7 +279,9 @@ export function AiChatWidget({ whatsappNumber, campusAddress }: AiChatWidgetProp
         <button
           onClick={() => setIsOpen(!isOpen)}
           aria-label="Toggle Laasya AI Assistant"
-          className="group relative flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-gradient-to-tr from-[#3d0c34] via-[#8A064D] to-[#e8c078] text-white shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer border-2 border-white/60"
+          className={`group relative flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-gradient-to-tr from-[#3d0c34] via-[#8A064D] to-[#e8c078] text-white shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer border-2 border-white/60 ${
+            isOpen ? 'hidden sm:flex' : 'flex'
+          }`}
         >
           {isOpen ? (
             <X className="h-6 w-6 sm:h-7 sm:w-7 transition-transform duration-300 group-hover:rotate-90" />
@@ -294,33 +296,33 @@ export function AiChatWidget({ whatsappNumber, campusAddress }: AiChatWidgetProp
         </button>
       </div>
 
-      {/* Floating Chat Modal / Drawer */}
+      {/* Floating Chat Modal / Drawer: Native mobile bottom-sheet & desktop floating card */}
       {isOpen && (
-        <div className="fixed bottom-20 right-3 sm:bottom-24 sm:right-7 z-50 w-[420px] sm:w-[500px] md:w-[540px] max-w-[95vw] h-[740px] sm:h-[820px] max-h-[93vh] rounded-3xl border-2 border-[#D4AF37]/50 bg-white shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-24 sm:right-7 z-50 w-full sm:w-[440px] md:w-[460px] h-[78vh] sm:h-[600px] max-h-[82vh] rounded-t-3xl sm:rounded-3xl border-t-2 sm:border-2 border-[#D4AF37]/60 bg-white shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
           {/* Header */}
-          <div className="bg-gradient-to-r from-[#3d0c34] via-[#610a39] to-[#8A064D] p-4 sm:p-5 text-white shrink-0">
+          <div className="bg-gradient-to-r from-[#3d0c34] via-[#610a39] to-[#8A064D] p-3.5 sm:p-4 text-white shrink-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 sm:gap-3">
                 <div className="relative">
                   <img
                     src="/images/laasya_logo.png"
                     alt="Laasya Academy"
-                    className="h-11 w-11 rounded-full bg-white/20 p-1 object-contain"
+                    className="h-9 w-9 sm:h-11 sm:w-11 rounded-full bg-white/20 p-1 object-contain"
                   />
-                  <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-[#3d0c34]" />
+                  <span className="absolute bottom-0 right-0 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-400 ring-2 ring-[#3d0c34]" />
                 </div>
                 <div>
-                  <h3 className="font-display text-base sm:text-lg font-bold text-[#fbf0b9] leading-tight">
+                  <h3 className="font-display text-sm sm:text-base font-bold text-[#fbf0b9] leading-tight">
                     Laasya AI Assistant
                   </h3>
-                  <p className="text-[0.7rem] sm:text-xs text-white/80">
+                  <p className="text-[0.68rem] sm:text-xs text-white/80">
                     Online 24/7 · Live Admissions & Academy Guide
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="rounded-full p-2 text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                className="rounded-full p-2 text-white/80 hover:bg-white/15 hover:text-white transition-colors cursor-pointer"
                 aria-label="Close chat"
               >
                 <X className="h-5 w-5" />
@@ -328,7 +330,7 @@ export function AiChatWidget({ whatsappNumber, campusAddress }: AiChatWidgetProp
             </div>
 
             {/* Quick Actions Bar */}
-            <div className="mt-3.5 grid grid-cols-2 gap-2">
+            <div className="mt-2.5 sm:mt-3 grid grid-cols-2 gap-2">
               <a
                 href={`https://wa.me/${cleanWa}`}
                 target="_blank"

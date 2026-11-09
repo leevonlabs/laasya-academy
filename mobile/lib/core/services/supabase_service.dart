@@ -745,7 +745,26 @@ class SupabaseService {
           return serverUser;
         }
       } else if (res.statusCode == 401 || res.statusCode == 403) {
-        debugPrint('[SupabaseService] Session token rejected (HTTP ' + res.statusCode.toString() + '). Revoking cached session.');
+        debugPrint('[SupabaseService] Session token rejected (HTTP ' + res.statusCode.toString() + '). Attempting token renewal.');
+        _cachedProfile?['token'] = null;
+        try {
+          final refreshedToken = await getAuthToken();
+          if (refreshedToken != null && refreshedToken.isNotEmpty) {
+            final retryRes = await http.get(
+              Uri.parse('${ApiConstants.baseUrl}/api/auth/session'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $refreshedToken',
+              },
+            ).timeout(const Duration(seconds: 6));
+            if (retryRes.statusCode == 200) {
+              final decoded = jsonDecode(retryRes.body);
+              if (decoded is Map && decoded['authenticated'] == true && decoded['user'] is Map) {
+                return Map<String, dynamic>.from(decoded['user']);
+              }
+            }
+          }
+        } catch (_) {}
         await signOut();
         return null;
       }

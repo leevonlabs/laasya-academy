@@ -103,24 +103,10 @@ class _AuthGateState extends State<AuthGate> {
           _targetScreen = const StudentMainScaffold();
         }
       } else {
-        if (kIsWeb) {
-          try {
-            await SupabaseService().signOut();
-            await launchUrl(Uri.parse('${ApiConstants.baseUrl}/login'), webOnlyWindowName: '_self');
-            return;
-          } catch (_) {}
-        }
         _targetScreen = const PortalLandingScreen();
       }
     } catch (e) {
       debugPrint('Auth check error: $e');
-      if (kIsWeb) {
-        try {
-          await SupabaseService().signOut();
-          await launchUrl(Uri.parse('${ApiConstants.baseUrl}/login'), webOnlyWindowName: '_self');
-          return;
-        } catch (_) {}
-      }
       _targetScreen = const PortalLandingScreen();
     } finally {
       if (mounted) setState(() => _checking = false);

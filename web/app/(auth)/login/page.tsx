@@ -61,6 +61,7 @@ function LoginContent() {
   const [loadingStatus, setLoadingStatus] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [activeLoggedInUser, setActiveLoggedInUser] = useState<any>(null);
+  const [resumingSession, setResumingSession] = useState(false);
 
   // Contact Admin Modal state for "Forgot Password" and "New Registration" (Student & Guru only)
   const [contactModal, setContactModal] = useState<{
@@ -184,6 +185,85 @@ function LoginContent() {
     }
     // Direct browser redirect into portal - loads directly into Student/Trainer dashboard
     window.location.replace('/portal/');
+  };
+
+  // Helper to resume existing session with automatic token refresh
+  const handleResumeSession = async () => {
+    if (!activeLoggedInUser || resumingSession) return;
+    setResumingSession(true);
+    setError(null);
+
+    // 1. Owner / Receptionist
+    if (activeLoggedInUser.role === 'owner' || activeLoggedInUser.role === 'receptionist') {
+      try {
+        const res = await fetch('/api/auth/session');
+        const d = await res.json();
+        if (d?.authenticated) {
+          router.push('/overview');
+          return;
+        }
+      } catch (_) {}
+      setAdminPhone(activeLoggedInUser.phone || activeLoggedInUser.email || '');
+      setActiveTab('admin');
+      setActiveLoggedInUser(null);
+      setError('Admin session has expired. Please enter your password to sign in.');
+      setResumingSession(false);
+      return;
+    }
+
+    // 2. Student / Guru: renew token and launch portal
+    try {
+      const profileId = activeLoggedInUser.id || activeLoggedInUser.profile_id;
+      const phone = activeLoggedInUser.phone || activeLoggedInUser.parent_phone || '';
+      const roll = activeLoggedInUser.roll_number || '';
+      const role = activeLoggedInUser.role || 'student';
+
+      const tokenRes = await fetch('/api/auth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId,
+          phone,
+          rollNumber: roll,
+          role,
+        }),
+      });
+
+      const tokenData = await tokenRes.json();
+      if (tokenRes.ok && tokenData.token) {
+        const updatedProfile = {
+          ...activeLoggedInUser,
+          token: tokenData.token,
+          role: tokenData.role || role,
+        };
+        setActiveLoggedInUser(updatedProfile);
+        persistSessionAndLaunchPortal(updatedProfile);
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback: Check if existing profile can launch
+    if (activeLoggedInUser.token) {
+      persistSessionAndLaunchPortal(activeLoggedInUser);
+      return;
+    }
+
+    // If completely expired/invalid:
+    localStorage.removeItem('saved_user_profile');
+    localStorage.removeItem('flutter.saved_user_profile');
+    localStorage.removeItem('laasya_cached_user');
+    const prevRole = activeLoggedInUser.role;
+    const prevPhone = activeLoggedInUser.phone || '';
+    setActiveLoggedInUser(null);
+    setResumingSession(false);
+    if (prevRole === 'trainer') {
+      setActiveTab('guru');
+      if (prevPhone) setGuruPhone(prevPhone);
+    } else {
+      setActiveTab('student');
+      if (prevPhone) setStudentId(prevPhone);
+    }
+    setError('Your session has expired. Please enter your password to sign in.');
   };
 
   // 1. Student / Parent Submit
@@ -468,16 +548,20 @@ function LoginContent() {
               <div className="flex items-center gap-2 self-end sm:self-auto">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (activeLoggedInUser.role === 'owner' || activeLoggedInUser.role === 'receptionist') {
-                      router.push('/overview');
-                    } else {
-                      window.location.replace('/portal/');
-                    }
-                  }}
-                  className="px-3 py-1 bg-emerald-700 text-white font-bold rounded-lg text-xs hover:bg-emerald-800 transition cursor-pointer"
+                  disabled={resumingSession}
+                  onClick={handleResumeSession}
+                  className="px-3.5 py-1.5 bg-emerald-700 text-white font-bold rounded-lg text-xs hover:bg-emerald-800 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-60 shadow-xs"
                 >
-                  Go to {activeLoggedInUser.role === 'owner' ? 'Admin ERP' : 'Portal'} &rarr;
+                  {resumingSession ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                      <span>Launching...</span>
+                    </>
+                  ) : (
+                    <span>
+                      Go to {activeLoggedInUser.role === 'owner' ? 'Admin ERP' : 'Portal'} &rarr;
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"
