@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser, updateAdminPassword, verifyCurrentPassword } from '@/lib/auth';
 import { query, queryOne } from '@/lib/db';
+import { saveBase64Media } from '@/lib/media';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,7 +28,7 @@ export async function GET() {
         p.*
       FROM public.profiles p
       WHERE p.role = 'owner'
-      ORDER BY p.created_at ASC
+      ORDER BY p.avatar_url IS NOT NULL DESC, p.created_at ASC
       LIMIT 1
     `);
 
@@ -117,7 +118,10 @@ export async function POST(request: NextRequest) {
     const designation = (body.designation || 'Academy Director & Operations Lead').toString().trim();
     const campusAddress = (body.campus_address || 'Laasya Cultural Academy, Main Campus, Bangalore / Hyderabad').toString().trim();
     const mapUrl = (body.map_url || '').toString().trim();
-    const avatarUrl = body.avatar_url !== undefined ? body.avatar_url : null;
+    let avatarUrl = body.avatar_url !== undefined ? body.avatar_url : null;
+    if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.startsWith('data:image')) {
+      avatarUrl = await saveBase64Media(avatarUrl, 'avatars');
+    }
     const whatsappNumber = (body.whatsapp_number || '+91 8151 998 899').toString().trim();
     const primaryLoginPhone = (body.primary_login_phone || '').toString().trim();
 

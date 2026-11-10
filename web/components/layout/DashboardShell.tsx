@@ -280,8 +280,21 @@ export default function DashboardShell({ user, children }: Props) {
               href={user.role === 'receptionist' ? '/reception-profile' : '/admin-profile'}
               className="flex items-center gap-2.5 overflow-hidden group hover:opacity-90 transition cursor-pointer"
             >
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#8A064D] to-[#73023E] border border-[#F9E33A] flex items-center justify-center font-black text-xs text-[#F9E33A] shadow-xs shrink-0 group-hover:scale-105 transition">
-                {user.role === 'receptionist' ? 'RC' : 'AD'}
+              <div className="relative w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-[#8A064D] to-[#73023E] border border-[#F9E33A] flex items-center justify-center font-black text-xs text-[#F9E33A] shadow-xs shrink-0 group-hover:scale-105 transition">
+                {user.role === 'receptionist' ? (
+                  <span>RC</span>
+                ) : adminAvatar ? (
+                  <img
+                    src={adminAvatar}
+                    alt={adminName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <span>{adminName ? adminName.charAt(0).toUpperCase() : 'AD'}</span>
+                )}
               </div>
               {!isCollapsed && (
                 <div className="overflow-hidden min-w-0">

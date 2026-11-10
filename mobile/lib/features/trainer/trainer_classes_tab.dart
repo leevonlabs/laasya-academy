@@ -57,16 +57,68 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
 
   String _getDays(Map<String, dynamic> b) {
     final d = b['days_of_week'];
-    if (d is List) return d.map((x) => _formatShortDay(x)).join(', ');
+    if (d is List && d.isNotEmpty) {
+      return d.map((x) => _formatShortDay(x.toString())).join(', ');
+    }
     if (d != null && d.toString().isNotEmpty) {
       final parts = d.toString().split(',');
-      return parts.map((x) => _formatShortDay(x.trim())).join(', ');
+      final mapped = parts.map((x) => _formatShortDay(x.trim())).where((x) => x.isNotEmpty).toList();
+      if (mapped.isNotEmpty) return mapped.join(', ');
+    }
+    final rawSchedules = b['schedules'];
+    if (rawSchedules is List && rawSchedules.isNotEmpty) {
+      final days = rawSchedules
+          .map((s) => s is Map ? _formatShortDay(s['day']?.toString() ?? '') : '')
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList();
+      if (days.isNotEmpty) return days.join(', ');
     }
     return 'Mon, Wed, Fri';
   }
 
   String _getRoom(Map<String, dynamic> b) {
-    return b['room_or_hall']?.toString() ?? 'Natya Mandapam';
+    final r1 = b['room_or_hall']?.toString().trim();
+    if (r1 != null && r1.isNotEmpty) return r1;
+    final r2 = b['room']?.toString().trim();
+    if (r2 != null && r2.isNotEmpty) return r2;
+    final rawSchedules = b['schedules'];
+    if (rawSchedules is List && rawSchedules.isNotEmpty) {
+      for (var s in rawSchedules) {
+        if (s is Map && s['room'] != null && s['room'].toString().trim().isNotEmpty) {
+          return s['room'].toString().trim();
+        }
+      }
+    }
+    return 'Natya Mandapam (Room 101)';
+  }
+
+  String _formatTimeStr(String t) {
+    final clean = t.trim();
+    if (clean.isEmpty) return clean;
+    final parts = clean.split(':');
+    if (parts.length >= 2) {
+      return '${parts[0]}:${parts[1]}';
+    }
+    return clean;
+  }
+
+  String _getTimings(Map<String, dynamic> b) {
+    final rawSchedules = b['schedules'];
+    if (rawSchedules is List && rawSchedules.isNotEmpty) {
+      for (var s in rawSchedules) {
+        if (s is Map && s['startTime'] != null && s['endTime'] != null) {
+          final st = _formatTimeStr(s['startTime'].toString());
+          final et = _formatTimeStr(s['endTime'].toString());
+          if (st.isNotEmpty && et.isNotEmpty) {
+            return '$st - $et';
+          }
+        }
+      }
+    }
+    final startTime = _formatTimeStr(b['start_time']?.toString() ?? '17:00');
+    final endTime = _formatTimeStr(b['end_time']?.toString() ?? '18:30');
+    return '$startTime - $endTime';
   }
 
   String _getStatus(Map<String, dynamic> b) {
@@ -81,26 +133,10 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
     final courseTitle = _getCourseTitle(b);
     final room = _getRoom(b);
     final days = _getDays(b);
-    final startTime = b['start_time']?.toString() ?? '17:00';
-    final endTime = b['end_time']?.toString() ?? '18:30';
+    final timings = _getTimings(b);
     final enrolled = b['enrolled_count']?.toString() ?? '0';
     final capacity = b['max_capacity']?.toString() ?? '20';
     final startDate = b['start_date']?.toString() ?? 'Active Session';
-
-    final rawSchedules = b['schedules'];
-    List<Map<String, dynamic>> scheduleSlots = [];
-    if (rawSchedules is List) {
-      for (var s in rawSchedules) {
-        if (s is Map) {
-          scheduleSlots.add({
-            'day': _formatShortDay(s['day']),
-            'startTime': s['startTime']?.toString() ?? '',
-            'endTime': s['endTime']?.toString() ?? '',
-            'room': s['room']?.toString() ?? room,
-          });
-        }
-      }
-    }
 
     showModalBottomSheet(
       context: context,
@@ -142,55 +178,9 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
             ),
             const SizedBox(height: 8),
-            if (scheduleSlots.isNotEmpty)
-              ...scheduleSlots.map((slot) => Container(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFBF8FA),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFF0D5E4)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF590231),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            slot['day'] ?? 'Day',
-                            style: const TextStyle(color: Color(0xFFF9E33A), fontWeight: FontWeight.bold, fontSize: 11),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '${slot['startTime']} - ${slot['endTime']}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: LaasyaColors.textDark),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.room_rounded, size: 13, color: LaasyaColors.primary),
-                            const SizedBox(width: 2),
-                            Text(
-                              slot['room'] ?? 'Hall',
-                              style: const TextStyle(fontSize: 11, color: Colors.black87),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ))
-            else ...[
-              _infoRow(Icons.calendar_month_rounded, 'Days of Week', days),
-              _infoRow(Icons.access_time_rounded, 'Timings', '$startTime - $endTime'),
-              _infoRow(Icons.room_rounded, 'Classroom Hall', room),
-            ],
+            _infoRow(Icons.calendar_month_rounded, 'Days of Week', days),
+            _infoRow(Icons.access_time_rounded, 'Timings', timings),
+            _infoRow(Icons.room_rounded, 'Classroom Hall', room),
             const SizedBox(height: 10),
             _infoRow(Icons.groups_rounded, 'Capacity', '$enrolled Enrolled / $capacity Capacity'),
             _infoRow(Icons.date_range_rounded, 'Batch Start Date', startDate),
@@ -365,6 +355,36 @@ class _TrainerClassesTabState extends State<TrainerClassesTab> {
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
+                              ),
+
+                              const SizedBox(height: 8),
+
+                              // Timings & Room Info
+                              Row(
+                                children: [
+                                  const Icon(Icons.schedule_rounded, size: 14, color: LaasyaColors.primary),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      '${_getDays(b)} • ${_getTimings(b)}',
+                                      style: const TextStyle(fontSize: 12, color: Colors.black87, fontWeight: FontWeight.w600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.room_rounded, size: 14, color: LaasyaColors.primary),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        _getRoom(b),
+                                        style: const TextStyle(fontSize: 11.5, color: Colors.black87, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
 
                               const SizedBox(height: 12),

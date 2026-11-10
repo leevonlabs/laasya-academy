@@ -37,7 +37,7 @@ class _StudentSettingsTabState extends State<StudentSettingsTab> {
 
   Future<void> _loadProfile() async {
     setState(() => _isLoading = true);
-    final prof = await SupabaseService().getCurrentUserProfile();
+    final prof = await SupabaseService().getCurrentUserProfile(forceRefresh: true);
     if (mounted) {
       setState(() {
         _profile = prof;

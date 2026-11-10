@@ -90,7 +90,7 @@ class _StudentDashboardTabState extends State<StudentDashboardTab> {
     try {
       // 1. Fetch profile and courses concurrently (< 200ms)
       final results = await Future.wait([
-        SupabaseService().getCurrentUserProfile(),
+        SupabaseService().getCurrentUserProfile(forceRefresh: true),
         SupabaseService().getStudentEnrolledCourses(),
       ]);
 
