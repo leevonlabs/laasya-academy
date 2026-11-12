@@ -76,8 +76,13 @@ export default function SettingsClient({
   });
 
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const [isInlineEditing, setIsInlineEditing] = useState(false);
   const [editProfileForm, setEditProfileForm] = useState(adminProfile);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
+  const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({});
+  const [passwordSuccessMessage, setPasswordSuccessMessage] = useState('');
+  const [passwordTouched, setPasswordTouched] = useState(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -96,9 +101,14 @@ export default function SettingsClient({
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      showNotification('error', 'Image size must be less than 2MB');
+      setProfileErrors(prev => ({ ...prev, avatar_url: 'Image size must be less than 2MB' }));
       return;
     }
+    setProfileErrors(prev => {
+      const next = { ...prev };
+      delete next.avatar_url;
+      return next;
+    });
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
@@ -107,8 +117,58 @@ export default function SettingsClient({
     reader.readAsDataURL(file);
   };
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const validateProfileForm = (form: typeof editProfileForm): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    if (!form.full_name?.trim()) {
+      errors.full_name = 'Full name is required';
+    }
+    if (!form.designation?.trim()) {
+      errors.designation = 'Designation is required';
+    }
+    const cleanLoginPhone = form.primary_login_phone?.replace(/\D/g, '') || '';
+    if (!cleanLoginPhone || cleanLoginPhone.length < 10) {
+      errors.primary_login_phone = 'Enter a valid 10-digit primary login mobile number';
+    }
+    const cleanWa = form.whatsapp_number?.replace(/\D/g, '') || '';
+    if (!cleanWa || cleanWa.length < 10) {
+      errors.whatsapp_number = 'Enter a valid WhatsApp phone number for admissions';
+    }
+    if (Array.isArray(form.contacts)) {
+      form.contacts.forEach((c, idx) => {
+        if (!c.title?.trim()) {
+          errors[`contact_title_${idx}`] = 'Contact label is required';
+        }
+        const cleanP = c.phone?.replace(/\D/g, '') || '';
+        if (!cleanP || cleanP.length < 7) {
+          errors[`contact_phone_${idx}`] = 'Valid phone number is required';
+        }
+      });
+    }
+    if (Array.isArray(form.emails)) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      form.emails.forEach((em, idx) => {
+        if (!em.title?.trim()) {
+          errors[`email_title_${idx}`] = 'Email label is required';
+        }
+        if (!em.email?.trim() || !emailRegex.test(em.email.trim())) {
+          errors[`email_address_${idx}`] = 'Valid email is required (e.g. name@domain.com)';
+        }
+      });
+    }
+    if (form.map_url?.trim() && !/^https?:\/\//i.test(form.map_url.trim())) {
+      errors.map_url = 'Map link must start with https://';
+    }
+    return errors;
+  };
+
+  const handleSaveProfile = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const errors = validateProfileForm(editProfileForm);
+    if (Object.keys(errors).length > 0) {
+      setProfileErrors(errors);
+      return;
+    }
+    setProfileErrors({});
     setIsSavingProfile(true);
     try {
       const res = await fetch('/api/settings/admin-profile', {
@@ -122,13 +182,14 @@ export default function SettingsClient({
       const data = await res.json();
       if (data.success && data.profile) {
         setAdminProfile(data.profile);
+        setIsInlineEditing(false);
         setIsEditProfileModalOpen(false);
-        showNotification('success', 'Admin profile and academy support directory updated successfully!');
+        showNotification('success', 'Admin profile and academy directory updated successfully!');
       } else {
-        showNotification('error', data.error || 'Failed to update admin profile');
+        setProfileErrors(prev => ({ ...prev, form: data.error || 'Failed to update admin profile' }));
       }
     } catch {
-      showNotification('error', 'Network error while saving admin profile');
+      setProfileErrors(prev => ({ ...prev, form: 'Network error while saving admin profile' }));
     } finally {
       setIsSavingProfile(false);
     }
@@ -169,17 +230,21 @@ export default function SettingsClient({
     setTimeout(() => setFeedback(null), 4000);
   };
 
-
   const handleUpdateAdminPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adminNewPassword || adminNewPassword.trim().length < 4) {
-      showNotification('error', 'New password must be at least 4 characters long.');
-      return;
+    setPasswordTouched(true);
+    const errors: Record<string, string> = {};
+    if (!adminNewPassword || adminNewPassword.trim().length < 6) {
+      errors.new_password = 'Password must be at least 6 characters long.';
     }
     if (adminNewPassword !== adminConfirmPassword) {
-      showNotification('error', 'New password and confirm password do not match.');
+      errors.confirm_password = 'New password and confirm password do not match.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setPasswordErrors(errors);
       return;
     }
+    setPasswordErrors({});
     setIsUpdatingAdminPassword(true);
     try {
       const res = await fetch('/api/settings/admin-profile', {
@@ -189,11 +254,13 @@ export default function SettingsClient({
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update admin password.');
-      showNotification('success', 'Admin password updated successfully! Use your new password on next sign in.');
+      setPasswordSuccessMessage('Admin password updated successfully! Use your new password on next sign in.');
+      setTimeout(() => setPasswordSuccessMessage(''), 6000);
       setAdminNewPassword('');
       setAdminConfirmPassword('');
+      setPasswordTouched(false);
     } catch (err: any) {
-      showNotification('error', err.message || 'Error updating admin password.');
+      setPasswordErrors({ new_password: err.message || 'Error updating admin password.' });
     } finally {
       setIsUpdatingAdminPassword(false);
     }
@@ -365,8 +432,8 @@ export default function SettingsClient({
         <div className="space-y-6">
           {/* Admin Hero Card */}
           <div className="bg-gradient-to-r from-[#2D041A] via-[#590231] to-[#8A064D] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-[#D4AF37]/40 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-            <div className="flex items-center gap-5 z-10">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#D4AF37] to-[#F9E33A] p-1 shadow-lg shrink-0 overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-5 z-10">
+              <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-2xl bg-gradient-to-br from-[#D4AF37] to-[#F9E33A] p-1 shadow-lg shrink-0 overflow-hidden">
                 {adminProfile.avatar_url ? (
                   <img
                     src={adminProfile.avatar_url}
@@ -379,23 +446,23 @@ export default function SettingsClient({
                   </div>
                 )}
               </div>
-              <div className="space-y-1.5">
-                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/10 backdrop-blur-md text-[#F9E33A] text-[11px] font-bold border border-[#D4AF37]/30">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#F9E33A] text-[11px] font-bold border border-[#D4AF37]/30">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#F9E33A]" />
                   <span>{adminProfile.designation.toUpperCase() || 'SUPER ADMINISTRATOR'}</span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-white">
                   {adminProfile.full_name}
                 </h2>
-                <div className="text-xs sm:text-sm text-rose-100/90 flex flex-wrap items-center gap-3">
+                <div className="text-xs sm:text-sm text-rose-100/90 flex flex-wrap items-center gap-2 sm:gap-3">
                   {adminProfile.whatsapp_number && (
                     <button
                       type="button"
                       onClick={() => copyToClipboard(adminProfile.whatsapp_number, 'hero_wa')}
-                      className="flex items-center gap-1.5 font-mono font-bold text-emerald-300 bg-emerald-950/40 hover:bg-emerald-900/60 px-2.5 py-1 rounded-xl transition cursor-pointer border border-emerald-500/30"
+                      className="flex items-center gap-1.5 font-mono font-bold text-emerald-300 bg-emerald-950/40 hover:bg-emerald-900/60 px-2.5 py-1 rounded-xl transition cursor-pointer border border-emerald-500/30 text-xs"
                       title="Click to copy official WhatsApp number"
                     >
-                      <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       <span>{adminProfile.whatsapp_number}</span>
                       {copiedIndex === 'hero_wa' ? <Check className="w-3 h-3 text-emerald-400 ml-1" /> : <Copy className="w-3 h-3 text-white/50 ml-1" />}
                     </button>
@@ -404,28 +471,25 @@ export default function SettingsClient({
                     <button
                       type="button"
                       onClick={() => copyToClipboard(adminProfile.contacts[0].phone, 'hero_phone')}
-                      className="flex items-center gap-1.5 font-mono font-bold text-[#F9E33A] bg-black/20 hover:bg-black/40 px-2.5 py-1 rounded-xl transition cursor-pointer border border-[#D4AF37]/20"
+                      className="flex items-center gap-1.5 font-mono font-bold text-[#F9E33A] bg-black/20 hover:bg-black/40 px-2.5 py-1 rounded-xl transition cursor-pointer border border-[#D4AF37]/20 text-xs"
                       title="Click to copy public helpline"
                     >
-                      <Phone className="w-3.5 h-3.5" />
+                      <Phone className="w-3.5 h-3.5 shrink-0" />
                       <span>{adminProfile.contacts[0].phone}</span>
                       {copiedIndex === 'hero_phone' ? <Check className="w-3 h-3 text-emerald-400 ml-1" /> : <Copy className="w-3 h-3 text-white/50 ml-1" />}
                     </button>
                   )}
                   {adminProfile.emails.length > 0 && (
-                    <>
-                      <span>•</span>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(adminProfile.emails[0].email, 'hero_email')}
-                        className="flex items-center gap-1.5 text-rose-100 bg-black/20 hover:bg-black/40 px-2.5 py-1 rounded-xl transition cursor-pointer border border-white/10"
-                        title="Click to copy admin email"
-                      >
-                        <Mail className="w-3.5 h-3.5" />
-                        <span>{adminProfile.emails[0].email}</span>
-                        {copiedIndex === 'hero_email' ? <Check className="w-3 h-3 text-emerald-400 ml-1" /> : <Copy className="w-3 h-3 text-white/50 ml-1" />}
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(adminProfile.emails[0].email, 'hero_email')}
+                      className="flex items-center gap-1.5 text-rose-100 bg-black/20 hover:bg-black/40 px-2.5 py-1 rounded-xl transition cursor-pointer border border-white/10 text-xs"
+                      title="Click to copy admin email"
+                    >
+                      <Mail className="w-3.5 h-3.5 shrink-0" />
+                      <span>{adminProfile.emails[0].email}</span>
+                      {copiedIndex === 'hero_email' ? <Check className="w-3 h-3 text-emerald-400 ml-1" /> : <Copy className="w-3 h-3 text-white/50 ml-1" />}
+                    </button>
                   )}
                 </div>
               </div>
@@ -436,302 +500,269 @@ export default function SettingsClient({
                 type="button"
                 onClick={() => {
                   setEditProfileForm(adminProfile);
-                  setIsEditProfileModalOpen(true);
+                  setProfileErrors({});
+                  setIsInlineEditing(!isInlineEditing);
+                  const el = document.getElementById('executive-profile-details');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#F9E33A] to-[#D4AF37] hover:brightness-110 active:scale-95 text-[#2D041A] font-bold text-xs shadow-md shadow-black/20 transition cursor-pointer"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-[#F9E33A] to-[#D4AF37] hover:brightness-110 active:scale-95 text-[#2D041A] font-bold text-xs shadow-md shadow-black/20 transition cursor-pointer"
               >
                 <Edit3 className="w-4 h-4 text-[#2D041A]" />
-                <span>Edit Profile</span>
+                <span>{isInlineEditing ? 'Cancel Editing' : 'Edit Profile'}</span>
               </button>
             </div>
             {/* Background luxury gradient flare */}
             <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-[#D4AF37]/15 rounded-full blur-3xl pointer-events-none" />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Column 1 & 2: Admin Details */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Profile Details Card */}
-              <div className="bg-white rounded-3xl p-6 shadow-xs border border-[#F0D5E4] space-y-5">
-                <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+          {/* Two-Column Responsive Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* Column 1 & 2: Executive Profile Details (with seamless inline editing mode) */}
+            <div id="executive-profile-details" className="lg:col-span-2 space-y-6">
+              <div className={`bg-white rounded-3xl p-6 sm:p-7 shadow-xs border transition-all duration-200 ${isInlineEditing ? 'border-[#8A064D]/40 ring-4 ring-[#8A064D]/5' : 'border-[#F0D5E4]'}`}>
+                {/* Card Header with Clear Action Buttons */}
+                <div className="border-b border-[#F0D5E4]/80 pb-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h3 className="font-bold text-base text-[#2D041A] flex items-center gap-2">
+                    {isInlineEditing && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFF2F8] text-[#8A064D] text-[10.5px] font-bold border border-[#F0D5E4] mb-1.5">
+                        <Edit3 className="w-3 h-3 text-[#8A064D]" />
+                        <span>INLINE EDIT MODE</span>
+                      </div>
+                    )}
+                    <h3 className="font-bold text-base sm:text-lg text-[#2D041A] flex items-center gap-2">
                       <Users className="w-5 h-5 text-[#8A064D]" />
-                      <span>Executive Profile Details</span>
+                      <span>{isInlineEditing ? 'Edit Executive Profile & Contacts' : 'Executive Profile Details'}</span>
                     </h3>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Official contact and location information published across mobile applications.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditProfileForm(adminProfile);
-                      setIsEditProfileModalOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#FFF2F8] hover:bg-[#FCE7F3] text-[#8A064D] text-xs font-bold border border-[#F0D5E4] transition cursor-pointer"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Edit</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  {/* Full Name */}
-                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60">
-                    <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Full Name</span>
-                    <span className="text-sm font-bold text-[#2D041A] mt-1 block">{adminProfile.full_name}</span>
-                  </div>
-
-                  {/* Designation */}
-                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60">
-                    <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Designation</span>
-                    <span className="text-sm font-bold text-gray-800 mt-1 block">{adminProfile.designation}</span>
-                  </div>
-
-                  {/* Primary Admin Dashboard Login Contact (Private) */}
-                  <div className="bg-[#FFFDF5] p-4 rounded-2xl border border-amber-300/80 sm:col-span-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <Lock className="w-3.5 h-3.5 text-amber-700" />
-                        <span className="text-[11px] text-amber-900 font-bold uppercase tracking-wider">
-                          Primary Admin Dashboard Login Contact (Private)
-                        </span>
-                      </div>
-                      <span className="inline-block text-[10px] bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full font-bold">
-                        Admin Login Credential · Hidden From Landing Page
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-amber-200 mt-2">
-                      <div>
-                        <span className="text-[10px] font-bold text-amber-800 uppercase block">Login Account Contact</span>
-                        <span className="text-xs font-mono font-bold text-gray-900">{adminProfile.primary_login_phone || '7780763121'}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(adminProfile.primary_login_phone, 'login_phone')}
-                        className="p-1.5 text-gray-400 hover:text-amber-800 rounded-lg hover:bg-amber-50 cursor-pointer"
-                        title="Copy login phone"
-                      >
-                        {copiedIndex === 'login_phone' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-amber-800/80 mt-1.5 leading-relaxed">
-                      This number is used strictly for authenticating into the Admin Portal dashboard. It is never displayed on the public landing page.
+                      {isInlineEditing
+                        ? 'Update official credentials, designation, public hotlines, and academy address.'
+                        : 'Official contact and location information published across mobile applications.'}
                     </p>
                   </div>
 
-                  {/* Official WhatsApp Number (Public) */}
-                  <div className="bg-[#F0FDF4] p-4 rounded-2xl border border-emerald-300 sm:col-span-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <MessageCircle className="w-3.5 h-3.5 text-emerald-700" />
-                        <span className="text-[11px] text-emerald-900 font-bold uppercase tracking-wider">
-                          Official Academy WhatsApp Number (Public Admissions)
-                        </span>
-                      </div>
-                      <span className="inline-block text-[10px] bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full font-bold">
-                        Linked To Landing Page &amp; Chatbot
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-emerald-200 mt-2">
-                      <div>
-                        <span className="text-[10px] font-bold text-emerald-800 uppercase block">Landing Page WhatsApp Link</span>
-                        <span className="text-xs font-mono font-bold text-emerald-950">{adminProfile.whatsapp_number || '+91 8151 998 899'}</span>
-                      </div>
+                  {/* Header Action Buttons */}
+                  <div className="flex items-center gap-2.5 self-end sm:self-auto shrink-0">
+                    {!isInlineEditing ? (
                       <button
                         type="button"
-                        onClick={() => copyToClipboard(adminProfile.whatsapp_number, 'wa_phone')}
-                        className="p-1.5 text-emerald-600 hover:text-emerald-800 rounded-lg hover:bg-emerald-50 cursor-pointer"
-                        title="Copy WhatsApp"
+                        onClick={() => {
+                          setEditProfileForm(adminProfile);
+                          setProfileErrors({});
+                          setIsInlineEditing(true);
+                        }}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#FFF2F8] hover:bg-[#FCE7F3] text-[#8A064D] text-xs font-bold border border-[#F0D5E4] transition cursor-pointer shadow-2xs"
                       >
-                        {copiedIndex === 'wa_phone' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Edit Profile</span>
                       </button>
-                    </div>
-                    <p className="text-[11px] text-emerald-800/80 mt-1.5 leading-relaxed">
-                      All "Book Trial", "Send Enquiry", floating WhatsApp buttons, and AI Admissions assistant across the landing page link up directly to this contact.
-                    </p>
-                  </div>
-
-                  {/* Contacts */}
-                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Public Office &amp; Helpline Numbers</span>
-                      <span className="text-[10px] text-gray-400 font-medium">{adminProfile.contacts.length} displayed on website</span>
-                    </div>
-                    <div className="space-y-2">
-                      {adminProfile.contacts.map((c, i) => (
-                        <div key={`contact-view-${i}`} className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-100">
-                          <div>
-                            <span className="text-[10px] font-bold text-[#8A064D] uppercase block">{c.title}</span>
-                            <span className="text-xs font-mono font-bold text-gray-900">{c.phone}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(c.phone, `contact_${i}`)}
-                            className="p-1.5 text-gray-400 hover:text-[#8A064D] rounded-lg hover:bg-gray-50 cursor-pointer"
-                            title="Copy number"
-                          >
-                            {copiedIndex === `contact_${i}` ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Academy Emails */}
-                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Academy Emails</span>
-                      <span className="text-[10px] text-gray-400 font-medium">{adminProfile.emails.length} registered</span>
-                    </div>
-                    <div className="space-y-2">
-                      {adminProfile.emails.map((e, i) => (
-                        <div key={`email-view-${i}`} className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-100">
-                          <div>
-                            <span className="text-[10px] font-bold text-blue-800 uppercase block">{e.title}</span>
-                            <span className="text-xs font-semibold text-gray-800">{e.email}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(e.email, `email_${i}`)}
-                            className="p-1.5 text-gray-400 hover:text-blue-700 rounded-lg hover:bg-gray-50 cursor-pointer"
-                            title="Copy email"
-                          >
-                            {copiedIndex === `email_${i}` ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Campus Address */}
-                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
-                    <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Campus Address</span>
-                    <span className="text-xs font-medium text-gray-800 mt-1 block leading-relaxed">{adminProfile.campus_address}</span>
-                  </div>
-
-                  {/* Map URL Link */}
-                  <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
-                    <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Map URL Link</span>
-                    {adminProfile.map_url ? (
-                      <a
-                        href={adminProfile.map_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#8A064D] hover:underline mt-1 break-all"
-                      >
-                        <MapPin className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
-                        <span>{adminProfile.map_url}</span>
-                        <ExternalLink className="w-3 h-3 shrink-0" />
-                      </a>
-                    ) : (
-                      <span className="text-xs text-gray-400 mt-1 block italic">No Google Map link added yet</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Column 3: Change Password Form */}
-            <div className="space-y-6">
-              <div className="bg-white rounded-3xl p-6 shadow-xs border-2 border-[#8A064D]/20 space-y-5">
-                <div className="border-b border-gray-100 pb-3">
-                  <div className="w-10 h-10 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D] mb-3">
-                    <KeyRound className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-bold text-base text-[#2D041A]">
-                    Change Admin Password
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                    Update the credentials used to sign into the Admin portal.
-                  </p>
-                </div>
-
-                <form onSubmit={handleUpdateAdminPassword} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D041A] mb-1.5">
-                      New Admin Password
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showAdminPassword ? 'text' : 'password'}
-                        required
-                        value={adminNewPassword}
-                        onChange={(e) => setAdminNewPassword(e.target.value)}
-                        placeholder="Enter new password (min 4 chars)"
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-2xl border border-gray-200 bg-[#FFF9FB] text-xs font-medium text-gray-900 focus:bg-white focus:ring-2 focus:ring-[#8A064D]/30 focus:border-[#8A064D]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowAdminPassword(!showAdminPassword)}
-                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer"
-                      >
-                        {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D041A] mb-1.5">
-                      Confirm New Password
-                    </label>
-                    <input
-                      type={showAdminPassword ? 'text' : 'password'}
-                      required
-                      value={adminConfirmPassword}
-                      onChange={(e) => setAdminConfirmPassword(e.target.value)}
-                      placeholder="Re-enter new password"
-                      className="w-full px-3.5 py-2.5 rounded-2xl border border-gray-200 bg-[#FFF9FB] text-xs font-medium text-gray-900 focus:bg-white focus:ring-2 focus:ring-[#8A064D]/30 focus:border-[#8A064D]"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isUpdatingAdminPassword}
-                    className="w-full py-3 px-4 rounded-2xl bg-[#8A064D] hover:bg-[#72043F] active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-[#8A064D]/20 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {isUpdatingAdminPassword ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Updating Password...</span>
-                      </>
                     ) : (
                       <>
-                        <Check className="w-4 h-4" />
-                        <span>Update Admin Password</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsInlineEditing(false);
+                            setEditProfileForm(adminProfile);
+                            setProfileErrors({});
+                          }}
+                          disabled={isSavingProfile}
+                          className="px-3.5 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-xs font-bold text-gray-700 transition cursor-pointer flex items-center gap-1.5"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>Cancel</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSaveProfile()}
+                          disabled={isSavingProfile}
+                          className="px-4 py-2 rounded-xl bg-[#8A064D] hover:bg-[#72043F] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                        >
+                          {isSavingProfile ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Saving...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Save Changes</span>
+                            </>
+                          )}
+                        </button>
                       </>
                     )}
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-
-          {/* EDIT PROFILE MODAL */}
-          {isEditProfileModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-              <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 flex flex-col">
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-xs z-10">
-                  <div>
-                    <h3 className="font-bold text-lg text-[#2D041A]">Edit Administrator Profile</h3>
-                    <p className="text-xs text-gray-500">Update official contact, designation, and campus details</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditProfileModalOpen(false)}
-                    className="p-2 text-gray-400 hover:text-gray-700 rounded-xl hover:bg-gray-100 cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
                 </div>
 
-                <form onSubmit={handleSaveProfile} className="p-6 space-y-5">
-                  {/* Avatar Upload */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D041A] mb-2">Profile Image</label>
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-2xl bg-[#FFF2F8] border-2 border-dashed border-[#F0D5E4] flex items-center justify-center overflow-hidden shrink-0">
+                {/* Inline General Error (if any) */}
+                {profileErrors.form && (
+                  <div className="p-3.5 mb-5 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-800 text-xs font-medium">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                    <span>{profileErrors.form}</span>
+                  </div>
+                )}
+
+                {/* VIEW MODE */}
+                {!isInlineEditing ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    {/* Full Name */}
+                    <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60">
+                      <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Full Name</span>
+                      <span className="text-sm font-bold text-[#2D041A] mt-1 block">{adminProfile.full_name}</span>
+                    </div>
+
+                    {/* Designation */}
+                    <div className="bg-[#FFF9FB] p-4 rounded-2xl border border-[#F0D5E4]/60">
+                      <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Designation</span>
+                      <span className="text-sm font-bold text-gray-800 mt-1 block">{adminProfile.designation}</span>
+                    </div>
+
+                    {/* Primary Admin Dashboard Login Contact (Private) */}
+                    <div className="bg-[#FFFDF5] p-4.5 rounded-2xl border border-amber-300/80 sm:col-span-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5 text-amber-700" />
+                          <span className="text-[11px] text-amber-900 font-bold uppercase tracking-wider">
+                            Primary Admin Dashboard Login Contact (Private)
+                          </span>
+                        </div>
+                        <span className="inline-block text-[10px] bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full font-bold">
+                          Admin Login Credential · Hidden From Landing Page
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-amber-200 mt-2">
+                        <div>
+                          <span className="text-[10px] font-bold text-amber-800 uppercase block">Login Account Contact</span>
+                          <span className="text-xs font-mono font-bold text-gray-900">{adminProfile.primary_login_phone || '7780763121'}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(adminProfile.primary_login_phone, 'login_phone')}
+                          className="p-1.5 text-gray-400 hover:text-amber-800 rounded-lg hover:bg-amber-50 cursor-pointer"
+                          title="Copy login phone"
+                        >
+                          {copiedIndex === 'login_phone' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-amber-800/80 mt-2 leading-relaxed">
+                        This number is used strictly for authenticating into the Admin Portal dashboard. It is never displayed on the public landing page.
+                      </p>
+                    </div>
+
+                    {/* Official WhatsApp Number (Public) */}
+                    <div className="bg-[#F0FDF4] p-4.5 rounded-2xl border border-emerald-300 sm:col-span-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <MessageCircle className="w-3.5 h-3.5 text-emerald-700" />
+                          <span className="text-[11px] text-emerald-900 font-bold uppercase tracking-wider">
+                            Official Academy WhatsApp Number (Public Admissions)
+                          </span>
+                        </div>
+                        <span className="inline-block text-[10px] bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded-full font-bold">
+                          Linked To Landing Page &amp; Chatbot
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-emerald-200 mt-2">
+                        <div>
+                          <span className="text-[10px] font-bold text-emerald-800 uppercase block">Landing Page WhatsApp Link</span>
+                          <span className="text-xs font-mono font-bold text-emerald-950">{adminProfile.whatsapp_number || '+91 8151 998 899'}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(adminProfile.whatsapp_number, 'wa_phone')}
+                          className="p-1.5 text-emerald-600 hover:text-emerald-800 rounded-lg hover:bg-emerald-50 cursor-pointer"
+                          title="Copy WhatsApp"
+                        >
+                          {copiedIndex === 'wa_phone' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-emerald-800/80 mt-2 leading-relaxed">
+                        All "Book Trial", "Send Enquiry", floating WhatsApp buttons, and AI Admissions assistant across the landing page link up directly to this contact.
+                      </p>
+                    </div>
+
+                    {/* Contacts */}
+                    <div className="bg-[#FFF9FB] p-4.5 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Public Office &amp; Helpline Numbers</span>
+                        <span className="text-[10px] text-gray-400 font-medium">{adminProfile.contacts.length} displayed on website</span>
+                      </div>
+                      <div className="space-y-2">
+                        {adminProfile.contacts.map((c, i) => (
+                          <div key={`contact-view-${i}`} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
+                            <div>
+                              <span className="text-[10px] font-bold text-[#8A064D] uppercase block">{c.title}</span>
+                              <span className="text-xs font-mono font-bold text-gray-900">{c.phone}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(c.phone, `contact_${i}`)}
+                              className="p-1.5 text-gray-400 hover:text-[#8A064D] rounded-lg hover:bg-gray-50 cursor-pointer"
+                              title="Copy number"
+                            >
+                              {copiedIndex === `contact_${i}` ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Academy Emails */}
+                    <div className="bg-[#FFF9FB] p-4.5 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Academy Emails</span>
+                        <span className="text-[10px] text-gray-400 font-medium">{adminProfile.emails.length} registered</span>
+                      </div>
+                      <div className="space-y-2">
+                        {adminProfile.emails.map((e, i) => (
+                          <div key={`email-view-${i}`} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
+                            <div>
+                              <span className="text-[10px] font-bold text-blue-800 uppercase block">{e.title}</span>
+                              <span className="text-xs font-semibold text-gray-800">{e.email}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(e.email, `email_${i}`)}
+                              className="p-1.5 text-gray-400 hover:text-blue-700 rounded-lg hover:bg-gray-50 cursor-pointer"
+                              title="Copy email"
+                            >
+                              {copiedIndex === `email_${i}` ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Campus Address */}
+                    <div className="bg-[#FFF9FB] p-4.5 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
+                      <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Campus Address</span>
+                      <span className="text-xs font-medium text-gray-800 mt-1 block leading-relaxed">{adminProfile.campus_address}</span>
+                    </div>
+
+                    {/* Map URL Link */}
+                    <div className="bg-[#FFF9FB] p-4.5 rounded-2xl border border-[#F0D5E4]/60 sm:col-span-2">
+                      <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider block">Map URL Link</span>
+                      {adminProfile.map_url ? (
+                        <a
+                          href={adminProfile.map_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#8A064D] hover:underline mt-1 break-all"
+                        >
+                          <MapPin className="w-3.5 h-3.5 text-[#8A064D] shrink-0" />
+                          <span>{adminProfile.map_url}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-gray-400 mt-1 block italic">No Google Map link added yet</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* INLINE EDIT MODE FORM */
+                  <form onSubmit={handleSaveProfile} className="space-y-6">
+                    {/* Avatar Upload Inline */}
+                    <div className="p-4 bg-[#FFF9FB] rounded-2xl border border-[#F0D5E4]/80 flex flex-col sm:flex-row sm:items-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl bg-[#FFF2F8] border-2 border-dashed border-[#F0D5E4] flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
                         {editProfileForm.avatar_url ? (
                           <img
                             src={editProfileForm.avatar_url}
@@ -742,7 +773,10 @@ export default function SettingsClient({
                           <ImageIcon className="w-6 h-6 text-[#8A064D]/50" />
                         )}
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 flex-1">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#2D041A]">
+                          Profile Photo
+                        </label>
                         <input
                           type="file"
                           ref={avatarFileInputRef}
@@ -750,272 +784,562 @@ export default function SettingsClient({
                           accept="image/*"
                           className="hidden"
                         />
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => avatarFileInputRef.current?.click()}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#8A064D] hover:bg-[#72043F] text-white text-xs font-bold cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8A064D] hover:bg-[#72043F] text-white text-xs font-bold cursor-pointer transition shadow-2xs"
                           >
                             <Upload className="w-3.5 h-3.5" />
-                            <span>Upload Image</span>
+                            <span>Upload New Photo</span>
                           </button>
                           {editProfileForm.avatar_url && (
                             <button
                               type="button"
                               onClick={() => setEditProfileForm(prev => ({ ...prev, avatar_url: '' }))}
-                              className="px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold cursor-pointer"
+                              className="px-3.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold cursor-pointer transition"
                             >
                               Remove
                             </button>
                           )}
                         </div>
-                        <p className="text-[10px] text-gray-400">PNG, JPG or WEBP (Max 2MB)</p>
+                        {profileErrors.avatar_url ? (
+                          <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
+                            <AlertCircle className="w-3 h-3 shrink-0" />
+                            <span>{profileErrors.avatar_url}</span>
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-gray-400">Recommended: Square portrait photo in PNG, JPG or WEBP (Max 2MB)</p>
+                        )}
                       </div>
                     </div>
-                  </div>
 
-                  {/* Full Name */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D041A] mb-1.5">Full Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={editProfileForm.full_name}
-                      onChange={(e) => setEditProfileForm(prev => ({ ...prev, full_name: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 rounded-2xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
-                      placeholder="e.g. Satya"
-                    />
-                  </div>
-
-                  {/* Designation */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D041A] mb-1.5">Designation *</label>
-                    <input
-                      type="text"
-                      required
-                      value={editProfileForm.designation}
-                      onChange={(e) => setEditProfileForm(prev => ({ ...prev, designation: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 rounded-2xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
-                      placeholder="e.g. Academy Director & Operations Lead"
-                    />
-                  </div>
-
-                  {/* Primary Admin Dashboard Login Contact (Private) */}
-                  <div className="bg-[#FFFDF5] p-3.5 rounded-2xl border border-amber-300">
-                    <label className="block text-xs font-bold text-amber-950 mb-1">
-                      Primary Admin Dashboard Login Contact (Private) *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={editProfileForm.primary_login_phone}
-                      onChange={(e) => setEditProfileForm(prev => ({ ...prev, primary_login_phone: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-amber-300 bg-white text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500"
-                      placeholder="e.g. 7780763121"
-                    />
-                    <p className="text-[11px] text-amber-800 mt-1">
-                      🔒 <strong>Private Credential:</strong> Used strictly for signing into this Admin Dashboard. This number will <strong>NEVER</strong> be displayed on the public landing page.
-                    </p>
-                  </div>
-
-                  {/* Official Academy WhatsApp Number (Public) */}
-                  <div className="bg-[#F0FDF4] p-3.5 rounded-2xl border border-emerald-300">
-                    <label className="block text-xs font-bold text-emerald-950 mb-1">
-                      Official Academy WhatsApp Number (Public Admissions) *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={editProfileForm.whatsapp_number}
-                      onChange={(e) => setEditProfileForm(prev => ({ ...prev, whatsapp_number: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-300 bg-white text-xs font-mono font-bold focus:ring-2 focus:ring-emerald-500"
-                      placeholder="e.g. +91 8151 998 899"
-                    />
-                    <p className="text-[11px] text-emerald-800 mt-1">
-                      💬 <strong>Public Link-Up:</strong> All website WhatsApp buttons, "Book Trial / Send Enquiry" forms, and AI chatbot link up directly to this contact.
-                    </p>
-                  </div>
-
-                  {/* Contacts List */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
+                    {/* Full Name & Designation */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                       <div>
-                        <label className="block text-xs font-bold text-[#2D041A]">
-                          Public Office &amp; Helpline Numbers
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#2D041A] mb-2">
+                          Full Name <span className="text-rose-500 font-bold">*</span>
                         </label>
-                        <p className="text-[10px] text-gray-500">
-                          Displayed publicly on the landing page contact cards and footer bottom bar.
-                        </p>
+                        <input
+                          type="text"
+                          value={editProfileForm.full_name}
+                          onChange={(e) => {
+                            setEditProfileForm(prev => ({ ...prev, full_name: e.target.value }));
+                            if (profileErrors.full_name) {
+                              setProfileErrors(prev => {
+                                const next = { ...prev };
+                                delete next.full_name;
+                                return next;
+                              });
+                            }
+                          }}
+                          className={`w-full h-11 sm:h-12 px-4 rounded-xl border text-sm font-medium transition-colors ${
+                            profileErrors.full_name
+                              ? 'border-rose-400 bg-rose-50/20 text-rose-950 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                              : 'border-gray-200 bg-white text-gray-900 focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]'
+                          }`}
+                          placeholder="e.g. Satya"
+                        />
+                        {profileErrors.full_name && (
+                          <p className="text-[11px] font-semibold text-rose-600 mt-1.5 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{profileErrors.full_name}</span>
+                          </p>
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setEditProfileForm(prev => ({
-                          ...prev,
-                          contacts: [...prev.contacts, { title: 'Office Helpline', phone: '' }]
-                        }))}
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-[#8A064D] hover:underline cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Number</span>
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {editProfileForm.contacts.map((c, i) => (
-                        <div key={`edit-contact-${i}`} className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={c.title}
-                            onChange={(e) => {
-                              const newC = [...editProfileForm.contacts];
-                              newC[i].title = e.target.value;
-                              setEditProfileForm(prev => ({ ...prev, contacts: newC }));
-                            }}
-                            placeholder="Title (e.g. Office Desk)"
-                            className="w-1/3 px-3 py-2 rounded-xl border border-gray-200 text-xs"
-                          />
-                          <input
-                            type="tel"
-                            value={c.phone}
-                            onChange={(e) => {
-                              const newC = [...editProfileForm.contacts];
-                              newC[i].phone = e.target.value;
-                              setEditProfileForm(prev => ({ ...prev, contacts: newC }));
-                            }}
-                            placeholder="Phone (e.g. +91 8151 998 899)"
-                            className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs font-mono"
-                          />
-                          {editProfileForm.contacts.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newC = editProfileForm.contacts.filter((_, idx) => idx !== i);
-                                setEditProfileForm(prev => ({ ...prev, contacts: newC }));
-                              }}
-                              className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl cursor-pointer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Emails List */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-xs font-bold text-[#2D041A]">
-                        Academy Emails (Title & Email)
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setEditProfileForm(prev => ({
-                          ...prev,
-                          emails: [...prev.emails, { title: 'Helpdesk Email', email: '' }]
-                        }))}
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-[#8A064D] hover:underline cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Email</span>
-                      </button>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#2D041A] mb-2">
+                          Designation <span className="text-rose-500 font-bold">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={editProfileForm.designation}
+                          onChange={(e) => {
+                            setEditProfileForm(prev => ({ ...prev, designation: e.target.value }));
+                            if (profileErrors.designation) {
+                              setProfileErrors(prev => {
+                                const next = { ...prev };
+                                delete next.designation;
+                                return next;
+                              });
+                            }
+                          }}
+                          className={`w-full h-11 sm:h-12 px-4 rounded-xl border text-sm font-medium transition-colors ${
+                            profileErrors.designation
+                              ? 'border-rose-400 bg-rose-50/20 text-rose-950 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                              : 'border-gray-200 bg-white text-gray-900 focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]'
+                          }`}
+                          placeholder="e.g. Academy Director & Operations Lead"
+                        />
+                        {profileErrors.designation && (
+                          <p className="text-[11px] font-semibold text-rose-600 mt-1.5 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{profileErrors.designation}</span>
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      {editProfileForm.emails.map((em, i) => (
-                        <div key={`edit-email-${i}`} className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={em.title}
-                            onChange={(e) => {
-                              const newE = [...editProfileForm.emails];
-                              newE[i].title = e.target.value;
-                              setEditProfileForm(prev => ({ ...prev, emails: newE }));
-                            }}
-                            placeholder="Title (e.g. Support)"
-                            className="w-1/3 px-3 py-2 rounded-xl border border-gray-200 text-xs"
-                          />
-                          <input
-                            type="email"
-                            value={em.email}
-                            onChange={(e) => {
-                              const newE = [...editProfileForm.emails];
-                              newE[i].email = e.target.value;
-                              setEditProfileForm(prev => ({ ...prev, emails: newE }));
-                            }}
-                            placeholder="Email (e.g. info@laasya.com)"
-                            className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs"
-                          />
-                          {editProfileForm.emails.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newE = editProfileForm.emails.filter((_, idx) => idx !== i);
-                                setEditProfileForm(prev => ({ ...prev, emails: newE }));
-                              }}
-                              className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl cursor-pointer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Campus Address */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D041A] mb-1.5">Campus Address</label>
-                    <textarea
-                      rows={2}
-                      value={editProfileForm.campus_address}
-                      onChange={(e) => setEditProfileForm(prev => ({ ...prev, campus_address: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 rounded-2xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
-                      placeholder="Campus address..."
-                    />
-                  </div>
-
-                  {/* Map URL */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D041A] mb-1.5">Map URL Link</label>
-                    <input
-                      type="url"
-                      value={editProfileForm.map_url}
-                      onChange={(e) => setEditProfileForm(prev => ({ ...prev, map_url: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 rounded-2xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
-                      placeholder="https://maps.google.com/..."
-                    />
-                  </div>
-
-                  {/* Submit Button */}
-                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
-                    <button
-                      type="button"
-                      onClick={() => setIsEditProfileModalOpen(false)}
-                      className="px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSavingProfile}
-                      className="px-6 py-2.5 rounded-xl bg-[#8A064D] hover:bg-[#72043F] text-white text-xs font-bold transition shadow-md shadow-[#8A064D]/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {isSavingProfile ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Saving Changes...</span>
-                        </>
+                    {/* Primary Admin Dashboard Login Contact (Private) */}
+                    <div className="bg-[#FFFDF5] p-4 sm:p-5 rounded-2xl border border-amber-300 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-amber-950">
+                          Primary Admin Login Contact (Private) <span className="text-rose-500 font-bold">*</span>
+                        </label>
+                        <span className="inline-block text-[10px] bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full font-bold">
+                          Admin Login Credential · Hidden From Landing Page
+                        </span>
+                      </div>
+                      <input
+                        type="tel"
+                        value={editProfileForm.primary_login_phone}
+                        onChange={(e) => {
+                          setEditProfileForm(prev => ({ ...prev, primary_login_phone: e.target.value }));
+                          if (profileErrors.primary_login_phone) {
+                            setProfileErrors(prev => {
+                              const next = { ...prev };
+                              delete next.primary_login_phone;
+                              return next;
+                            });
+                          }
+                        }}
+                        className={`w-full h-11 sm:h-12 px-4 rounded-xl border font-mono font-bold text-sm transition-colors ${
+                          profileErrors.primary_login_phone
+                            ? 'border-rose-400 bg-rose-50/20 text-rose-950 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                            : 'border-amber-300 bg-white text-gray-900 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500'
+                        }`}
+                        placeholder="e.g. 7780763121"
+                      />
+                      {profileErrors.primary_login_phone ? (
+                        <p className="text-[11px] font-semibold text-rose-600 mt-1.5 flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{profileErrors.primary_login_phone}</span>
+                        </p>
                       ) : (
-                        <>
-                          <Check className="w-4 h-4" />
-                          <span>Save Profile Changes</span>
-                        </>
+                        <p className="text-[11px] text-amber-800 leading-relaxed">
+                          🔒 <strong>Private Credential:</strong> Used strictly for signing into this Admin Dashboard. This number will <strong>NEVER</strong> be displayed on the public landing page.
+                        </p>
                       )}
-                    </button>
+                    </div>
+
+                    {/* Official Academy WhatsApp Number (Public) */}
+                    <div className="bg-[#F0FDF4] p-4 sm:p-5 rounded-2xl border border-emerald-300 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-emerald-950">
+                          Official WhatsApp Admissions Hotline <span className="text-rose-500 font-bold">*</span>
+                        </label>
+                        <span className="inline-block text-[10px] bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded-full font-bold">
+                          Linked To Landing Page &amp; Chatbot
+                        </span>
+                      </div>
+                      <input
+                        type="tel"
+                        value={editProfileForm.whatsapp_number}
+                        onChange={(e) => {
+                          setEditProfileForm(prev => ({ ...prev, whatsapp_number: e.target.value }));
+                          if (profileErrors.whatsapp_number) {
+                            setProfileErrors(prev => {
+                              const next = { ...prev };
+                              delete next.whatsapp_number;
+                              return next;
+                            });
+                          }
+                        }}
+                        className={`w-full h-11 sm:h-12 px-4 rounded-xl border font-mono font-bold text-sm transition-colors ${
+                          profileErrors.whatsapp_number
+                            ? 'border-rose-400 bg-rose-50/20 text-rose-950 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                            : 'border-emerald-300 bg-white text-emerald-950 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500'
+                        }`}
+                        placeholder="e.g. +91 8151 998 899"
+                      />
+                      {profileErrors.whatsapp_number ? (
+                        <p className="text-[11px] font-semibold text-rose-600 mt-1.5 flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{profileErrors.whatsapp_number}</span>
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-emerald-800 leading-relaxed">
+                          💬 <strong>Public Link-Up:</strong> All website WhatsApp buttons, "Book Trial / Send Enquiry" forms, and AI chatbot link up directly to this contact.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Contacts List */}
+                    <div className="bg-[#FFF9FB] p-4 sm:p-5 rounded-2xl border border-[#F0D5E4]/80 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#F0D5E4]/40">
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-[#2D041A]">
+                            Public Office &amp; Helpline Numbers
+                          </label>
+                          <p className="text-[11px] text-gray-500">
+                            Displayed publicly on the landing page contact cards and footer bottom bar.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditProfileForm(prev => ({
+                            ...prev,
+                            contacts: [...prev.contacts, { title: 'Office Helpline', phone: '' }]
+                          }))}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-[11px] font-bold text-[#8A064D] border border-[#F0D5E4] hover:bg-[#FCE7F3] transition cursor-pointer self-start sm:self-auto shadow-2xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Number</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-3 pt-1">
+                        {editProfileForm.contacts.map((c, i) => (
+                          <div key={`edit-contact-${i}`} className="space-y-1">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                              <input
+                                type="text"
+                                value={c.title}
+                                onChange={(e) => {
+                                  const newC = [...editProfileForm.contacts];
+                                  newC[i].title = e.target.value;
+                                  setEditProfileForm(prev => ({ ...prev, contacts: newC }));
+                                }}
+                                placeholder="Label (e.g. Office Desk)"
+                                className="h-11 sm:h-12 sm:w-1/3 px-3.5 rounded-xl border border-gray-200 bg-white text-xs font-semibold focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
+                              />
+                              <input
+                                type="tel"
+                                value={c.phone}
+                                onChange={(e) => {
+                                  const newC = [...editProfileForm.contacts];
+                                  newC[i].phone = e.target.value;
+                                  setEditProfileForm(prev => ({ ...prev, contacts: newC }));
+                                }}
+                                placeholder="Phone (e.g. +91 8151 998 899)"
+                                className="h-11 sm:h-12 sm:flex-1 px-3.5 rounded-xl border border-gray-200 bg-white text-xs font-mono font-bold focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
+                              />
+                              {editProfileForm.contacts.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newC = editProfileForm.contacts.filter((_, idx) => idx !== i);
+                                    setEditProfileForm(prev => ({ ...prev, contacts: newC }));
+                                  }}
+                                  className="h-11 sm:h-12 w-11 sm:w-12 shrink-0 flex items-center justify-center text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-200/60 cursor-pointer transition"
+                                  title="Remove contact"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                            {(profileErrors[`contact_title_${i}`] || profileErrors[`contact_phone_${i}`]) && (
+                              <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 pl-1">
+                                <AlertCircle className="w-3 h-3 shrink-0" />
+                                <span>{profileErrors[`contact_title_${i}`] || profileErrors[`contact_phone_${i}`]}</span>
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Emails List */}
+                    <div className="bg-[#FFF9FB] p-4 sm:p-5 rounded-2xl border border-[#F0D5E4]/80 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#F0D5E4]/40">
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-[#2D041A]">
+                            Academy Emails (Title &amp; Address)
+                          </label>
+                          <p className="text-[11px] text-gray-500">
+                            Official inboxes for admissions, student care, and management queries.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditProfileForm(prev => ({
+                            ...prev,
+                            emails: [...prev.emails, { title: 'Helpdesk Email', email: '' }]
+                          }))}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-[11px] font-bold text-[#8A064D] border border-[#F0D5E4] hover:bg-[#FCE7F3] transition cursor-pointer self-start sm:self-auto shadow-2xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Email</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-3 pt-1">
+                        {editProfileForm.emails.map((em, i) => (
+                          <div key={`edit-email-${i}`} className="space-y-1">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                              <input
+                                type="text"
+                                value={em.title}
+                                onChange={(e) => {
+                                  const newE = [...editProfileForm.emails];
+                                  newE[i].title = e.target.value;
+                                  setEditProfileForm(prev => ({ ...prev, emails: newE }));
+                                }}
+                                placeholder="Label (e.g. Official Inquiries)"
+                                className="h-11 sm:h-12 sm:w-1/3 px-3.5 rounded-xl border border-gray-200 bg-white text-xs font-semibold focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
+                              />
+                              <input
+                                type="email"
+                                value={em.email}
+                                onChange={(e) => {
+                                  const newE = [...editProfileForm.emails];
+                                  newE[i].email = e.target.value;
+                                  setEditProfileForm(prev => ({ ...prev, emails: newE }));
+                                }}
+                                placeholder="Email (e.g. admin@laasyaacademy.com)"
+                                className="h-11 sm:h-12 sm:flex-1 px-3.5 rounded-xl border border-gray-200 bg-white text-xs font-medium focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]"
+                              />
+                              {editProfileForm.emails.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newE = editProfileForm.emails.filter((_, idx) => idx !== i);
+                                    setEditProfileForm(prev => ({ ...prev, emails: newE }));
+                                  }}
+                                  className="h-11 sm:h-12 w-11 sm:w-12 shrink-0 flex items-center justify-center text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-200/60 cursor-pointer transition"
+                                  title="Remove email"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                            {(profileErrors[`email_title_${i}`] || profileErrors[`email_address_${i}`]) && (
+                              <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 pl-1">
+                                <AlertCircle className="w-3 h-3 shrink-0" />
+                                <span>{profileErrors[`email_title_${i}`] || profileErrors[`email_address_${i}`]}</span>
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Campus Address & Google Map URL */}
+                    <div className="grid grid-cols-1 gap-4 sm:gap-5">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#2D041A] mb-2">
+                          Campus Address
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={editProfileForm.campus_address}
+                          onChange={(e) => setEditProfileForm(prev => ({ ...prev, campus_address: e.target.value }))}
+                          className="w-full p-4 rounded-xl border border-gray-200 text-xs font-medium focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D] bg-white transition-colors"
+                          placeholder="e.g. VV Maple Hub, 2nd Floor, Kannamangala, Bangalore 560115"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#2D041A] mb-2">
+                          Google Maps URL Link
+                        </label>
+                        <input
+                          type="url"
+                          value={editProfileForm.map_url}
+                          onChange={(e) => {
+                            setEditProfileForm(prev => ({ ...prev, map_url: e.target.value }));
+                            if (profileErrors.map_url) {
+                              setProfileErrors(prev => {
+                                const next = { ...prev };
+                                delete next.map_url;
+                                return next;
+                              });
+                            }
+                          }}
+                          className={`w-full h-11 sm:h-12 px-4 rounded-xl border text-xs font-medium transition-colors ${
+                            profileErrors.map_url
+                              ? 'border-rose-400 bg-rose-50/20 text-rose-950 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                              : 'border-gray-200 bg-white text-gray-900 focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]'
+                          }`}
+                          placeholder="https://maps.app.goo.gl/..."
+                        />
+                        {profileErrors.map_url && (
+                          <p className="text-[11px] font-semibold text-rose-600 mt-1.5 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{profileErrors.map_url}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom Action Bar */}
+                    <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-3 pt-5 border-t border-gray-100 mt-6">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsInlineEditing(false);
+                          setEditProfileForm(adminProfile);
+                          setProfileErrors({});
+                        }}
+                        disabled={isSavingProfile}
+                        className="h-11 sm:h-12 px-6 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-xs font-bold text-gray-700 transition cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <X className="w-4 h-4" />
+                        <span>Cancel</span>
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSavingProfile}
+                        className="h-11 sm:h-12 px-8 rounded-xl bg-[#8A064D] hover:bg-[#72043F] active:scale-[0.99] text-white text-xs font-bold transition shadow-md shadow-[#8A064D]/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSavingProfile ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Saving Changes...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4" />
+                            <span>Save Changes</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+
+            {/* Column 3: Change Admin Password Card */}
+            <div className="space-y-6">
+              <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-xs border-2 border-[#8A064D]/20 space-y-5">
+                <div className="border-b border-gray-100 pb-4">
+                  <div className="w-10 h-10 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center text-[#8A064D] mb-3 shadow-2xs">
+                    <KeyRound className="w-5 h-5" />
                   </div>
+                  <h3 className="font-bold text-base text-[#2D041A]">
+                    Change Admin Password
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                    Update the credentials used to sign into the Master Admin dashboard portal.
+                  </p>
+                </div>
+
+                {passwordSuccessMessage && (
+                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-2.5 text-emerald-800 text-xs font-medium animate-in fade-in">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>{passwordSuccessMessage}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleUpdateAdminPassword} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#2D041A] mb-2">
+                      New Admin Password <span className="text-rose-500 font-bold">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showAdminPassword ? 'text' : 'password'}
+                        value={adminNewPassword}
+                        onChange={(e) => {
+                          setAdminNewPassword(e.target.value);
+                          setPasswordTouched(true);
+                          if (passwordErrors.new_password) {
+                            setPasswordErrors(prev => {
+                              const next = { ...prev };
+                              delete next.new_password;
+                              return next;
+                            });
+                          }
+                        }}
+                        placeholder="Enter new password (min 6 chars)"
+                        className={`w-full h-11 sm:h-12 pl-4 pr-11 rounded-xl border text-sm font-medium transition-colors ${
+                          passwordErrors.new_password
+                            ? 'border-rose-400 bg-rose-50/20 text-rose-950 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                            : 'border-gray-200 bg-[#FFF9FB]/60 focus:bg-white text-gray-900 focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowAdminPassword(!showAdminPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer p-1"
+                        title={showAdminPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {passwordErrors.new_password ? (
+                      <p className="text-[11px] font-semibold text-rose-600 mt-1.5 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{passwordErrors.new_password}</span>
+                      </p>
+                    ) : passwordTouched && adminNewPassword.length > 0 && adminNewPassword.length < 6 ? (
+                      <p className="text-[11px] font-semibold text-amber-600 mt-1.5 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>Password must be at least 6 characters (currently {adminNewPassword.length})</span>
+                      </p>
+                    ) : passwordTouched && adminNewPassword.length >= 6 ? (
+                      <p className="text-[11px] font-semibold text-emerald-600 mt-1.5 flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5 shrink-0" />
+                        <span>Password length is secure</span>
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#2D041A] mb-2">
+                      Confirm New Password <span className="text-rose-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type={showAdminPassword ? 'text' : 'password'}
+                      value={adminConfirmPassword}
+                      onChange={(e) => {
+                        setAdminConfirmPassword(e.target.value);
+                        if (passwordErrors.confirm_password) {
+                          setPasswordErrors(prev => {
+                            const next = { ...prev };
+                            delete next.confirm_password;
+                            return next;
+                          });
+                        }
+                      }}
+                      placeholder="Re-enter new password"
+                      className={`w-full h-11 sm:h-12 px-4 rounded-xl border text-sm font-medium transition-colors ${
+                        passwordErrors.confirm_password
+                          ? 'border-rose-400 bg-rose-50/20 text-rose-950 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                          : 'border-gray-200 bg-[#FFF9FB]/60 focus:bg-white text-gray-900 focus:ring-2 focus:ring-[#8A064D]/20 focus:border-[#8A064D]'
+                      }`}
+                    />
+                    {passwordErrors.confirm_password ? (
+                      <p className="text-[11px] font-semibold text-rose-600 mt-1.5 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{passwordErrors.confirm_password}</span>
+                      </p>
+                    ) : adminConfirmPassword.length > 0 && adminNewPassword === adminConfirmPassword ? (
+                      <p className="text-[11px] font-semibold text-emerald-600 mt-1.5 flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5 shrink-0" />
+                        <span>Passwords match</span>
+                      </p>
+                    ) : adminConfirmPassword.length > 0 && adminNewPassword !== adminConfirmPassword ? (
+                      <p className="text-[11px] font-semibold text-rose-600 mt-1.5 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>Passwords do not match</span>
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isUpdatingAdminPassword || !adminNewPassword || adminNewPassword.length < 6 || adminNewPassword !== adminConfirmPassword}
+                    className="w-full h-11 sm:h-12 mt-2 rounded-xl bg-[#8A064D] hover:bg-[#72043F] active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-[#8A064D]/20 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {isUpdatingAdminPassword ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Saving New Password...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-4 h-4" />
+                        <span>Save New Password</span>
+                      </>
+                    )}
+                  </button>
                 </form>
               </div>
             </div>
-          )}
+          </div>
         </div>
       ) : (
         /* ============================================================= */
