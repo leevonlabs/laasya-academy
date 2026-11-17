@@ -60,8 +60,6 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const [activeLoggedInUser, setActiveLoggedInUser] = useState<any>(null);
-  const [resumingSession, setResumingSession] = useState(false);
 
   // Contact Admin Modal state for "Forgot Password" and "New Registration" (Student & Guru only)
   const [contactModal, setContactModal] = useState<{
@@ -96,18 +94,7 @@ function LoginContent() {
       return;
     }
 
-    // Direct visit or navigation back: If already logged in, keep session active
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('saved_user_profile');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (parsed && (parsed.id || parsed.profile_id)) {
-            setActiveLoggedInUser(parsed);
-          }
-        } catch (_) {}
-      }
-
       const remPhone = localStorage.getItem('remembered_admin_phone');
       if (remPhone) {
         setAdminPhone(remPhone);
@@ -185,85 +172,6 @@ function LoginContent() {
     }
     // Direct browser redirect into portal - loads directly into Student/Trainer dashboard
     window.location.replace('/portal/');
-  };
-
-  // Helper to resume existing session with automatic token refresh
-  const handleResumeSession = async () => {
-    if (!activeLoggedInUser || resumingSession) return;
-    setResumingSession(true);
-    setError(null);
-
-    // 1. Owner / Receptionist
-    if (activeLoggedInUser.role === 'owner' || activeLoggedInUser.role === 'receptionist') {
-      try {
-        const res = await fetch('/api/auth/session');
-        const d = await res.json();
-        if (d?.authenticated) {
-          router.push('/overview');
-          return;
-        }
-      } catch (_) {}
-      setAdminPhone(activeLoggedInUser.phone || activeLoggedInUser.email || '');
-      setActiveTab('admin');
-      setActiveLoggedInUser(null);
-      setError('Admin session has expired. Please enter your password to sign in.');
-      setResumingSession(false);
-      return;
-    }
-
-    // 2. Student / Guru: renew token and launch portal
-    try {
-      const profileId = activeLoggedInUser.id || activeLoggedInUser.profile_id;
-      const phone = activeLoggedInUser.phone || activeLoggedInUser.parent_phone || '';
-      const roll = activeLoggedInUser.roll_number || '';
-      const role = activeLoggedInUser.role || 'student';
-
-      const tokenRes = await fetch('/api/auth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId,
-          phone,
-          rollNumber: roll,
-          role,
-        }),
-      });
-
-      const tokenData = await tokenRes.json();
-      if (tokenRes.ok && tokenData.token) {
-        const updatedProfile = {
-          ...activeLoggedInUser,
-          token: tokenData.token,
-          role: tokenData.role || role,
-        };
-        setActiveLoggedInUser(updatedProfile);
-        persistSessionAndLaunchPortal(updatedProfile);
-        return;
-      }
-    } catch (_) {}
-
-    // Fallback: Check if existing profile can launch
-    if (activeLoggedInUser.token) {
-      persistSessionAndLaunchPortal(activeLoggedInUser);
-      return;
-    }
-
-    // If completely expired/invalid:
-    localStorage.removeItem('saved_user_profile');
-    localStorage.removeItem('flutter.saved_user_profile');
-    localStorage.removeItem('laasya_cached_user');
-    const prevRole = activeLoggedInUser.role;
-    const prevPhone = activeLoggedInUser.phone || '';
-    setActiveLoggedInUser(null);
-    setResumingSession(false);
-    if (prevRole === 'trainer') {
-      setActiveTab('guru');
-      if (prevPhone) setGuruPhone(prevPhone);
-    } else {
-      setActiveTab('student');
-      if (prevPhone) setStudentId(prevPhone);
-    }
-    setError('Your session has expired. Please enter your password to sign in.');
   };
 
   // 1. Student / Parent Submit
@@ -535,49 +443,6 @@ function LoginContent() {
               Select your role to access your personalized learning dashboard or administrative workspace.
             </p>
           </div>
-
-          {/* Active Session Resumption Banner */}
-          {activeLoggedInUser && (
-            <div className="mb-3.5 bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-xs">
-              <div className="flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>
-                  Signed in as <strong>{activeLoggedInUser.full_name || 'Active User'}</strong> ({activeLoggedInUser.role === 'trainer' ? 'Guru' : activeLoggedInUser.role === 'owner' ? 'Admin' : 'Student'})
-                </span>
-              </div>
-              <div className="flex items-center gap-2 self-end sm:self-auto">
-                <button
-                  type="button"
-                  disabled={resumingSession}
-                  onClick={handleResumeSession}
-                  className="px-3.5 py-1.5 bg-emerald-700 text-white font-bold rounded-lg text-xs hover:bg-emerald-800 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-60 shadow-xs"
-                >
-                  {resumingSession ? (
-                    <>
-                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
-                      <span>Launching...</span>
-                    </>
-                  ) : (
-                    <span>
-                      Go to {activeLoggedInUser.role === 'owner' ? 'Admin ERP' : 'Portal'} &rarr;
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.removeItem('saved_user_profile');
-                    localStorage.removeItem('flutter.saved_user_profile');
-                    localStorage.removeItem('laasya_cached_user');
-                    setActiveLoggedInUser(null);
-                  }}
-                  className="text-[11px] text-gray-500 hover:text-rose-600 underline cursor-pointer"
-                >
-                  Switch
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Segmented Role Selector Pill (Student | Guru | Admin) */}
           <div className="bg-[#E4D2DC] p-1 rounded-2xl flex items-center gap-1 mb-4 shadow-inner">

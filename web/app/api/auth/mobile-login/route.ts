@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
-import { createToken } from '@/lib/auth';
+import { createToken, setSessionCookie } from '@/lib/auth';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { recordActiveSession } from '@/lib/active-sessions';
 import { logSecurityAudit } from '@/lib/audit';
@@ -176,6 +176,7 @@ export async function POST(request: NextRequest) {
 
     let rawInput = identifier.trim();
     let cleanDigits = rawInput.replace(/\D/g, '');
+    let nationalDigits = cleanDigits.replace(/^91/, '').replace(/^0+/, '');
     const trimmedPass = password.trim();
 
     // Determine target role (default to student if not specified, or auto-detect)
@@ -204,25 +205,27 @@ export async function POST(request: NextRequest) {
         JOIN public.profiles p ON t.profile_id = p.id
         LEFT JOIN auth.users u ON u.id = p.id
         WHERE (
-          (LENGTH($1) >= 8 AND (
-            RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)
-            OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $1
+          (LENGTH($1) >= 6 AND (
+            regexp_replace(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), '^91', '') = $1
+            OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $2
+            OR (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10))
+            OR (LENGTH($2) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($2, 10))
           ))
-          OR LOWER(TRIM(t.guru_id)) = LOWER(TRIM($2))
-          OR LOWER(TRIM(t.code)) = LOWER(TRIM($2))
-          OR LOWER(TRIM(p.email)) = LOWER(TRIM($2))
+          OR LOWER(TRIM(t.guru_id)) = LOWER(TRIM($3))
+          OR LOWER(TRIM(t.code)) = LOWER(TRIM($3))
+          OR LOWER(TRIM(p.email)) = LOWER(TRIM($3))
         )
         ORDER BY
           CASE 
-            WHEN (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)) THEN 1
-            WHEN LOWER(TRIM(t.guru_id)) = LOWER(TRIM($2)) THEN 2
-            WHEN LOWER(TRIM(t.code)) = LOWER(TRIM($2)) THEN 3
-            WHEN LOWER(TRIM(p.email)) = LOWER(TRIM($2)) THEN 4
+            WHEN (LENGTH($1) >= 6 AND regexp_replace(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), '^91', '') = $1) THEN 1
+            WHEN LOWER(TRIM(t.guru_id)) = LOWER(TRIM($3)) THEN 2
+            WHEN LOWER(TRIM(t.code)) = LOWER(TRIM($3)) THEN 3
+            WHEN LOWER(TRIM(p.email)) = LOWER(TRIM($3)) THEN 4
             ELSE 5
           END ASC
         LIMIT 1
       `;
-      const trainer = await queryOne<any>(guruSql, [cleanDigits, rawInput]);
+      const trainer = await queryOne<any>(guruSql, [nationalDigits, cleanDigits, rawInput]);
 
       if (trainer) {
         if (trainer.is_active === false) {
@@ -256,7 +259,7 @@ export async function POST(request: NextRequest) {
 
           const guruDisplayTitle = trainer.display_title || 'Revered Faculty Guru';
           const guruCourseName = batchStats?.primary_course_title || (Array.isArray(trainer.specializations) && trainer.specializations.length > 0 ? trainer.specializations[0] : 'Classical Arts');
-          const isDefaultGuruPass = trimmedPass === 'Guru@123' || trimmedPass === cleanDigits || trimmedPass === '123456';
+          const isDefaultGuruPass = trimmedPass === 'Guru@123' || trimmedPass === cleanDigits || trimmedPass === nationalDigits || trimmedPass === '123456';
 
           const profile = {
             id: trainer.trainer_id,
@@ -307,6 +310,15 @@ export async function POST(request: NextRequest) {
             req: request,
           });
 
+          try {
+            await setSessionCookie({
+              userId: trainer.profile_id,
+              email: trainer.email || `${cleanDigits}@laasyaacademy.com`,
+              fullName: trainer.full_name,
+              role: 'trainer',
+            }, true);
+          } catch (_) {}
+
           return NextResponse.json({ success: true, profile: { ...profile, token, session_id: sessionId }, token }, { headers: corsHeaders });
         } else if (targetRole === 'trainer') {
           await logSecurityAudit({
@@ -325,12 +337,18 @@ export async function POST(request: NextRequest) {
           SELECT s.id, p.full_name FROM public.students s
           JOIN public.profiles p ON s.profile_id = p.id
           WHERE (
-            (LENGTH($1) >= 8 AND regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
-            OR (LENGTH($1) >= 8 AND regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
-            OR LOWER(s.roll_number) = LOWER($2)
-            OR LOWER(s.roll_number) = 'lca-' || LOWER($2)
+            (LENGTH($1) >= 6 AND (
+              regexp_replace(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), '^91', '') = $1
+              OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $2
+            ))
+            OR (LENGTH($1) >= 6 AND (
+              regexp_replace(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), '^91', '') = $1
+              OR regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g') = $2
+            ))
+            OR LOWER(s.roll_number) = LOWER($3)
+            OR LOWER(s.roll_number) = 'lca-' || LOWER($3)
           ) LIMIT 1
-        `, [cleanDigits, rawInput]);
+        `, [nationalDigits, cleanDigits, rawInput]);
 
         if (studentCheck) {
           return NextResponse.json(
@@ -373,28 +391,32 @@ export async function POST(request: NextRequest) {
         JOIN public.profiles p ON s.profile_id = p.id
         LEFT JOIN auth.users u ON u.id = p.id
         WHERE (
-          (LENGTH($1) >= 8 AND (
-            RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)
-            OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $1
+          (LENGTH($1) >= 6 AND (
+            regexp_replace(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), '^91', '') = $1
+            OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $2
+            OR (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10))
+            OR (LENGTH($2) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($2, 10))
           ))
-          OR (LENGTH($1) >= 8 AND (
-            RIGHT(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)
-            OR regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g') = $1
+          OR (LENGTH($1) >= 6 AND (
+            regexp_replace(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), '^91', '') = $1
+            OR regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g') = $2
+            OR (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10))
+            OR (LENGTH($2) >= 8 AND RIGHT(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), 10) = RIGHT($2, 10))
           ))
-          OR LOWER(TRIM(s.roll_number)) = LOWER(TRIM($2))
-          OR LOWER(TRIM(s.roll_number)) = 'lca-' || LOWER(TRIM($2))
+          OR LOWER(TRIM(s.roll_number)) = LOWER(TRIM($3))
+          OR LOWER(TRIM(s.roll_number)) = 'lca-' || LOWER(TRIM($3))
           OR (LENGTH($1) > 0 AND regexp_replace(LOWER(s.roll_number), '[^0-9]', '', 'g') = $1)
         )
         ORDER BY
           CASE 
-            WHEN LOWER(TRIM(s.roll_number)) = LOWER(TRIM($2)) THEN 1
-            WHEN LOWER(TRIM(s.roll_number)) = 'lca-' || LOWER(TRIM($2)) THEN 2
-            WHEN (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)) THEN 3
-            WHEN (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)) THEN 4
+            WHEN LOWER(TRIM(s.roll_number)) = LOWER(TRIM($3)) THEN 1
+            WHEN LOWER(TRIM(s.roll_number)) = 'lca-' || LOWER(TRIM($3)) THEN 2
+            WHEN (LENGTH($1) >= 6 AND regexp_replace(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), '^91', '') = $1) THEN 3
+            WHEN (LENGTH($1) >= 6 AND regexp_replace(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), '^91', '') = $1) THEN 4
             ELSE 5
           END ASC
       `;
-      const candidateStudents = await query<any>(studentSql, [cleanDigits, rawInput]);
+      const candidateStudents = await query<any>(studentSql, [nationalDigits, cleanDigits, rawInput]);
 
       if (candidateStudents && candidateStudents.length > 0) {
         // Multi-child disambiguation: verify password across candidates
@@ -441,6 +463,15 @@ export async function POST(request: NextRequest) {
             req: request,
           });
 
+          try {
+            await setSessionCookie({
+              userId: primaryCandidate.profile_id,
+              email: primaryCandidate.email || `${primaryCandidate.roll_number || nationalDigits}@laasyaacademy.com`,
+              fullName: primaryCandidate.full_name,
+              role: 'student',
+            }, true);
+          } catch (_) {}
+
           return NextResponse.json({
             success: true,
             profile: result.profile,
@@ -465,11 +496,14 @@ export async function POST(request: NextRequest) {
           SELECT t.id, p.full_name FROM public.trainers t
           JOIN public.profiles p ON t.profile_id = p.id
           WHERE (
-            (LENGTH($1) >= 8 AND regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%')
-            OR LOWER(TRIM(t.guru_id)) = LOWER(TRIM($2))
-            OR LOWER(TRIM(t.code)) = LOWER(TRIM($2))
+            (LENGTH($1) >= 6 AND (
+              regexp_replace(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), '^91', '') = $1
+              OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $2
+            ))
+            OR LOWER(TRIM(t.guru_id)) = LOWER(TRIM($3))
+            OR LOWER(TRIM(t.code)) = LOWER(TRIM($3))
           ) LIMIT 1
-        `, [cleanDigits, rawInput]);
+        `, [nationalDigits, cleanDigits, rawInput]);
 
         if (guruCheck) {
           return NextResponse.json(

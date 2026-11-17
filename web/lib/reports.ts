@@ -69,8 +69,10 @@ export interface BatchAttendanceReportRow {
   trainer_name: string;
   trainer_contact: string;
   total_registered_students: number;
+  total_classes: number;
   total_classes_held: number;
   total_absences: number;
+  total_presents?: number;
   absence_percentage: number;
 }
 
@@ -78,6 +80,8 @@ export interface BatchAttendanceReportSummary {
   totalCourses: number;
   totalBatches: number;
   totalStudents: number;
+  totalClasses?: number;
+  totalClassesHeld?: number;
 }
 
 export interface AbsenceReportRow {
@@ -86,9 +90,11 @@ export interface AbsenceReportRow {
   roll_number: string;
   student_contact: string;
   parent_contact: string;
+  total_classes_scheduled: number;
   total_classes_held: number;
   total_absent_days: number;
   total_present_days: number;
+  total_unmarked_days: number;
 }
 
 export interface StudentCourseAbsenceRow {
@@ -96,9 +102,11 @@ export interface StudentCourseAbsenceRow {
   course_name: string;
   batch_id: string;
   batch_name: string;
+  total_classes_scheduled: number;
   total_classes_held: number;
   total_present_days: number;
   total_absent_days: number;
+  total_unmarked_days: number;
 }
 
 export interface SessionAttendanceAuditRow {
@@ -797,21 +805,22 @@ export async function getAbsenceReport(filters: {
         COALESCE(s.roll_number, 'N/A') as roll_number,
         COALESCE(p.phone, 'N/A') as student_contact,
         COALESCE(s.parent_contact, s.emergency_contact, p.alternate_phone, 'N/A') as parent_contact,
+        COUNT(DISTINCT cs.id)::int as total_classes_scheduled,
         COUNT(DISTINCT CASE 
-          WHEN COALESCE(att_held.has_attendance, false) = true
+          WHEN (cs.status = 'completed' OR att_held.has_attendance = true)
            AND COALESCE(hol_check.is_holiday, false) = false
            AND COALESCE(ga_check.is_guru_absent, false) = false
           THEN cs.id 
         END)::int as total_classes_held,
         COUNT(DISTINCT CASE 
-          WHEN COALESCE(att_held.has_attendance, false) = true
+          WHEN (cs.status = 'completed' OR att_held.has_attendance = true)
            AND COALESCE(hol_check.is_holiday, false) = false
            AND COALESCE(ga_check.is_guru_absent, false) = false
            AND LOWER(a.status) = 'absent' 
           THEN cs.id 
         END)::int as total_absent_days,
         COUNT(DISTINCT CASE 
-          WHEN COALESCE(att_held.has_attendance, false) = true
+          WHEN (cs.status = 'completed' OR att_held.has_attendance = true)
            AND COALESCE(hol_check.is_holiday, false) = false
            AND COALESCE(ga_check.is_guru_absent, false) = false
            AND LOWER(a.status) = 'present' 
@@ -880,12 +889,21 @@ export async function getAbsenceReport(filters: {
     const records = await query<AbsenceReportRow>(sql, params);
 
     return {
-      records: records.map(r => ({
-        ...r,
-        total_classes_held: Number(r.total_classes_held || 0),
-        total_absent_days: Number(r.total_absent_days || 0),
-        total_present_days: Number(r.total_present_days || 0),
-      })),
+      records: records.map(r => {
+        const scheduled = Number(r.total_classes_scheduled || 0);
+        const held = Number(r.total_classes_held || 0);
+        const absent = Number(r.total_absent_days || 0);
+        const present = Number(r.total_present_days || 0);
+        const unmarked = Math.max(0, scheduled - (present + absent));
+        return {
+          ...r,
+          total_classes_scheduled: scheduled,
+          total_classes_held: held,
+          total_absent_days: absent,
+          total_present_days: present,
+          total_unmarked_days: unmarked,
+        };
+      }),
       totalStudents: records.length,
       generatedAt: new Date().toISOString()
     };
@@ -909,9 +927,11 @@ export async function getStudentCourseAbsenceReport(filters: {
 }): Promise<{
   student: StudentAbsenceProfile | null;
   records: StudentCourseAbsenceRow[];
+  totalClassesScheduled: number;
   totalClassesHeld: number;
   totalPresentDays: number;
   totalAbsentDays: number;
+  totalUnmarkedDays: number;
   generatedAt: string;
 }> {
   try {
@@ -937,21 +957,22 @@ export async function getStudentCourseAbsenceReport(filters: {
         c.title as course_name,
         b.id as batch_id,
         b.name as batch_name,
+        COUNT(DISTINCT cs.id)::int as total_classes_scheduled,
         COUNT(DISTINCT CASE 
-          WHEN COALESCE(att_held.has_attendance, false) = true
+          WHEN (cs.status = 'completed' OR att_held.has_attendance = true)
            AND COALESCE(hol_check.is_holiday, false) = false
            AND COALESCE(ga_check.is_guru_absent, false) = false
           THEN cs.id 
         END)::int as total_classes_held,
         COUNT(DISTINCT CASE 
-          WHEN COALESCE(att_held.has_attendance, false) = true
+          WHEN (cs.status = 'completed' OR att_held.has_attendance = true)
            AND COALESCE(hol_check.is_holiday, false) = false
            AND COALESCE(ga_check.is_guru_absent, false) = false
            AND LOWER(a.status) = 'present' 
           THEN cs.id 
         END)::int as total_present_days,
         COUNT(DISTINCT CASE 
-          WHEN COALESCE(att_held.has_attendance, false) = true
+          WHEN (cs.status = 'completed' OR att_held.has_attendance = true)
            AND COALESCE(hol_check.is_holiday, false) = false
            AND COALESCE(ga_check.is_guru_absent, false) = false
            AND LOWER(a.status) = 'absent' 
@@ -1002,23 +1023,36 @@ export async function getStudentCourseAbsenceReport(filters: {
     `;
 
     const rawRecords = await query<StudentCourseAbsenceRow>(sql, params);
-    const records = rawRecords.map(r => ({
-      ...r,
-      total_classes_held: Number(r.total_classes_held || 0),
-      total_present_days: Number(r.total_present_days || 0),
-      total_absent_days: Number(r.total_absent_days || 0),
-    }));
+    const records = rawRecords.map(r => {
+      const scheduled = Number(r.total_classes_scheduled || 0);
+      const held = Number(r.total_classes_held || 0);
+      const present = Number(r.total_present_days || 0);
+      const absent = Number(r.total_absent_days || 0);
+      const unmarked = Math.max(0, scheduled - (present + absent));
+      return {
+        ...r,
+        total_classes_scheduled: scheduled,
+        total_classes_held: held,
+        total_present_days: present,
+        total_absent_days: absent,
+        total_unmarked_days: unmarked,
+      };
+    });
 
+    const totalClassesScheduled = records.reduce((sum, r) => sum + (r.total_classes_scheduled || 0), 0);
     const totalClassesHeld = records.reduce((sum, r) => sum + r.total_classes_held, 0);
     const totalPresentDays = records.reduce((sum, r) => sum + r.total_present_days, 0);
     const totalAbsentDays = records.reduce((sum, r) => sum + r.total_absent_days, 0);
+    const totalUnmarkedDays = records.reduce((sum, r) => sum + (r.total_unmarked_days || 0), 0);
 
     return {
       student: studentProfile,
       records,
+      totalClassesScheduled,
       totalClassesHeld,
       totalPresentDays,
       totalAbsentDays,
+      totalUnmarkedDays,
       generatedAt: new Date().toISOString()
     };
   } catch (err) {
@@ -1026,9 +1060,11 @@ export async function getStudentCourseAbsenceReport(filters: {
     return {
       student: null,
       records: [],
+      totalClassesScheduled: 0,
       totalClassesHeld: 0,
       totalPresentDays: 0,
       totalAbsentDays: 0,
+      totalUnmarkedDays: 0,
       generatedAt: new Date().toISOString()
     };
   }
@@ -1048,8 +1084,10 @@ export async function getStudentBatchSessionAudit(filters: {
   batchName: string;
   records: SessionAttendanceAuditRow[];
   totalSessions: number;
+  classesHeldCount: number;
   presentCount: number;
   absentCount: number;
+  unmarkedCount: number;
   generatedAt: string;
 }> {
   try {
@@ -1117,6 +1155,8 @@ export async function getStudentBatchSessionAudit(filters: {
 
     const presentCount = records.filter(r => r.audit_status === 'Present').length;
     const absentCount = records.filter(r => r.audit_status === 'Absent').length;
+    const classesHeldCount = presentCount + absentCount;
+    const unmarkedCount = records.filter(r => r.audit_status === 'Unmarked').length;
 
     return {
       student,
@@ -1124,8 +1164,10 @@ export async function getStudentBatchSessionAudit(filters: {
       batchName: batchInfo?.batch_name || 'Batch',
       records,
       totalSessions: records.length,
+      classesHeldCount,
       presentCount,
       absentCount,
+      unmarkedCount,
       generatedAt: new Date().toISOString()
     };
   } catch (err) {
@@ -1136,8 +1178,10 @@ export async function getStudentBatchSessionAudit(filters: {
       batchName: 'Batch',
       records: [],
       totalSessions: 0,
+      classesHeldCount: 0,
       presentCount: 0,
       absentCount: 0,
+      unmarkedCount: 0,
       generatedAt: new Date().toISOString()
     };
   }
@@ -1170,7 +1214,11 @@ export async function getBatchAttendanceReport(filters: {
         COALESCE(tp.full_name, 'Unassigned Trainer') as trainer_name,
         COALESCE(tp.phone, 'N/A') as trainer_contact,
         (SELECT COUNT(*)::int FROM public.batch_enrollments be WHERE be.batch_id = b.id AND be.status = 'active') as total_registered_students,
-        COUNT(DISTINCT cs.id)::int as total_classes_held,
+        COUNT(DISTINCT cs.id)::int as total_classes,
+        COUNT(DISTINCT CASE 
+          WHEN cs.status = 'completed' OR att_held.has_attendance = true 
+          THEN cs.id 
+        END)::int as total_classes_held,
         COUNT(DISTINCT CASE WHEN LOWER(a.status) = 'absent' THEN a.id END)::int as total_absences,
         COUNT(DISTINCT CASE WHEN LOWER(a.status) = 'present' THEN a.id END)::int as total_presents
       FROM public.batches b
@@ -1191,6 +1239,12 @@ export async function getBatchAttendanceReport(filters: {
     }
 
     sql += `
+      LEFT JOIN LATERAL (
+        SELECT true as has_attendance 
+        FROM public.attendance att_sub 
+        WHERE att_sub.session_id = cs.id 
+        LIMIT 1
+      ) att_held ON true
       LEFT JOIN public.attendance a ON a.session_id = cs.id
       WHERE 1=1
     `;
@@ -1213,6 +1267,7 @@ export async function getBatchAttendanceReport(filters: {
 
     const mapped: BatchAttendanceReportRow[] = rawRows.map(r => {
       const totalReg = Number(r.total_registered_students || 0);
+      const totalClasses = Number(r.total_classes || 0);
       const classesHeld = Number(r.total_classes_held || 0);
       const absences = Number(r.total_absences || 0);
       const presents = Number(r.total_presents || 0);
@@ -1231,8 +1286,10 @@ export async function getBatchAttendanceReport(filters: {
         trainer_name: r.trainer_name,
         trainer_contact: r.trainer_contact,
         total_registered_students: totalReg,
+        total_classes: totalClasses,
         total_classes_held: classesHeld,
         total_absences: absences,
+        total_presents: presents,
         absence_percentage: pct
       };
     });
@@ -1247,13 +1304,17 @@ export async function getBatchAttendanceReport(filters: {
     const distinctCourses = new Set(mapped.map(m => m.course_id)).size;
     const totalBatches = mapped.length;
     const totalStudents = mapped.reduce((acc, m) => acc + m.total_registered_students, 0);
+    const totalClassesSum = mapped.reduce((acc, m) => acc + m.total_classes, 0);
+    const totalClassesHeldSum = mapped.reduce((acc, m) => acc + m.total_classes_held, 0);
 
     return {
       records: mapped,
       summary: {
         totalCourses: distinctCourses,
         totalBatches,
-        totalStudents
+        totalStudents,
+        totalClasses: totalClassesSum,
+        totalClassesHeld: totalClassesHeldSum
       },
       generatedAt: new Date().toISOString()
     };
@@ -1264,7 +1325,9 @@ export async function getBatchAttendanceReport(filters: {
       summary: {
         totalCourses: 0,
         totalBatches: 0,
-        totalStudents: 0
+        totalStudents: 0,
+        totalClasses: 0,
+        totalClassesHeld: 0
       },
       generatedAt: new Date().toISOString()
     };

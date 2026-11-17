@@ -118,26 +118,29 @@ export async function authenticateOwner(
   try {
     const raw = identifier.trim();
     const cleanDigits = raw.replace(/\D/g, '');
+    const nationalDigits = cleanDigits.replace(/^91/, '').replace(/^0+/, '');
     const phone10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
     const trimmedPass = password.trim();
 
-    // Find admin user by phone (last 10 digits handles +91, 0, or spaces) or email
+    // Find admin user by phone (handles +91, 0, national digits, spaces) or email
     const row = await queryOne<{ id: string; email: string; full_name: string; role: string; phone: string }>(
       `SELECT u.id, u.email, p.full_name, p.role, p.phone
        FROM auth.users u
        JOIN public.profiles p ON u.id = p.id
        WHERE (
-         (LENGTH($1) >= 8 AND (
-           RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)
-           OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $1
+         (LENGTH($1) >= 6 AND (
+           regexp_replace(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), '^91', '') = $1
+           OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $2
+           OR (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10))
+           OR (LENGTH($2) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($2, 10))
          ))
-         OR LOWER(u.email) = LOWER($2)
-         OR LOWER(p.email) = LOWER($2)
+         OR LOWER(u.email) = LOWER($3)
+         OR LOWER(p.email) = LOWER($3)
        )
-       AND u.encrypted_password = crypt($3, u.encrypted_password)
+       AND u.encrypted_password = crypt($4, u.encrypted_password)
        AND p.role = 'owner'
        LIMIT 1`,
-      [cleanDigits, raw, trimmedPass]
+      [nationalDigits, cleanDigits, raw, trimmedPass]
     );
 
     if (!row) {
@@ -155,16 +158,18 @@ export async function authenticateOwner(
         `SELECT id, full_name, phone, email, password_hash, allowed_pages, COALESCE(can_delete, false) as can_delete, is_active
          FROM public.receptionists
          WHERE (
-           (LENGTH($1) >= 8 AND (
-             RIGHT(regexp_replace(COALESCE(phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)
-             OR regexp_replace(COALESCE(phone, ''), '\\D', '', 'g') = $1
+           (LENGTH($1) >= 6 AND (
+             regexp_replace(regexp_replace(COALESCE(phone, ''), '\\D', '', 'g'), '^91', '') = $1
+             OR regexp_replace(COALESCE(phone, ''), '\\D', '', 'g') = $2
+             OR (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10))
+             OR (LENGTH($2) >= 8 AND RIGHT(regexp_replace(COALESCE(phone, ''), '\\D', '', 'g'), 10) = RIGHT($2, 10))
            ))
-           OR LOWER(TRIM(phone)) = LOWER(TRIM($2))
-           OR LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM($2))
+           OR LOWER(TRIM(phone)) = LOWER(TRIM($3))
+           OR LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM($3))
          )
          AND is_active = true
          LIMIT 1`,
-        [cleanDigits, raw]
+        [nationalDigits, cleanDigits, raw]
       );
 
       if (receptionist) {

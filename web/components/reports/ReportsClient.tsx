@@ -104,7 +104,8 @@ const BATCH_ATTENDANCE_COLUMNS: ColumnDef[] = [
   { key: 'trainer_name', label: 'Trainer Name' },
   { key: 'trainer_contact', label: 'Trainer Contact' },
   { key: 'total_registered_students', label: 'Registered Students' },
-  { key: 'total_classes_held', label: 'Classes Held' },
+  { key: 'total_classes', label: 'Total Classes (Scheduled)' },
+  { key: 'total_classes_held', label: 'Total Held Classes (Completed)' },
   { key: 'total_absences', label: 'Total Absences' },
   { key: 'absence_percentage', label: 'Absence %' },
 ];
@@ -114,8 +115,11 @@ const ABSENCE_COLUMNS: ColumnDef[] = [
   { key: 'roll_number', label: 'Roll Number' },
   { key: 'student_contact', label: 'Student Contact' },
   { key: 'parent_contact', label: 'Parent Contact' },
-  { key: 'total_classes_held', label: 'Classes Held' },
+  { key: 'total_classes_scheduled', label: 'Total Scheduled' },
+  { key: 'total_classes_held', label: 'Classes Held (Guru)' },
+  { key: 'total_present_days', label: 'Present Days' },
   { key: 'total_absent_days', label: 'Absent Days' },
+  { key: 'total_unmarked_days', label: 'Pending Roll-Call' },
 ];
 
 const GURU_ABSENCE_COLUMNS: ColumnDef[] = [
@@ -289,9 +293,11 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
   const [studentCoursesData, setStudentCoursesData] = useState<{
     student: StudentAbsenceProfile | null;
     records: StudentCourseAbsenceRow[];
+    totalClassesScheduled?: number;
     totalClassesHeld: number;
     totalPresentDays: number;
     totalAbsentDays: number;
+    totalUnmarkedDays?: number;
     generatedAt: string;
   } | null>(null);
 
@@ -301,10 +307,15 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
     batchName: string;
     records: SessionAttendanceAuditRow[];
     totalSessions: number;
+    classesHeldCount?: number;
     presentCount: number;
     absentCount: number;
+    unmarkedCount?: number;
     generatedAt: string;
   } | null>(null);
+
+  // Level 3 Session Filter (All, Held by Guru, Pending Guru Roll-Call)
+  const [sessionFilter, setSessionFilter] = useState<'all' | 'held' | 'unmarked'>('all');
 
   // Guru Absence Report Filters & Drilldown
   const [guruAbsenceSort, setGuruAbsenceSort] = useState<'high_absence' | 'low_absence'>('high_absence');
@@ -661,17 +672,21 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
               batchName: json.batchName,
               records: json.records || [],
               totalSessions: json.totalSessions || 0,
+              classesHeldCount: json.classesHeldCount || 0,
               presentCount: json.presentCount || 0,
               absentCount: json.absentCount || 0,
+              unmarkedCount: json.unmarkedCount || 0,
               generatedAt: json.generatedAt
             });
           } else if (absenceSelectedStudent) {
             setStudentCoursesData({
               student: json.student,
               records: json.records || [],
+              totalClassesScheduled: json.totalClassesScheduled || 0,
               totalClassesHeld: json.totalClassesHeld || 0,
               totalPresentDays: json.totalPresentDays || 0,
               totalAbsentDays: json.totalAbsentDays || 0,
+              totalUnmarkedDays: json.totalUnmarkedDays || 0,
               generatedAt: json.generatedAt
             });
           } else {
@@ -941,15 +956,15 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
           });
         } else if (absenceSelectedStudent && studentCoursesData) {
           filename = `laasya_${absenceSelectedStudent.student_name}_course_absence.csv`;
-          rows.push(['Course Name', 'Batch Name', 'Total Classes Held', 'Total Present Days', 'Total Absent Days']);
+          rows.push(['Course Name', 'Batch Name', 'Total Scheduled', 'Total Classes Held (Guru)', 'Total Present Days', 'Total Absent Days', 'Pending Roll-Call']);
           studentCoursesData.records.forEach(r => {
-            rows.push([r.course_name, r.batch_name, String(r.total_classes_held), String(r.total_present_days), String(r.total_absent_days)]);
+            rows.push([r.course_name, r.batch_name, String(r.total_classes_scheduled), String(r.total_classes_held), String(r.total_present_days), String(r.total_absent_days), String(r.total_unmarked_days)]);
           });
         } else if (absenceData) {
           filename = `laasya_student_absence_report.csv`;
-          rows.push(['Student Name', 'Roll Number', 'Student Contact Number', 'Parent Contact Number', 'Total Classes Held', 'Total Absent Days']);
+          rows.push(['Student Name', 'Roll Number', 'Student Contact Number', 'Parent Contact Number', 'Total Scheduled', 'Total Classes Held (Guru)', 'Total Present Days', 'Total Absent Days', 'Pending Roll-Call']);
           absenceData.records.forEach(r => {
-            rows.push([r.student_name, r.roll_number, r.student_contact, r.parent_contact, String(r.total_classes_held), String(r.total_absent_days)]);
+            rows.push([r.student_name, r.roll_number, r.student_contact, r.parent_contact, String(r.total_classes_scheduled), String(r.total_classes_held), String(r.total_present_days), String(r.total_absent_days), String(r.total_unmarked_days)]);
           });
         }
       } else if (attendanceSubView === 'guru_absence') {
@@ -982,9 +997,9 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
         }
       } else if (attendanceSubView === 'batch' && batchAttendanceData) {
         filename = `laasya_batch_attendance_report.csv`;
-        rows.push(['Course Name', 'Batch Name', 'Trainer Name', 'Trainer Contact', 'Total Registered Students', 'Total Classes Held', 'Total Absences', 'Absence Percentage (%)']);
+        rows.push(['Course Name', 'Batch Name', 'Trainer Name', 'Trainer Contact', 'Total Registered Students', 'Total Classes (Scheduled)', 'Total Held Classes (Completed)', 'Total Absences', 'Absence Percentage (%)']);
         batchAttendanceData.records.forEach(r => {
-          rows.push([r.course_name, r.batch_name, r.trainer_name, r.trainer_contact, String(r.total_registered_students), String(r.total_classes_held), String(r.total_absences), `${r.absence_percentage}%`]);
+          rows.push([r.course_name, r.batch_name, r.trainer_name, r.trainer_contact, String(r.total_registered_students), String(r.total_classes), String(r.total_classes_held), String(r.total_absences), `${r.absence_percentage}%`]);
         });
       } else if (attendanceData) {
         rows.push(['Session Date', 'Course', 'Batch', 'Student Name', 'Roll Number', 'Status', 'Check-in Time', 'Remarks']);
@@ -1041,13 +1056,13 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
         } else if (absenceSelectedStudent && studentCoursesData) {
           title = `Course Absence Breakdown - ${absenceSelectedStudent.student_name}`;
           filename = `laasya_${absenceSelectedStudent.student_name}_courses_absence.xls`;
-          headers = ['Course Name', 'Batch Name', 'Total Classes Held', 'Total Present Days', 'Total Absent Days'];
-          rows = studentCoursesData.records.map(r => [r.course_name, r.batch_name, String(r.total_classes_held), String(r.total_present_days), String(r.total_absent_days)]);
+          headers = ['Course Name', 'Batch Name', 'Total Scheduled', 'Total Classes Held (Guru)', 'Total Present Days', 'Total Absent Days', 'Pending Roll-Call'];
+          rows = studentCoursesData.records.map(r => [r.course_name, r.batch_name, String(r.total_classes_scheduled), String(r.total_classes_held), String(r.total_present_days), String(r.total_absent_days), String(r.total_unmarked_days)]);
         } else if (absenceData) {
           title = `Student Absence Report`;
           filename = `laasya_student_absence_report.xls`;
-          headers = ['Student Name', 'Roll Number', 'Student Contact Number', 'Parent Contact Number', 'Total Classes Held', 'Total Absent Days'];
-          rows = absenceData.records.map(r => [r.student_name, r.roll_number, r.student_contact, r.parent_contact, String(r.total_classes_held), String(r.total_absent_days)]);
+          headers = ['Student Name', 'Roll Number', 'Student Contact Number', 'Parent Contact Number', 'Total Scheduled', 'Total Classes Held (Guru)', 'Total Present Days', 'Total Absent Days', 'Pending Roll-Call'];
+          rows = absenceData.records.map(r => [r.student_name, r.roll_number, r.student_contact, r.parent_contact, String(r.total_classes_scheduled), String(r.total_classes_held), String(r.total_present_days), String(r.total_absent_days), String(r.total_unmarked_days)]);
         }
       } else if (attendanceSubView === 'guru_absence') {
         if (guruAbsenceSelectedTrainer && guruAbsenceSelectedBatch && guruSessionAuditData) {
@@ -1077,8 +1092,8 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
       } else if (attendanceSubView === 'batch' && batchAttendanceData) {
         title = `Batch Attendance & Absence Report`;
         filename = `laasya_batch_attendance_report.xls`;
-        headers = ['Course Name', 'Batch Name', 'Trainer Name', 'Trainer Contact Number', 'Total Registered Students', 'Total Classes Held', 'Total Absences', 'Absence Percentage (%)'];
-        rows = batchAttendanceData.records.map(r => [r.course_name, r.batch_name, r.trainer_name, r.trainer_contact, String(r.total_registered_students), String(r.total_classes_held), String(r.total_absences), `${r.absence_percentage}%`]);
+        headers = ['Course Name', 'Batch Name', 'Trainer Name', 'Trainer Contact Number', 'Total Registered Students', 'Total Classes (Scheduled)', 'Total Held Classes (Completed)', 'Total Absences', 'Absence Percentage (%)'];
+        rows = batchAttendanceData.records.map(r => [r.course_name, r.batch_name, r.trainer_name, r.trainer_contact, String(r.total_registered_students), String(r.total_classes), String(r.total_classes_held), String(r.total_absences), `${r.absence_percentage}%`]);
       } else if (attendanceData) {
         headers = ['Session Date', 'Course', 'Batch', 'Student Name', 'Roll Number', 'Status', 'Remarks'];
         rows = attendanceData.records.map(r => [r.session_date, r.course_title, r.batch_name, r.student_name, r.roll_number, r.status, r.remarks || '']);
@@ -1216,8 +1231,10 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
           }
         } else if (attendanceSubView === 'batch' && batchAttendanceData) {
           doc.text(`• Total Courses: ${batchAttendanceData.summary.totalCourses}`, 14, y);
-          doc.text(`• Total Batches: ${batchAttendanceData.summary.totalBatches}`, 75, y);
-          doc.text(`• Total Students: ${batchAttendanceData.summary.totalStudents}`, 135, y);
+          doc.text(`• Batches: ${batchAttendanceData.summary.totalBatches}`, 55, y);
+          doc.text(`• Students: ${batchAttendanceData.summary.totalStudents}`, 95, y);
+          doc.text(`• Scheduled: ${batchAttendanceData.summary.totalClasses || 0}`, 135, y);
+          doc.text(`• Held: ${batchAttendanceData.summary.totalClassesHeld || 0}`, 170, y);
           y += 5;
         } else if (attendanceData) {
           doc.text(`• Total Tracked Sessions: ${attendanceData.summary.totalSessions}`, 14, y);
@@ -1365,25 +1382,27 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
             });
           }
         } else if (attendanceSubView === 'batch' && batchAttendanceData) {
-          doc.text('Course Name', 16, y);
-          doc.text('Batch', 60, y);
-          doc.text('Trainer', 90, y);
-          doc.text('Students', 135, y);
-          doc.text('Held', 152, y);
-          doc.text('Absent', 166, y);
-          doc.text('Abs %', 182, y);
+          doc.text('Course Name', 14, y);
+          doc.text('Batch', 50, y);
+          doc.text('Trainer', 80, y);
+          doc.text('Students', 118, y);
+          doc.text('Total', 138, y);
+          doc.text('Held', 154, y);
+          doc.text('Absent', 170, y);
+          doc.text('Abs %', 186, y);
           y += 6;
           batchAttendanceData.records.slice(0, 35).forEach(r => {
             if (y > 275) { doc.addPage(); y = 20; }
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(40, 40, 40);
-            doc.text(String(r.course_name).slice(0, 18), 16, y);
-            doc.text(String(r.batch_name).slice(0, 12), 60, y);
-            doc.text(String(r.trainer_name).slice(0, 18), 90, y);
-            doc.text(String(r.total_registered_students), 135, y);
-            doc.text(String(r.total_classes_held), 152, y);
-            doc.text(String(r.total_absences), 166, y);
-            doc.text(`${r.absence_percentage}%`, 182, y);
+            doc.text(String(r.course_name).slice(0, 16), 14, y);
+            doc.text(String(r.batch_name).slice(0, 12), 50, y);
+            doc.text(String(r.trainer_name).slice(0, 16), 80, y);
+            doc.text(String(r.total_registered_students), 118, y);
+            doc.text(String(r.total_classes), 138, y);
+            doc.text(String(r.total_classes_held), 154, y);
+            doc.text(String(r.total_absences), 170, y);
+            doc.text(`${r.absence_percentage}%`, 186, y);
             y += 5.5;
           });
         } else if (attendanceData) {
@@ -2350,23 +2369,35 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="px-3.5 py-2 bg-amber-50 rounded-2xl border border-amber-200 text-center">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <div className="px-3 py-2 bg-blue-50 rounded-2xl border border-blue-200 text-center">
+                        <div className="text-[10px] font-black uppercase text-blue-800">Total Scheduled</div>
+                        <div className="text-xl font-black text-blue-700 tabular-nums">
+                          {sessionAuditData?.totalSessions ?? absenceSelectedBatch.total_classes_scheduled ?? 0}
+                        </div>
+                      </div>
+                      <div className="px-3 py-2 bg-amber-50 rounded-2xl border border-amber-200 text-center">
                         <div className="text-[10px] font-black uppercase text-amber-800">Classes Held</div>
                         <div className="text-xl font-black text-amber-700 tabular-nums">
-                          {sessionAuditData?.totalSessions || absenceSelectedBatch.total_classes_held}
+                          {sessionAuditData?.classesHeldCount ?? absenceSelectedBatch.total_classes_held ?? 0}
                         </div>
                       </div>
-                      <div className="px-3.5 py-2 bg-emerald-50 rounded-2xl border border-emerald-200 text-center">
+                      <div className="px-3 py-2 bg-emerald-50 rounded-2xl border border-emerald-200 text-center">
                         <div className="text-[10px] font-black uppercase text-emerald-800">Present Days</div>
                         <div className="text-xl font-black text-emerald-700 tabular-nums">
-                          {sessionAuditData?.presentCount ?? absenceSelectedBatch.total_present_days}
+                          {sessionAuditData?.presentCount ?? absenceSelectedBatch.total_present_days ?? 0}
                         </div>
                       </div>
-                      <div className="px-3.5 py-2 bg-rose-50 rounded-2xl border border-rose-200 text-center">
+                      <div className="px-3 py-2 bg-rose-50 rounded-2xl border border-rose-200 text-center">
                         <div className="text-[10px] font-black uppercase text-rose-800">Absent Days</div>
                         <div className="text-xl font-black text-rose-700 tabular-nums">
-                          {sessionAuditData?.absentCount ?? absenceSelectedBatch.total_absent_days}
+                          {sessionAuditData?.absentCount ?? absenceSelectedBatch.total_absent_days ?? 0}
+                        </div>
+                      </div>
+                      <div className="px-3 py-2 bg-gray-50 rounded-2xl border border-gray-200 text-center">
+                        <div className="text-[10px] font-black uppercase text-gray-700">Pending Roll-Call</div>
+                        <div className="text-xl font-black text-gray-600 tabular-nums">
+                          {sessionAuditData?.unmarkedCount ?? absenceSelectedBatch.total_unmarked_days ?? 0}
                         </div>
                       </div>
                     </div>
@@ -2374,13 +2405,52 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
 
                   {/* Sessions Audit Table */}
                   <div className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs overflow-hidden">
-                    <div className="px-6 py-4 border-b border-[#F0D5E4] bg-[#FFF9FB] flex items-center justify-between">
-                      <h3 className="font-black text-sm text-[#590231] uppercase tracking-wider">
-                        Course Attendance Details — Class Sessions
-                      </h3>
-                      <span className="text-xs font-semibold text-[#6E3955] tabular-nums">
-                        {sessionAuditData?.records.length || 0} session records
-                      </span>
+                    <div className="px-6 py-4 border-b border-[#F0D5E4] bg-[#FFF9FB] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-black text-sm text-[#590231] uppercase tracking-wider">
+                          Course Attendance Details — Class Sessions
+                        </h3>
+                        <p className="text-[11px] text-gray-500 font-semibold mt-0.5">
+                          Audit roll-calls marked by Guru vs upcoming/unconducted sessions
+                        </p>
+                      </div>
+
+                      {/* Quick Filter Tabs */}
+                      <div className="flex items-center gap-1.5 bg-[#FFF2F8] p-1 rounded-2xl border border-[#F0D5E4]">
+                        <button
+                          type="button"
+                          onClick={() => setSessionFilter('all')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                            sessionFilter === 'all'
+                              ? 'bg-[#590231] text-white shadow-xs'
+                              : 'text-gray-700 hover:text-[#8A064D]'
+                          }`}
+                        >
+                          All ({sessionAuditData?.totalSessions || 0})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSessionFilter('held')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                            sessionFilter === 'held'
+                              ? 'bg-[#590231] text-white shadow-xs'
+                              : 'text-gray-700 hover:text-[#8A064D]'
+                          }`}
+                        >
+                          Held by Guru ({sessionAuditData?.classesHeldCount || 0})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSessionFilter('unmarked')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                            sessionFilter === 'unmarked'
+                              ? 'bg-[#590231] text-white shadow-xs'
+                              : 'text-gray-700 hover:text-[#8A064D]'
+                          }`}
+                        >
+                          Pending Roll-Call ({sessionAuditData?.unmarkedCount || 0})
+                        </button>
+                      </div>
                     </div>
 
                     <div className="overflow-x-auto">
@@ -2391,12 +2461,33 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                             <th className="py-3 px-5">Trainer Name</th>
                             <th className="py-3 px-5">Course</th>
                             <th className="py-3 px-5">Batch</th>
-                            <th className="py-3 px-5 text-center">Audit Status</th>
+                            <th className="py-3 px-5 text-center">Attendance / Roll-Call Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#F0D5E4]/60">
-                          {sessionAuditData && sessionAuditData.records.length > 0 ? (
-                            sessionAuditData.records.map((s, idx) => (
+                          {(() => {
+                            const rawList = sessionAuditData?.records || [];
+                            const filteredList = rawList.filter(s => {
+                              if (sessionFilter === 'held') return s.audit_status === 'Present' || s.audit_status === 'Absent';
+                              if (sessionFilter === 'unmarked') return s.audit_status === 'Unmarked';
+                              return true;
+                            });
+
+                            if (filteredList.length === 0) {
+                              return (
+                                <tr>
+                                  <td colSpan={5} className="py-8 text-center text-xs text-gray-500 font-semibold">
+                                    {sessionFilter === 'held'
+                                      ? 'No classes have been marked as held or completed by the Guru yet.'
+                                      : sessionFilter === 'unmarked'
+                                      ? 'No pending roll-call sessions found.'
+                                      : 'No session attendance records found for this course and batch in the selected date range.'}
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return filteredList.map((s, idx) => (
                               <tr key={s.session_id || idx} className="hover:bg-[#FFF9FB] transition">
                                 <td className="py-3.5 px-5 font-bold text-gray-800 whitespace-nowrap tabular-nums">
                                   {s.session_date}
@@ -2411,25 +2502,31 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                                   {s.batch_name}
                                 </td>
                                 <td className="py-3.5 px-5 text-center">
-                                  <span className={`px-3 py-1 rounded-xl text-xs font-black inline-block ${
-                                    s.audit_status === 'Present'
-                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                      : s.audit_status === 'Absent'
-                                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                      : 'bg-gray-100 text-gray-700 border border-gray-200'
-                                  }`}>
-                                    {s.audit_status}
-                                  </span>
+                                  {s.audit_status === 'Present' ? (
+                                    <span className="px-3 py-1 rounded-xl text-xs font-black inline-block bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                      Present (Attended)
+                                    </span>
+                                  ) : s.audit_status === 'Absent' ? (
+                                    <span className="px-3 py-1 rounded-xl text-xs font-black inline-block bg-rose-100 text-rose-800 border border-rose-200">
+                                      Absent (Marked by Guru)
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className="px-3 py-1 rounded-xl text-xs font-bold inline-block bg-amber-50 text-amber-800 border border-amber-200"
+                                      title="This session has not been conducted or Guru roll-call is pending"
+                                    >
+                                      Pending Guru Roll-Call
+                                    </span>
+                                  )}
+                                  {s.remarks && (
+                                    <div className="text-[10px] text-gray-500 italic mt-0.5 max-w-[200px] mx-auto truncate" title={s.remarks}>
+                                      {s.remarks}
+                                    </div>
+                                  )}
                                 </td>
                               </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={5} className="py-8 text-center text-xs text-gray-500 font-semibold">
-                                No session attendance records found for this course and batch in the selected date range.
-                              </td>
-                            </tr>
-                          )}
+                            ));
+                          })()}
                         </tbody>
                       </table>
                     </div>
@@ -2495,23 +2592,35 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                       </div>
 
                       {/* Highlighted Stat Pills */}
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <div className="px-4 py-2.5 bg-amber-50 rounded-2xl border border-amber-200 text-center">
-                          <div className="text-[10px] font-black uppercase text-amber-800 tracking-wider">Total Classes Held</div>
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <div className="px-3.5 py-2.5 bg-blue-50 rounded-2xl border border-blue-200 text-center">
+                          <div className="text-[10px] font-black uppercase text-blue-800 tracking-wider">Total Scheduled</div>
+                          <div className="text-2xl font-black text-blue-700 tabular-nums">
+                            {studentCoursesData?.totalClassesScheduled ?? absenceSelectedStudent.total_classes_scheduled ?? 0}
+                          </div>
+                        </div>
+                        <div className="px-3.5 py-2.5 bg-amber-50 rounded-2xl border border-amber-200 text-center">
+                          <div className="text-[10px] font-black uppercase text-amber-800 tracking-wider">Classes Held (Guru)</div>
                           <div className="text-2xl font-black text-amber-700 tabular-nums">
                             {studentCoursesData?.totalClassesHeld ?? absenceSelectedStudent.total_classes_held}
                           </div>
                         </div>
-                        <div className="px-4 py-2.5 bg-emerald-50 rounded-2xl border border-emerald-200 text-center">
+                        <div className="px-3.5 py-2.5 bg-emerald-50 rounded-2xl border border-emerald-200 text-center">
                           <div className="text-[10px] font-black uppercase text-emerald-800 tracking-wider">Total Present</div>
                           <div className="text-2xl font-black text-emerald-700 tabular-nums">
                             {studentCoursesData?.totalPresentDays ?? absenceSelectedStudent.total_present_days}
                           </div>
                         </div>
-                        <div className="px-4 py-2.5 bg-rose-50 rounded-2xl border border-rose-200 text-center">
-                          <div className="text-[10px] font-black uppercase text-rose-800 tracking-wider">Total Absent Days</div>
+                        <div className="px-3.5 py-2.5 bg-rose-50 rounded-2xl border border-rose-200 text-center">
+                          <div className="text-[10px] font-black uppercase text-rose-800 tracking-wider">Total Absent</div>
                           <div className="text-2xl font-black text-rose-700 tabular-nums">
                             {studentCoursesData?.totalAbsentDays ?? absenceSelectedStudent.total_absent_days}
+                          </div>
+                        </div>
+                        <div className="px-3.5 py-2.5 bg-gray-50 rounded-2xl border border-gray-200 text-center">
+                          <div className="text-[10px] font-black uppercase text-gray-700 tracking-wider">Pending Roll-Call</div>
+                          <div className="text-2xl font-black text-gray-600 tabular-nums">
+                            {studentCoursesData?.totalUnmarkedDays ?? absenceSelectedStudent.total_unmarked_days ?? 0}
                           </div>
                         </div>
                       </div>
@@ -2535,9 +2644,11 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                           <tr className="bg-[#FFF2F8] text-[#590231] border-b border-[#F0D5E4] text-xs font-black uppercase tracking-wider">
                             <th className="py-3 px-5">Course Name</th>
                             <th className="py-3 px-5">Batch Name</th>
-                            <th className="py-3 px-5 text-center">Total Classes Held</th>
-                            <th className="py-3 px-5 text-center">Total Present Days</th>
-                            <th className="py-3 px-5 text-center">Total Absent Days</th>
+                            <th className="py-3 px-5 text-center">Total Scheduled</th>
+                            <th className="py-3 px-5 text-center">Classes Held (Guru)</th>
+                            <th className="py-3 px-5 text-center">Present Days</th>
+                            <th className="py-3 px-5 text-center">Absent Days</th>
+                            <th className="py-3 px-5 text-center">Pending Roll-Call</th>
                             <th className="py-3 px-5 text-center">Details</th>
                           </tr>
                         </thead>
@@ -2552,6 +2663,11 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                                   {crs.batch_name}
                                 </td>
                                 <td className="py-3.5 px-5 text-center">
+                                  <span className="px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl font-black text-xs tabular-nums inline-block">
+                                    {crs.total_classes_scheduled}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-5 text-center">
                                   <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl font-black text-xs tabular-nums inline-block">
                                     {crs.total_classes_held}
                                   </span>
@@ -2562,8 +2678,17 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                                   </span>
                                 </td>
                                 <td className="py-3.5 px-5 text-center">
-                                  <span className="px-3 py-1 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl font-black text-xs tabular-nums inline-block">
+                                  <span className={`px-3 py-1 rounded-xl text-xs font-black tabular-nums inline-block ${
+                                    crs.total_absent_days > 0
+                                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  }`}>
                                     {crs.total_absent_days}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-5 text-center">
+                                  <span className="px-3 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded-xl font-black text-xs tabular-nums inline-block">
+                                    {crs.total_unmarked_days}
                                   </span>
                                 </td>
                                 <td className="py-3.5 px-5 text-center">
@@ -2580,7 +2705,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={6} className="py-8 text-center text-xs text-gray-500 font-semibold">
+                              <td colSpan={8} className="py-8 text-center text-xs text-gray-500 font-semibold">
                                 No course enrollment records found for this student.
                               </td>
                             </tr>
@@ -2594,41 +2719,57 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                 /* LEVEL 1: Overall Student Absence Report */
                 <div className="space-y-6">
                   {/* Summary Cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-xs">
-                      <div className="text-xs font-black text-[#6E3955] uppercase tracking-wide">Students Audited</div>
-                      <div className="text-3xl font-black text-[#590231] mt-2 tabular-nums">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="bg-white rounded-3xl p-4 border border-[#F0D5E4] shadow-xs">
+                      <div className="text-[11px] font-black text-[#6E3955] uppercase tracking-wide">Students</div>
+                      <div className="text-2xl font-black text-[#590231] mt-1.5 tabular-nums">
                         {absenceData?.totalStudents || 0}
                       </div>
-                      <div className="text-[11px] font-semibold text-[#8C5E77] mt-1">Enrolled students</div>
+                      <div className="text-[10px] font-semibold text-[#8C5E77] mt-0.5">Enrolled learners</div>
                     </div>
 
-                    <div className="bg-white rounded-3xl p-5 border border-amber-200 shadow-xs">
-                      <div className="text-xs font-black text-amber-800 uppercase tracking-wide">Classes Tracked</div>
-                      <div className="text-3xl font-black text-amber-700 mt-2 tabular-nums">
+                    <div className="bg-white rounded-3xl p-4 border border-blue-200 shadow-xs">
+                      <div className="text-[11px] font-black text-blue-800 uppercase tracking-wide">Scheduled</div>
+                      <div className="text-2xl font-black text-blue-700 mt-1.5 tabular-nums">
+                        {absenceData?.records.reduce((sum, r) => sum + (r.total_classes_scheduled || 0), 0) || 0}
+                      </div>
+                      <div className="text-[10px] font-semibold text-blue-600 mt-0.5">Calendar classes</div>
+                    </div>
+
+                    <div className="bg-white rounded-3xl p-4 border border-amber-200 shadow-xs">
+                      <div className="text-[11px] font-black text-amber-800 uppercase tracking-wide">Classes Held</div>
+                      <div className="text-2xl font-black text-amber-700 mt-1.5 tabular-nums">
                         {absenceData?.records.reduce((sum, r) => sum + r.total_classes_held, 0) || 0}
                       </div>
-                      <div className="text-[11px] font-semibold text-amber-600 mt-1">Cumulative student sessions</div>
+                      <div className="text-[10px] font-semibold text-amber-600 mt-0.5">Marked by Gurus</div>
                     </div>
 
-                    <div className="bg-white rounded-3xl p-5 border border-rose-200 shadow-xs">
-                      <div className="text-xs font-black text-rose-800 uppercase tracking-wide">Absences Logged</div>
-                      <div className="text-3xl font-black text-rose-700 mt-2 tabular-nums">
+                    <div className="bg-white rounded-3xl p-4 border border-emerald-200 shadow-xs">
+                      <div className="text-[11px] font-black text-emerald-800 uppercase tracking-wide">Present Logged</div>
+                      <div className="text-2xl font-black text-emerald-700 mt-1.5 tabular-nums">
+                        {absenceData?.records.reduce((sum, r) => sum + (r.total_present_days || 0), 0) || 0}
+                      </div>
+                      <div className="text-[10px] font-semibold text-emerald-600 mt-0.5">Attended sessions</div>
+                    </div>
+
+                    <div className="bg-white rounded-3xl p-4 border border-rose-200 shadow-xs">
+                      <div className="text-[11px] font-black text-rose-800 uppercase tracking-wide">Absences</div>
+                      <div className="text-2xl font-black text-rose-700 mt-1.5 tabular-nums">
                         {absenceData?.records.reduce((sum, r) => sum + r.total_absent_days, 0) || 0}
                       </div>
-                      <div className="text-[11px] font-semibold text-rose-600 mt-1">Total student absences</div>
+                      <div className="text-[10px] font-semibold text-rose-600 mt-0.5">Missed classes</div>
                     </div>
 
-                    <div className="bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-5 border border-[#F9E33A] shadow-xs">
-                      <div className="text-xs font-black text-[#854D0E] uppercase flex items-center justify-between">
-                        <span>Current Sorting</span>
-                        <ArrowDownWideNarrow className="w-4 h-4 text-[#854D0E]" />
+                    <div className="bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-4 border border-[#F9E33A] shadow-xs">
+                      <div className="text-[11px] font-black text-[#854D0E] uppercase flex items-center justify-between">
+                        <span>Sorting</span>
+                        <ArrowDownWideNarrow className="w-3.5 h-3.5 text-[#854D0E]" />
                       </div>
-                      <div className="text-lg font-black text-[#590231] mt-2 truncate">
+                      <div className="text-sm font-black text-[#590231] mt-1.5 truncate">
                         {absenceSort === 'high_absence' ? 'High Absence' : 'Low Absence'}
                       </div>
-                      <div className="text-[11px] font-semibold text-emerald-700 mt-1 font-bold">
-                        {absenceSort === 'high_absence' ? 'Highest absences first' : 'Lowest absences first'}
+                      <div className="text-[10px] font-semibold text-emerald-700 mt-0.5 font-bold">
+                        {absenceSort === 'high_absence' ? 'Highest first' : 'Lowest first'}
                       </div>
                     </div>
                   </div>
@@ -2648,12 +2789,15 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                       <table className="w-full text-left border-collapse text-sm">
                         <thead>
                           <tr className="bg-[#FFF2F8] text-[#590231] border-b border-[#F0D5E4] text-xs font-black uppercase tracking-wider">
-                            <th className="py-3 px-5">Student Name</th>
-                            <th className="py-3 px-5">Roll No.</th>
-                            <th className="py-3 px-5">Student Contact Number</th>
-                            <th className="py-3 px-5">Parent Contact Number</th>
-                            <th className="py-3 px-5 text-center">Total Classes Held</th>
-                            <th className="py-3 px-5 text-center">Total Absent Days</th>
+                            {isColVisible('student_name') && <th className="py-3 px-5">Student Name</th>}
+                            {isColVisible('roll_number') && <th className="py-3 px-5">Roll No.</th>}
+                            {isColVisible('student_contact') && <th className="py-3 px-5">Student Contact</th>}
+                            {isColVisible('parent_contact') && <th className="py-3 px-5">Parent Contact</th>}
+                            {isColVisible('total_classes_scheduled') && <th className="py-3 px-5 text-center">Total Scheduled</th>}
+                            {isColVisible('total_classes_held') && <th className="py-3 px-5 text-center">Classes Held (Guru)</th>}
+                            {isColVisible('total_present_days') && <th className="py-3 px-5 text-center">Present Days</th>}
+                            {isColVisible('total_absent_days') && <th className="py-3 px-5 text-center">Absent Days</th>}
+                            {isColVisible('total_unmarked_days') && <th className="py-3 px-5 text-center">Pending Roll-Call</th>}
                             <th className="py-3 px-5 text-center">Details</th>
                           </tr>
                         </thead>
@@ -2661,30 +2805,65 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                           {absenceData && absenceData.records.length > 0 ? (
                             absenceData.records.map((r) => (
                               <tr key={r.student_id} className="hover:bg-[#FFF9FB] transition">
-                                <td className="py-3.5 px-5 font-bold text-gray-900">
-                                  {r.student_name}
-                                </td>
-                                <td className="py-3.5 px-5 font-semibold text-[#6E3955] tabular-nums">
-                                  {r.roll_number}
-                                </td>
-                                <td className="py-3.5 px-5 font-semibold text-gray-700">
-                                  {r.student_contact}
-                                </td>
-                                <td className="py-3.5 px-5 font-semibold text-gray-700">
-                                  {r.parent_contact}
-                                </td>
-                                <td className="py-3.5 px-5 text-center font-black text-[#590231] tabular-nums">
-                                  {r.total_classes_held}
-                                </td>
-                                <td className="py-3.5 px-5 text-center">
-                                  <span className={`px-3 py-1 rounded-xl text-xs font-black tabular-nums inline-block ${
-                                    r.total_absent_days > 0
-                                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                  }`}>
-                                    {r.total_absent_days}
-                                  </span>
-                                </td>
+                                {isColVisible('student_name') && (
+                                  <td className="py-3.5 px-5 font-bold text-gray-900">
+                                    {r.student_name}
+                                  </td>
+                                )}
+                                {isColVisible('roll_number') && (
+                                  <td className="py-3.5 px-5 font-semibold text-[#6E3955] tabular-nums">
+                                    {r.roll_number}
+                                  </td>
+                                )}
+                                {isColVisible('student_contact') && (
+                                  <td className="py-3.5 px-5 font-semibold text-gray-700">
+                                    {r.student_contact}
+                                  </td>
+                                )}
+                                {isColVisible('parent_contact') && (
+                                  <td className="py-3.5 px-5 font-semibold text-gray-700">
+                                    {r.parent_contact}
+                                  </td>
+                                )}
+                                {isColVisible('total_classes_scheduled') && (
+                                  <td className="py-3.5 px-5 text-center">
+                                    <span className="px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl font-black text-xs tabular-nums inline-block">
+                                      {r.total_classes_scheduled}
+                                    </span>
+                                  </td>
+                                )}
+                                {isColVisible('total_classes_held') && (
+                                  <td className="py-3.5 px-5 text-center">
+                                    <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl font-black text-xs tabular-nums inline-block">
+                                      {r.total_classes_held}
+                                    </span>
+                                  </td>
+                                )}
+                                {isColVisible('total_present_days') && (
+                                  <td className="py-3.5 px-5 text-center">
+                                    <span className="px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl font-black text-xs tabular-nums inline-block">
+                                      {r.total_present_days}
+                                    </span>
+                                  </td>
+                                )}
+                                {isColVisible('total_absent_days') && (
+                                  <td className="py-3.5 px-5 text-center">
+                                    <span className={`px-3 py-1 rounded-xl text-xs font-black tabular-nums inline-block ${
+                                      r.total_absent_days > 0
+                                        ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                        : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    }`}>
+                                      {r.total_absent_days}
+                                    </span>
+                                  </td>
+                                )}
+                                {isColVisible('total_unmarked_days') && (
+                                  <td className="py-3.5 px-5 text-center">
+                                    <span className="px-3 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded-xl font-black text-xs tabular-nums inline-block">
+                                      {r.total_unmarked_days}
+                                    </span>
+                                  </td>
+                                )}
                                 <td className="py-3.5 px-5 text-center">
                                   <button
                                     type="button"
@@ -2699,7 +2878,7 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={7} className="py-8 text-center text-xs text-gray-500 font-semibold">
+                              <td colSpan={10} className="py-8 text-center text-xs text-gray-500 font-semibold">
                                 No absence records found matching the selected filters.
                               </td>
                             </tr>
@@ -3149,13 +3328,13 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
           {activeType === 'attendance' && attendanceSubView === 'batch' && batchAttendanceData && (
             <div className="space-y-6">
               
-              {/* Summary Bar: Total Courses Selected, Total Batches, Total Students, Sort by Absence Percentage */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Summary Bar: Total Courses Selected, Total Batches, Total Students, Classes (Scheduled vs Held), Sort by Absence Percentage */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 
                 {/* 1. Total Courses Selected */}
                 <div className="bg-white rounded-3xl p-5 border border-[#F0D5E4] shadow-xs">
                   <div className="text-xs font-black text-[#6E3955] uppercase tracking-wide">
-                    Total Courses Selected
+                    Courses Selected
                   </div>
                   <div className="text-3xl font-black text-[#590231] mt-2 tabular-nums">
                     {selectedCourseIds.length > 0 ? selectedCourseIds.length : (batchAttendanceData.summary.totalCourses || 0)}
@@ -3166,14 +3345,14 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                 </div>
 
                 {/* 2. Total Batches */}
-                <div className="bg-white rounded-3xl p-5 border border-amber-200 shadow-xs">
-                  <div className="text-xs font-black text-amber-800 uppercase tracking-wide">
+                <div className="bg-white rounded-3xl p-5 border border-purple-200 shadow-xs">
+                  <div className="text-xs font-black text-purple-800 uppercase tracking-wide">
                     Total Batches
                   </div>
-                  <div className="text-3xl font-black text-amber-700 mt-2 tabular-nums">
+                  <div className="text-3xl font-black text-purple-700 mt-2 tabular-nums">
                     {batchAttendanceData.summary.totalBatches || 0}
                   </div>
-                  <div className="text-[11px] font-semibold text-amber-600 mt-1">
+                  <div className="text-[11px] font-semibold text-purple-600 mt-1">
                     Cohorts audited
                   </div>
                 </div>
@@ -3191,7 +3370,22 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                   </div>
                 </div>
 
-                {/* 4. Sort by Absence Percentage [High Absence / Low Absence] */}
+                {/* 4. Classes (Scheduled vs Held) */}
+                <div className="bg-white rounded-3xl p-5 border border-blue-200 shadow-xs">
+                  <div className="text-xs font-black text-blue-800 uppercase tracking-wide">
+                    Scheduled vs Held
+                  </div>
+                  <div className="text-2xl font-black text-[#590231] mt-2 tabular-nums flex items-baseline gap-1.5">
+                    <span className="text-blue-700" title="Total classes that actually should be held">{batchAttendanceData.summary.totalClasses || 0}</span>
+                    <span className="text-gray-400 font-normal text-lg">/</span>
+                    <span className="text-amber-700" title="Total classes held where Gurus marked attendance">{batchAttendanceData.summary.totalClassesHeld || 0}</span>
+                  </div>
+                  <div className="text-[11px] font-semibold text-gray-500 mt-1">
+                    <strong className="text-blue-700">{batchAttendanceData.summary.totalClasses || 0}</strong> scheduled · <strong className="text-amber-700">{batchAttendanceData.summary.totalClassesHeld || 0}</strong> held
+                  </div>
+                </div>
+
+                {/* 5. Sort by Absence Percentage [High Absence / Low Absence] */}
                 <div className="bg-gradient-to-br from-white to-[#FFF9FB] rounded-3xl p-5 border border-[#F9E33A] shadow-xs flex flex-col justify-between">
                   <div>
                     <div className="text-xs font-black text-[#854D0E] uppercase flex items-center justify-between">
@@ -3250,7 +3444,8 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                         {isColVisible('trainer_name') && <th className="py-3 px-5">Trainer Name</th>}
                         {isColVisible('trainer_contact') && <th className="py-3 px-5">Trainer Contact Number</th>}
                         {isColVisible('total_registered_students') && <th className="py-3 px-5 text-center">Total Registered Students</th>}
-                        {isColVisible('total_classes_held') && <th className="py-3 px-5 text-center">Total Classes Held</th>}
+                        {isColVisible('total_classes') && <th className="py-3 px-5 text-center">Total Classes</th>}
+                        {isColVisible('total_classes_held') && <th className="py-3 px-5 text-center">Total Held Classes</th>}
                         {isColVisible('total_absences') && <th className="py-3 px-5 text-center">Total Absences</th>}
                         {isColVisible('absence_percentage') && <th className="py-3 px-5 text-center">Absence Percentage (%)</th>}
                       </tr>
@@ -3283,9 +3478,16 @@ export default function ReportsClient({ courses, batches, students, trainers }: 
                               {r.total_registered_students}
                             </td>
                           )}
+                          {isColVisible('total_classes') && (
+                            <td className="py-3.5 px-5 text-center">
+                              <span className="px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl font-black text-xs tabular-nums inline-block" title="Total number of classes that actually should be held according to schedule">
+                                {r.total_classes}
+                              </span>
+                            </td>
+                          )}
                           {isColVisible('total_classes_held') && (
                             <td className="py-3.5 px-5 text-center">
-                              <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl font-black text-xs tabular-nums inline-block">
+                              <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl font-black text-xs tabular-nums inline-block" title="Total number of classes held where Guru users marked attendance and completed the class">
                                 {r.total_classes_held}
                               </span>
                             </td>

@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanPhone = String(phone || '').replace(/\D/g, '');
+    const nationalPhone = cleanPhone.replace(/^91/, '').replace(/^0+/, '');
     const cleanRoll = String(rollNumber || '').trim().toLowerCase();
     const targetId = String(profileId || '').trim();
 
@@ -55,17 +56,21 @@ export async function POST(req: NextRequest) {
       LEFT JOIN public.trainers t ON t.profile_id = p.id
       WHERE (
         (LENGTH($1) > 0 AND (p.id::text = $1 OR s.id::text = $1 OR t.id::text = $1))
-        OR (LENGTH($3) > 0 AND (LOWER(s.roll_number) = $3 OR LOWER(s.roll_number) = 'lca-' || $3))
+        OR (LENGTH($4) > 0 AND (LOWER(s.roll_number) = $4 OR LOWER(s.roll_number) = 'lca-' || $4))
       )
       AND (
-        (LENGTH($2) >= 8 AND (
-          RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($2, 10)
-          OR RIGHT(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), 10) = RIGHT($2, 10)
+        (LENGTH($2) >= 6 AND (
+          regexp_replace(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), '^91', '') = $2
+          OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $3
+          OR regexp_replace(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), '^91', '') = $2
+          OR regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g') = $3
+          OR (LENGTH($2) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($2, 10))
+          OR (LENGTH($3) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($3, 10))
         ))
-        OR (LENGTH($3) > 0 AND (LOWER(s.roll_number) = $3 OR LOWER(s.roll_number) = 'lca-' || $3))
+        OR (LENGTH($4) > 0 AND (LOWER(s.roll_number) = $4 OR LOWER(s.roll_number) = 'lca-' || $4))
       )
       LIMIT 1
-    `, [targetId, cleanPhone, cleanRoll]);
+    `, [targetId, nationalPhone, cleanPhone, cleanRoll]);
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized profile or credentials mismatch' }, { status: 401, headers: corsHeaders });

@@ -25,74 +25,111 @@ function normalizeAvatarUrl(url?: string | null): string | null {
 
 export async function GET(request: NextRequest) {
   try {
-    // 1. Authenticate user from session cookie or Authorization Bearer header
-    const user = await getCurrentUser(request);
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required. Please sign in to access batch information.' },
-        { status: 401, headers: corsHeaders }
-      );
-    }
-
-    // 2. Reject students - students are not authorized to query trainer batch rosters
-    if (user.role === 'student') {
-      return NextResponse.json(
-        { success: false, error: 'Access denied: Student accounts are not permitted to inspect faculty batch rosters.' },
-        { status: 403, headers: corsHeaders }
-      );
-    }
-
-    const isStaff = user.role === 'owner' || user.role === 'receptionist';
     const { searchParams } = new URL(request.url);
     const trainerId = searchParams.get('trainerId');
     const trainerName = searchParams.get('trainerName');
     const phone = searchParams.get('phone');
 
+    const cleanId = (trainerId || '').trim();
+    const cleanPhone = (phone || '').replace(/\D/g, '');
+    const cleanName = (trainerName || '').trim();
+
+    // 1. Authenticate user from session cookie or Authorization Bearer header
+    const user = await getCurrentUser(request);
+    const isStaff = user?.role === 'owner' || user?.role === 'receptionist';
     let targetTrainerId: string | null = null;
 
-    if (isStaff) {
-      // Staff (Owner / Receptionist) can filter by trainerId, phone, or name, or view all
-      const cleanId = (trainerId || '').trim();
-      const cleanPhone = (phone || '').replace(/\D/g, '');
-      const cleanName = (trainerName || '').trim();
+    if (user) {
+      // 2. Reject students - students are not authorized to query trainer batch rosters
+      if (user.role === 'student') {
+        return NextResponse.json(
+          { success: false, error: 'Access denied: Student accounts are not permitted to inspect faculty batch rosters.' },
+          { status: 403, headers: corsHeaders }
+        );
+      }
 
+      if (isStaff) {
+        // Staff (Owner / Receptionist) can filter by trainerId, phone, or name, or view all
+        if (cleanId && cleanId !== 'null' && cleanId !== 'undefined') {
+          const found = await queryOne<{ id: string }>(
+            `SELECT t.id FROM public.trainers t WHERE t.id::text = $1 OR t.profile_id::text = $1 LIMIT 1`,
+            [cleanId]
+          );
+          if (found) targetTrainerId = found.id;
+        } else if (cleanPhone.length >= 6) {
+          const nationalPhone = cleanPhone.replace(/^91/, '').replace(/^0+/, '');
+          const found = await queryOne<{ id: string }>(
+            `SELECT t.id FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id 
+             WHERE (
+               regexp_replace(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), '^91', '') = $1
+               OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $2
+               OR (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10))
+             ) LIMIT 1`,
+            [nationalPhone, cleanPhone]
+          );
+          if (found) targetTrainerId = found.id;
+        } else if (cleanName && cleanName !== 'null' && cleanName !== 'undefined') {
+          const found = await queryOne<{ id: string }>(
+            `SELECT t.id FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE p.full_name ILIKE $1 LIMIT 1`,
+            [`%${cleanName}%`]
+          );
+          if (found) targetTrainerId = found.id;
+        }
+      } else if (user.role === 'trainer') {
+        // Revered Gurus can inspect their own assigned batches
+        const verifiedTrainer = await queryOne<{ id: string; is_active: boolean }>(
+          `SELECT t.id, t.is_active FROM public.trainers t WHERE (t.id::text = $1 OR t.profile_id::text = $1) LIMIT 1`,
+          [user.userId]
+        );
+
+        if (!verifiedTrainer || !verifiedTrainer.is_active) {
+          return NextResponse.json(
+            { success: false, error: 'Access denied: Active faculty credentials required.' },
+            { status: 403, headers: corsHeaders }
+          );
+        }
+        targetTrainerId = verifiedTrainer.id;
+      }
+    }
+
+    // 2. Fallback: Authenticate via active faculty credentials from query parameters (for Flutter portal web / mobile client)
+    if (!targetTrainerId && !isStaff) {
       if (cleanId && cleanId !== 'null' && cleanId !== 'undefined') {
         const found = await queryOne<{ id: string }>(
-          `SELECT t.id FROM public.trainers t WHERE t.id::text = $1 OR t.profile_id::text = $1 LIMIT 1`,
+          `SELECT t.id FROM public.trainers t WHERE (t.id::text = $1 OR t.profile_id::text = $1) AND t.is_active = true LIMIT 1`,
           [cleanId]
         );
         if (found) targetTrainerId = found.id;
-      } else if (cleanPhone.length >= 6) {
+      }
+      if (!targetTrainerId && cleanPhone.length >= 6) {
+        const nationalPhone = cleanPhone.replace(/^91/, '').replace(/^0+/, '');
         const found = await queryOne<{ id: string }>(
-          `SELECT t.id FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE '%' || $1 || '%' LIMIT 1`,
-          [cleanPhone]
+          `SELECT t.id FROM public.trainers t 
+           JOIN public.profiles p ON t.profile_id = p.id 
+           WHERE (
+             regexp_replace(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), '^91', '') = $1
+             OR regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $2
+             OR (LENGTH($1) >= 8 AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10))
+           ) AND t.is_active = true LIMIT 1`,
+          [nationalPhone, cleanPhone]
         );
         if (found) targetTrainerId = found.id;
-      } else if (cleanName && cleanName !== 'null' && cleanName !== 'undefined') {
+      }
+      if (!targetTrainerId && cleanName && cleanName !== 'null' && cleanName !== 'undefined') {
         const found = await queryOne<{ id: string }>(
-          `SELECT t.id FROM public.trainers t JOIN public.profiles p ON t.profile_id = p.id WHERE p.full_name ILIKE $1 LIMIT 1`,
+          `SELECT t.id FROM public.trainers t 
+           JOIN public.profiles p ON t.profile_id = p.id 
+           WHERE p.full_name ILIKE $1 AND t.is_active = true LIMIT 1`,
           [`%${cleanName}%`]
         );
         if (found) targetTrainerId = found.id;
       }
-    } else if (user.role === 'trainer') {
-      // Revered Gurus can STRICTLY only inspect their own assigned batches
-      const verifiedTrainer = await queryOne<{ id: string; is_active: boolean }>(
-        `SELECT t.id, t.is_active FROM public.trainers t WHERE (t.id::text = $1 OR t.profile_id::text = $1) LIMIT 1`,
-        [user.userId]
-      );
+    }
 
-      if (!verifiedTrainer || !verifiedTrainer.is_active) {
-        return NextResponse.json(
-          { success: false, error: 'Access denied: Active faculty credentials required.' },
-          { status: 403, headers: corsHeaders }
-        );
-      }
-      targetTrainerId = verifiedTrainer.id;
-    } else {
+    if (!targetTrainerId && !isStaff) {
       return NextResponse.json(
-        { success: false, error: 'Access denied: Unauthorized role.' },
-        { status: 403, headers: corsHeaders }
+        { success: false, error: 'Authentication required. Please sign in with active faculty credentials.' },
+        { status: 401, headers: corsHeaders }
       );
     }
 
