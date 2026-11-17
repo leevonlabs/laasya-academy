@@ -105,8 +105,12 @@ class EventFolderDetailsScreen extends StatelessWidget {
     final sharedByType = (folder['shared_by_type'] ?? '').toString().toLowerCase();
     final trainerName = folder['trainer_name']?.toString();
     final bool isGuru = sharedByType == 'guru' || (trainerName != null && trainerName.isNotEmpty);
-    final senderRole = isGuru ? 'Guru / Trainer' : 'Admin / Director';
-    final senderName = isGuru ? (trainerName ?? 'Guru') : (folder['created_by'] ?? 'Academy Director');
+    final senderName = isGuru ? (trainerName ?? 'Guru') : (folder['created_by'] ?? 'Academy Admin');
+    final String senderBadgeText = isGuru
+        ? 'Shared by Guru $senderName'
+        : (senderName.toLowerCase().contains('owner') || senderName.toLowerCase().contains('director') || senderName.toLowerCase().contains('admin')
+            ? 'Shared by Academy Admin'
+            : 'Shared by $senderName');
 
     final eventDateFormatted = _formatDate(eventDateRaw);
     final uploadDateFormatted = _formatDate(uploadDateRaw);
@@ -151,11 +155,14 @@ class EventFolderDetailsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                         decoration: BoxDecoration(
                           color: const Color(0xFFDEF7EC),
                           borderRadius: BorderRadius.circular(8),
@@ -173,15 +180,27 @@ class EventFolderDetailsScreen extends StatelessWidget {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                        constraints: const BoxConstraints(maxWidth: 240),
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(0.25),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.4)),
+                          border: Border.all(color: LaasyaColors.accentGold.withOpacity(0.5)),
                         ),
-                        child: Text(
-                          'Shared by $senderName ($senderRole)',
-                          style: const TextStyle(color: LaasyaColors.accentGold, fontSize: 11, fontWeight: FontWeight.w600),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.verified_user_rounded, size: 12, color: LaasyaColors.accentGold),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                senderBadgeText,
+                                style: const TextStyle(color: LaasyaColors.accentGold, fontSize: 11, fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -195,6 +214,8 @@ class EventFolderDetailsScreen extends StatelessWidget {
                       color: Colors.white,
                       height: 1.25,
                     ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
                   Container(
@@ -206,6 +227,8 @@ class EventFolderDetailsScreen extends StatelessWidget {
                     child: Text(
                       'Target: $course • $batch',
                       style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

@@ -667,25 +667,35 @@ export async function deleteVideoLibraryItem(id: string): Promise<boolean> {
 // -----------------------------------------------------------------------------
 export async function updateVideoLibraryItem(id: string, data: Partial<VideoLibraryItem>): Promise<VideoLibraryItem | null> {
   try {
+    const [existing] = await query<VideoLibraryItem>(`SELECT * FROM video_library WHERE id = $1`, [id]);
+    if (!existing) return null;
+
+    const title = data.title !== undefined && data.title !== null && data.title.trim() !== '' ? data.title.trim() : existing.title;
+    const driveUrl = data.drive_url !== undefined ? data.drive_url : existing.drive_url;
+    const youtubeUrl = data.youtube_url !== undefined ? data.youtube_url : existing.youtube_url;
+    const eventName = data.event_name !== undefined ? data.event_name : (data.title || existing.event_name);
+    const eventDate = data.event_date !== undefined && data.event_date ? data.event_date : existing.event_date;
+    const description = data.description !== undefined ? data.description : existing.description;
+
     const sql = `
       UPDATE video_library
-      SET title = COALESCE($1, title),
+      SET title = $1,
           drive_url = $2,
           youtube_url = $3,
-          event_name = COALESCE($4, event_name),
-          event_date = COALESCE($5, event_date),
-          description = COALESCE($6, description),
+          event_name = $4,
+          event_date = $5,
+          description = $6,
           updated_at = NOW()
       WHERE id = $7
       RETURNING *;
     `;
     const params = [
-      data.title || null,
-      data.drive_url !== undefined ? data.drive_url : null,
-      data.youtube_url !== undefined ? data.youtube_url : null,
-      data.event_name || data.title || null,
-      data.event_date || null,
-      data.description !== undefined ? data.description : null,
+      title,
+      driveUrl,
+      youtubeUrl,
+      eventName,
+      eventDate,
+      description,
       id
     ];
     return await queryOne<VideoLibraryItem>(sql, params);

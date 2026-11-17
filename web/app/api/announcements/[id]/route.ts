@@ -19,23 +19,23 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     const isOwnerOrStaff = user?.role === 'owner' || user?.role === 'receptionist';
-    const isTrainer = body?.sender_role === 'trainer' || body?.role === 'trainer';
+    const isTrainer = user?.role === 'trainer' || body?.sender_role === 'trainer' || body?.role === 'trainer';
     const isSystemAdmin = body?.sender_role === 'admin' || body?.announcement_type === 'banner';
 
     if (!user && !isOwnerOrStaff && !isTrainer && !isSystemAdmin) {
       // allow if direct API with valid payload
     }
 
-    if (!body.title || body.title.trim() === '') {
-      return NextResponse.json({ error: 'Title is required', field: 'title' }, { status: 400, headers: corsHeaders });
+    if (body.title !== undefined && body.title.trim() === '') {
+      return NextResponse.json({ error: 'Title cannot be empty', field: 'title' }, { status: 400, headers: corsHeaders });
     }
-    if (!body.message || body.message.trim() === '') {
+    if (body.message !== undefined && body.message.trim() === '') {
       if (body.announcement_type === 'banner' || body.image_url) {
-        body.message = body.title.trim();
+        body.message = body.title?.trim() || 'Announcement';
       } else {
-        return NextResponse.json({ error: 'Message is required', field: 'message' }, { status: 400, headers: corsHeaders });
+        return NextResponse.json({ error: 'Message cannot be empty', field: 'message' }, { status: 400, headers: corsHeaders });
       }
     }
 
@@ -57,7 +57,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (user && user.role === 'receptionist' && !user.canDelete) {
       return NextResponse.json({ error: 'Receptionist does not have delete permission.' }, { status: 403, headers: corsHeaders });
     }

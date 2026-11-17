@@ -39,9 +39,9 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
 
   // Multi-Year & Month Filter State (Side-scrolling multi-year selection up to 2050)
   Set<int> _selectedYears = {DateTime.now().year};
-  int? _selectedMonth = 10; // Default: October (10), null = All Months
+  int? _selectedMonth = DateTime.now().month; // Dynamic active month, null = All Months
 
-  static final List<int> _availableYears = List<int>.generate(31, (i) => 2020 + i);
+  static final List<int> _availableYears = List<int>.generate(21, (i) => 2024 + i);
 
   static const List<String> _monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -65,9 +65,9 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
     }
 
     if (_selectedMonth == null) {
-      return 'All Months ($yearPart)';
+      return 'All Months • $yearPart';
     }
-    return '${_monthNames[_selectedMonth! - 1]} ($yearPart)';
+    return '${_monthNames[_selectedMonth! - 1]} $yearPart';
   }
 
   int _unreadCount = 0;
@@ -322,18 +322,36 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                       color: Color(0xFF8A064D),
                     ),
                   ),
-                  if (tempMonth != null)
-                    InkWell(
-                      onTap: () => setSheetState(() => tempMonth = null),
-                      child: const Text(
-                        'Select All Months',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF8A064D),
+                  Row(
+                    children: [
+                      InkWell(
+                        onTap: () => setSheetState(() {
+                          tempMonth = DateTime.now().month;
+                          tempYears = {DateTime.now().year};
+                        }),
+                        child: const Text(
+                          'This Month',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF8A064D),
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 14),
+                      InkWell(
+                        onTap: () => setSheetState(() => tempMonth = null),
+                        child: Text(
+                          tempMonth == null ? '✓ All Months' : 'All Months',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: tempMonth == null ? LaasyaColors.primary : Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -817,17 +835,19 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
     return false;
   }
 
-  // Check upload date matches selected month and year
+  // Check upload date matches selected month and year (checks both event_date and created_at)
   bool _matchesUploadDate(Map<String, dynamic> item) {
-    final itemDate = _getUploadDate(item);
-    if (itemDate == null) return true;
+    final evDate = _parseDate(item['event_date']);
+    final upDate = _parseDate(item['created_at']);
+    final dates = [evDate, upDate].whereType<DateTime>().toList();
+    if (dates.isEmpty) return true;
 
     // Check year match (matches all if empty or contains)
-    final matchesYear = _selectedYears.isEmpty || _selectedYears.contains(itemDate.year);
+    final matchesYear = _selectedYears.isEmpty || dates.any((d) => _selectedYears.contains(d.year));
     if (!matchesYear) return false;
 
     if (_selectedMonth != null) {
-      return itemDate.month == _selectedMonth;
+      return dates.any((d) => d.month == _selectedMonth && (_selectedYears.isEmpty || _selectedYears.contains(d.year)));
     }
     return true;
   }
@@ -911,7 +931,7 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                     // 1. PROMINENT ACTIVE MONTH & YEAR ON TOP (USER REQUIREMENT)
                     // =========================================================
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
@@ -926,100 +946,101 @@ class _StudentVideoLibraryScreenState extends State<StudentVideoLibraryScreen> {
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(9),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF2F8),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFF0D5E4)),
-                            ),
-                            child: const Icon(
-                              Icons.calendar_month_rounded,
-                              color: LaasyaColors.primary,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: InkWell(
-                              onTap: _openMonthYearFilterSheet,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'MONTH & YEAR FILTER',
-                                    style: TextStyle(
-                                      fontSize: 9.5,
-                                      letterSpacing: 0.8,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF8A064D),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: Text(
-                                          _displayMonthYear,
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold,
-                                            color: LaasyaColors.textDark,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 3),
-                                      const Icon(Icons.arrow_drop_down, color: LaasyaColors.primary, size: 18),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          // Month Nav Stepper: Previous Month (<)
+                          // Previous Month Stepper (<)
                           IconButton(
-                            icon: const Icon(Icons.chevron_left_rounded, size: 24, color: LaasyaColors.primary),
-                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.chevron_left_rounded, size: 28, color: LaasyaColors.primary),
+                            padding: const EdgeInsets.all(4),
                             constraints: const BoxConstraints(),
                             tooltip: 'Previous Month',
                             onPressed: () => _stepMonth(-1),
                           ),
                           const SizedBox(width: 4),
-                          // Month Nav Stepper: Next Month (>)
+
+                          // Center Prominent Month & Year Display Pill
+                          Expanded(
+                            child: InkWell(
+                              onTap: _openMonthYearFilterSheet,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF4F8),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFF0D5E4)),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.calendar_month_rounded,
+                                      color: LaasyaColors.primary,
+                                      size: 19,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        _displayMonthYear,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: LaasyaColors.textDark,
+                                          letterSpacing: 0.2,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.arrow_drop_down_rounded, color: LaasyaColors.primary, size: 20),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+
+                          // Next Month Stepper (>)
                           IconButton(
-                            icon: const Icon(Icons.chevron_right_rounded, size: 24, color: LaasyaColors.primary),
-                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.chevron_right_rounded, size: 28, color: LaasyaColors.primary),
+                            padding: const EdgeInsets.all(4),
                             constraints: const BoxConstraints(),
                             tooltip: 'Next Month',
                             onPressed: () => _stepMonth(1),
                           ),
-                          const SizedBox(width: 8),
-                          // Month & Year Picker Button
+                          const SizedBox(width: 6),
+
+                          // Quick Toggle: All Months vs Single Month
                           InkWell(
-                            onTap: _openMonthYearFilterSheet,
+                            onTap: () {
+                              setState(() {
+                                if (_selectedMonth == null) {
+                                  _selectedMonth = DateTime.now().month;
+                                } else {
+                                  _selectedMonth = null;
+                                }
+                              });
+                            },
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF590231),
+                                color: _selectedMonth == null
+                                    ? const Color(0xFF590231)
+                                    : const Color(0xFFF3F4F6),
                                 borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _selectedMonth == null
+                                      ? const Color(0xFF590231)
+                                      : Colors.grey.shade300,
+                                ),
                               ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.tune_rounded, color: LaasyaColors.accentGold, size: 13),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Filter',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
+                              child: Text(
+                                _selectedMonth == null ? 'All' : 'All',
+                                style: TextStyle(
+                                  color: _selectedMonth == null ? Colors.white : Colors.black87,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),

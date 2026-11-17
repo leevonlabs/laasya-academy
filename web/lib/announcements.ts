@@ -440,15 +440,15 @@ export async function createAnnouncement(data: {
 export async function updateAnnouncement(
   id: string,
   data: {
-    title: string;
-    message: string;
-    audience: string;
+    title?: string;
+    message?: string;
+    audience?: string;
     target_course_id?: string | null;
     target_course_title?: string | null;
     target_batch_id?: string | null;
     target_batch_name?: string | null;
-    type_tag: string;
-    publish_date: string;
+    type_tag?: string;
+    publish_date?: string;
     expiry_date?: string | null;
     status?: string;
     image_url?: string | null;
@@ -456,23 +456,53 @@ export async function updateAnnouncement(
     action_links?: Array<{ title: string; url: string }> | null;
   }
 ): Promise<Announcement> {
-  if (!data.title || data.title.trim() === '') {
-    throw new Error('Title is required');
+  const [existing] = await query<Announcement>(`
+    SELECT * FROM public.announcements WHERE id = $1
+  `, [id]);
+
+  if (!existing) {
+    throw new Error('Announcement not found');
   }
-  const effectiveMessage = (data.message && data.message.trim() !== '')
+
+  const effectiveTitle = (data.title !== undefined && data.title !== null && data.title.trim() !== '')
+    ? data.title.trim()
+    : existing.title;
+
+  const effectiveMessage = (data.message !== undefined && data.message !== null && data.message.trim() !== '')
     ? data.message.trim()
-    : (data.title ? data.title.trim() : 'Academy Announcement');
+    : (data.title && data.title.trim() !== '' ? data.title.trim() : existing.message);
 
-  const status = data.status || 'Published';
-  const deliveryStatus = status === 'Draft' 
-    ? 'Draft (Not sent)' 
-    : status === 'Scheduled' 
-      ? 'Queued for Scheduled Dispatch' 
-      : 'System verified (Delivered)';
+  const status = data.status || existing.status || 'Published';
+  const deliveryStatus = data.status 
+    ? (status === 'Draft' 
+        ? 'Draft (Not sent)' 
+        : status === 'Scheduled' 
+          ? 'Queued for Scheduled Dispatch' 
+          : 'System verified (Delivered)')
+    : (existing.delivery_status || 'System verified (Delivered)');
 
-  const validCourseId = isValidUuid(data.target_course_id) ? data.target_course_id : null;
-  const validBatchId = isValidUuid(data.target_batch_id) ? data.target_batch_id : null;
-  const effectiveImageUrl = data.image_url ? await saveBase64Media(data.image_url, 'announcements') : data.image_url;
+  const validCourseId = data.target_course_id !== undefined
+    ? (isValidUuid(data.target_course_id) ? data.target_course_id : null)
+    : existing.target_course_id;
+
+  const validBatchId = data.target_batch_id !== undefined
+    ? (isValidUuid(data.target_batch_id) ? data.target_batch_id : null)
+    : existing.target_batch_id;
+
+  const targetCourseTitle = data.target_course_title !== undefined ? data.target_course_title : existing.target_course_title;
+  const targetBatchName = data.target_batch_name !== undefined ? data.target_batch_name : existing.target_batch_name;
+  const audience = data.audience || existing.audience || 'All students';
+  const typeTag = data.type_tag || existing.type_tag || 'General';
+  const publishDate = data.publish_date || existing.publish_date || new Date().toISOString().split('T')[0];
+  const expiryDate = data.expiry_date !== undefined ? data.expiry_date : existing.expiry_date;
+
+  let effectiveImageUrl = existing.image_url;
+  if (data.image_url !== undefined) {
+    effectiveImageUrl = data.image_url ? await saveBase64Media(data.image_url, 'announcements') : null;
+  }
+
+  const announcementType = data.announcement_type || existing.announcement_type || 'message';
+  const actionLinks = data.action_links !== undefined ? data.action_links : existing.action_links;
 
   const [updated] = await query<Announcement>(`
     UPDATE public.announcements
@@ -518,21 +548,21 @@ export async function updateAnnouncement(
       COALESCE(TO_CHAR(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), updated_at::text) as updated_at;
   `, [
     id,
-    data.title.trim(),
+    effectiveTitle,
     effectiveMessage,
-    data.audience,
+    audience,
     validCourseId,
-    data.target_course_title || null,
+    targetCourseTitle || null,
     validBatchId,
-    data.target_batch_name || null,
-    data.type_tag || 'General',
-    data.publish_date,
-    data.expiry_date || null,
+    targetBatchName || null,
+    typeTag,
+    publishDate,
+    expiryDate || null,
     status,
     deliveryStatus,
     effectiveImageUrl !== undefined ? effectiveImageUrl : null,
-    data.announcement_type || null,
-    data.action_links !== undefined ? JSON.stringify(data.action_links || []) : null
+    announcementType || null,
+    actionLinks !== undefined ? JSON.stringify(actionLinks || []) : null
   ]);
 
   invalidateAnnouncementsCache();

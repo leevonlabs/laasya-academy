@@ -418,7 +418,8 @@ class _TrainerCreateShareVideoScreenState
     try {
       final res = await http.delete(
         Uri.parse('${ApiConstants.baseUrl}/api/video-library/$id'),
-      );
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -484,12 +485,16 @@ class _TrainerCreateShareVideoScreenState
           'event_date': _dateController.text.trim().isNotEmpty
               ? _dateController.text.trim()
               : DateTime.now().toIso8601String().split('T')[0],
+          'shared_by_type': 'guru',
+          'trainer_id': widget.trainerProfile?['id'],
+          'trainer_name': widget.trainerProfile?['full_name'] ?? widget.trainerProfile?['name'],
+          'phone': widget.trainerProfile?['phone'],
         };
         final res = await http.put(
           Uri.parse('${ApiConstants.baseUrl}/api/video-library/$id'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(updatePayload),
-        );
+        ).timeout(const Duration(seconds: 10));
         if (res.statusCode == 200) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(

@@ -867,10 +867,19 @@ class _TrainerAnnouncementsScreenState extends State<TrainerAnnouncementsScreen>
                                           'title': newTitle,
                                           'message': newMsg,
                                           'sender_role': 'trainer',
+                                          'audience': ann['audience'] ?? 'All students',
+                                          'status': ann['status'] ?? 'Published',
+                                          'type_tag': ann['type_tag'] ?? 'General',
+                                          'publish_date': ann['publish_date'] ?? DateTime.now().toIso8601String().split('T')[0],
                                         }),
-                                      );
+                                      ).timeout(const Duration(seconds: 10));
                                       if (res.statusCode >= 400) {
-                                        throw Exception('HTTP ${res.statusCode}');
+                                        String err = 'Failed to update message';
+                                        try {
+                                          final bodyJson = jsonDecode(res.body);
+                                          err = bodyJson['error'] ?? err;
+                                        } catch (_) {}
+                                        throw Exception(err);
                                       }
                                     }
 
