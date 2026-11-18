@@ -228,258 +228,6 @@ function formatTime12(timeStr?: string): string {
   return clean;
 }
 
-const TIME_ROWS: Array<{
-  time: string;
-  slots: Record<string, TimetableSlot[]>;
-}> = [
-  {
-    time: '5:00 AM – 6:00 AM',
-    slots: {
-      Monday: [{ course: 'YOGA', batch: 'Batch 1', trainer: 'Satish Kale' }],
-      Tuesday: [{ course: 'YOGA', batch: 'Batch 1', trainer: 'Satish Kale' }],
-      Wednesday: [{ course: 'YOGA', batch: 'Batch 1', trainer: 'Satish Kale' }],
-      Thursday: [{ course: 'YOGA', batch: 'Batch 1', trainer: 'Satish Kale' }],
-      Friday: [{ course: 'YOGA', batch: 'Batch 1', trainer: 'Satish Kale' }],
-      Saturday: [],
-      Sunday: []
-    }
-  },
-  {
-    time: '6:00 AM – 7:00 AM',
-    slots: {
-      Monday: [{ course: 'YOGA', batch: 'Batch 2', trainer: 'Satish Kale' }],
-      Tuesday: [{ course: 'YOGA', batch: 'Batch 2', trainer: 'Satish Kale' }],
-      Wednesday: [{ course: 'YOGA', batch: 'Batch 2', trainer: 'Satish Kale' }],
-      Thursday: [{ course: 'YOGA', batch: 'Batch 2', trainer: 'Satish Kale' }],
-      Friday: [{ course: 'YOGA', batch: 'Batch 2', trainer: 'Satish Kale' }],
-      Saturday: [],
-      Sunday: []
-    }
-  },
-  {
-    time: '7:00 AM – 8:00 AM',
-    slots: {
-      Monday: [{ course: 'YOGA', batch: 'Batch 3', trainer: 'Satish Kale' }],
-      Tuesday: [{ course: 'YOGA', batch: 'Batch 3', trainer: 'Satish Kale' }],
-      Wednesday: [{ course: 'YOGA', batch: 'Batch 3', trainer: 'Satish Kale' }],
-      Thursday: [{ course: 'YOGA', batch: 'Batch 3', trainer: 'Satish Kale' }],
-      Friday: [{ course: 'YOGA', batch: 'Batch 3', trainer: 'Satish Kale' }],
-      Saturday: [],
-      Sunday: []
-    }
-  },
-  {
-    time: '8:30 AM – 9:30 AM',
-    slots: {
-      Monday: [],
-      Tuesday: [{ course: 'BHARATANATYAM', batch: 'Semi-Classical', trainer: 'Nandana' }],
-      Wednesday: [],
-      Thursday: [{ course: 'BHARATANATYAM', batch: 'Semi-Classical', trainer: 'Nandana' }],
-      Friday: [{ course: 'BHARATANATYAM', batch: 'Semi-Classical', trainer: 'Nandana' }],
-      Saturday: [],
-      Sunday: []
-    }
-  },
-  {
-    time: '9:30 AM – 10:30 AM',
-    slots: {
-      Monday: [],
-      Tuesday: [],
-      Wednesday: [],
-      Thursday: [],
-      Friday: [],
-      Saturday: [{ course: 'BHARATANATYAM', batch: 'Nrityam', trainer: 'Nandana' }],
-      Sunday: [{ course: 'BHARATANATYAM', batch: 'Nrityam', trainer: 'Nandana' }]
-    }
-  },
-  {
-    time: '10:30 AM – 11:30 AM',
-    slots: {
-      Monday: [],
-      Tuesday: [],
-      Wednesday: [],
-      Thursday: [],
-      Friday: [],
-      Saturday: [
-        { course: 'BHARATANATYAM', batch: 'Kartari Mukham', trainer: 'Nandana' },
-        { course: 'BHARATANATYAM', batch: 'Spanda', trainer: 'Vismaya' }
-      ],
-      Sunday: [
-        { course: 'BHARATANATYAM', batch: 'Kartari Mukham', trainer: 'Nandana' },
-        { course: 'BHARATANATYAM', batch: 'Spanda', trainer: 'Vismaya' }
-      ]
-    }
-  },
-  {
-    time: '11:30 AM – 12:30 PM',
-    slots: {
-      Monday: [],
-      Tuesday: [],
-      Wednesday: [],
-      Thursday: [],
-      Friday: [],
-      Saturday: [
-        { course: 'BHARATANATYAM', batch: 'Shikharam', trainer: 'Kavya' },
-        { course: 'BHARATANATYAM', batch: 'Blossom', trainer: 'Amrutha' }
-      ],
-      Sunday: [
-        { course: 'BHARATANATYAM', batch: 'Shikharam', trainer: 'Kavya' },
-        { course: 'BHARATANATYAM', batch: 'Blossom', trainer: 'Amrutha' }
-      ]
-    }
-  },
-  {
-    time: '2:00 PM – 3:00 PM',
-    slots: {
-      Monday: [],
-      Tuesday: [],
-      Wednesday: [],
-      Thursday: [],
-      Friday: [],
-      Saturday: [{ course: 'BHARATANATYAM', batch: 'Ladies Bharatanatyam', trainer: 'Kavya' }],
-      Sunday: [{ course: 'BHARATANATYAM', batch: 'Ladies Bharatanatyam', trainer: 'Kavya' }]
-    }
-  },
-  {
-    time: '3:30 PM – 4:30 PM',
-    slots: {
-      Monday: [],
-      Tuesday: [],
-      Wednesday: [],
-      Thursday: [],
-      Friday: [],
-      Saturday: [{ course: 'WESTERN DANCE', batch: 'Weekend Batch', trainer: 'Manjunath' }],
-      Sunday: [{ course: 'WESTERN DANCE', batch: 'Weekend Batch', trainer: 'Manjunath' }]
-    }
-  },
-  {
-    time: '4:00 PM – 5:00 PM',
-    slots: {
-      Monday: [],
-      Tuesday: [{ course: 'BHARATANATYAM', batch: 'Ragam', trainer: 'Nandana' }],
-      Wednesday: [{ course: 'INSTRUMENT CLASSES', batch: 'Weekday Batch', trainer: 'Amos' }],
-      Thursday: [{ course: 'BHARATANATYAM', batch: 'Ragam', trainer: 'Nandana' }],
-      Friday: [{ course: 'INSTRUMENT CLASSES', batch: 'Weekday Batch', trainer: 'Amos' }],
-      Saturday: [],
-      Sunday: []
-    }
-  },
-  {
-    time: '4:30 PM – 5:30 PM',
-    slots: {
-      Monday: [{ course: 'BHARATANATYAM', batch: 'Anjali', trainer: 'Kavya' }],
-      Tuesday: [{ course: 'KARATE', batch: 'Karate', trainer: 'Balraj' }],
-      Wednesday: [],
-      Thursday: [{ course: 'KARATE', batch: 'Karate', trainer: 'Balraj' }],
-      Friday: [{ course: 'BHARATANATYAM', batch: 'Anjali', trainer: 'Kavya' }],
-      Saturday: [{ course: 'BHARATANATYAM', batch: 'Alapadma', trainer: 'Vismaya', asterisk: true }],
-      Sunday: [{ course: 'BHARATANATYAM', batch: 'Thalam', trainer: 'Amrutha', asterisk: true }]
-    }
-  },
-  {
-    time: '5:00 PM – 6:00 PM',
-    slots: {
-      Monday: [{ course: 'BHARATANATYAM', batch: 'Mudra', trainer: 'Amrutha' }],
-      Tuesday: [{ course: 'BHARATANATYAM', batch: 'Pataka', trainer: 'Vismaya' }],
-      Wednesday: [
-        { course: 'BHARATANATYAM', batch: 'Mudra', trainer: 'Amrutha' },
-        { course: 'INSTRUMENT CLASSES', batch: 'Weekday Batch', trainer: 'Amos' }
-      ],
-      Thursday: [],
-      Friday: [{ course: 'INSTRUMENT CLASSES', batch: 'Weekday Batch', trainer: 'Amos' }],
-      Saturday: [],
-      Sunday: []
-    }
-  },
-  {
-    time: '5:30 PM – 6:30 PM',
-    slots: {
-      Monday: [
-        { course: 'WESTERN DANCE', batch: 'Kids Batch', trainer: 'Karthik and Uday' },
-        { course: 'WESTERN DANCE', batch: 'Senior Kids Batch', trainer: 'Manjunath and Karthik', asterisk: true }
-      ],
-      Tuesday: [
-        { course: 'BHARATANATYAM', batch: 'Pataka Varnam', trainer: 'Amrutha' },
-        { course: 'KALARIPAYATTU', batch: 'Kalari', trainer: 'Vrushhabh Prakash' }
-      ],
-      Wednesday: [{ course: 'WESTERN DANCE', batch: 'Kids Batch', trainer: 'Karthik and Uday' }],
-      Thursday: [{ course: 'KALARIPAYATTU', batch: 'Kalari', trainer: 'Vrushhabh Prakash' }],
-      Friday: [
-        { course: 'BHARATANATYAM', batch: 'Pataka', trainer: 'Vismaya' },
-        { course: 'BHARATANATYAM', batch: 'Pataka Varnam', trainer: 'Amrutha' }
-      ],
-      Saturday: [
-        { course: 'BHARATANATYAM', batch: 'Brahmaram', trainer: 'Nandana' },
-        { course: 'BHARATANATYAM', batch: 'Chandrachooda', trainer: 'Kavya' },
-        { course: 'CARNATIC MUSIC', batch: 'Kids/Senior Batch', trainer: 'H Manikandan' }
-      ],
-      Sunday: [
-        { course: 'BHARATANATYAM', batch: 'Brahmaram', trainer: 'Nandana' },
-        { course: 'BHARATANATYAM', batch: 'Chandrachooda', trainer: 'Kavya' }
-      ]
-    }
-  },
-  {
-    time: '6:30 PM – 7:30 PM',
-    slots: {
-      Monday: [
-        { course: 'BHARATANATYAM', batch: 'Padam', trainer: 'Vismaya' },
-        { course: 'CARNATIC MUSIC', batch: 'Adult Batch', trainer: 'H Manikandan' },
-        { course: 'DRAWING', batch: 'Junior Batch', trainer: 'Dipanyan Sarkar', asterisk: true }
-      ],
-      Tuesday: [
-        { course: 'CARNATIC MUSIC', batch: 'Kids/Senior Batch', trainer: 'H Manikandan' },
-        { course: 'WESTERN DANCE', batch: 'Senior Kids Batch', trainer: 'Manjunath and Karthik', asterisk: true }
-      ],
-      Wednesday: [{ course: 'CARNATIC MUSIC', batch: 'Adult Batch', trainer: 'H Manikandan' }],
-      Thursday: [{ course: 'CARNATIC MUSIC', batch: 'Kids Junior Batch', trainer: 'H Manikandan' }],
-      Friday: [{ course: 'BHARATANATYAM', batch: 'Padam', trainer: 'Vismaya' }],
-      Saturday: [
-        { course: 'BHARATANATYAM', batch: 'Thalam', trainer: 'Amrutha', asterisk: true },
-        { course: 'CARNATIC MUSIC', batch: 'Kids Junior Batch', trainer: 'H Manikandan' }
-      ],
-      Sunday: [{ course: 'BHARATANATYAM', batch: 'Alapadma', trainer: 'Vismaya', asterisk: true }]
-    }
-  },
-  {
-    time: '6:45 PM – 7:45 PM',
-    slots: {
-      Monday: [],
-      Tuesday: [],
-      Wednesday: [{ course: 'DRAWING', batch: 'Senior Batch', trainer: 'Dipanyan Sarkar', asterisk: true }],
-      Thursday: [{ course: 'DRAWING', batch: 'Junior Batch', trainer: 'Dipanyan Sarkar', asterisk: true }],
-      Friday: [{ course: 'DRAWING', batch: 'Senior Batch', trainer: 'Dipanyan Sarkar', asterisk: true }],
-      Saturday: [],
-      Sunday: []
-    }
-  },
-  {
-    time: '7:30 PM – 8:30 PM',
-    slots: {
-      Monday: [],
-      Tuesday: [],
-      Wednesday: [],
-      Thursday: [],
-      Friday: [],
-      Saturday: [{ course: 'INSTRUMENT CLASSES', batch: 'Weekend Batch', trainer: 'Sahil', asterisk: true }],
-      Sunday: []
-    }
-  },
-  {
-    time: '7:45 PM – 8:45 PM',
-    slots: {
-      Monday: [{ course: 'WESTERN DANCE', batch: 'Adult Batch', trainer: 'Uday' }],
-      Tuesday: [{ course: 'WESTERN DANCE', batch: 'Adult Batch', trainer: 'Uday' }],
-      Wednesday: [],
-      Thursday: [{ course: 'WESTERN DANCE', batch: 'Adult Batch', trainer: 'Uday' }],
-      Friday: [],
-      Saturday: [],
-      Sunday: []
-    }
-  }
-];
-
-
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function TimetableView({ onBack, batches, tallyClasses: initialTallyClasses, showBackLink = true }: Props) {
@@ -489,9 +237,8 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
 
   // Sync or fetch live batches from API so any change to room name or schedule is reactive immediately
   React.useEffect(() => {
-    if (batches && batches.length > 0) {
+    if (batches !== undefined) {
       setLiveBatches(batches);
-      return;
     }
     fetch('/api/batches')
       .then(res => res.json())
@@ -538,44 +285,28 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
 
   // Dynamic room resolution: Reads live database room_or_hall
   const getSlotRoom = (slot: TimetableSlot): string => {
-    // A. Explicit room from slot (e.g. rescheduled tally classes)
     if (slot.room && slot.room.trim().length > 0) return slot.room.trim();
-
-    // B. Match with live batches in database
     const match = findMatchingBatch(slot.batch, slot.course);
     if (match && (match.room_or_hall || match.room)) {
       return (match.room_or_hall || match.room || '').trim();
     }
-
-    // C. Fallback room based on course category
-    const courseUpper = (slot.course || '').toUpperCase();
-    if (courseUpper.includes('YOGA')) return 'Room 1 (Yoga Shala)';
-    if (courseUpper.includes('WESTERN')) return 'Room 1 (Dance Studio)';
-    if (courseUpper.includes('BHARATANATYAM') || courseUpper.includes('KALARI') || courseUpper.includes('KUCHIPUDI') || courseUpper.includes('MOHINI')) return 'Room 2 (Natya Mandapam)';
-    if (courseUpper.includes('MUSIC') || courseUpper.includes('INSTRUMENT') || courseUpper.includes('VIOLIN') || courseUpper.includes('KEYBOARD') || courseUpper.includes('GUITAR') || courseUpper.includes('UKULELE')) return 'Room 3 (Sangeetha Hall)';
-    if (courseUpper.includes('DRAWING') || courseUpper.includes('ART') || courseUpper.includes('CHESS') || courseUpper.includes('KARATE')) return 'Room 4 (Chitrakala Studio)';
-    return 'Room 2 (Main Hall)';
+    return 'Room 1 (Natya Mandapam)';
   };
 
   // Dynamic trainer resolution: Reads live database faculty assignment
   const getSlotTrainer = (slot: TimetableSlot): string => {
-    if (slot.isRescheduled && slot.trainer) return slot.trainer;
+    if (slot.trainer && slot.trainer.trim().length > 0) return slot.trainer.trim();
     const match = findMatchingBatch(slot.batch, slot.course);
     if (match && match.trainer_name && match.trainer_name.trim().length > 0) {
       return match.trainer_name.trim();
     }
-    return slot.trainer;
+    return 'Assigned Guru';
   };
 
   // Synthesize dynamic time rows strictly from live database batches
   const dynamicTimeRows = useMemo(() => {
     if (!liveBatches || liveBatches.length === 0) {
-      return TIME_ROWS.map(r => ({
-        time: r.time,
-        slots: Object.fromEntries(
-          DAYS.map(day => [day, [...(r.slots[day] || [])]])
-        ) as Record<string, TimetableSlot[]>
-      }));
+      return [];
     }
 
     const activeBatches = liveBatches.filter(b => b.is_active !== false);
@@ -587,12 +318,52 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
     const timeSlotMap = new Map<string, Record<string, TimetableSlot[]>>();
 
     activeBatches.forEach(b => {
+      // If batch has explicit multi-slot schedules, use them
+      if (b.schedules && Array.isArray(b.schedules) && b.schedules.length > 0) {
+        b.schedules.forEach(slot => {
+          const start12 = formatTime12(slot.startTime || b.start_time);
+          const end12 = formatTime12(slot.endTime || b.end_time);
+          const timeLabel = (start12 && end12) ? `${start12} – ${end12}` : '5:00 PM – 6:00 PM';
+          const cleanDay = (slot.day || '').trim();
+          const matchedDay = DAYS.find(d => d.toLowerCase() === cleanDay.toLowerCase());
+
+          if (!timeSlotMap.has(timeLabel)) {
+            timeSlotMap.set(timeLabel, Object.fromEntries(DAYS.map(day => [day, []])) as Record<string, TimetableSlot[]>);
+          }
+
+          if (matchedDay) {
+            timeSlotMap.get(timeLabel)![matchedDay].push({
+              course: (b.course_title || 'CLASSICAL').toUpperCase().trim(),
+              batch: (b.name || 'Batch').trim(),
+              trainer: (b.trainer_name || 'Assigned Guru').trim(),
+              room: (slot.room || b.room_or_hall || b.room || 'Room 1').trim()
+            });
+          }
+        });
+        return;
+      }
+
+      // Otherwise parse days_of_week and start/end time
       const start12 = formatTime12(b.start_time);
       const end12 = formatTime12(b.end_time);
       const timeLabel = (start12 && end12) ? `${start12} – ${end12}` : '5:00 PM – 6:00 PM';
-      const days = Array.isArray(b.days_of_week) && b.days_of_week.length > 0
-        ? b.days_of_week
-        : ['Monday', 'Wednesday'];
+
+      let days: string[] = [];
+      if (Array.isArray(b.days_of_week)) {
+        days = b.days_of_week;
+      } else if (typeof b.days_of_week === 'string' && (b.days_of_week as string).trim()) {
+        try {
+          const parsed = JSON.parse(b.days_of_week);
+          if (Array.isArray(parsed)) days = parsed;
+          else days = (b.days_of_week as string).split(',').map(s => s.trim());
+        } catch {
+          days = (b.days_of_week as string).split(',').map(s => s.trim());
+        }
+      }
+
+      if (days.length === 0) {
+        days = ['Monday', 'Wednesday'];
+      }
 
       if (!timeSlotMap.has(timeLabel)) {
         timeSlotMap.set(timeLabel, Object.fromEntries(DAYS.map(day => [day, []])) as Record<string, TimetableSlot[]>);
@@ -613,6 +384,20 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
       });
     });
 
+    // Also check liveTallyClasses for any rescheduled classes whose time slot might need to exist in the grid
+    if (liveTallyClasses && liveTallyClasses.length > 0) {
+      liveTallyClasses.forEach(tc => {
+        const start12 = formatTime12(tc.start_time);
+        const end12 = formatTime12(tc.end_time);
+        if (start12 && end12) {
+          const timeLabel = `${start12} – ${end12}`;
+          if (!timeSlotMap.has(timeLabel)) {
+            timeSlotMap.set(timeLabel, Object.fromEntries(DAYS.map(day => [day, []])) as Record<string, TimetableSlot[]>);
+          }
+        }
+      });
+    }
+
     // Sort time rows chronologically by starting time
     const parseMinutes = (str: string) => {
       const m = str.match(/(\d+):(\d+)\s*(AM|PM)/i);
@@ -631,7 +416,7 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
       time,
       slots: timeSlotMap.get(time)!
     }));
-  }, [liveBatches]);
+  }, [liveBatches, liveTallyClasses]);
 
   // Fetch rescheduled tally classes if not passed in props
   React.useEffect(() => {
@@ -689,16 +474,19 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
     if (liveBatches && liveBatches.length > 0) {
       return liveBatches.filter(b => b.is_active !== false).length;
     }
-    return 33;
+    return 0;
   }, [liveBatches]);
 
   const availableCourseFilters = useMemo(() => {
-    const list: string[] = [];
-    Object.keys(COURSES_THEME).forEach(k => {
-      if (!list.includes(k)) list.push(k);
+    if (!liveBatches || liveBatches.length === 0) return [];
+    const courseSet = new Set<string>();
+    liveBatches.forEach(b => {
+      if (b.is_active !== false && b.course_title) {
+        courseSet.add(b.course_title.toUpperCase().trim());
+      }
     });
-    return list;
-  }, []);
+    return Array.from(courseSet).sort();
+  }, [liveBatches]);
 
   const [isExporting, setIsExporting] = useState(false);
   const timetableRef = useRef<HTMLDivElement>(null);
@@ -812,7 +600,7 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
               : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
           }`}
         >
-          All Courses (${activeBatchesCount} Batches)
+          All Courses ({activeBatchesCount} Batches)
         </button>
         {availableCourseFilters.map(name => {
           const theme = getCourseTheme(name);
@@ -872,7 +660,31 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F0D5E4]/80">
-              {dynamicTimeRows.map((row, idx) => (
+              {dynamicTimeRows.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-20 px-4 text-center bg-gray-50/50">
+                    <div className="max-w-md mx-auto flex flex-col items-center justify-center text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center mb-3 shadow-xs">
+                        <Calendar className="w-7 h-7 text-[#8A064D]" />
+                      </div>
+                      <h3 className="text-base font-extrabold text-[#2A0418] mb-1">
+                        No Batches or Classes Scheduled
+                      </h3>
+                      <p className="text-xs text-gray-500 mb-5 leading-relaxed">
+                        The weekly master timetable is dynamically linked to your active batch schedules. Once batches and courses are added or imported, their weekly class slots, assigned gurus, and room allocations will automatically appear here.
+                      </p>
+                      <Link
+                        href="/batches"
+                        className="inline-flex items-center gap-2 bg-[#8A064D] hover:bg-[#70043E] text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-xs cursor-pointer"
+                      >
+                        <span>Manage Batches</span>
+                        <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                dynamicTimeRows.map((row, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/50 transition">
                   {/* Time Column */}
                   <td className="py-3 px-2 text-center text-[10px] font-bold text-gray-700 bg-[#FDFBFB] border-r border-[#F0D5E4] whitespace-nowrap align-middle">
@@ -955,7 +767,8 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
                     );
                   })}
                 </tr>
-              ))}
+              ))
+            )}
             </tbody>
           </table>
         </div>
