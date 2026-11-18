@@ -228,29 +228,13 @@ class SupabaseService {
         debugPrint('Restored persistent login for ' + (_cachedProfile?['full_name']?.toString() ?? '') + ' (' + (_cachedProfile?['role']?.toString() ?? '') + ')');
       }
 
-      final savedBannersJson = prefs.getString('laasya_cached_banners');
-      if (savedBannersJson != null && savedBannersJson.isNotEmpty) {
-        final decoded = jsonDecode(savedBannersJson);
-        if (decoded is List) {
-          _cachedBannerAnnouncements = decoded.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
-        }
-      }
-
-      final savedMessagesJson = prefs.getString('laasya_cached_messages');
-      if (savedMessagesJson != null && savedMessagesJson.isNotEmpty) {
-        final decoded = jsonDecode(savedMessagesJson);
-        if (decoded is List) {
-          _cachedMessageAnnouncements = decoded.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
-        }
-      }
-
-      final savedNotifsJson = prefs.getString('laasya_cached_notifications');
-      if (savedNotifsJson != null && savedNotifsJson.isNotEmpty) {
-        final decoded = jsonDecode(savedNotifsJson);
-        if (decoded is List) {
-          _cachedNotifications = decoded.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
-        }
-      }
+      // Reset any legacy cached notifications/banners on clean start
+      _cachedNotifications = [];
+      _cachedBannerAnnouncements = [];
+      _cachedMessageAnnouncements = [];
+      await prefs.remove('laasya_cached_notifications');
+      await prefs.remove('laasya_cached_banners');
+      await prefs.remove('laasya_cached_messages');
 
       final savedSalariesJson = prefs.getString('laasya_cached_trainer_salaries');
       if (savedSalariesJson != null && savedSalariesJson.isNotEmpty) {
@@ -2103,7 +2087,7 @@ class SupabaseService {
         getStudentPayments(),
       ]).timeout(
         const Duration(seconds: 3),
-        onTimeout: () => [[], _mockMessageAnnouncements, _mockBannerAnnouncements, _cachedPayments],
+        onTimeout: () => [[], [], [], _cachedPayments],
       );
 
       final alerts = results[0];
@@ -2208,14 +2192,7 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Notification parallel fetch notice: $e');
       if (_cachedNotifications.isEmpty) {
-        for (var m in _mockMessageAnnouncements) {
-          notifs.add(Map<String, dynamic>.from(m));
-        }
-        for (var b in _mockBannerAnnouncements) {
-          notifs.add(Map<String, dynamic>.from(b));
-        }
-        _cachedNotifications = notifs;
-        _saveNotificationsToPrefs(notifs);
+        _cachedNotifications = [];
       }
     }
 

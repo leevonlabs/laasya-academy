@@ -44,191 +44,25 @@ export interface AcademyNotification {
   };
 }
 
-const INITIAL_NOTIFICATIONS: AcademyNotification[] = [
-  // 1. Student Payments
-  {
-    id: 'notif-pay-1',
-    category: 'payment',
-    title: 'Student Tuition Fee Received',
-    description: 'Aditi Sundaram paid ₹2,000 for October 2026 tuition fee via UPI. Receipt #LCA-REC-2026-10-006 generated.',
-    timestamp: '10 minutes ago',
-    unread: true,
-    amount: 2000,
-    actorName: 'Aditi Sundaram',
-    actorRole: 'Disciple (LCA-6)',
-    actionUrl: '/finance/fees',
-    actionLabel: 'View Payment Receipt',
-    metadata: {
-      course: 'Bharatanatyam',
-      batch: 'Batch A (Beginners)',
-      receiptNo: 'LCA-REC-2026-10-006'
-    }
-  },
-  {
-    id: 'notif-pay-2',
-    category: 'payment',
-    title: 'Advance Fee Payment Credited',
-    description: 'Rohan Mehra deposited ₹4,500 advance tuition. Balance credit of ₹500 applied for upcoming month cycle.',
-    timestamp: '2 hours ago',
-    unread: true,
-    amount: 4500,
-    actorName: 'Rohan Mehra',
-    actorRole: 'Disciple (LCA-12)',
-    actionUrl: '/finance/fees',
-    actionLabel: 'View Invoice Record',
-    metadata: {
-      course: 'Carnatic Music',
-      batch: 'Vocal Intermediate',
-      receiptNo: 'LCA-REC-2026-10-019'
-    }
-  },
-  {
-    id: 'notif-pay-3',
-    category: 'payment',
-    title: 'New Admission Fee Confirmed',
-    description: 'Ananya Sharma completed registration and paid initial admission fee of ₹3,000 for Kuchipudi Foundation.',
-    timestamp: 'Yesterday at 5:15 PM',
-    unread: false,
-    amount: 3000,
-    actorName: 'Ananya Sharma',
-    actorRole: 'New Disciple (LCA-34)',
-    actionUrl: '/students',
-    actionLabel: 'Inspect Disciple Profile',
-    metadata: {
-      course: 'Kuchipudi',
-      batch: 'Foundation Batch 1',
-      receiptNo: 'LCA-REC-2026-10-022'
-    }
-  },
-
-  // 2. Guru Salary Credits
-  {
-    id: 'notif-sal-1',
-    category: 'salary',
-    title: 'Guru Monthly Salary Disbursed',
-    description: 'October honorarium of ₹42,500 successfully transferred to Guru Nandana (Senior Bharatanatyam Faculty). Payslip ready for download.',
-    timestamp: '3 hours ago',
-    unread: true,
-    amount: 42500,
-    actorName: 'Guru Nandana',
-    actorRole: 'Senior Dance Faculty',
-    actionUrl: '/finance/salaries',
-    actionLabel: 'View Salary Payslip',
-    metadata: {
-      course: 'Bharatanatyam',
-      invoiceNo: 'LCA-SAL-2026-10-01'
-    }
-  },
-  {
-    id: 'notif-sal-2',
-    category: 'salary',
-    title: 'Tally Class Honorarium Credited',
-    description: 'Rescheduled compensation class honorarium of ₹3,500 approved for Acharya Vidyashankar for Hall 2 extra sessions.',
-    timestamp: 'Yesterday at 3:30 PM',
-    unread: false,
-    amount: 3500,
-    actorName: 'Acharya Vidyashankar',
-    actorRole: 'Carnatic Vocal Faculty',
-    actionUrl: '/finance/salaries',
-    actionLabel: 'Review Disbursal Details',
-    metadata: {
-      course: 'Carnatic Music',
-      invoiceNo: 'LCA-SAL-2026-10-02'
-    }
-  },
-
-  // 3. Messages & Inquiries from Gurus
-  {
-    id: 'notif-msg-1',
-    category: 'message',
-    title: 'Guru Message: Repertoire Practice Request',
-    description: 'Guru Amrutha sent a broadcast notice for students of Mudra Batch regarding upcoming Navarasa recital rehearsals on Saturday.',
-    timestamp: '25 minutes ago',
-    unread: true,
-    actorName: 'Guru Amrutha',
-    actorRole: 'Bharatanatyam Faculty',
-    actionUrl: '/messages',
-    actionLabel: 'Open Academy Messages',
-    metadata: {
-      course: 'Bharatanatyam',
-      batch: 'Mudra Batch'
-    }
-  },
-  {
-    id: 'notif-msg-2',
-    category: 'message',
-    title: 'Guru Leave Notice & Substitution Request',
-    description: 'Guru Manjunath requested substitution coverage for Western Dance Kids Batch on Thursday due to interstate dance adjudication.',
-    timestamp: '5 hours ago',
-    unread: false,
-    actorName: 'Guru Manjunath',
-    actorRole: 'Western Dance Faculty',
-    actionUrl: '/tally-classes',
-    actionLabel: 'Manage Class Reschedule',
-    metadata: {
-      course: 'Western Dance',
-      batch: 'Kids Batch'
-    }
-  },
-
-  // 4. Video Shares from Gurus
-  {
-    id: 'notif-vid-1',
-    category: 'video',
-    title: 'New Choreography Video Shared',
-    description: 'Guru Vismaya uploaded a new practice recording: "Alarippu - Tisra Eka Tala Demonstrations & Adavu Breakdowns" for batch students.',
-    timestamp: '45 minutes ago',
-    unread: true,
-    actorName: 'Guru Vismaya',
-    actorRole: 'Bharatanatyam Faculty',
-    actionUrl: '/videos',
-    actionLabel: 'Watch Video & Curriculum',
-    metadata: {
-      course: 'Bharatanatyam',
-      batch: 'Spanda Batch',
-      videoDuration: '14 mins 20 secs'
-    }
-  },
-  {
-    id: 'notif-vid-2',
-    category: 'video',
-    title: 'Riyaz Warmup Tutorial Uploaded',
-    description: 'Acharya Vidyashankar uploaded high-fidelity riyaz audio-video exercise: "Akaram & Sarali Varisai Scales in Mayamalavagowla".',
-    timestamp: '4 hours ago',
-    unread: true,
-    actorName: 'Acharya Vidyashankar',
-    actorRole: 'Vocal Department Head',
-    actionUrl: '/videos',
-    actionLabel: 'Play Academy Tutorial',
-    metadata: {
-      course: 'Carnatic Music',
-      batch: 'All Vocal Disciples',
-      videoDuration: '22 mins 10 secs'
-    }
-  },
-  {
-    id: 'notif-vid-3',
-    category: 'video',
-    title: 'Kalaripayattu Footwork Drill Shared',
-    description: 'Guru Vrushhabh Prakash uploaded "Meippayattu Stances & Chuvadukal Level 2" for martial arts weekend students.',
-    timestamp: '2 days ago',
-    unread: false,
-    actorName: 'Guru Vrushhabh Prakash',
-    actorRole: 'Kalaripayattu Master',
-    actionUrl: '/videos',
-    actionLabel: 'View Video Archive',
-    metadata: {
-      course: 'Kalaripayattu',
-      batch: 'Kalari Batch',
-      videoDuration: '18 mins 45 secs'
-    }
-  }
-];
+const INITIAL_NOTIFICATIONS: AcademyNotification[] = [];
 
 export default function NotificationsClient() {
   const [notifications, setNotifications] = useState<AcademyNotification[]>(INITIAL_NOTIFICATIONS);
   const [activeTab, setActiveTab] = useState<'all' | 'payment' | 'salary' | 'message' | 'video'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  React.useEffect(() => {
+    fetch('/api/notifications')
+      .then(res => res.json())
+      .then(data => {
+        if (data && Array.isArray(data.notifications)) {
+          setNotifications(data.notifications);
+        } else if (Array.isArray(data)) {
+          setNotifications(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Counts
   const unreadCount = useMemo(() => notifications.filter(n => n.unread).length, [notifications]);
@@ -504,9 +338,9 @@ export default function NotificationsClient() {
         {filteredNotifications.length === 0 ? (
           <div className="bg-white p-12 text-center rounded-3xl border border-[#F0D5E4] shadow-xs">
             <Bell className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <h3 className="text-sm font-bold text-[#2D041A]">No Notifications Found</h3>
+            <h3 className="text-sm font-bold text-[#2D041A]">No Notifications Yet</h3>
             <p className="text-xs text-gray-500 mt-1">
-              There are no notifications matching your selected category or filter query.
+              Your academy activity feed is completely clear. Real-time notifications for student fee receipts, guru salary disbursals, notices, and shared tutorial videos will appear here.
             </p>
           </div>
         ) : (
