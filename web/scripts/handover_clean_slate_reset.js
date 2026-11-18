@@ -16,9 +16,20 @@
  *   node web/scripts/handover_clean_slate_reset.js --confirm-handover
  */
 
+const fs = require('fs');
+const path = require('path');
 const { Pool } = require('pg');
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres.kumbtvmjpmjtmoefddux:Laasya%4024530@aws-0-ap-south-1.pooler.supabase.com:6543/postgres';
+let DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL && fs.existsSync(path.join(__dirname, '../.env.local'))) {
+  const env = fs.readFileSync(path.join(__dirname, '../.env.local'), 'utf8');
+  for (const line of env.split('\n')) {
+    if (line.startsWith('DATABASE_URL=')) DATABASE_URL = line.substring(13).trim().replace(/^['"]|['"]$/g, '');
+  }
+}
+if (!DATABASE_URL) {
+  DATABASE_URL = 'postgresql://postgres.kumbtvmjpmjtmoefddux:Laasya%4024530@aws-0-ap-south-1.pooler.supabase.com:6543/postgres';
+}
 
 const pool = new Pool({
   connectionString: DATABASE_URL,
@@ -77,6 +88,7 @@ async function cleanSlateReset() {
     await client.query(`DELETE FROM public.guru_payments`);
     await client.query(`DELETE FROM public.guru_salary_advances`);
     await client.query(`DELETE FROM public.guru_salary_records`);
+    await client.query(`DELETE FROM public.receptionist_salaries`);
     await client.query(`DELETE FROM public.active_sessions`);
     await client.query(`DELETE FROM public.device_tokens`);
     await client.query(`DELETE FROM public.advertisement_views`);
@@ -101,8 +113,14 @@ async function cleanSlateReset() {
     console.log('✓ Cleared all batches, courses, student profiles, and guru profiles.');
 
     // 5. Purge test user profiles and auth.users (except preserved admin accounts)
-    console.log('\n[4/6] Purging non-admin test users from profiles and auth.users...');
+    console.log('\n[4/6] Purging non-admin test users from auth.identities, profiles, and auth.users...');
     const idListStr = preservedIds.map(id => `'${id}'`).join(', ');
+
+    const identitiesRes = await client.query(`
+      DELETE FROM auth.identities 
+      WHERE user_id NOT IN (${idListStr})
+    `);
+    console.log(`✓ Deleted ${identitiesRes.rowCount} test identities from auth.identities.`);
 
     const profRes = await client.query(`
       DELETE FROM public.profiles 
@@ -120,17 +138,35 @@ async function cleanSlateReset() {
     console.log('\n[5/6] Resetting academy rooms to 4 pristine standard halls...');
     await client.query(`DELETE FROM public.rooms`);
     await client.query(`
-      INSERT INTO public.rooms (id, name, capacity, is_active) VALUES
-        (gen_random_uuid(), 'Room 1 (Natya Mandapam)', 30, true),
-        (gen_random_uuid(), 'Room 2 (Sangeetha Shala)', 25, true),
-        (gen_random_uuid(), 'Room 3 (Chitrakala Hall)', 25, true),
-        (gen_random_uuid(), 'Room 4 (Veera Kalari Koodam)', 30, true)
+      INSERT INTO public.rooms (id, name, capacity) VALUES
+        (gen_random_uuid(), 'Natya Mandapam (Room 101)', 30),
+        (gen_random_uuid(), 'Sangeetha Shala (Room 102)', 25),
+        (gen_random_uuid(), 'Chitrakala Hall (Room 103)', 25),
+        (gen_random_uuid(), 'Veera Kalari Koodam (Room 104)', 30)
       ON CONFLICT DO NOTHING;
     `);
-    console.log('✓ Initialized standard academy rooms: Room 1, Room 2, Room 3, Room 4.');
+    console.log('✓ Initialized standard academy rooms: Room 101, Room 102, Room 103, Room 104.');
 
     // 7. Reset sequences if applicable
     console.log('\n[6/6] Verifying database integrity and storage state...');
+    const tableCounts = await client.query(`
+      SELECT 
+        (SELECT count(*) FROM public.students) as students,
+        (SELECT count(*) FROM public.trainers) as trainers,
+        (SELECT count(*) FROM public.courses) as courses,
+        (SELECT count(*) FROM public.batches) as batches,
+        (SELECT count(*) FROM public.attendance) as attendance,
+        (SELECT count(*) FROM public.announcements) as announcements,
+        (SELECT count(*) FROM public.video_library) as video_library,
+        (SELECT count(*) FROM public.student_fee_payments) as student_fee_payments,
+        (SELECT count(*) FROM public.guru_payments) as guru_payments,
+        (SELECT count(*) FROM public.expenses) as expenses,
+        (SELECT count(*) FROM public.profiles) as profiles,
+        (SELECT count(*) FROM public.rooms) as rooms
+    `);
+    console.log('Post-cleanup table verification:');
+    console.table(tableCounts.rows);
+
     const dbSizeRes = await client.query(`SELECT pg_size_pretty(pg_database_size(current_database())) as db_size;`);
     console.log(`✓ Database disk size after clean-slate reset: ${dbSizeRes.rows[0].db_size}`);
 
