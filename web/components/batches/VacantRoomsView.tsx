@@ -52,12 +52,6 @@ const MONTHS_LIST = [
 ];
 const YEARS_LIST = [2024, 2025, 2026, 2027, 2028];
 
-const FALLBACK_ROOMS: Room[] = [
-  { id: 'r1', name: 'Natya Mandapam (Room 101)', capacity: 25 },
-  { id: 'r2', name: 'Sangeetha Shala (Room 102)', capacity: 25 },
-  { id: 'r3', name: 'Chitra Kuteera (Room 103)', capacity: 25 },
-  { id: 'r4', name: 'Yogasana Shala (Room 104)', capacity: 25 }
-];
 
 export default function VacantRoomsView({ batches, rooms, onBack }: Props) {
   // Today's real date
@@ -144,7 +138,7 @@ export default function VacantRoomsView({ batches, rooms, onBack }: Props) {
   };
 
   const effectiveRooms = useMemo(() => {
-    return rooms && rooms.length > 0 ? rooms : FALLBACK_ROOMS;
+    return rooms || [];
   }, [rooms]);
 
   // Find all classes scheduled in each room for the selected date's day of week
@@ -421,7 +415,9 @@ export default function VacantRoomsView({ batches, rooms, onBack }: Props) {
               onChange={(e) => setFilterRoom(e.target.value)}
               className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8A064D]/20 cursor-pointer shadow-2xs hover:border-[#8A064D]"
             >
-              <option value="all">All Academy Rooms</option>
+              <option value="all">
+                {effectiveRooms.length > 0 ? 'All Academy Rooms' : 'No Rooms Available'}
+              </option>
               {effectiveRooms.map(r => (
                 <option key={r.id} value={r.id}>{r.name}</option>
               ))}
@@ -523,95 +519,120 @@ export default function VacantRoomsView({ batches, rooms, onBack }: Props) {
         </div>
       </div>
 
-      {/* 4 Rooms Vacancy Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-        {filteredCards.map(({ room, timeSlotsStatus, vacantCount, bookedCount, vacancyRate }) => (
-          <div
-            key={room.id}
-            className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs p-5 flex flex-col justify-between space-y-4 hover:border-[#8A064D]/40 transition"
+      {/* Rooms Vacancy Cards Grid or Clean Empty State */}
+      {effectiveRooms.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-[#F0D5E4] p-12 text-center shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-[#FFF2F8] border border-[#F0D5E4] flex items-center justify-center mx-auto mb-4">
+            <DoorOpen className="w-8 h-8 text-[#8A064D]" />
+          </div>
+          <h3 className="text-base font-bold text-[#2D041A]">No Academy Rooms Configured</h3>
+          <p className="text-xs text-gray-500 max-w-md mx-auto mt-1 mb-6 leading-relaxed">
+            There are currently no academy classrooms or halls registered. When you register rooms in the Batches page room manager or assign rooms to batches, room vacancy and live availability will be tracked here.
+          </p>
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-2 bg-[#8A064D] hover:bg-[#70043E] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
           >
-            <div>
-              {/* Room Header */}
-              <div className="flex items-start justify-between gap-2 pb-3 border-b border-gray-100">
-                <div>
-                  <h3 className="font-bold text-sm text-[#2D041A] truncate">{room.name}</h3>
-                  <p className="text-[11px] text-gray-500 font-medium">Capacity: {room.capacity || 25} students</p>
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Batches</span>
+          </button>
+        </div>
+      ) : filteredCards.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-[#F0D5E4] p-10 text-center shadow-xs">
+          <AlertCircle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+          <p className="text-xs font-bold text-gray-600">No rooms match the selected filter.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          {filteredCards.map(({ room, timeSlotsStatus, vacantCount, bookedCount, vacancyRate }) => (
+            <div
+              key={room.id}
+              className="bg-white rounded-3xl border border-[#F0D5E4] shadow-xs p-5 flex flex-col justify-between space-y-4 hover:border-[#8A064D]/40 transition"
+            >
+              <div>
+                {/* Room Header */}
+                <div className="flex items-start justify-between gap-2 pb-3 border-b border-gray-100">
+                  <div>
+                    <h3 className="font-bold text-sm text-[#2D041A] truncate">{room.name}</h3>
+                    <p className="text-[11px] text-gray-500 font-medium">Capacity: {room.capacity || 25} students</p>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                    vacancyRate >= 50
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  }`}>
+                    {vacancyRate}% Free
+                  </span>
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                  vacancyRate >= 50
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-amber-50 text-amber-700 border border-amber-200'
-                }`}>
-                  {vacancyRate}% Free
-                </span>
-              </div>
 
-              {/* Status Pill Summary */}
-              <div className="my-3 flex items-center justify-between text-[11px] font-semibold text-gray-600 bg-gray-50/70 p-2 rounded-xl">
-                <span>{bookedCount} Booked</span>
-                <span className="text-gray-300">•</span>
-                <span className="text-emerald-700 font-bold">{vacantCount} Vacant Slots</span>
-              </div>
+                {/* Status Pill Summary */}
+                <div className="my-3 flex items-center justify-between text-[11px] font-semibold text-gray-600 bg-gray-50/70 p-2 rounded-xl">
+                  <span>{bookedCount} Booked</span>
+                  <span className="text-gray-300">•</span>
+                  <span className="text-emerald-700 font-bold">{vacantCount} Vacant Slots</span>
+                </div>
 
-              {/* Time Slots Timeline */}
-              <div className="space-y-1.5 max-h-[440px] overflow-y-auto pr-1 scrollbar-thin">
-                {timeSlotsStatus.map((slot, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-2 rounded-xl text-xs transition border ${
-                      slot.isVacant
-                        ? 'bg-emerald-50/40 border-emerald-200/80 hover:bg-emerald-50'
-                        : 'bg-[#FFF2F8] border-[#F0D5E4] hover:bg-[#FFE5F0]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] font-bold text-gray-700">
-                        {slot.block.label}
-                      </span>
-                      {slot.isVacant ? (
-                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded uppercase">
-                          Vacant
+                {/* Time Slots Timeline */}
+                <div className="space-y-1.5 max-h-[440px] overflow-y-auto pr-1 scrollbar-thin">
+                  {timeSlotsStatus.map((slot, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-2 rounded-xl text-xs transition border ${
+                        slot.isVacant
+                          ? 'bg-emerald-50/40 border-emerald-200/80 hover:bg-emerald-50'
+                          : 'bg-[#FFF2F8] border-[#F0D5E4] hover:bg-[#FFE5F0]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-[10px] font-bold text-gray-700">
+                          {slot.block.label}
                         </span>
-                      ) : (slot.booking as any)?.isTally ? (
-                        <span className="text-[9px] font-black text-amber-950 bg-amber-300 px-1.5 py-0.5 rounded uppercase flex items-center gap-0.5 animate-pulse shadow-2xs">
-                          <span>★</span>
-                          <span>Rescheduled</span>
-                        </span>
-                      ) : (
-                        <span className="text-[9px] font-bold text-[#8A064D] bg-[#FFE5F0] px-1.5 py-0.5 rounded uppercase">
-                          Occupied
-                        </span>
+                        {slot.isVacant ? (
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded uppercase">
+                            Vacant
+                          </span>
+                        ) : (slot.booking as any)?.isTally ? (
+                          <span className="text-[9px] font-black text-amber-950 bg-amber-300 px-1.5 py-0.5 rounded uppercase flex items-center gap-0.5 animate-pulse shadow-2xs">
+                            <span>★</span>
+                            <span>Rescheduled</span>
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-bold text-[#8A064D] bg-[#FFE5F0] px-1.5 py-0.5 rounded uppercase">
+                            Occupied
+                          </span>
+                        )}
+                      </div>
+
+                      {!slot.isVacant && slot.booking && (
+                        <div className="mt-1 pt-1 border-t border-[#F0D5E4]/60">
+                          <p className="text-[11px] font-bold text-[#2D041A] truncate flex items-center gap-1">
+                            {(slot.booking as any)?.isTally && <span className="text-amber-500 font-black">★</span>}
+                            <span>{slot.booking.batch.name} • {slot.booking.batch.course_title}</span>
+                          </p>
+                          <p className="text-[10px] text-gray-500 font-medium truncate">
+                            Guru: {slot.booking.batch.trainer_name}
+                          </p>
+                        </div>
+                      )}
+
+                      {slot.isVacant && (
+                        <p className="text-[10px] text-emerald-600 font-medium mt-0.5">
+                          Available for booking
+                        </p>
                       )}
                     </div>
+                  ))}
+                </div>
+              </div>
 
-                    {!slot.isVacant && slot.booking && (
-                      <div className="mt-1 pt-1 border-t border-[#F0D5E4]/60">
-                        <p className="text-[11px] font-bold text-[#2D041A] truncate flex items-center gap-1">
-                          {(slot.booking as any)?.isTally && <span className="text-amber-500 font-black">★</span>}
-                          <span>{slot.booking.batch.name} • {slot.booking.batch.course_title}</span>
-                        </p>
-                        <p className="text-[10px] text-gray-500 font-medium truncate">
-                          Guru: {slot.booking.batch.trainer_name}
-                        </p>
-                      </div>
-                    )}
-
-                    {slot.isVacant && (
-                      <p className="text-[10px] text-emerald-600 font-medium mt-0.5">
-                        Available for booking
-                      </p>
-                    )}
-                  </div>
-                ))}
+              <div className="pt-3 border-t border-gray-100 text-[10px] text-gray-400 text-center font-medium">
+                Classroom sanitized & available
               </div>
             </div>
-
-            <div className="pt-3 border-t border-gray-100 text-[10px] text-gray-400 text-center font-medium">
-              Classroom sanitized & available
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

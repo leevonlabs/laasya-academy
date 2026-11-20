@@ -743,7 +743,34 @@ export async function createRoom(name: string, capacity: number = 25): Promise<R
 }
 
 export async function deleteRoom(id: string): Promise<boolean> {
-  await query('DELETE FROM public.rooms WHERE id = $1', [id]);
+  const existing = await queryOne<Room>(`
+    SELECT id, name FROM public.rooms 
+    WHERE id::text = $1 OR LOWER(name) = LOWER($1)
+  `, [id]);
+
+  if (!existing) {
+    throw new Error('Room not found');
+  }
+
+  // Check if any batch is currently assigned to this room
+  const assignedBatches = await query<{ id: string; name: string }>(`
+    SELECT b.id, b.name 
+    FROM public.batches b
+    WHERE TRIM(LOWER(COALESCE(b.room_or_hall, ''))) = TRIM(LOWER($1))
+       OR EXISTS (
+         SELECT 1 FROM jsonb_array_elements(COALESCE(b.schedules, '[]'::jsonb)) slot
+         WHERE TRIM(LOWER(COALESCE(slot->>'room', ''))) = TRIM(LOWER($1))
+       )
+  `, [existing.name]);
+
+  if (assignedBatches.length > 0) {
+    const names = assignedBatches.map(b => `"${b.name}"`).join(', ');
+    throw new Error(
+      `Cannot delete room "${existing.name}": It is currently assigned to ${assignedBatches.length} batch(es) (${names}). Reassign or delete the batch(es) before deleting this room.`
+    );
+  }
+
+  await query('DELETE FROM public.rooms WHERE id = $1', [existing.id]);
   return true;
 }
 
@@ -762,13 +789,41 @@ export async function updateRoom(id: string, name: string, capacity?: number): P
 
   if (!room) throw new Error('Failed to update room');
 
-  // Also update batch room_or_hall if it matched existing room name
-  if (existing.name !== trimmed) {
+  // Also update batch room_or_hall and schedules if room name changed
+  if (existing.name.toLowerCase() !== trimmed.toLowerCase()) {
+    // 1. Update batch room_or_hall
     await query(`
       UPDATE public.batches
       SET room_or_hall = $1
-      WHERE room_or_hall = $2
+      WHERE TRIM(LOWER(room_or_hall)) = TRIM(LOWER($2))
     `, [trimmed, existing.name]);
+
+    // 2. Update schedules JSON in batches
+    try {
+      await query(`
+        UPDATE public.batches
+        SET schedules = (
+          SELECT jsonb_agg(
+            CASE 
+              WHEN TRIM(LOWER(slot->>'room')) = TRIM(LOWER($2)) 
+              THEN jsonb_set(slot, '{room}', to_jsonb($1::text))
+              ELSE slot
+            END
+          )
+          FROM jsonb_array_elements(COALESCE(schedules, '[]'::jsonb)) slot
+        )
+        WHERE schedules IS NOT NULL AND schedules::text ILIKE '%' || $2 || '%';
+      `, [trimmed, existing.name]);
+    } catch (_) {}
+
+    // 3. Update tally classes
+    try {
+      await query(`
+        UPDATE public.tally_classes
+        SET room_or_hall = $1
+        WHERE TRIM(LOWER(room_or_hall)) = TRIM(LOWER($2))
+      `, [trimmed, existing.name]);
+    } catch (_) {}
   }
 
   return room;

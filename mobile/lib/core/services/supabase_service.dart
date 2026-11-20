@@ -839,7 +839,7 @@ class SupabaseService {
           'batches': {
             'id': b['id'],
             'name': b['name'],
-            'room_or_hall': b['room_or_hall'] ?? 'Natya Mandapam (Room 101)',
+            'room_or_hall': b['room_or_hall'] ?? '',
             'max_capacity': b['max_capacity'] ?? 20,
             'enrolled_count': enrolledCount,
             'courses': {
@@ -879,7 +879,7 @@ class SupabaseService {
                   'batches': {
                     'id': bId,
                     'name': tc['batch_name'] ?? 'Batch',
-                    'room_or_hall': tc['room_or_hall'] ?? 'Natya Mandapam (Room 101)',
+                    'room_or_hall': tc['room_or_hall'] ?? '',
                     'max_capacity': 20,
                     'enrolled_count': tc['students_count'] ?? 15,
                     'courses': {
@@ -1020,7 +1020,7 @@ class SupabaseService {
             'batch_name': prof['batch'] ?? 'Batch A',
             'batch_id': 'batch-current',
             'timings': prof['timings'] ?? 'Mon, Wed, Fri • 17:00 - 18:30',
-            'room': prof['room_or_hall'] ?? 'Natya Mandapam (Room 101)',
+            'room': prof['room_or_hall'] ?? '',
             'start_date': '01 Jan 2026',
             'status': 'Active',
             'fee': '₹${prof['total_monthly_fee'] ?? 2000} / month',
@@ -1035,28 +1035,7 @@ class SupabaseService {
       }
     }
 
-    return [
-      {
-        'id': 'c-1',
-        'title': 'Bharathanatyam',
-        'telugu_name': 'Classical Indian Dance',
-        'category': 'Classical Dance',
-        'trainer_name': 'Guru Smt. Nandana',
-        'batch_name': 'Batch A (Beginners)',
-        'batch_id': 'batch-201',
-        'timings': 'Mon, Wed, Fri • 17:00 - 18:30',
-        'room': 'Natya Mandapam (Room 101)',
-        'start_date': '01 Jan 2026',
-        'status': 'Active',
-        'fee': '₹2,500 / month',
-        'attendance_rate': 92,
-        'month_attendance': '92% (11/12 classes)',
-        'month_attended': 11,
-        'month_total': 12,
-        'syllabus_covered': 'Adavu Steps 1-8, Alarippu rhythm bols',
-        'dress_code': 'Practice Saree or Salwar with Dupatta firmly pinned',
-      }
-    ];
+    return [];
   }
 
   Future<List<Map<String, dynamic>>> getStudentSchedule() async {
@@ -1080,7 +1059,7 @@ class SupabaseService {
         final batchName = c['batch_name']?.toString() ?? 'Batch';
         final batchId = c['batch_id']?.toString() ?? 'b-$idx';
         final trainer = c['trainer_name']?.toString() ?? 'Assigned Guru';
-        final room = c['room']?.toString() ?? 'Natya Mandapam (Room 101)';
+        final room = c['room']?.toString() ?? '';
         final timings = c['timings']?.toString() ?? '05:00 PM - 06:30 PM';
 
         // Extract days

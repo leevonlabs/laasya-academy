@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Room } from '@/lib/academy';
+import { Room, Batch } from '@/lib/academy';
 import { DoorOpen, ChevronDown, Search, Plus, Check, Loader2, X, Trash2 } from 'lucide-react';
 
 export interface SearchableRoomSelectProps {
   value: string;
   onChange: (roomName: string, capacity?: number) => void;
   rooms: Room[];
+  batches?: Batch[];
   onRoomCreated?: (newRoom: Room) => void;
   onRoomDeleted?: (roomId: string) => void;
   placeholder?: string;
@@ -18,6 +19,7 @@ export default function SearchableRoomSelect({
   value,
   onChange,
   rooms,
+  batches,
   onRoomCreated,
   onRoomDeleted,
   placeholder = 'Select a classroom or hall...',
@@ -99,6 +101,18 @@ export default function SearchableRoomSelect({
 
   const handleDeleteRoom = async (roomId: string, roomName: string, e: React.MouseEvent) => {
     e.stopPropagation();
+
+    if (batches && batches.length > 0) {
+      const assigned = batches.filter(b => 
+        b.room_or_hall?.toLowerCase().trim() === roomName.toLowerCase().trim() ||
+        (b.schedules && b.schedules.some(s => s.room?.toLowerCase().trim() === roomName.toLowerCase().trim()))
+      );
+      if (assigned.length > 0) {
+        alert(`Cannot delete room "${roomName}": It is currently assigned to ${assigned.length} batch(es) (${assigned.map(b => b.name).join(', ')}). Reassign the batch(es) before deleting.`);
+        return;
+      }
+    }
+
     if (!confirm(`Are you sure you want to delete room "${roomName}"?`)) {
       return;
     }
@@ -239,6 +253,10 @@ export default function SearchableRoomSelect({
             {filteredRooms.length > 0 ? (
               filteredRooms.map((r) => {
                 const isSelected = value?.toLowerCase().trim() === r.name.toLowerCase().trim();
+                const isAssigned = batches && batches.some(b => 
+                  b.room_or_hall?.toLowerCase().trim() === r.name.toLowerCase().trim() ||
+                  (b.schedules && b.schedules.some(s => s.room?.toLowerCase().trim() === r.name.toLowerCase().trim()))
+                );
                 return (
                   <div
                     key={r.id}
@@ -265,14 +283,25 @@ export default function SearchableRoomSelect({
                         {r.capacity || 25} seats
                       </span>
                       {isSelected && <Check className="w-3.5 h-3.5 text-[#8A064D]" />}
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteRoom(r.id, r.name, e)}
-                        title={`Delete ${r.name}`}
-                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {isAssigned ? (
+                        <button
+                          type="button"
+                          disabled={true}
+                          title="Cannot delete: Room is currently assigned to active batch(es)"
+                          className="p-1 text-gray-300 cursor-not-allowed rounded"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteRoom(r.id, r.name, e)}
+                          title={`Delete ${r.name}`}
+                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

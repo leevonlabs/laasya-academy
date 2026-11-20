@@ -160,6 +160,18 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   };
 
   const handleHeaderDeleteRoom = async (roomId: string, roomName: string) => {
+    // Check if the room is assigned to any batch
+    const assignedBatches = batches.filter(b => 
+      b.room_or_hall?.toLowerCase().trim() === roomName.toLowerCase().trim() ||
+      (b.schedules && b.schedules.some(s => s.room?.toLowerCase().trim() === roomName.toLowerCase().trim()))
+    );
+
+    if (assignedBatches.length > 0) {
+      const names = assignedBatches.map(b => `"${b.name}"`).join(', ');
+      showFeedback('error', `Cannot delete room "${roomName}": It is currently assigned to ${assignedBatches.length} batch(es) (${names}). Reassign the batch(es) before deleting.`);
+      return;
+    }
+
     if (!confirm(`Are you sure you want to delete room "${roomName}"?`)) {
       return;
     }
@@ -198,7 +210,21 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update room');
       setRooms(prev => prev.map(r => r.id === editingRoom.id ? data.room : r).sort((a, b) => a.name.localeCompare(b.name)));
-      setBatches(prev => prev.map(b => (b.room === editingRoom.name || b.room_or_hall === editingRoom.name) ? { ...b, room: trimmed, room_or_hall: trimmed } : b));
+      setBatches(prev => prev.map(b => {
+        const matchesRoomOrHall = b.room_or_hall?.toLowerCase().trim() === editingRoom.name.toLowerCase().trim() ||
+                                  b.room?.toLowerCase().trim() === editingRoom.name.toLowerCase().trim();
+        const updatedSchedules = b.schedules?.map(s => 
+          s.room?.toLowerCase().trim() === editingRoom.name.toLowerCase().trim()
+            ? { ...s, room: trimmed }
+            : s
+        );
+        return {
+          ...b,
+          room: matchesRoomOrHall ? trimmed : b.room,
+          room_or_hall: matchesRoomOrHall ? trimmed : b.room_or_hall,
+          schedules: updatedSchedules || b.schedules
+        };
+      }));
       setEditingRoom(null);
       showFeedback('success', `Room "${trimmed}" updated successfully!`);
     } catch (err: any) {
@@ -293,12 +319,12 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
   const [addMonthlyFee, setAddMonthlyFee] = useState<string>('');
   const [addGstPercent, setAddGstPercent] = useState<string>('18');
   const [addDescription, setAddDescription] = useState('');
-  const [addRoom, setAddRoom] = useState('Natya Mandapam (Room 101)');
+  const [addRoom, setAddRoom] = useState(rooms[0]?.name || '');
   const [addCapacity, setAddCapacity] = useState(25);
   const [addIsActive, setAddIsActive] = useState(true);
   const [addSaveConflictError, setAddSaveConflictError] = useState<string | null>(null);
   const [addSchedules, setAddSchedules] = useState<ScheduleEntry[]>([
-    { day: 'Monday', startTime: '09:00', endTime: '10:00', room: 'Natya Mandapam (Room 101)' }
+    { day: 'Monday', startTime: '09:00', endTime: '10:00', room: rooms[0]?.name || '' }
   ]);
 
   // When opening Add Modal - clean blank state with no drafted autofill
@@ -312,12 +338,12 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     setAddMonthlyFee('');
     setAddGstPercent('18');
     setAddDescription('');
-    setAddRoom(rooms[0]?.name || 'Natya Mandapam (Room 101)');
+    setAddRoom(rooms[0]?.name || '');
     setAddCapacity(25);
     setAddIsActive(true);
     setAddSaveConflictError(null);
     setAddSchedules([
-      { day: 'Monday', startTime: '09:00', endTime: '10:00', room: rooms[0]?.name || 'Natya Mandapam (Room 101)' }
+      { day: 'Monday', startTime: '09:00', endTime: '10:00', room: rooms[0]?.name || '' }
     ]);
     setIsAddOpen(true);
   };
@@ -363,7 +389,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
     setEditMonthlyFee(batch.monthly_fee !== undefined ? String(batch.monthly_fee) : '0');
     setEditGstPercent(batch.gst_percent !== undefined ? String(batch.gst_percent) : '18');
     setEditDescription(batch.description || '');
-    setEditRoom(batch.room_or_hall || 'Natya Mandapam (Room 101)');
+    setEditRoom(batch.room_or_hall || (rooms[0]?.name || ''));
     setEditCapacity(batch.max_capacity || 25);
     setEditIsActive(batch.is_active ?? true);
 
@@ -372,7 +398,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
         day: s.day,
         startTime: s.startTime ? s.startTime.substring(0, 5) : '09:00',
         endTime: s.endTime ? s.endTime.substring(0, 5) : '10:00',
-        room: s.room || batch.room_or_hall || (rooms[0]?.name || 'Natya Mandapam (Room 101)')
+        room: s.room || batch.room_or_hall || (rooms[0]?.name || '')
       })));
     } else {
       const sTime = batch.start_time ? batch.start_time.substring(0, 5) : '09:00';
@@ -385,7 +411,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
         day: d,
         startTime: sTime,
         endTime: eTime,
-        room: batch.room_or_hall || (rooms[0]?.name || 'Natya Mandapam (Room 101)')
+        room: batch.room_or_hall || (rooms[0]?.name || '')
       })));
     }
   };
@@ -396,7 +422,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
       day: 'Friday',
       startTime: '14:00',
       endTime: '15:00',
-      room: rooms[0]?.name || 'Natya Mandapam (Room 101)'
+      room: rooms[0]?.name || ''
     };
     if (mode === 'add') {
       setAddSchedules(prev => [...prev, newEntry]);
@@ -644,7 +670,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
       const distinctDays = Array.from(new Set(addSchedules.map(s => s.day)));
       const primaryStart = addSchedules[0]?.startTime ? `${addSchedules[0].startTime}:00` : '09:00:00';
       const primaryEnd = addSchedules[0]?.endTime ? `${addSchedules[0].endTime}:00` : '10:00:00';
-      const primaryRoom = addSchedules[0]?.room || addRoom.trim() || 'Natya Mandapam (Room 101)';
+      const primaryRoom = addSchedules[0]?.room || addRoom.trim() || (rooms[0]?.name || '');
 
       const finalBatchCode = (addBatchCode.trim() || getNextSequentialBatchCode(addCourseId, batches)).toLowerCase();
       const res = await fetch('/api/batches', {
@@ -717,7 +743,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
       const distinctDays = Array.from(new Set(editSchedules.map(s => s.day)));
       const primaryStart = editSchedules[0]?.startTime ? `${editSchedules[0].startTime}:00` : '09:00:00';
       const primaryEnd = editSchedules[0]?.endTime ? `${editSchedules[0].endTime}:00` : '10:00:00';
-      const primaryRoom = editSchedules[0]?.room || editRoom.trim() || 'Natya Mandapam (Room 101)';
+      const primaryRoom = editSchedules[0]?.room || editRoom.trim() || (rooms[0]?.name || '');
       const finalEditCode = editBatchCode.trim().toLowerCase();
 
       const res = await fetch('/api/batches', {
@@ -1058,7 +1084,11 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                   {rooms
                     .filter(r => r.name.toLowerCase().includes(roomHeaderSearch.toLowerCase()))
                     .map((r) => {
-                      const roomBatches = batches.filter(b => b.room_or_hall?.toLowerCase().trim() === r.name.toLowerCase().trim());
+                      const roomBatches = batches.filter(b => 
+                        b.room_or_hall?.toLowerCase().trim() === r.name.toLowerCase().trim() ||
+                        (b.schedules && b.schedules.some(s => s.room?.toLowerCase().trim() === r.name.toLowerCase().trim()))
+                      );
+                      const isAssigned = roomBatches.length > 0;
                       return (
                         <div
                           key={r.id}
@@ -1069,9 +1099,12 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                             <p className="text-[10px] text-gray-400">Capacity: {r.capacity || 25} seats</p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                              isAssigned ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-gray-100 text-gray-600'
+                            }`}>
                               {roomBatches.length} {roomBatches.length === 1 ? 'batch' : 'batches'}
                             </span>
+                            {/* Edit room is always allowed */}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1085,17 +1118,29 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleHeaderDeleteRoom(r.id, r.name);
-                              }}
-                              title={`Delete ${r.name}`}
-                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {/* Deletion locked when assigned to batches */}
+                            {isAssigned ? (
+                              <button
+                                type="button"
+                                disabled={true}
+                                title={`Cannot delete: Assigned to ${roomBatches.length} batch(es) (${roomBatches.map(b => b.name).join(', ')}). Reassign or delete the batch(es) first.`}
+                                className="p-1 text-gray-300 cursor-not-allowed rounded-lg"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleHeaderDeleteRoom(r.id, r.name);
+                                }}
+                                title={`Delete ${r.name}`}
+                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -1989,6 +2034,9 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                           onChange={(e) => updateScheduleRow(idx, 'room', e.target.value, 'add')}
                           className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
                         >
+                          {rooms.length === 0 && (
+                            <option value="">No rooms configured</option>
+                          )}
                           {rooms.map(r => (
                             <option key={r.id} value={r.name}>{r.name}</option>
                           ))}
@@ -2021,6 +2069,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                     if (rCap) setAddCapacity(rCap);
                   }}
                   rooms={rooms}
+                  batches={batches}
                   onRoomCreated={(newRoom) => {
                     setRooms(prev => [...prev.filter(r => r.id !== newRoom.id), newRoom].sort((a, b) => a.name.localeCompare(b.name)));
                     setAddRoom(newRoom.name);
@@ -2303,6 +2352,9 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                           onChange={(e) => updateScheduleRow(idx, 'room', e.target.value, 'edit')}
                           className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
                         >
+                          {rooms.length === 0 && (
+                            <option value="">No rooms configured</option>
+                          )}
                           {rooms.map(r => (
                             <option key={r.id} value={r.name}>{r.name}</option>
                           ))}
@@ -2335,6 +2387,7 @@ export default function BatchesListClient({ initialBatches, courses, trainers, i
                     if (rCap) setEditCapacity(rCap);
                   }}
                   rooms={rooms}
+                  batches={batches}
                   onRoomCreated={(newRoom) => {
                     setRooms(prev => [...prev.filter(r => r.id !== newRoom.id), newRoom].sort((a, b) => a.name.localeCompare(b.name)));
                     setEditRoom(newRoom.name);

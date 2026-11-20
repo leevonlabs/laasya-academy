@@ -662,7 +662,7 @@ export default function TallyClassesClient({
 
     setCreateRescheduledDate(initialDate);
     const batchObj = batches.find(b => b.id === item.batchId);
-    setCreateSelectedRoom(batchObj?.room_or_hall || rooms[0]?.name || 'Natya Mandapam (Room 101)');
+    setCreateSelectedRoom(batchObj?.room_or_hall || rooms[0]?.name || '');
     setCreateStartTime(batchObj?.start_time ? batchObj.start_time.substring(0, 5) : '10:00');
     setCreateEndTime(batchObj?.end_time ? batchObj.end_time.substring(0, 5) : '11:00');
     setCreateReason(`Compensation class for ${item.cause === 'Holiday' ? 'Admin Declared Holiday' : 'Guru Absence'}: ${item.holidayTitle || item.reason} on ${item.date}`);
@@ -1428,12 +1428,7 @@ export default function TallyClassesClient({
                       <option key={r.id} value={r.name}>{r.name} (Capacity: {r.capacity})</option>
                     ))}
                     {rooms.length === 0 && (
-                      <>
-                        <option value="Natya Mandapam (Room 101)">Natya Mandapam (Room 101)</option>
-                        <option value="Sangeetha Shala (Room 102)">Sangeetha Shala (Room 102)</option>
-                        <option value="Chitra Kuteera (Room 103)">Chitra Kuteera (Room 103)</option>
-                        <option value="Yogasana Shala (Room 104)">Yogasana Shala (Room 104)</option>
-                      </>
+                      <option value="" disabled>No rooms configured (Add rooms in Batches first)</option>
                     )}
                   </select>
                 </div>

@@ -290,7 +290,7 @@ export default function TimetableView({ onBack, batches, tallyClasses: initialTa
     if (match && (match.room_or_hall || match.room)) {
       return (match.room_or_hall || match.room || '').trim();
     }
-    return 'Room 1 (Natya Mandapam)';
+    return 'Assigned Room';
   };
 
   // Dynamic trainer resolution: Reads live database faculty assignment

@@ -7,7 +7,7 @@ export async function GET() {
     const rooms = await getRooms();
     return NextResponse.json({ rooms });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
 
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     const room = await createRoom(name.trim(), capacity ? Number(capacity) : 25);
     return NextResponse.json({ room });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
 
@@ -48,7 +48,7 @@ export async function PUT(req: Request) {
     const room = await updateRoom(id, name.trim(), capacity !== undefined ? Number(capacity) : undefined);
     return NextResponse.json({ room, success: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
 
@@ -75,6 +75,6 @@ export async function DELETE(req: Request) {
     await deleteRoom(id);
     return NextResponse.json({ success: true, id });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
