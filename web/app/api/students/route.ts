@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const student = await createStudent(body);
     return NextResponse.json(student);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
 
@@ -42,7 +42,7 @@ export async function PUT(req: Request) {
     const student = await updateStudent(id, data);
     return NextResponse.json(student);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
 
@@ -65,6 +65,6 @@ export async function DELETE(req: Request) {
     const deleted = await deleteStudent(id);
     return NextResponse.json(deleted);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }

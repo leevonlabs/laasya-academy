@@ -792,6 +792,10 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
   // Register New Student
   const handleRegisterStudent = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!phone.trim()) {
+      alert('Primary contact phone number is required to register a Student.');
+      return;
+    }
     setSavingNew(true);
 
     try {
@@ -896,6 +900,10 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent) return;
+    if (!editPhone.trim()) {
+      alert('Primary contact phone number is required to update a Student.');
+      return;
+    }
     setSavingEdit(true);
 
     try {
@@ -3357,7 +3365,9 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
               {/* Row 4: Phone & Joining Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Student Contact Number</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Student Contact Number <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="tel"
                     required
@@ -3658,7 +3668,9 @@ export default function StudentsListClient({ initialStudents, batches, courses, 
               {/* Row 4: Contact Number & Joining Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Contact Number</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Contact Number <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="tel"
                     required

@@ -337,6 +337,10 @@ export default function TrainersListClient({
       alert('Please select at least one course / discipline for this Guru.');
       return;
     }
+    if (!addPhone.trim()) {
+      alert('Primary phone number is required. Please specify a valid contact number.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -416,6 +420,10 @@ export default function TrainersListClient({
     }
     if (!editGender) {
       alert('Gender is required. Please select a gender.');
+      return;
+    }
+    if (!editPhone.trim()) {
+      alert('Primary phone number is required. Please specify a valid contact number.');
       return;
     }
 
@@ -894,9 +902,12 @@ export default function TrainersListClient({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Primary Phone</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Primary Phone <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="tel"
+                    required
                     placeholder="+91 98765 43210"
                     value={addPhone}
                     onChange={(e) => setAddPhone(e.target.value)}
@@ -1306,9 +1317,12 @@ export default function TrainersListClient({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">Primary Phone</label>
+                  <label className="block text-xs font-black text-[#590231] uppercase tracking-wide mb-1.5">
+                    Primary Phone <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="tel"
+                    required
                     placeholder="+91 98765 43210"
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}

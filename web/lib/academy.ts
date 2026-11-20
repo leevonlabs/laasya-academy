@@ -490,27 +490,79 @@ export async function assertUniqueContactNumber(contact?: string | null, exclude
   if (!trimmed) return;
   const digits = trimmed.replace(/\D/g, '');
   if (!digits || digits.length < 5) return;
-  const suffix = digits.slice(-10);
+  const core10 = digits.length >= 10 ? digits.slice(-10) : digits;
 
+  // Search across profiles (primary phone, alternate_phone), students (parent_contact, emergency_contact), and trainers (alternate_phone)
   const sql = `
-    SELECT id, full_name, role, phone 
-    FROM public.profiles 
+    SELECT 
+      p.id, 
+      p.full_name, 
+      p.role, 
+      p.phone,
+      s.roll_number,
+      t.guru_id
+    FROM public.profiles p
+    LEFT JOIN public.students s ON s.profile_id = p.id
+    LEFT JOIN public.trainers t ON t.profile_id = p.id
     WHERE (
-      phone = $1 
-      OR alternate_phone = $1
-      OR regexp_replace(COALESCE(phone, ''), '\\D', '', 'g') = $2
-      OR regexp_replace(COALESCE(phone, ''), '\\D', '', 'g') LIKE '%' || $3
+      -- Check primary phone
+      (
+        LENGTH(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g')) >= 10 
+        AND RIGHT(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g'), 10) = $1
+      )
+      OR
+      (
+        LENGTH(regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g')) >= 5
+        AND regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = $2
+      )
+      -- Check alternate phone on profile
+      OR
+      (
+        LENGTH(regexp_replace(COALESCE(p.alternate_phone, ''), '\\D', '', 'g')) >= 10 
+        AND RIGHT(regexp_replace(COALESCE(p.alternate_phone, ''), '\\D', '', 'g'), 10) = $1
+      )
+      OR
+      (
+        LENGTH(regexp_replace(COALESCE(p.alternate_phone, ''), '\\D', '', 'g')) >= 5
+        AND regexp_replace(COALESCE(p.alternate_phone, ''), '\\D', '', 'g') = $2
+      )
+      -- Check alternate phone on trainer
+      OR
+      (
+        LENGTH(regexp_replace(COALESCE(t.alternate_phone, ''), '\\D', '', 'g')) >= 10 
+        AND RIGHT(regexp_replace(COALESCE(t.alternate_phone, ''), '\\D', '', 'g'), 10) = $1
+      )
+      -- Check parent contact on student
+      OR
+      (
+        LENGTH(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g')) >= 10 
+        AND RIGHT(regexp_replace(COALESCE(s.parent_contact, ''), '\\D', '', 'g'), 10) = $1
+      )
+      -- Check emergency contact on student
+      OR
+      (
+        LENGTH(regexp_replace(COALESCE(s.emergency_contact, ''), '\\D', '', 'g')) >= 10 
+        AND RIGHT(regexp_replace(COALESCE(s.emergency_contact, ''), '\\D', '', 'g'), 10) = $1
+      )
     )
-    ${excludeProfileId ? 'AND id != $4' : ''}
+    ${excludeProfileId ? 'AND p.id != $3' : ''}
     LIMIT 1;
   `;
-  const params = excludeProfileId ? [trimmed, digits, suffix, excludeProfileId] : [trimmed, digits, suffix];
-  const rows = await query<{ id: string; full_name: string; role: string; phone: string }>(sql, params);
+
+  const params = excludeProfileId ? [core10, digits, excludeProfileId] : [core10, digits];
+  const rows = await query<{ id: string; full_name: string; role: string; phone: string; roll_number?: string; guru_id?: string }>(sql, params);
 
   if (rows.length > 0) {
     const existing = rows[0];
-    const roleLabel = existing.role === 'trainer' ? 'Guru' : existing.role === 'student' ? 'Student' : 'User';
-    throw new Error(`Contact number "${trimmed}" is already registered with ${roleLabel} "${existing.full_name}". Every student and guru must have a unique contact number.`);
+    const roleLabel = existing.role === 'trainer'
+      ? `Guru ${existing.full_name}${existing.guru_id ? ` (${existing.guru_id})` : ''}`
+      : existing.role === 'student'
+      ? `Student ${existing.full_name}${existing.roll_number ? ` (${existing.roll_number})` : ''}`
+      : `User ${existing.full_name} (${existing.role})`;
+
+    throw new Error(
+      `Contact number "${trimmed}" is already registered with ${roleLabel}. Duplicate contact numbers are not allowed across students and gurus.`
+    );
   }
 }
 
@@ -545,11 +597,14 @@ export async function createTrainer(data: {
   const cleanEmail = (data.email && data.email.trim())
     ? data.email.toLowerCase().trim()
     : `${data.full_name.toLowerCase().replace(/[^a-z0-9]/g, '') || 'guru'}@laasyaacademy.com`;
-  const cleanPhone = data.phone?.trim() || '+91 8151 998 899';
+  if (!data.phone || !data.phone.trim()) {
+    throw new Error('Primary contact phone number is required to register a Guru.');
+  }
+  const cleanPhone = data.phone.trim();
   const cleanAlternatePhone = data.alternate_phone?.trim() || null;
 
-  // Enforce unique contact numbers for Gurus
-  if (data.phone) await assertUniqueContactNumber(data.phone);
+  // Enforce unique contact numbers for Gurus across both Gurus and Students
+  await assertUniqueContactNumber(cleanPhone);
   if (cleanAlternatePhone) await assertUniqueContactNumber(cleanAlternatePhone);
 
   const displayTitle = data.display_title?.trim() || 'Revered Guru & Mentor';
@@ -1126,8 +1181,17 @@ export async function createStudent(data: {
   }
   const rollNumber = `LCA-${maxId + 1}`;
 
-  // Enforce unique contact numbers for Students
-  if (data.phone) await assertUniqueContactNumber(data.phone);
+  if (!data.phone || !data.phone.trim()) {
+    throw new Error('Primary contact phone number is required to register a Student.');
+  }
+  const cleanPhone = data.phone.trim();
+  const cleanParentContact = data.parent_contact?.trim() || cleanPhone;
+
+  // Enforce unique contact numbers for Students across both Students and Gurus
+  await assertUniqueContactNumber(cleanPhone);
+  if (cleanParentContact && cleanParentContact !== cleanPhone) {
+    await assertUniqueContactNumber(cleanParentContact);
+  }
 
   const cleanEmail = data.email.toLowerCase().trim();
 
@@ -1263,6 +1327,9 @@ export async function updateStudent(id: string, data: {
 
   // Enforce unique contact numbers on update
   if (data.phone) await assertUniqueContactNumber(data.phone, current.profile_id);
+  if (data.parent_contact && data.parent_contact.trim() && data.parent_contact.trim() !== data.phone?.trim()) {
+    await assertUniqueContactNumber(data.parent_contact, current.profile_id);
+  }
 
   const calculatedAge = data.date_of_birth ? Math.max(1, Math.floor((new Date().getTime() - new Date(data.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))) : undefined;
   const age = data.age !== undefined ? (data.age ? Number(data.age) : null) : calculatedAge;

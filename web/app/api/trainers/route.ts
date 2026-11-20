@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     const trainer = await createTrainer(body);
     return NextResponse.json(trainer);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
 
@@ -68,7 +68,7 @@ export async function PUT(req: Request) {
     const updated = await updateTrainer(id, data);
     return NextResponse.json(updated);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
 
@@ -87,6 +87,6 @@ export async function DELETE(req: Request) {
     const deleted = await deleteTrainer(id);
     return NextResponse.json({ success: true, deleted });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
